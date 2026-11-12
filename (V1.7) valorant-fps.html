@@ -589,8 +589,9 @@
         
         .fps-display {
             position: absolute;
-            top: 14px;
-            left: 210px;
+            /* V1.7: under the minimap; at left 210 it covered the [F1]/[F2] mode buttons */
+            top: 224px;
+            left: 14px;
             background-color: rgba(15, 25, 35, 0.72);
             border: 1px solid rgba(255, 255, 255, 0.15);
             color: white;
@@ -676,8 +677,8 @@
         
         .quality-toggle {
             position: absolute;
-            top: 42px;
-            left: 210px;
+            top: 252px;
+            left: 14px;
             background-color: rgba(15, 25, 35, 0.78);
             color: white;
             padding: 4px 10px;
@@ -835,6 +836,43 @@
             outline: 2px solid #38f6ff !important;
             outline-offset: 2px;
             box-shadow: 0 0 12px rgba(56, 246, 255, 0.55) !important;
+        }
+
+        /* V1.7: on narrow windows the centred top bar ran under the minimap */
+        @media (max-width: 1180px) {
+            #tactical-top-bar { transform: translateX(-50%) scale(0.8); transform-origin: top center; }
+        }
+        @media (max-width: 960px) {
+            #tactical-top-bar { transform: translateX(-50%) scale(0.66); transform-origin: top center; }
+        }
+
+        /* V1.7: collapsed controls help */
+        .controls-hint-box.collapsed {
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+        }
+        .controls-hint-pill {
+            position: absolute;
+            top: 356px;
+            left: 14px;
+            z-index: 900;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #e2e8f0;
+            background: rgba(10, 16, 24, 0.72);
+            border: 1px solid rgba(56, 246, 255, 0.35);
+            border-left: 3px solid #ff4655;
+            border-radius: 3px;
+            cursor: pointer;
+            pointer-events: auto;
+            opacity: 0;
+            transition: opacity 0.6s;
+        }
+        .controls-hint-pill.visible {
+            opacity: 0.85;
         }
 
         .ability-key {
@@ -1054,8 +1092,12 @@
 
         .controls-hint-box {
             position: absolute;
-            top: 222px;
+            /* V1.7: left column under the minimap + FPS cluster, never wider than the
+               space left of the centred agent/ability bar; collapses after 12 s */
+            top: 356px;
             left: 14px;
+            max-width: calc(50vw - 260px); /* the agent bar starts at 50vw - 217px */
+            transition: opacity 0.6s, transform 0.6s;
             background: rgba(15, 25, 35, 0.74);
             border: 1px solid rgba(255, 255, 255, 0.16);
             border-left: 3px solid #ff4655;
@@ -2466,8 +2508,8 @@
         /* Top-Left Live FPS & Frame-Time Sparkline Widget */
         .fps-sparkline-widget {
             position: absolute;
-            top: 72px;
-            left: 210px;
+            top: 282px;
+            left: 14px;
             width: 190px;
             background: rgba(11, 18, 28, 0.82);
             border: 1px solid rgba(56, 246, 255, 0.25);
@@ -4280,8 +4322,8 @@
 
                 <div class="settings-modal-footer">
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                        <button class="settings-footer-btn" id="settings-ls-toggle-btn" title="Off by default. Click to enable saving settings to browser localStorage.">
-                            💾 BROWSER STORAGE (LOCALSTORAGE): OFF
+                        <button class="settings-footer-btn ls-active" id="settings-ls-toggle-btn" title="On by default: settings are saved in this browser. Click to stop saving and clear them.">
+                            💾 SAVE SETTINGS IN THIS BROWSER: ON (CLICK TO DISABLE)
                         </button>
                         <button class="settings-footer-btn" id="settings-reset-btn" title="Restore all Video, FPS, Crosshair, Controls, and Audio settings to factory defaults">
                             ↺ RESET TO DEFAULTS
@@ -4408,7 +4450,7 @@
             <div><b>[1-4]</b> Arsenal &nbsp;|&nbsp; <b>[V]</b> Vandal/Phantom/Bulldog/Judge • Operator/Outlaw/Marshal • Sheriff/Classic/Frenzy &nbsp;|&nbsp; <b>[Y]</b> Inspect</div>
             <div><b>[P]</b> Settings &amp; FPS &nbsp;|&nbsp; <b>[K/N]</b> Rank &amp; Combat Report &nbsp;|&nbsp; <b>[G]</b> 29 Agents &nbsp;|&nbsp; <b>[B]</b> Buy &nbsp;|&nbsp; <b>[F4]</b> 6 Maps &nbsp;|&nbsp; <b>[F5/F6]</b> Bot &amp; Wingman AI</div>
             <div><b>[F]</b> Plant/Defuse Spike, Orbs, Lotus Stone Doors &amp; Split Ziplines &nbsp;|&nbsp; <b>[T / Mid-Click]</b> 3D Ping &nbsp;|&nbsp; <b>[Click Radar]</b> Sky-Smoke / Ping</div>
-            <div><b>[C] [Q] [E] [X]</b> Abilities &nbsp;|&nbsp; <b>[F2/F3]</b> Range / Retake &nbsp;|&nbsp; <b>[Ctrl/Z]</b> Crouch &nbsp;|&nbsp; <b>[TAB]</b> Cycle 29 Agents</div>
+            <div><b>[C] [Q] [E] [X]</b> Abilities &nbsp;|&nbsp; <b>[F2/F3]</b> Range / Retake &nbsp;|&nbsp; <b>[Ctrl/Z]</b> Crouch &nbsp;|&nbsp; <b>[TAB]</b> Cycle 29 Agents &nbsp;|&nbsp; <b>[I]</b> Hide this help</div>
         </div>
     </div>
 
@@ -4962,7 +5004,7 @@
         const perfOverlayEnabled = /perf/i.test(location.hash) || /[?&]perf\b/i.test(location.search);
         if (perfOverlayEnabled) {
             fpsDisplay.style.whiteSpace = 'pre';
-            qualityToggle.style.top = '90px';
+            qualityToggle.style.top = '318px';
         }
         
         function countActive(pool) {
@@ -10331,6 +10373,9 @@
                 case 'KeyO': // Toggle quality setting
                     cycleQualitySettings();
                     break;
+                case 'KeyI': // V1.7: show/hide the controls help
+                    if (!event.repeat) controlsHelp.toggle();
+                    break;
             }
         });
         
@@ -10383,6 +10428,53 @@
             }
         });
 
+        // =============================================
+        // V1.7 Controls help: shown for the first 12 s of play, then collapsed to a
+        // small "[I] Controls" pill. I (or clicking the pill) toggles it. The HUD
+        // "hints" setting still hides both.
+        // =============================================
+        const controlsHelp = {
+            AUTO_HIDE_MS: 12000,
+            box: null,
+            pill: null,
+            expanded: true,
+            timer: 0,
+            init: function() {
+                this.box = document.getElementById('controls-hint-box');
+                if (!this.box) return;
+                this.pill = document.createElement('div');
+                this.pill.className = 'controls-hint-pill';
+                this.pill.id = 'controls-hint-pill';
+                this.pill.textContent = '[I] CONTROLS';
+                this.pill.addEventListener('mousedown', (e) => { e.stopPropagation(); this.toggle(); });
+                this.box.parentNode.appendChild(this.pill);
+                // Below 1280x720 the wrapped panel would reach the vitals panel: start collapsed
+                if (window.innerWidth < 1280 || window.innerHeight < 720) {
+                    this.expanded = false;
+                } else {
+                    this.timer = setTimeout(() => this.set(false), this.AUTO_HIDE_MS);
+                }
+                this.sync();
+            },
+            set: function(expanded) {
+                this.expanded = expanded;
+                if (this.timer) { clearTimeout(this.timer); this.timer = 0; }
+                this.sync();
+            },
+            toggle: function() {
+                this.set(!this.expanded);
+            },
+            sync: function() {
+                if (!this.box) return;
+                const allowed = !(game.userSettings && game.userSettings.showHints === false);
+                this.box.classList.toggle('collapsed', !this.expanded);
+                if (this.pill) {
+                    this.pill.style.display = allowed ? '' : 'none';
+                    this.pill.classList.toggle('visible', allowed && !this.expanded);
+                }
+            }
+        };
+        
         // =============================================
         // V1.7 Enemy footsteps (positional) and low-health warning
         // =============================================
@@ -31722,6 +31814,10 @@
         
         function takeDamage(amount, sourcePos = null) {
             const now = performance.now();
+            // V1.7 fix: already down and waiting to respawn. Without this, every hit
+            // during the 3 s respawn delay counted another death and queued another
+            // respawn timer.
+            if (game.health <= 0) return;
             // Invulnerability window during Jett/Phoenix dash phase or Reyna/Clove Dismiss intangibility
             if (characterController.dashTimer > 0 || (typeof agentSystem !== 'undefined' && now < agentSystem.reynaDismissUntil)) return;
 
@@ -32721,10 +32817,13 @@
                 const recCanvas = document.getElementById('recoil-trainer-canvas');
                 if (recCanvas) this.recoilCtx = recCanvas.getContext('2d');
 
-                // Privacy-first: localStorage is OFF by default unless user explicitly confirmed previously
+                // V1.7: settings are remembered by default. Only an explicit opt-out
+                // (the footer button, which stores consent 'false' and wipes the saved
+                // data) keeps storage off. Private modes where localStorage throws fall
+                // back to off.
                 let loadedFromStorage = false;
                 try {
-                    const hasConsent = localStorage.getItem(this.LS_CONSENT_KEY) === 'true';
+                    const hasConsent = localStorage.getItem(this.LS_CONSENT_KEY) !== 'false';
                     if (hasConsent) {
                         const raw = localStorage.getItem(this.LS_DATA_KEY);
                         if (raw) {
@@ -32768,8 +32867,9 @@
 
             wipeStorage: function() {
                 try {
-                    localStorage.removeItem(this.LS_CONSENT_KEY);
                     localStorage.removeItem(this.LS_DATA_KEY);
+                    // Remember the opt-out itself, so saving stays off on the next visit
+                    localStorage.setItem(this.LS_CONSENT_KEY, 'false');
                 } catch (err) {}
             },
 
@@ -33442,7 +33542,7 @@
                             this.wipeStorage();
                             if (lsConfirmBanner) lsConfirmBanner.classList.remove('visible');
                             this.syncLocalStorageBtnUI();
-                            showNotification('Browser Storage (localStorage) turned OFF & cleared', 2200);
+                            showNotification('Settings will no longer be saved (saved settings cleared)', 2200);
                         } else {
                             if (lsConfirmBanner) lsConfirmBanner.classList.add('visible');
                         }
@@ -33846,6 +33946,7 @@
 
                 if (minimapEl) minimapEl.style.display = cfg.showMinimap ? '' : 'none';
                 if (hintsEl) hintsEl.style.display = cfg.showHints ? '' : 'none';
+                if (typeof controlsHelp !== 'undefined') controlsHelp.sync();
                 if (floatingDmgLayer) floatingDmgLayer.style.display = cfg.showDamageNumbers ? '' : 'none';
                 if (recoilEl) recoilEl.classList.toggle('visible', !!cfg.showRecoilTrainer);
 
@@ -33854,13 +33955,14 @@
                     fpsDisplay.style.display = mode === 'off' ? 'none' : 'block';
                     fpsDisplay.style.whiteSpace = mode === 'detailed' ? 'pre' : 'nowrap';
                 }
+                // V1.7: cluster sits under the minimap (detailed mode is ~5 lines tall)
                 if (qualityToggle) {
                     qualityToggle.style.display = mode === 'off' ? 'none' : 'block';
-                    qualityToggle.style.top = mode === 'detailed' ? '92px' : '';
+                    qualityToggle.style.top = mode === 'detailed' ? '318px' : '';
                 }
                 if (sparkEl) {
                     sparkEl.style.display = (cfg.showSparkline && mode !== 'off') ? 'flex' : 'none';
-                    sparkEl.style.top = mode === 'detailed' ? '122px' : '72px';
+                    sparkEl.style.top = mode === 'detailed' ? '348px' : '282px';
                 }
             },
 
@@ -33937,8 +34039,8 @@
                 const on = !!(game.userSettings && game.userSettings.localStorageEnabled);
                 btn.classList.toggle('ls-active', on);
                 btn.textContent = on
-                    ? '💾 BROWSER STORAGE (LOCALSTORAGE): ON (CLICK TO DISABLE)'
-                    : '💾 BROWSER STORAGE (LOCALSTORAGE): OFF';
+                    ? '💾 SAVE SETTINGS IN THIS BROWSER: ON (CLICK TO DISABLE)'
+                    : '💾 SAVE SETTINGS IN THIS BROWSER: OFF (CLICK TO ENABLE)';
             },
 
             syncAllUI: function() {
@@ -35135,7 +35237,10 @@
                             const sx = (this._projVec.x * 0.5 + 0.5) * vw;
                             const sy = (-this._projVec.y * 0.5 + 0.5) * vh;
                             bot.hudEl.classList.add('visible');
-                            bot.hudEl.style.transform = `translate3d(${sx.toFixed(1)}px, ${sy.toFixed(1)}px, 0) translate(-50%, -100%)`;
+                            // V1.7: clamp so the label stays fully on screen (it was cut off at the edges)
+                            const cx = Math.max(80, Math.min(vw - 80, sx));
+                            const cy = Math.max(60, Math.min(vh - 10, sy));
+                            bot.hudEl.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0) translate(-50%, -100%)`;
                         }
                     }
                 }
@@ -35484,6 +35589,7 @@
             settingsManager.init();
             tacticalEnhancements.init();
             gamepadController.init();
+            controlsHelp.init();
             
             // Glow halo anchors: pooled ability cores, the spike core, ult orbs
             haloSystem.collectAbilityAnchors();

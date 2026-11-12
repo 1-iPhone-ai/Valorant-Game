@@ -18,6 +18,9 @@ The `tests/` folder holds headless browser tests. They need no GPU, because Chro
 - **Abilities:** every agent's abilities and ultimate cast, and ground effects stay circular.
 - **Maps and modes:** all 6 maps × 3 atmosphere modes.
 - **Controller:** input works through a simulated gamepad.
+- **Game modes:** Wave, Retake and the 30-bot Range play through planting, defusing, detonation, round changes and the range scorecard.
+- **HUD and settings:** the HUD has no overlapping panels at common window sizes, and settings survive a reload (and the opt-out sticks).
+- **Audio and hit feedback:** 3D enemy audio and hit feedback work.
 
 ```bash
 cd tests
