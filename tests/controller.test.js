@@ -110,29 +110,42 @@ test('PlayStation pad: detection, analog movement, look, fire, ADS, menus', { ti
 });
 
 test('Xbox pad is detected as Xbox (not PlayStation) and aim assist only slows', { timeout: 300000 }, async () => {
-    const { errors, frames, evaluate } = await bootWithPad('Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)');
+    const { errors, evaluate } = await bootWithPad('Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)');
     assert.equal(await evaluate(() => gamepadController.family), 'xbox');
-    const turn = async (assist) => {
-        await evaluate((assist) => {
+    // Aim assist is checked inside one synchronous page step: the enemy and
+    // camera are placed and look() is driven with a fixed stick input and
+    // frame time. (Driving it through real frames was timing dependent: on a
+    // slow CI runner the crosshair had already turned past the enemy, or the
+    // enemy had walked away, before the check ran.)
+    const r = await evaluate(() => {
+        const e = enemyObjects.find((x) => x.isActive && !x.hit);
+        const place = (yaw) => {
+            characterController.position.set(0, 1.7, 30);
+            camera.position.set(0, 1.7, 30);
+            camera.rotation.set(0, yaw, 0);
+            camera.updateMatrixWorld();
+            e.mesh.position.set(0, 0, 18);
+            e.mesh.updateMatrixWorld();
+        };
+        const turn = (assist) => {
             game.userSettings.gpAimAssist = assist;
-            characterController.position.set(0, 1.7, 30); characterController.prevSimPosition.copy(characterController.position); camera.rotation.set(0, 0, 0);
-            const e = enemyObjects.find((x) => x.isActive && !x.hit);
-            e.mesh.position.set(0, 0, 18); e.poseDirty = true;
-        }, assist);
-        await frames(3);
-        const y0 = await evaluate(() => camera.rotation.y);
-        await evaluate(() => { __pad.axes[2] = 0.25; });
-        await frames(5);
-        await evaluate(() => { __pad.axes[2] = 0; });
-        const flagged = await evaluate(() => gamepadController.assistActive);
-        await frames(2);
-        return { turned: Math.abs((await evaluate(() => camera.rotation.y)) - y0), flagged };
-    };
-    const off = await turn(false);
-    const on = await turn(true);
-    assert.equal(off.flagged, false);
-    assert.equal(on.flagged, true, 'assist engages on a visible enemy under the crosshair');
-    assert.ok(on.turned < off.turned, 'assist slows turning');
-    assert.ok(on.turned > 0, 'assist never stops or reverses the player\'s input');
+            place(0);
+            gamepadController.lookHeldMs = 0;
+            gamepadController.look({ x: 0.25, y: 0, mag: 0.25 }, 1 / 60);
+            return { turned: Math.abs(camera.rotation.y), flagged: gamepadController.assistActive };
+        };
+        const out = { off: turn(false), on: turn(true) };
+        place(0);
+        out.targetAhead = !!gamepadController.aimAssistTarget();
+        place(0.6); // ~34 degrees away from the enemy
+        out.targetAway = !!gamepadController.aimAssistTarget();
+        return out;
+    });
+    assert.equal(r.targetAhead, true, 'an enemy straight ahead is an aim-assist target');
+    assert.equal(r.targetAway, false, 'an enemy far off the crosshair is not');
+    assert.equal(r.off.flagged, false);
+    assert.equal(r.on.flagged, true, 'assist engages on a visible enemy under the crosshair');
+    assert.ok(r.on.turned < r.off.turned * 0.75, 'assist slows turning');
+    assert.ok(r.on.turned > 0, 'assist never stops or reverses the player\'s input');
     assert.deepEqual(errors, []);
 });
