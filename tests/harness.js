@@ -27,6 +27,7 @@ function getBrowser() {
 }
 
 async function closeBrowser() {
+    currentPage = null;
     if (browserPromise) {
         const b = await browserPromise;
         browserPromise = null;
@@ -40,9 +41,15 @@ async function closeBrowser() {
  * options.quality: graphics profile to force (default 'medium'); pass null to keep Auto.
  * Returns { page, errors, frames, evaluate }.
  */
+// Only one game runs at a time: a page left open keeps its render loop going
+// and slows every later test (SwiftShader shares the CPU).
+let currentPage = null;
+
 async function boot(options = {}) {
     const browser = await getBrowser();
+    if (currentPage) { await currentPage.close().catch(() => {}); currentPage = null; }
     const page = await browser.newPage({ viewport: options.viewport || { width: 480, height: 270 } });
+    currentPage = page;
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
