@@ -4974,7 +4974,7 @@
                     adsFov: 58,
                     baseCrosshairGap: 12,
                     hipPos: { x: 0.3, y: -0.3, z: -0.5 },
-                    adsPos: { x: 0.0, y: -0.185, z: -0.36 },
+                    adsPos: { x: 0.0, y: -0.12, z: -0.36 },  // sight top (y +0.13) ~1 cm above the crosshair
                     model: null,
                     muzzleFlash: null,
                     magazine: null
@@ -4997,7 +4997,7 @@
                     adsFov: 20,
                     baseCrosshairGap: 22,
                     hipPos: { x: 0.3, y: -0.3, z: -0.5 },
-                    adsPos: { x: 0.0, y: -0.22, z: -0.32 },
+                    adsPos: { x: 0.0, y: -0.225, z: -0.32 }, // scope top (y +0.22) at the crosshair
                     model: null,
                     muzzleFlash: null
                 },
@@ -5018,7 +5018,7 @@
                     adsFov: 64,
                     baseCrosshairGap: 10,
                     hipPos: { x: 0.26, y: -0.28, z: -0.45 },
-                    adsPos: { x: 0.0, y: -0.17, z: -0.34 },
+                    adsPos: { x: 0.0, y: -0.063, z: -0.42 }, // rear sight (y +0.074) ~1 cm above the crosshair
                     model: null,
                     muzzleFlash: null,
                     magazine: null,
@@ -13028,6 +13028,23 @@
         const _abilityTempVec = new THREE.Vector3();
         const _abilityRay = new THREE.Ray();
 
+        // =============================================
+        // Ability tuning (edit here to adjust feel). Valorant's values in brackets.
+        // =============================================
+        const ABILITY_TUNING = {
+            soulOrbLifetimeMs: 3500,   // Reyna soul orb after a kill        [3 s]
+            soulOrbRange: 15,          // Devour / Dismiss reach to an orb   [~15 m]
+            devourHeal: 50,            // Devour instant heal                 [100 HP over 3 s]
+            devourShield: 25,          // Devour shield bonus                 [overheal up to 50]
+            dismissMs: 2000,           // Dismiss intangible + haste          [2 s]
+            leerRange: 18,             // Leer placement distance
+            leerLifetimeMs: 2000,      // Leer eye lifetime                   [2 s]
+            omenStepRange: 15,         // Shrouded Step teleport range        [~12.5 m]
+            omenUltStepRange: 30,      // From the Shadows blink range        [whole map]
+            omenParanoiaMs: 1300,      // Paranoia travel time (x24 m/s)      [~1.2 s]
+            omenDarkCoverMs: 15000     // Dark Cover smoke duration           [15 s]
+        };
+        
         const agentSystem = {
             initialized: false,
             stateByAgent: {},
@@ -20631,7 +20648,7 @@
                 orb.inUse = true;
                 orb.position.set(worldPos.x, Math.max(1.0, worldPos.y + 1.0), worldPos.z);
                 orb.startAt = now;
-                orb.expireAt = now + 3500;
+                orb.expireAt = now + ABILITY_TUNING.soulOrbLifetimeMs;
                 orb.group.position.copy(orb.position);
                 orb.group.visible = true;
             },
@@ -20663,7 +20680,7 @@
             },
 
             castReynaLeer: function(now) {
-                const hit = this.getAimGroundPoint(18.0);
+                const hit = this.getAimGroundPoint(ABILITY_TUNING.leerRange);
                 let eye = this.leerEyes[0];
                 for (let i = 0; i < this.leerEyes.length; i++) {
                     if (!this.leerEyes[i].inUse) { eye = this.leerEyes[i]; break; }
@@ -20671,7 +20688,7 @@
                 eye.inUse = true;
                 eye.position.set(hit.x, hit.y + 1.6, hit.z);
                 eye.startAt = now;
-                eye.expireAt = now + 2000;
+                eye.expireAt = now + ABILITY_TUNING.leerLifetimeMs;
                 eye.nextPulseAt = now;
                 eye.group.position.copy(eye.position);
                 eye.group.visible = true;
@@ -20680,23 +20697,23 @@
             },
 
             castReynaDevour: function(now) {
-                const orb = this.findNearestSoulOrb(15.0);
+                const orb = this.findNearestSoulOrb(ABILITY_TUNING.soulOrbRange);
                 if (!orb) {
                     this.refundCharge('q', now);
                     showNotification("DEVOUR: No Soul Orb in range (get a kill first)", 1400);
                     return;
                 }
                 this.consumeSoulOrb(orb, now);
-                this.healPlayer(50, now);
+                this.healPlayer(ABILITY_TUNING.devourHeal, now);
                 game.maxShield = Math.max(game.maxShield || 25, 50);
-                game.shield = Math.min(50, (game.shield || 0) + 25);
+                game.shield = Math.min(50, (game.shield || 0) + ABILITY_TUNING.devourShield);
                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                 soundFX.reynaDevour();
-                showNotification("DEVOUR! Soul Consumed: +50 HP & +25 Overshield", 1500);
+                showNotification(`DEVOUR! Soul Consumed: +${ABILITY_TUNING.devourHeal} HP & +${ABILITY_TUNING.devourShield} Overshield`, 1500);
             },
 
             castReynaDismiss: function(now) {
-                const orb = this.findNearestSoulOrb(15.0);
+                const orb = this.findNearestSoulOrb(ABILITY_TUNING.soulOrbRange);
                 if (!orb) {
                     this.refundCharge('e', now);
                     showNotification("DISMISS: No Soul Orb in range (get a kill first)", 1400);
@@ -20704,14 +20721,14 @@
                 }
                 this.consumeSoulOrb(orb, now);
                 // Existing intangible state: enemies cannot hit you and you move +45% faster
-                this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + 2000);
+                this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + ABILITY_TUNING.dismissMs);
                 this.dashFxUntil = now + 420;
                 soundFX.reynaDismiss();
-                showNotification("DISMISS! Intangible & Hasted for 2s", 1400);
+                showNotification(`DISMISS! Intangible & Hasted for ${(ABILITY_TUNING.dismissMs / 1000).toFixed(1)}s`, 1400);
             },
 
             castOmenShroudedStep: function(now, isUlt) {
-                const range = isUlt ? 30.0 : 15.0;
+                const range = isUlt ? ABILITY_TUNING.omenUltStepRange : ABILITY_TUNING.omenStepRange;
                 const hit = this.getAimGroundPoint(range);
                 const originX = characterController.position.x;
                 const originY = Math.max(0.05, characterController.position.y - characterController.height);
@@ -20758,7 +20775,7 @@
                 wave.position.copy(camera.position).addScaledVector(_abilityForward, 1.2);
                 wave.velocity.copy(_abilityForward).multiplyScalar(24);
                 wave.startAt = now;
-                wave.expireAt = now + 1300; // ~31 m, passes through walls
+                wave.expireAt = now + ABILITY_TUNING.omenParanoiaMs; // 24 m/s, passes through walls
                 wave.hitSet.clear();
                 wave.group.position.copy(wave.position);
                 wave.group.visible = true;
@@ -20768,7 +20785,7 @@
 
             castOmenDarkCover: function(now) {
                 // Long-lasting purple controller smoke through the shared smoke system
-                this.castSmokeProjectile(now, 0x6d28d9, 0.8, 4.8, 15000);
+                this.castSmokeProjectile(now, 0x6d28d9, 0.8, 4.8, ABILITY_TUNING.omenDarkCoverMs);
             },
 
             castPhoenixHotHands: function(now) {
