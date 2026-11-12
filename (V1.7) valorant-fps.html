@@ -5747,6 +5747,27 @@
                 this.motionDirty = true;
             },
             
+            // V1.7: "shadows off" without a recompile. renderer.shadowMap.enabled
+            // stays true (toggling it rebuilt ~75 lit programs, a multi-second
+            // stall exactly when the auto controller drops to Low). While
+            // suspended the shadow map is never rendered and the light's shadow
+            // matrix maps every fragment outside the shadow frustum, so r128's
+            // getShadow() returns 1.0 before any texture fetch.
+            suspended: false,
+            suspend: function() {
+                if (this.suspended) return;
+                this.suspended = true;
+                this.eventDirty = false;
+                this.motionDirty = false;
+                renderer.shadowMap.needsUpdate = false;
+                directionalLight.shadow.matrix.makeScale(0, 0, 0).setPosition(2, 2, 2);
+            },
+            resume: function() {
+                if (!this.suspended) return;
+                this.suspended = false;
+                this.markEvent(); // next render rebuilds the map and its real matrix
+            },
+            
             setMovingHz: function(hz) {
                 if (hz !== 15 && hz !== 20 && hz !== 30) return false;
                 this.MOVING_REFRESH_HZ = hz;
@@ -5755,7 +5776,7 @@
             
             // Events refresh on the next frame. Motion is capped at MOVING_REFRESH_HZ.
             beforeRender: function(now) {
-                if (!renderer.shadowMap.enabled) return false;
+                if (!renderer.shadowMap.enabled || this.suspended) return false;
                 const interval = 1000 / this.MOVING_REFRESH_HZ;
                 let kind = null;
                 if (this.eventDirty) kind = 'event';
@@ -6553,26 +6574,8 @@
         
         let gameInitialized = false; // set at the end of initGame()
         
-        // Shadow flags the currently compiled lit programs were built against
-        let appliedShadowEnabled = renderer.shadowMap.enabled;
-        let appliedShadowType = renderer.shadowMap.type;
-        
-        // r128 does not recompile programs when renderer.shadowMap.enabled/type
-        // change, so lit materials must be flagged explicitly.
-        function invalidateLitMaterialPrograms() {
-            scene.traverse(object => {
-                const material = object.material;
-                if (!material) return;
-                const materials = Array.isArray(material) ? material : [material];
-                for (const m of materials) {
-                    if (m.isMeshStandardMaterial || m.isMeshPhongMaterial ||
-                        m.isMeshLambertMaterial || m.isShadowMaterial) {
-                        m.needsUpdate = true;
-                    }
-                }
-            });
-            perfTelemetry.programInvalidations++;
-        }
+        // V1.7: shadows are suspended/resumed by shadowManager instead of toggling
+        // renderer.shadowMap.enabled, so lit programs never need invalidating.
         
         // V1.7 surface detail + glow halo budget: the quality profile's value unless
         // the player overrode it in Settings ([P] > Video). Uniform/budget only, so
@@ -6600,17 +6603,8 @@
             applyVisualOverrides(profile);
             scene.fog.density = profile.fogDensity;
             
-            renderer.shadowMap.enabled = profile.shadows;
-            if (renderer.shadowMap.enabled !== appliedShadowEnabled ||
-                renderer.shadowMap.type !== appliedShadowType) {
-                appliedShadowEnabled = renderer.shadowMap.enabled;
-                appliedShadowType = renderer.shadowMap.type;
-                invalidateLitMaterialPrograms();
-                shadowManager.markEvent();
-                // Rebuild the flash-light variants for the new shadow state now, at the
-                // deliberate profile change, instead of at the first enemy shot
-                if (gameInitialized) warmFlashLightVariants();
-            }
+            // V1.7: suspend/resume instead of toggling shadowMap.enabled (no recompile)
+            if (profile.shadows) shadowManager.resume(); else shadowManager.suspend();
             
             // An allocated render target keeps its old size unless disposed, so
             // dispose only when the size really changes.
@@ -6898,7 +6892,7 @@
                 }
                 // V1.7: full-map shadows make each moving-caster refresh dearer, so
                 // before giving up a profile, cap moving-shadow refreshes at 20 Hz.
-                if (renderer.shadowMap.enabled && shadowManager.MOVING_REFRESH_HZ > 20) {
+                if (!shadowManager.suspended && shadowManager.MOVING_REFRESH_HZ > 20) {
                     this.shadowHzBefore = shadowManager.MOVING_REFRESH_HZ;
                     shadowManager.setMovingHz(20);
                     this.log({ kind: 'shadowHzDown', from: this.shadowHzBefore, hz: 20, p95: p95, cpuP95: cpuP95 });
@@ -15141,7 +15135,7 @@
                 caCardMesh.position.y = 1.15;
                 const caRingMesh = new THREE.Mesh(mollyRingGeo, caRingMat);
                 caRingMesh.position.y = 0.05;
-                caRingMesh.scale.set(2.4, 2.4, 1);
+                caRingMesh.scale.set(2.4, 1, 2.4);
                 caPillarMesh.frustumCulled = false;
                 caCardMesh.frustumCulled = false;
                 caRingMesh.frustumCulled = false;
@@ -15870,10 +15864,10 @@
                 kcCylMesh.position.y = 2.1;
                 const kcFloorMesh = new THREE.Mesh(mollyDiscGeo, kcFloorMat);
                 kcFloorMesh.position.y = 0.05;
-                kcFloorMesh.scale.set(9.0, 9.0, 1);
+                kcFloorMesh.scale.set(9.0, 1, 9.0);
                 const kcRingMesh = new THREE.Mesh(mollyRingGeo, kcRingMat);
                 kcRingMesh.position.y = 0.09;
-                kcRingMesh.scale.set(9.0, 9.0, 1);
+                kcRingMesh.scale.set(9.0, 1, 9.0);
                 kcCylMesh.frustumCulled = false;
                 kcFloorMesh.frustumCulled = false;
                 kcRingMesh.frustumCulled = false;
@@ -16236,7 +16230,7 @@
                     wallBMesh.rotation.y = Math.PI * 0.5;
                     const ringMesh = new THREE.Mesh(mollyRingGeo, ringMat);
                     ringMesh.position.y = 0.06;
-                    ringMesh.scale.set(5.8, 5.8, 1);
+                    ringMesh.scale.set(5.8, 1, 5.8);
                     coreMesh.frustumCulled = false;
                     wallAMesh.frustumCulled = false;
                     wallBMesh.frustumCulled = false;
@@ -16894,7 +16888,7 @@
                     rotorMesh.position.y = 0.16;
                     const ringMesh = new THREE.Mesh(mollyRingGeo, ringMat);
                     ringMesh.position.y = -1.25;
-                    ringMesh.scale.set(2.4, 2.4, 1);
+                    ringMesh.scale.set(2.4, 1, 2.4);
                     bodyMesh.frustumCulled = false;
                     rotorMesh.frustumCulled = false;
                     ringMesh.frustumCulled = false;
@@ -17344,7 +17338,7 @@
                 veShellMesh.position.y = 1.1;
                 const veRingMesh = new THREE.Mesh(mollyRingGeo, veRingMat);
                 veRingMesh.position.y = 0.06;
-                veRingMesh.scale.set(9.0, 9.0, 1);
+                veRingMesh.scale.set(9.0, 1, 9.0);
                 veShellMesh.frustumCulled = false;
                 veRingMesh.frustumCulled = false;
                 veGroup.add(veShellMesh);
@@ -17524,7 +17518,12 @@
                     waveFrontMesh: mbqWaveFrontMesh,
                     eqArchMesh: mbqEqArchMesh,
                     laneMat: mbqLaneMat,
-                    waveMat: mbqWaveMat
+                    waveMat: mbqWaveMat,
+                    // V1.7 fix: fields the spawn/update/radar code uses (they never existed)
+                    origin: new THREE.Vector3(),
+                    dir: new THREE.Vector3(0, 0, -1),
+                    currentWavePos: new THREE.Vector3(),
+                    wavesFired: 0
                 };
 
                 // 9. Pooled 3D X-Ray Wallhack Rings + 2D HUD Recon Diamonds (16)
@@ -17894,8 +17893,8 @@
                 mp.eruptAt = now + 1600;
                 mp.expireAt = now + 2150;
                 mp.nextTickAt = now + 100;
-                mp.discMesh.scale.set(mp.radius, mp.radius, 1);
-                mp.ringMesh.scale.set(mp.radius, mp.radius, 1);
+                mp.discMesh.scale.set(mp.radius, 1, mp.radius);
+                mp.ringMesh.scale.set(mp.radius, 1, mp.radius);
                 mp.group.position.copy(mp.position);
                 mp.group.visible = true;
                 soundFX.gekkoMosh();
@@ -18096,7 +18095,7 @@
                 gn.expireAt = now + 5500;
                 gn.nextTickAt = now + 100;
                 gn.domeMesh.scale.set(gn.radius, gn.radius * 0.42, gn.radius);
-                gn.ringMesh.scale.set(gn.radius, gn.radius, 1);
+                gn.ringMesh.scale.set(gn.radius, 1, gn.radius);
                 gn.group.position.copy(gn.position);
                 gn.group.visible = true;
                 soundFX.deadlockGravNet();
@@ -18135,7 +18134,7 @@
                 ds.radius = 11.5;
                 ds.startAt = now;
                 ds.expireAt = now + 26000;
-                ds.ringMesh.scale.set(ds.radius, ds.radius, 1);
+                ds.ringMesh.scale.set(ds.radius, 1, ds.radius);
                 ds.group.position.copy(ds.position);
                 ds.group.visible = true;
                 soundFX.deadlockSensor();
@@ -18298,7 +18297,7 @@
                 hc.expireAt = now + 10000;
                 hc.nextTickAt = now + 150;
                 hc.domeMesh.scale.set(hc.radius, hc.radius * 0.82, hc.radius);
-                hc.ringMesh.scale.set(hc.radius, hc.radius, 1);
+                hc.ringMesh.scale.set(hc.radius, 1, hc.radius);
                 hc.group.position.copy(hc.position);
                 hc.group.visible = true;
                 soundFX.harborCove();
@@ -18356,8 +18355,8 @@
                 hr.startAt = now;
                 hr.expireAt = now + 9000;
                 hr.nextGeyserAt = now + 350;
-                hr.ringMesh.scale.set(hr.radius, hr.radius, 1);
-                hr.discMesh.scale.set(hr.radius, hr.radius, 1);
+                hr.ringMesh.scale.set(hr.radius, 1, hr.radius);
+                hr.discMesh.scale.set(hr.radius, 1, hr.radius);
                 hr.group.position.copy(hr.position);
                 hr.group.visible = true;
                 this.spawnWindRing(sx, 0.25, sz, 0x22d3ee, 10.0, now);
@@ -18378,8 +18377,8 @@
                 gw.implodeAt = now + 1800;
                 gw.expireAt = now + 2450;
                 gw.nextPullAt = now + 80;
-                gw.vortexMesh.scale.set(gw.radius, gw.radius, 1);
-                gw.ringMesh.scale.set(gw.radius, gw.radius, 1);
+                gw.vortexMesh.scale.set(gw.radius, 1, gw.radius);
+                gw.ringMesh.scale.set(gw.radius, 1, gw.radius);
                 gw.group.position.copy(gw.position);
                 gw.group.visible = true;
                 soundFX.astraGravity();
@@ -18400,7 +18399,7 @@
                 np.startAt = now;
                 np.detonateAt = now + 650;
                 np.expireAt = now + 1350;
-                np.ringMesh.scale.set(np.radius, np.radius, 1);
+                np.ringMesh.scale.set(np.radius, 1, np.radius);
                 np.group.position.copy(np.position);
                 np.group.visible = true;
                 soundFX.astraStar();
@@ -18469,7 +18468,7 @@
                 vs.coreMesh.visible = true;
                 vs.wallMesh.visible = false;
                 vs.crestMesh.visible = false;
-                vs.ringMesh.scale.set(5.5, 5.5, 1);
+                vs.ringMesh.scale.set(5.5, 1, 5.5);
                 vs.group.position.copy(vs.position);
                 vs.group.rotation.y = yaw;
                 vs.group.visible = true;
@@ -18573,8 +18572,8 @@
                 rv.startAt = now;
                 rv.expireAt = now + 7500;
                 rv.nextTickAt = now + 100;
-                rv.discMesh.scale.set(rv.radius, rv.radius, 1);
-                rv.ringMesh.scale.set(rv.radius, rv.radius, 1);
+                rv.discMesh.scale.set(rv.radius, 1, rv.radius);
+                rv.ringMesh.scale.set(rv.radius, 1, rv.radius);
                 rv.group.position.copy(rv.position);
                 rv.group.visible = true;
                 soundFX.vyseRazorvine();
@@ -18593,8 +18592,8 @@
                 sg.startAt = now;
                 sg.eruptAt = now + 1100;
                 sg.expireAt = now + 9000;
-                sg.discMesh.scale.set(sg.radius, sg.radius, 1);
-                sg.ringMesh.scale.set(sg.radius, sg.radius, 1);
+                sg.discMesh.scale.set(sg.radius, 1, sg.radius);
+                sg.ringMesh.scale.set(sg.radius, 1, sg.radius);
                 sg.group.position.copy(sg.position);
                 sg.group.visible = true;
                 this.spawnWindRing(px, 0.25, pz, 0xc084fc, 16.0, now);
@@ -18755,8 +18754,8 @@
                     gs.startAt = now;
                     gs.nextPulseAt = now + 420 + k * 240;
                     gs.expireAt = now + 3800;
-                    gs.discMesh.scale.set(gs.radius, gs.radius, 1);
-                    gs.ringMesh.scale.set(gs.radius, gs.radius, 1);
+                    gs.discMesh.scale.set(gs.radius, 1, gs.radius);
+                    gs.ringMesh.scale.set(gs.radius, 1, gs.radius);
                     gs.group.position.copy(gs.position);
                     gs.group.visible = true;
                     this.spawnWindRing(tx, floorY + 0.15, tz, 0xf59e0b, 5.4, now);
@@ -18821,8 +18820,8 @@
                 sz.startAt = now;
                 sz.expireAt = now + 4500;
                 sz.nextTickAt = now + 450;
-                sz.discMesh.scale.set(sz.radius, sz.radius, 1);
-                sz.ringMesh.scale.set(sz.radius, sz.radius, 1);
+                sz.discMesh.scale.set(sz.radius, 1, sz.radius);
+                sz.ringMesh.scale.set(sz.radius, 1, sz.radius);
                 sz.group.position.copy(sz.position);
                 sz.group.visible = true;
                 soundFX.waylaySaturate();
@@ -19086,8 +19085,8 @@
                 ch.startAt = now;
                 ch.expireAt = now + 6500;
                 ch.nextTickAt = now + 450;
-                ch.discMesh.scale.set(ch.radius, ch.radius, 1);
-                ch.ringMesh.scale.set(ch.radius, ch.radius, 1);
+                ch.discMesh.scale.set(ch.radius, 1, ch.radius);
+                ch.ringMesh.scale.set(ch.radius, 1, ch.radius);
                 ch.group.position.copy(ch.position);
                 ch.group.visible = true;
                 soundFX.vetoChokehold();
@@ -19128,7 +19127,7 @@
                 vi.startAt = now;
                 vi.expireAt = now + 12000;
                 vi.nextZapAt = now + 350;
-                vi.ringMesh.scale.set(vi.radius, vi.radius, 1);
+                vi.ringMesh.scale.set(vi.radius, 1, vi.radius);
                 vi.group.position.copy(vi.position);
                 vi.group.visible = true;
                 this.playerBlindUntil = 0;
@@ -19296,10 +19295,11 @@
                 bq.startAt = now;
                 bq.nextWaveAt = now + 240;
                 bq.expireAt = now + 5400;
-                bq.floorMesh.position.set(ox + fwdX * 15.0, 0.05, oz + fwdZ * 15.0);
-                bq.floorMesh.rotation.y = yaw;
-                bq.waveMesh.position.set(ox, 1.85, oz);
-                bq.waveMesh.rotation.y = yaw;
+                // V1.7 fix: the lane/wave meshes are children of the group, authored
+                // along local -Z (forward), so place and yaw the group itself.
+                bq.group.position.set(ox, 0, oz);
+                bq.group.rotation.set(0, yaw, 0);
+                bq.waveFrontMesh.position.set(0, 1.1, -2.0);
                 bq.group.visible = true;
                 this.spawnWindRing(ox, 0.25, oz, 0xec4899, 9.5, now);
             },
@@ -19603,8 +19603,8 @@
                 sz.startAt = now;
                 sz.expireAt = now + 4500;
                 sz.nextTickAt = now + 50;
-                sz.discMesh.scale.set(sz.radius, sz.radius, 1);
-                sz.ringMesh.scale.set(sz.radius, sz.radius, 1);
+                sz.discMesh.scale.set(sz.radius, 1, sz.radius);
+                sz.ringMesh.scale.set(sz.radius, 1, sz.radius);
                 sz.group.position.copy(sz.position);
                 sz.group.visible = true;
                 soundFX.fadeNightfall();
@@ -19827,8 +19827,8 @@
                 kf.expireAt = now + 3100;
                 kf.pulsesLeft = 4;
                 kf.nextPulseAt = now + 120;
-                kf.discMesh.scale.set(kf.radius, kf.radius, 1);
-                kf.ringMesh.scale.set(kf.radius, kf.radius, 1);
+                kf.discMesh.scale.set(kf.radius, 1, kf.radius);
+                kf.ringMesh.scale.set(kf.radius, 1, kf.radius);
                 kf.group.position.copy(kf.position);
                 kf.group.visible = true;
                 soundFX.kayoFragment();
@@ -20260,7 +20260,7 @@
                 tm.expireAt = now + 24000;
                 tm.rotorMat.color.setHex(0xf59e0b).convertSRGBToLinear();
                 tm.ringMat.color.setHex(0xfbbf24).convertSRGBToLinear();
-                tm.ringMesh.scale.set(2.2, 2.2, 1);
+                tm.ringMesh.scale.set(2.2, 1, 2.2);
                 tm.group.position.copy(tm.position);
                 tm.group.visible = true;
 
@@ -20754,8 +20754,8 @@
                 beacon.startAt = now;
                 beacon.expireAt = now + 12000;
                 beacon.nextTickAt = now;
-                beacon.ringMesh.scale.set(beacon.radius, beacon.radius, 1);
-                beacon.discMesh.scale.set(beacon.radius, beacon.radius, 1);
+                beacon.ringMesh.scale.set(beacon.radius, 1, beacon.radius);
+                beacon.discMesh.scale.set(beacon.radius, 1, beacon.radius);
                 beacon.group.position.copy(beacon.position);
                 beacon.group.visible = true;
 
@@ -21578,7 +21578,7 @@
                         this.kjLockdown.nextPulseAt = now;
                         this.kjLockdown.group.position.copy(this.kjLockdown.position);
                         this.kjLockdown.domeMesh.scale.set(this.kjLockdown.radius, this.kjLockdown.radius * 0.65, this.kjLockdown.radius);
-                        this.kjLockdown.ringMesh.scale.set(this.kjLockdown.radius, this.kjLockdown.radius, 1);
+                        this.kjLockdown.ringMesh.scale.set(this.kjLockdown.radius, 1, this.kjLockdown.radius);
                         this.kjLockdown.group.visible = true;
                     }
                     const st = this.stateByAgent.killjoy;
@@ -21640,8 +21640,8 @@
                         this.orbitalStrike.expireAt = now + def.abilities.x.durationMs;
                         this.orbitalStrike.nextTickAt = now + 450;
                         this.orbitalStrike.group.position.copy(this.orbitalStrike.position);
-                        this.orbitalStrike.groundRing.scale.set(this.orbitalStrike.radius, this.orbitalStrike.radius, 1);
-                        this.orbitalStrike.groundDisc.scale.set(this.orbitalStrike.radius, this.orbitalStrike.radius, 1);
+                        this.orbitalStrike.groundRing.scale.set(this.orbitalStrike.radius, 1, this.orbitalStrike.radius);
+                        this.orbitalStrike.groundDisc.scale.set(this.orbitalStrike.radius, 1, this.orbitalStrike.radius);
                         this.orbitalStrike.outerCyl.scale.set(0.2, 1, 0.2);
                         this.orbitalStrike.innerCyl.scale.set(0.2, 1, 0.2);
                         this.orbitalStrike.group.visible = true;
@@ -21663,8 +21663,8 @@
                         this.vipersPit.nextTickAt = now + 150;
                         this.vipersPit.group.position.copy(this.vipersPit.position);
                         this.vipersPit.domeMesh.scale.set(this.vipersPit.radius, this.vipersPit.radius * 0.55, this.vipersPit.radius);
-                        this.vipersPit.ringMesh.scale.set(this.vipersPit.radius, this.vipersPit.radius, 1);
-                        this.vipersPit.discMesh.scale.set(this.vipersPit.radius, this.vipersPit.radius, 1);
+                        this.vipersPit.ringMesh.scale.set(this.vipersPit.radius, 1, this.vipersPit.radius);
+                        this.vipersPit.discMesh.scale.set(this.vipersPit.radius, 1, this.vipersPit.radius);
                         this.vipersPit.group.visible = true;
                     }
                     this.healPlayer(25, now);
@@ -25513,7 +25513,7 @@
                         const wx = bq.origin.x + bq.dir.x * stepDist;
                         const wz = bq.origin.z + bq.dir.z * stepDist;
                         bq.currentWavePos.set(wx, 0.04, wz);
-                        bq.waveMesh.position.set(wx, 1.85, wz);
+                        bq.waveFrontMesh.position.z = -(2.0 + stepDist); // local forward
                         soundFX.miksBassquake();
                         this.spawnFlashBurst(wx, 1.2, wz, 0xec4899, 7.2, 420, now);
                         this.spawnWindRing(wx, 0.25, wz, 0x22d3ee, 10.5, now);
@@ -25828,7 +25828,7 @@
                     const frac = (now - p.startAt) / (p.expireAt - p.startAt);
                     p.pillarMesh.rotation.y = time * 0.008;
                     p.pillarMesh.scale.set(1 + frac * 0.5, Math.max(0.1, 1 - frac * 0.6), 1 + frac * 0.5);
-                    p.ringMesh.scale.set(1 + frac * 0.8, 1 + frac * 0.8, 1);
+                    p.ringMesh.scale.set(1 + frac * 0.8, 1, 1 + frac * 0.8);
                     p.pillarMat.opacity = 0.75 * (1 - frac);
                     p.ringMat.opacity = 0.88 * (1 - frac);
                 }
@@ -25856,7 +25856,7 @@
                     const bot = this.boomBots[i];
                     if (!bot.inUse) continue;
                     const pulse = 1.0 + (bot.locked ? 0.28 : 0.14) * Math.sin(time * (bot.locked ? 0.028 : 0.012) + i);
-                    bot.ringMesh.scale.set(pulse, pulse, 1);
+                    bot.ringMesh.scale.set(pulse, 1, pulse);
                     if (Math.hypot(bot.velocity.x, bot.velocity.z) > 0.1) {
                         bot.group.rotation.y = Math.atan2(bot.velocity.x, bot.velocity.z);
                     }
@@ -25867,7 +25867,7 @@
                     const firedRecently = (now - turret.lastShotAt) < 160;
                     turret.headMat.emissiveIntensity = firedRecently ? 1.15 : 0.45;
                     const ringPulse = 1.2 + 0.15 * Math.sin(time * 0.01 + i);
-                    turret.ringMesh.scale.set(ringPulse, ringPulse, 1);
+                    turret.ringMesh.scale.set(ringPulse, 1, ringPulse);
                 }
                 if (this.kjLockdown && this.kjLockdown.active) {
                     this.kjLockdown.coreMesh.rotation.y = time * 0.005;
@@ -25892,7 +25892,7 @@
                     const cam = this.spycams[i];
                     if (!cam.inUse) continue;
                     const pulse = 0.55 + 0.12 * Math.sin(time * 0.012 + i);
-                    cam.auraMesh.scale.set(pulse, pulse, 1);
+                    cam.auraMesh.scale.set(pulse, 1, pulse);
                     cam.lensMat.opacity = (now - (cam.lastDartAt || 0) < 250) ? 1.0 : 0.85;
                 }
                 for (let i = 0; i < this.stimBeacons.length; i++) {
@@ -25902,7 +25902,7 @@
                     const fade = rem < 600 ? Math.max(0, rem / 600) : 1;
                     const pulse = 0.94 + 0.08 * Math.sin(time * 0.015 + i);
                     beacon.coreMesh.rotation.y = time * 0.006;
-                    beacon.ringMesh.scale.set(beacon.radius * pulse, beacon.radius * pulse, 1);
+                    beacon.ringMesh.scale.set(beacon.radius * pulse, 1, beacon.radius * pulse);
                     beacon.ringMat.opacity = 0.82 * fade;
                     beacon.discMat.opacity = 0.22 * pulse * fade;
                 }
@@ -25955,7 +25955,7 @@
                     const rem = decoy.expireAt - now;
                     const fade = rem < 500 ? Math.max(0, rem / 500) : 1;
                     const pulse = 0.95 + 0.18 * Math.sin(time * 0.018 + i);
-                    decoy.ringMesh.scale.set(pulse, pulse, 1);
+                    decoy.ringMesh.scale.set(pulse, 1, pulse);
                     decoy.bodyMat.opacity = 0.78 * fade;
                     decoy.headMat.opacity = 0.92 * fade;
                 }
@@ -25967,7 +25967,7 @@
                     yt.coreMesh.rotation.y = time * 0.012;
                     yt.outerMesh.rotation.y = -time * 0.016;
                     yt.outerMesh.rotation.x = time * 0.01;
-                    yt.ringMesh.scale.set(pulse, pulse, 1);
+                    yt.ringMesh.scale.set(pulse, 1, pulse);
                     yt.coreMat.opacity = 0.95 * fade;
                     yt.outerMat.opacity = 0.85 * fade;
                     yt.ringMat.opacity = 0.8 * fade;
@@ -26004,7 +26004,7 @@
                     if (!tm.inUse) continue;
                     const pulse = 1.0 + (tm.triggered ? 0.25 : 0.1) * Math.sin(time * (tm.triggered ? 0.032 : 0.012) + i);
                     tm.rotorMesh.rotation.y = time * (tm.triggered ? 0.025 : 0.008);
-                    tm.ringMesh.scale.set(pulse * 2.2, pulse * 2.2, 1);
+                    tm.ringMesh.scale.set(pulse * 2.2, 1, pulse * 2.2);
                     tm.rotorMat.color.setHex(tm.triggered ? 0xef4444 : 0xf59e0b).convertSRGBToLinear();
                 }
                 if (this.chamberAnchor && this.chamberAnchor.active) {
@@ -26013,7 +26013,7 @@
                     const fade = rem < 600 ? Math.max(0, rem / 600) : 1;
                     const pulse = 0.95 + 0.15 * Math.sin(time * 0.016);
                     ca.cardMesh.rotation.y = time * 0.01;
-                    ca.ringMesh.scale.set(pulse * 2.4, pulse * 2.4, 1);
+                    ca.ringMesh.scale.set(pulse * 2.4, 1, pulse * 2.4);
                     ca.cardMat.opacity = 0.92 * fade;
                     ca.ringMat.opacity = 0.78 * fade * pulse;
                 }
@@ -26026,7 +26026,7 @@
                     const fade = rem < 400 ? Math.max(0, rem / 400) : 1;
                     const pulse = 0.88 + 0.22 * Math.sin(time * 0.028 + i);
                     kf.coreMesh.rotation.y = time * 0.016;
-                    kf.ringMesh.scale.set(kf.radius * pulse, kf.radius * pulse, 1);
+                    kf.ringMesh.scale.set(kf.radius * pulse, 1, kf.radius * pulse);
                     kf.discMat.opacity = 0.45 * pulse * fade;
                     kf.ringMat.opacity = 0.92 * fade;
                 }
@@ -26053,7 +26053,7 @@
                     sp.bodyMesh.position.y = 0.36 + stride;
                     sp.headMesh.position.y = 0.48 + stride;
                     const ringPulse = 1.0 + 0.2 * Math.sin(time * 0.02);
-                    sp.ringMesh.scale.set(ringPulse, ringPulse, 1);
+                    sp.ringMesh.scale.set(ringPulse, 1, ringPulse);
                 }
                 for (let i = 0; i < this.skyeHawks.length; i++) {
                     const sh = this.skyeHawks[i];
@@ -26068,7 +26068,7 @@
                     const pulse = 1.0 + 0.22 * Math.sin(time * 0.024 + i);
                     ss.coreMesh.rotation.y = time * 0.014;
                     ss.shellMesh.rotation.y = -time * 0.018;
-                    ss.ringMesh.scale.set(pulse, pulse, 1);
+                    ss.ringMesh.scale.set(pulse, 1, pulse);
                 }
 
                 // 7H. Animate Fade Prowlers, Seize Tether Zones, Haunt Watchers & Nightfall Wave + Breach Aftershocks, Fault Lines & Rolling Thunder
@@ -26079,7 +26079,7 @@
                     fp.coreMesh.position.y = 0.42 + bob;
                     fp.auraMesh.rotation.z = time * 0.018;
                     const pulse = 1.0 + 0.2 * Math.sin(time * 0.024);
-                    fp.ringMesh.scale.set(pulse, pulse, 1);
+                    fp.ringMesh.scale.set(pulse, 1, pulse);
                 }
                 for (let i = 0; i < this.fadeSeizeZones.length; i++) {
                     const sz = this.fadeSeizeZones[i];
@@ -26089,7 +26089,7 @@
                     const pulse = 0.9 + 0.16 * Math.sin(time * 0.022 + i);
                     sz.coreMesh.rotation.y = time * 0.018;
                     sz.coreMesh.rotation.x = -time * 0.014;
-                    sz.ringMesh.scale.set(sz.radius * pulse, sz.radius * pulse, 1);
+                    sz.ringMesh.scale.set(sz.radius * pulse, 1, sz.radius * pulse);
                     sz.discMat.opacity = 0.42 * pulse * fade;
                     sz.ringMat.opacity = 0.88 * fade;
                 }
@@ -26122,7 +26122,7 @@
                     const pulse = 0.88 + 0.25 * Math.sin(time * 0.032 + i);
                     ba.cylMesh.rotation.y = time * 0.02;
                     ba.cylMesh.scale.set(ba.radius * pulse, 1, ba.radius * pulse);
-                    ba.ringMesh.scale.set(ba.radius * pulse, ba.radius * pulse, 1);
+                    ba.ringMesh.scale.set(ba.radius * pulse, 1, ba.radius * pulse);
                     ba.cylMat.opacity = 0.55 * pulse * fade;
                     ba.ringMat.opacity = 0.92 * fade;
                 }
@@ -26192,8 +26192,8 @@
                     const fade = rem < 250 ? Math.max(0, rem / 250) : 1;
                     const windupFrac = Math.min(1, Math.max(0, 1 - (mp.eruptAt - now) / 1600));
                     const pulse = 0.92 + (0.12 + 0.22 * windupFrac) * Math.sin(time * (0.024 + windupFrac * 0.045) + i);
-                    mp.discMesh.scale.set(mp.radius * pulse, mp.radius * pulse, 1);
-                    mp.ringMesh.scale.set(mp.radius * pulse, mp.radius * pulse, 1);
+                    mp.discMesh.scale.set(mp.radius * pulse, 1, mp.radius * pulse);
+                    mp.ringMesh.scale.set(mp.radius * pulse, 1, mp.radius * pulse);
                     mp.coreMesh.rotation.y = time * 0.025;
                     mp.coreMesh.scale.setScalar(0.9 + 0.55 * windupFrac);
                     mp.discMat.opacity = (0.48 + 0.35 * windupFrac) * fade;
@@ -26206,7 +26206,7 @@
                     gw.bodyMesh.rotation.z = waddle;
                     gw.bodyMesh.position.y = 0.48 + Math.abs(Math.sin(time * 0.032 + i)) * 0.14;
                     const ringPulse = 1.0 + 0.2 * Math.sin(time * 0.024);
-                    gw.ringMesh.scale.set(ringPulse, ringPulse, 1);
+                    gw.ringMesh.scale.set(ringPulse, 1, ringPulse);
                 }
                 for (let i = 0; i < this.gekkoDizzy.length; i++) {
                     const gd = this.gekkoDizzy[i];
@@ -26223,7 +26223,7 @@
                     gt.bodyMesh.rotation.y = swim;
                     gt.finMesh.rotation.z = -swim * 0.8;
                     const pulse = 1.0 + 0.24 * Math.sin(time * 0.03);
-                    gt.auraMesh.scale.set(pulse, pulse, 1);
+                    gt.auraMesh.scale.set(pulse, 1, pulse);
                 }
                 for (let i = 0; i < this.gekkoGlobules.length; i++) {
                     const gg = this.gekkoGlobules[i];
@@ -26235,7 +26235,7 @@
                     gg.coreMesh.rotation.y = time * 0.015;
                     gg.ringMesh.rotation.z = -time * 0.018;
                     const pulse = 0.92 + 0.18 * Math.sin(time * 0.022 + i);
-                    gg.ringMesh.scale.set(pulse, pulse, 1);
+                    gg.ringMesh.scale.set(pulse, 1, pulse);
                     gg.coreMat.opacity = 0.92 * fade;
                     gg.ringMat.opacity = 0.85 * fade;
                 }
@@ -26248,7 +26248,7 @@
                     gn.domeMesh.rotation.y = time * 0.008;
                     gn.ringMesh.rotation.z = -time * 0.014;
                     gn.domeMesh.scale.set(gn.radius * pulse, gn.radius * 0.42 * pulse, gn.radius * pulse);
-                    gn.ringMesh.scale.set(gn.radius * pulse, gn.radius * pulse, 1);
+                    gn.ringMesh.scale.set(gn.radius * pulse, 1, gn.radius * pulse);
                     gn.domeMat.opacity = 0.38 * fade;
                     gn.ringMat.opacity = 0.92 * fade;
                 }
@@ -26259,7 +26259,7 @@
                     const fade = rem < 400 ? Math.max(0, rem / 400) : 1;
                     const pulse = ds.triggered ? (1.0 + 0.35 * Math.sin(time * 0.06)) : (0.95 + 0.08 * Math.sin(time * 0.015 + i));
                     ds.coreMesh.rotation.y = time * (ds.triggered ? 0.05 : 0.012);
-                    ds.ringMesh.scale.set(ds.radius * pulse, ds.radius * pulse, 1);
+                    ds.ringMesh.scale.set(ds.radius * pulse, 1, ds.radius * pulse);
                     ds.ringMat.opacity = (ds.triggered ? 0.95 : 0.46) * fade;
                 }
                 for (let i = 0; i < this.deadlockBarriers.length; i++) {
@@ -26301,7 +26301,7 @@
                     cv.coreMesh.rotation.y = -time * 0.014;
                     cv.coreMesh.rotation.x = time * 0.01;
                     cv.domeMesh.scale.set(cv.radius * pulse, cv.radius * 0.82 * pulse, cv.radius * pulse);
-                    cv.ringMesh.scale.set(cv.radius * pulse, cv.radius * pulse, 1);
+                    cv.ringMesh.scale.set(cv.radius * pulse, 1, cv.radius * pulse);
                     cv.domeMat.opacity = (cv.shieldHp > 0 ? 0.62 : 0.25) * fade;
                     cv.ringMat.opacity = 0.85 * fade;
                     if (characterController.position.distanceToSquared(cv.position) <= (cv.radius * 0.95) * (cv.radius * 0.95)) {
@@ -26326,8 +26326,8 @@
                     hr.ringMesh.rotation.z = time * 0.008;
                     hr.spireMesh.rotation.y = -time * 0.018;
                     hr.spireMesh.scale.set(pulse, 0.85 + 0.25 * Math.sin(time * 0.03), pulse);
-                    hr.discMesh.scale.set(hr.radius * pulse, hr.radius * pulse, 1);
-                    hr.ringMesh.scale.set(hr.radius * pulse, hr.radius * pulse, 1);
+                    hr.discMesh.scale.set(hr.radius * pulse, 1, hr.radius * pulse);
+                    hr.ringMesh.scale.set(hr.radius * pulse, 1, hr.radius * pulse);
                     hr.discMat.opacity = 0.34 * fade;
                     hr.ringMat.opacity = 0.88 * fade;
                 }
@@ -26342,8 +26342,8 @@
                     gw.coreMesh.rotation.x = spin * 0.7;
                     gw.vortexMesh.rotation.z = -spin;
                     gw.ringMesh.rotation.z = spin * 0.5;
-                    gw.vortexMesh.scale.set(gw.radius * pulse, gw.radius * pulse, 1);
-                    gw.ringMesh.scale.set(gw.radius * pulse, gw.radius * pulse, 1);
+                    gw.vortexMesh.scale.set(gw.radius * pulse, 1, gw.radius * pulse);
+                    gw.ringMesh.scale.set(gw.radius * pulse, 1, gw.radius * pulse);
                     gw.vortexMat.opacity = 0.45 * fade;
                     gw.ringMat.opacity = 0.9 * fade;
                 }
@@ -26356,7 +26356,7 @@
                     const pulse = 0.85 + 0.25 * chargeFrac * Math.sin(time * 0.05 + i);
                     np.starMesh.rotation.y = time * 0.04;
                     np.starMesh.scale.setScalar(0.9 + 0.6 * chargeFrac);
-                    np.ringMesh.scale.set(np.radius * pulse, np.radius * pulse, 1);
+                    np.ringMesh.scale.set(np.radius * pulse, 1, np.radius * pulse);
                     np.ringMat.opacity = 0.95 * fade;
                 }
                 if (this.astraCosmicDivide && this.astraCosmicDivide.active) {
@@ -26405,8 +26405,8 @@
                     const pulse = 0.94 + 0.1 * Math.sin(time * 0.026 + i);
                     rv.thornMesh.rotation.y = time * 0.018;
                     rv.ringMesh.rotation.z = -time * 0.015;
-                    rv.discMesh.scale.set(rv.radius * pulse, rv.radius * pulse, 1);
-                    rv.ringMesh.scale.set(rv.radius * pulse, rv.radius * pulse, 1);
+                    rv.discMesh.scale.set(rv.radius * pulse, 1, rv.radius * pulse);
+                    rv.ringMesh.scale.set(rv.radius * pulse, 1, rv.radius * pulse);
                     rv.discMat.opacity = 0.42 * fade;
                     rv.ringMat.opacity = 0.9 * fade;
                 }
@@ -26417,8 +26417,8 @@
                     const pulse = 0.94 + 0.12 * Math.sin(time * 0.028);
                     sg.crownMesh.rotation.y = time * 0.016;
                     sg.ringMesh.rotation.z = -time * 0.012;
-                    sg.discMesh.scale.set(sg.radius * pulse, sg.radius * pulse, 1);
-                    sg.ringMesh.scale.set(sg.radius * pulse, sg.radius * pulse, 1);
+                    sg.discMesh.scale.set(sg.radius * pulse, 1, sg.radius * pulse);
+                    sg.ringMesh.scale.set(sg.radius * pulse, 1, sg.radius * pulse);
                     sg.discMat.opacity = (sg.erupted ? 0.38 : 0.24) * fade;
                     sg.ringMat.opacity = 0.92 * fade;
                 }
@@ -26427,7 +26427,7 @@
                     if (!td.inUse) continue;
                     td.rotorMesh.rotation.y = time * 0.065;
                     const pulse = 1.0 + 0.22 * Math.sin(time * 0.028 + i);
-                    td.ringMesh.scale.set(pulse * 2.2, pulse * 2.2, 1);
+                    td.ringMesh.scale.set(pulse * 2.2, 1, pulse * 2.2);
                 }
                 for (let i = 0; i < this.tejoGuidedSalvos.length; i++) {
                     const gs = this.tejoGuidedSalvos[i];
@@ -26436,8 +26436,8 @@
                     const fade = rem < 350 ? Math.max(0, rem / 350) : 1;
                     const pulse = 0.9 + 0.18 * Math.sin(time * 0.036 + i);
                     gs.beaconMesh.rotation.y = time * 0.025;
-                    gs.discMesh.scale.set(gs.radius * pulse, gs.radius * pulse, 1);
-                    gs.ringMesh.scale.set(gs.radius * pulse, gs.radius * pulse, 1);
+                    gs.discMesh.scale.set(gs.radius * pulse, 1, gs.radius * pulse);
+                    gs.ringMesh.scale.set(gs.radius * pulse, 1, gs.radius * pulse);
                     gs.discMat.opacity = 0.42 * fade;
                     gs.ringMat.opacity = 0.92 * fade;
                 }
@@ -26459,8 +26459,8 @@
                     sz.crystalMesh.rotation.y = time * 0.028;
                     sz.crystalMesh.rotation.z = time * 0.018;
                     sz.ringMesh.rotation.z = -time * 0.016;
-                    sz.discMesh.scale.set(sz.radius * pulse, sz.radius * pulse, 1);
-                    sz.ringMesh.scale.set(sz.radius * pulse, sz.radius * pulse, 1);
+                    sz.discMesh.scale.set(sz.radius * pulse, 1, sz.radius * pulse);
+                    sz.ringMesh.scale.set(sz.radius * pulse, 1, sz.radius * pulse);
                     sz.discMat.opacity = 0.44 * fade;
                     sz.ringMat.opacity = 0.92 * fade;
                 }
@@ -26507,8 +26507,8 @@
                     const pulse = 0.93 + 0.11 * Math.sin(time * 0.025 + i);
                     ch.tendrilMesh.rotation.y = time * 0.02;
                     ch.ringMesh.rotation.z = -time * 0.016;
-                    ch.discMesh.scale.set(ch.radius * pulse, ch.radius * pulse, 1);
-                    ch.ringMesh.scale.set(ch.radius * pulse, ch.radius * pulse, 1);
+                    ch.discMesh.scale.set(ch.radius * pulse, 1, ch.radius * pulse);
+                    ch.ringMesh.scale.set(ch.radius * pulse, 1, ch.radius * pulse);
                     ch.discMat.opacity = 0.44 * fade;
                     ch.ringMat.opacity = 0.9 * fade;
                 }
@@ -26534,7 +26534,7 @@
                     ea.group.position.set(characterController.position.x, 0.05, characterController.position.z);
                     ea.shellMesh.rotation.y = time * 0.022;
                     ea.ringMesh.rotation.z = -time * 0.018;
-                    ea.ringMesh.scale.set(9.0 * pulse, 9.0 * pulse, 1);
+                    ea.ringMesh.scale.set(9.0 * pulse, 1, 9.0 * pulse);
                     ea.shellMat.opacity = 0.36 * fade;
                     ea.ringMat.opacity = 0.86 * fade;
                 }
@@ -26572,9 +26572,9 @@
                     const rem = bq.expireAt - now;
                     const fade = rem < 450 ? Math.max(0, rem / 450) : 1;
                     const beat = 0.92 + 0.2 * Math.sin(time * 0.042);
-                    bq.waveMesh.scale.y = beat;
+                    bq.waveFrontMesh.scale.y = beat;
                     bq.waveMat.opacity = 0.86 * fade;
-                    bq.floorMat.opacity = 0.44 * fade;
+                    bq.laneMat.opacity = 0.44 * fade;
                 }
 
                 // 8. Animate Phoenix Solar Anchor & Sova Beam
@@ -31504,6 +31504,13 @@
         }
         
         // Take damage function for player (with Valorant Light/Heavy Shield 66% Damage Absorption & Directional Damage Arcs)
+        // V1.7 fix: Waylay/Veto heals called this but it was never defined
+        function updateHealthHUD() {
+            healthFill.style.width = `${game.health}%`;
+            healthValue.textContent = game.health;
+            if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
+        }
+        
         function takeDamage(amount, sourcePos = null) {
             const now = performance.now();
             // Invulnerability window during Jett/Phoenix dash phase or Reyna/Clove Dismiss intangibility
@@ -32176,7 +32183,7 @@
                     enemyFlashLights[i].object.visible = i < active;
                     enemyFlashLights[i].object.position.copy(p);
                 }
-                if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
+                if (renderer.shadowMap.enabled && !shadowManager.suspended) renderer.shadowMap.needsUpdate = true;
                 renderer.render(scene, camera);
             }
             for (const object of warmEffects) object.visible = false;
@@ -33563,15 +33570,8 @@
 
             applyShadowOverride: function(res) {
                 const enableShadows = res > 0;
-                renderer.shadowMap.enabled = enableShadows;
-                if (renderer.shadowMap.enabled !== appliedShadowEnabled ||
-                    renderer.shadowMap.type !== appliedShadowType) {
-                    appliedShadowEnabled = renderer.shadowMap.enabled;
-                    appliedShadowType = renderer.shadowMap.type;
-                    invalidateLitMaterialPrograms();
-                    shadowManager.markEvent();
-                    if (gameInitialized) warmFlashLightVariants();
-                }
+                // V1.7: suspend/resume instead of toggling shadowMap.enabled (no recompile)
+                if (enableShadows) shadowManager.resume(); else shadowManager.suspend();
                 if (enableShadows) {
                     adaptiveSettings.shadowResolution = res;
                     if (directionalLight.shadow.mapSize.width !== res ||
@@ -33737,7 +33737,7 @@
                 setActivePill('settings-quality-pills', 'data-quality', qualityController.auto ? 'auto' : adaptiveSettings.currentQuality);
                 setActivePill('setting-enemy-color-pills', 'data-enemycol', cfg.enemyHighlightColor || 'red');
                 setActivePill('setting-atmosphere-pills', 'data-atmos', cfg.atmosphereMode || 'daylight');
-                setActivePill('setting-shadow-res-pills', 'data-shadow', renderer.shadowMap.enabled ? adaptiveSettings.shadowResolution : 0);
+                setActivePill('setting-shadow-res-pills', 'data-shadow', !shadowManager.suspended ? adaptiveSettings.shadowResolution : 0);
                 setActivePill('setting-shadow-hz-pills', 'data-shz', cfg.shadowHz);
                 setActivePill('setting-surface-detail-pills', 'data-detail', cfg.surfaceDetail || 'auto');
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
@@ -34190,7 +34190,8 @@
 
                 if (isAceKill) {
                     this.acesCount++;
-                    this.awardRR(12, `★ 5K ACE STREAK BONUS (${(WEAPON_SKINS[game.weaponSkin || 'standard'] || WEAPON_SKINS.standard).name})`);
+                    // V1.7 fix: WEAPON_SKINS never existed (every ACE threw); the table is WEAPON_SKIN_THEMES
+                    this.awardRR(12, `★ 5K ACE STREAK BONUS (${(WEAPON_SKIN_THEMES[game.weaponSkin || 'standard'] || WEAPON_SKIN_THEMES.standard).label})`);
                 }
 
                 if (isWaveFinalKill || isRetakeFinalKill || isAceKill || (game.weaponSkin && game.weaponSkin !== 'standard' && nextStreak >= 3)) {
@@ -35489,31 +35490,27 @@
             previousCallbackCpu = performance.now() - cpuStart;
         }
         
-        // Start load sequence
-        let progress = 0;
-        const loadInterval = setInterval(() => {
-            progress += 5;
-            progressFill.style.width = `${progress}%`;
-            progressText.textContent = `Loading: ${progress}%`;
-            
-            if (progress >= 100) {
-                clearInterval(loadInterval);
-                
-                // Hide loading screen
-                setTimeout(() => {
-                    loadingScreen.style.opacity = "0";
-                    setTimeout(() => {
-                        loadingScreen.style.display = "none";
-                        
-                        // Initialize and start the game
-                        initGame();
-                        
-                        // Start animation loop
-                        animate(performance.now());
-                    }, 500);
-                }, 500);
-            }
-        }, 100);
+        // Start load sequence (V1.7): the old sequence animated a fake 0-100% bar for
+        // ~3 s and only then hid the screen and ran initGame(), which showed a blank
+        // hitch while shaders compiled. Now the real init (map, actors, shader
+        // warm-up) runs behind the loading screen, which then fades out over the
+        // already-running game. Init starts after 1 s: starting the GPU-heavy
+        // warm-up while the browser is still bringing up its GPU process cost ~5 s
+        // more in testing; at 1 s, play starts ~1.8 s sooner than before.
+        progressFill.style.width = '20%';
+        progressText.textContent = 'Loading: preparing renderer...';
+        setTimeout(() => {
+            progressFill.style.width = '55%';
+            progressText.textContent = 'Loading: building arena & compiling shaders...';
+        }, 450);
+        setTimeout(() => {
+            initGame();
+            progressFill.style.width = '100%';
+            progressText.textContent = 'Loading: 100%';
+            animate(performance.now());
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
+        }, 1000);
     </script>
 </body>
 </html>

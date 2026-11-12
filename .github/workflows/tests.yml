@@ -1,0 +1,29 @@
+name: Game regression tests
+
+# Headless Chromium (software WebGL, no GPU needed) loads the latest
+# "(V1.x) valorant-fps.html" and checks: clean load, no shader compiles after
+# warm-up, every agent ability and ultimate, all maps and atmosphere modes,
+# quality switching, and controller input (simulated gamepad).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
