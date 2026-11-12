@@ -114,6 +114,30 @@
             box-shadow: 0 0 10px #ffd166, 0 0 18px rgba(255, 209, 102, 0.9);
         }
 
+        /* V1.7: kill confirmation marker */
+        .hitmarker.kill .hitmarker-line {
+            background-color: #ff4655;
+            box-shadow: 0 0 10px #ff4655, 0 0 22px rgba(255, 70, 85, 0.95);
+        }
+
+        /* V1.7: low-health warning (opacity-only animation, compositor cheap) */
+        #low-health-vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 840;
+            opacity: 0;
+            transition: opacity 0.4s;
+            background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(200, 0, 30, 0.5) 100%);
+        }
+        #low-health-vignette.active {
+            animation: lowHpPulse 0.9s ease-in-out infinite;
+        }
+        @keyframes lowHpPulse {
+            0%, 100% { opacity: 0.55; }
+            50% { opacity: 1; }
+        }
+
         .hitmarker.legshot .hitmarker-line {
             background-color: #a8b8c8;
             box-shadow: 0 0 3px rgba(168, 184, 200, 0.6);
@@ -3998,6 +4022,39 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>3D Positional Audio</strong>
+                                    <small>Hear enemy gunfire, abilities and the spike from where they are; muffled through walls (headphones recommended)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-audio-3d-pills">
+                                    <button class="settings-pill-opt active" data-audio3d="on">ON</button>
+                                    <button class="settings-pill-opt" data-audio3d="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Enemy Footsteps</strong>
+                                    <small>Footstep sounds from enemies within 22 m</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-audio-steps-pills">
+                                    <button class="settings-pill-opt active" data-audiosteps="on">ON</button>
+                                    <button class="settings-pill-opt" data-audiosteps="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Low-Health Warning</strong>
+                                    <small>Pulsing red screen edges and a heartbeat at 30 HP or less</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-lowhp-pills">
+                                    <button class="settings-pill-opt active" data-lowhp="on">ON</button>
+                                    <button class="settings-pill-opt" data-lowhp="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Master Volume Gain</strong>
                                     <small>Overall volume level for gunshots, abilities, and footsteps (0% – 150%)</small>
                                 </div>
@@ -4954,6 +5011,9 @@
                 gpInvertY: false,
                 gpAimAssist: false,    // V1.7 controller: slowdown-only aim assist, off by default
                 gpVibration: true,
+                positionalAudio: true,  // V1.7: 3D audio for enemy gunfire, steps, abilities
+                enemyFootsteps: true,
+                lowHealthWarning: true,
                 glowHalos: 'auto',     // V1.7: 'auto' (profile budget) | 'off' | 'max'
                 brightness: 100,       // V1.7: % of the atmosphere mode's exposure (70-140)
                 fpsCap: 0,
@@ -10324,6 +10384,64 @@
         });
 
         // =============================================
+        // V1.7 Enemy footsteps (positional) and low-health warning
+        // =============================================
+        // Footsteps: every live enemy within 22 m emits a 3D step each ~1.7 m it
+        // travels (measured from its position, so it covers walking, strafing and
+        // pushes; jumps > 3 m in one frame such as respawns are ignored). Only runs
+        // once the AudioContext exists (after the first sound).
+        const ENEMY_STEP_STRIDE = 1.7;
+        const ENEMY_STEP_RANGE_SQ = 22 * 22;
+        const enemyAudio = {
+            update: function() {
+                const cfg = game.userSettings || {};
+                if (!soundFX.ctx || !game.soundEnabled || cfg.enemyFootsteps === false) return;
+                const p = characterController.position;
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    if (!e.isActive || e.hit) { e._stepX = undefined; continue; }
+                    const x = e.mesh.position.x, z = e.mesh.position.z;
+                    if (e._stepX === undefined) { e._stepX = x; e._stepZ = z; e._stepAcc = 0; continue; }
+                    const d = Math.hypot(x - e._stepX, z - e._stepZ);
+                    e._stepX = x; e._stepZ = z;
+                    if (d > 3) { e._stepAcc = 0; continue; }
+                    e._stepAcc += d;
+                    if (e._stepAcc < ENEMY_STEP_STRIDE) continue;
+                    e._stepAcc = 0;
+                    const dx = x - p.x, dz = z - p.z;
+                    if (dx * dx + dz * dz > ENEMY_STEP_RANGE_SQ) continue;
+                    soundFX.at(x, e.mesh.position.y + 0.1, z, () => soundFX.enemyStep());
+                }
+            }
+        };
+        
+        // Low health (<= 30 HP): pulsing red screen edges + heartbeat (faster <= 15 HP)
+        const lowHealthFx = {
+            el: null,
+            on: false,
+            nextBeat: 0,
+            update: function(now) {
+                const cfg = game.userSettings || {};
+                const low = cfg.lowHealthWarning !== false && game.health > 0 && game.health <= 30;
+                if (!this.el) {
+                    this.el = document.createElement('div');
+                    this.el.id = 'low-health-vignette';
+                    document.body.appendChild(this.el);
+                }
+                if (low !== this.on) {
+                    this.on = low;
+                    this.el.classList.toggle('active', low);
+                    if (low) this.nextBeat = now;
+                }
+                if (low && now >= this.nextBeat) {
+                    const urgent = game.health <= 15;
+                    soundFX.heartbeat(urgent);
+                    this.nextBeat = now + (urgent ? 620 : 900);
+                }
+            }
+        };
+        
+        // =============================================
         // V1.7 Controller support (PS4 / PS5 / Xbox via the browser Gamepad API)
         // =============================================
         // Polled once per frame from animate(); does nothing until a controller
@@ -11754,11 +11872,97 @@
                     gain.gain.linearRampToValueAtTime(scaledGain, t0 + Math.min(0.02, durationSec * 0.25));
                     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
                     osc.connect(gain);
-                    gain.connect(ctx.destination);
+                    this._route(ctx, gain);
                     osc.start(t0);
                     osc.stop(t0 + durationSec + 0.01);
                 } catch (e) {}
             },
+            // ---------------------------------------------------------------
+            // V1.7 3D positional audio. soundFX.at(x, y, z, fn) plays any existing
+            // sound through an HRTF panner at a world position (distance falloff,
+            // left/right and front/back cues). Sources behind a wall are muffled
+            // with a low-pass filter. The listener follows the camera every frame.
+            // ---------------------------------------------------------------
+            _pos: null,
+            at: function(x, y, z, fn) {
+                const cfg = game.userSettings || {};
+                if (cfg.positionalAudio === false || !this.ensureContext()) { fn(); return; }
+                this._pos = { x: x, y: y, z: z, occluded: this.isOccluded(x, y, z) };
+                try { fn(); } finally { this._pos = null; }
+            },
+            _occTarget: new THREE.Vector3(),
+            isOccluded: function(x, y, z) {
+                if (typeof agentSystem === 'undefined' || !agentSystem.hasWallLineOfSight) return false;
+                const t = this._occTarget.set(x, y, z);
+                const d = camera.position.distanceTo(t);
+                if (d < 1.5) return false;
+                return !agentSystem.hasWallLineOfSight(camera.position, t, d);
+            },
+            // Final hop for every synthesized voice: straight out, or via the panner
+            _route: function(ctx, node) {
+                const p = this._pos;
+                if (!p) { node.connect(ctx.destination); return; }
+                const panner = ctx.createPanner();
+                panner.panningModel = 'HRTF';
+                panner.distanceModel = 'inverse';
+                panner.refDistance = 4;
+                panner.maxDistance = 90;
+                panner.rolloffFactor = 1.1;
+                if (panner.positionX) {
+                    panner.positionX.value = p.x; panner.positionY.value = p.y; panner.positionZ.value = p.z;
+                } else {
+                    panner.setPosition(p.x, p.y, p.z);
+                }
+                if (p.occluded) {
+                    const lp = ctx.createBiquadFilter();
+                    lp.type = 'lowpass';
+                    lp.frequency.value = 650;
+                    node.connect(lp);
+                    lp.connect(panner);
+                } else {
+                    node.connect(panner);
+                }
+                panner.connect(ctx.destination);
+            },
+            _lFwd: new THREE.Vector3(),
+            _lUp: new THREE.Vector3(),
+            updateListener: function() {
+                const ctx = this.ctx;
+                if (!ctx) return;
+                const L = ctx.listener;
+                const cp = camera.position;
+                this._lFwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+                this._lUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+                const f = this._lFwd, u = this._lUp;
+                if (L.positionX) {
+                    L.positionX.value = cp.x; L.positionY.value = cp.y; L.positionZ.value = cp.z;
+                    L.forwardX.value = f.x; L.forwardY.value = f.y; L.forwardZ.value = f.z;
+                    L.upX.value = u.x; L.upY.value = u.y; L.upZ.value = u.z;
+                } else {
+                    L.setPosition(cp.x, cp.y, cp.z);
+                    L.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z);
+                }
+            },
+            // Enemy rifle crack: sharp noise burst + low body (call inside at())
+            enemyGunshot: function() {
+                this.playNoise(0.14, 0.34, 0, 3200);
+                this.playTone(240, 60, 0.16, 'sawtooth', 0.12, 0);
+            },
+            enemyStep: function() {
+                this.playNoise(0.07, 0.16, 0, 520);
+                this.playTone(95, 55, 0.08, 'sine', 0.07, 0);
+            },
+            // Hit confirmation for body/leg (tick) and armour (brighter ping)
+            hitTick: function(armor) {
+                if (armor) this.playTone(2350, 1900, 0.06, 'triangle', 0.07, 0);
+                else this.playTone(1500, 1300, 0.045, 'square', 0.045, 0);
+            },
+            heartbeat: function(urgent) {
+                const g = urgent ? 0.24 : 0.18;
+                this.playTone(72, 48, 0.13, 'sine', g, 0);
+                this.playTone(64, 44, 0.12, 'sine', g * 0.8, 0.2);
+            },
+
             // V1.7 fix: helpers/aliases that were called but never defined (each call threw).
             // Used by the synthesized stingers (skin finishers, rank-up, doors, pings).
             init: function() {
@@ -11799,7 +12003,7 @@
                     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
                     src.connect(filter);
                     filter.connect(gain);
-                    gain.connect(ctx.destination);
+                    this._route(ctx, gain);
                     src.start(t0, Math.random() * 0.04);
                     src.stop(t0 + dur + 0.02);
                 } catch (e) {}
@@ -12542,6 +12746,8 @@
                 const archBadge = `<span style="color:${arch.badgeColor};font-weight:800;">[${arch.label}]</span> `;
                 addCustomKillFeedMessage(`${wbBadge}${prefixBadge}${archBadge}Eliminated ${arch.shortName} with ${sourceLabel}`);
                 soundFX.kill(isHeadshot);
+                showHitMarker('kill');                       // V1.7: red kill marker
+                gamepadController.rumble(0.9, 0.6, 120);
                 animateEnemyDeath(enemy);
 
                 if (typeof tacticalDirector !== 'undefined' && game.gameMode === 'range' && tacticalDirector.rangeActive) {
@@ -12557,6 +12763,9 @@
                 agentSystem.onActorEliminated('enemy', enemy.mesh.position);
                 return true;
             } else {
+                // V1.7: body/armour hit sound (headshots already ding) + controller rumble
+                if (!isHeadshot) soundFX.hitTick(armorAbsorbed > 0);
+                gamepadController.rumble(isHeadshot ? 0.45 : 0.15, isHeadshot ? 0.85 : 0.4, isHeadshot ? 70 : 40);
                 const flashColor = isHeadshot ? 0xff2a4b : (armorAbsorbed > 0 ? 0x38f6ff : (isLegshot ? 0x94a3b8 : 0xffaa00));
                 for (let j = 0; j < enemy.leaves.length; j++) {
                     enemy.leaves[j].material.color.set(flashColor).convertSRGBToLinear();
@@ -29550,7 +29759,7 @@
                     const beepInterval = remSec > 15 ? 950 : (remSec > 7 ? 420 : 160);
                     if (now - this.lastSpikeBeepAt >= beepInterval) {
                         this.lastSpikeBeepAt = now;
-                        soundFX.spikeBeep(remSec <= 7);
+                        soundFX.at(sitePos.x, 0.6, sitePos.z, () => soundFX.spikeBeep(remSec <= 7));
                         if (this.spikeCoreMesh) {
                             this.spikeCoreMesh.material.color.setHex(remSec <= 7 ? 0xff2a4b : 0xffd166).convertSRGBToLinear();
                         }
@@ -29630,7 +29839,7 @@
                         this.enemyDefuseProgress = Math.min(1, this.enemyDefuseProgress + delta / this.enemyDefuseDurationSec);
                         if (now - this.lastDefuseAlertAt > 1600) {
                             this.lastDefuseAlertAt = now;
-                            soundFX.spikeDefuse(this.enemyDefuseProgress >= 0.5);
+                            soundFX.at(sitePos.x, 0.6, sitePos.z, () => soundFX.spikeDefuse(this.enemyDefuseProgress >= 0.5));
                             showNotification(`🚨 WARNING: HOSTILE DEFUSING SPIKE AT SITE ${this.activeSpikeSiteKey}! (${(this.enemyDefuseProgress * 100).toFixed(0)}%)`, 1400);
                         }
                         if (this.enemyDefuseProgress >= 1) {
@@ -30314,7 +30523,7 @@
                     pos.x += (perpX * 1.4 + nx * 0.9);
                     pos.z += (perpZ * 1.4 + nz * 0.9);
                     resolveEnemyMapCollision(pos, 0.68);
-                    soundFX.jettDash();
+                    soundFX.at(pos.x, pos.y + 1, pos.z, () => soundFX.jettDash());
 
                     const hz = this.acquireBotHazard();
                     if (hz) {
@@ -30355,7 +30564,7 @@
                         if (agentSystem && agentSystem.spawnFlashBurst) {
                             agentSystem.spawnFlashBurst(pos.x, pos.y + 1.0, pos.z, 0x38bdf8, 2.4, 280, perfNow);
                         }
-                        soundFX.omenTeleport();
+                        soundFX.at(pos.x, pos.y + 1, pos.z, () => soundFX.omenTeleport());
                         return;
                     }
                     if (enemy.hasSight && distToPlayer <= 27.0) {
@@ -30380,7 +30589,7 @@
                             hz.discMesh.visible = false;
                             hz.orbMesh.visible = false;
                             hz.group.visible = true;
-                            soundFX.sovaSonarPing();
+                            soundFX.at(hz.x, hz.y + 0.5, hz.z, () => soundFX.sovaSonarPing());
                         }
                         return;
                     }
@@ -30414,7 +30623,7 @@
                         hz.discMat.opacity = 0.22;
                         hz.orbMesh.visible = false;
                         hz.group.visible = true;
-                        soundFX.mollyCast();
+                        soundFX.at(hz.x, hz.y + 0.5, hz.z, () => soundFX.mollyCast());
                     }
                     return;
                 }
@@ -30442,7 +30651,7 @@
                         hz.orbMat.color.setHex(0x991b1b).convertSRGBToLinear();
                         hz.orbMat.opacity = 0.52;
                         hz.group.visible = true;
-                        soundFX.smokeDeploy();
+                        soundFX.at(hz.x, hz.y + 0.5, hz.z, () => soundFX.smokeDeploy());
                     }
                 }
             },
@@ -30464,7 +30673,7 @@
                             hz.detonated = true;
                             hz.orbMesh.scale.setScalar(1.8);
                             hz.orbMat.color.setHex(0xffffff).convertSRGBToLinear();
-                            soundFX.phoenixFlash();
+                            soundFX.at(hz.x, hz.y + 0.5, hz.z, () => soundFX.phoenixFlash());
 
                             // Check if player is within 17m and looking toward the Curveball Flash Orb
                             const dx = hz.x - camera.position.x;
@@ -31178,11 +31387,11 @@
         let _hitmarkerTimeout1 = null;
         let _hitmarkerTimeout2 = null;
         function showHitMarker(kind = 'normal') {
-            hitmarker.classList.remove('headshot', 'bullseye', 'legshot');
-            if (kind === 'headshot' || kind === 'bullseye' || kind === 'legshot') {
+            hitmarker.classList.remove('headshot', 'bullseye', 'legshot', 'kill');
+            if (kind === 'headshot' || kind === 'bullseye' || kind === 'legshot' || kind === 'kill') {
                 hitmarker.classList.add(kind);
             }
-            const peakScale = (kind === 'headshot' || kind === 'bullseye') ? 1.85 : 1.45;
+            const peakScale = kind === 'kill' ? 2.1 : ((kind === 'headshot' || kind === 'bullseye') ? 1.85 : 1.45);
             hitmarker.style.transform = `translate(-50%, -50%) scale(${peakScale})`;
             
             if (_hitmarkerTimeout1) clearTimeout(_hitmarkerTimeout1);
@@ -31926,6 +32135,8 @@
             // Pooled muzzle-flash light (expired by updatePooledEffects) + glow halo
             acquireEnemyFlash(muzzleX, muzzleY, muzzleZ);
             haloSystem.flash(muzzleX, muzzleY, muzzleZ, 0xffcc00, 1.2, ENEMY_FLASH_DURATION_MS);
+            // V1.7: enemy gunfire was silent; now a positional (and wall-muffled) crack
+            soundFX.at(muzzleX, muzzleY, muzzleZ, () => soundFX.enemyGunshot());
             
             // Create bullet trail from enemy (using pool)
             _enemyShotDirection.set(dirX, dirY, dirZ).normalize();
@@ -32333,6 +32544,9 @@
             gpInvertY: false,
             gpAimAssist: false,
             gpVibration: true,
+            positionalAudio: true,
+            enemyFootsteps: true,
+            lowHealthWarning: true,
             fpsCap: 0,
             fpsDisplayMode: 'compact',
             showSparkline: true,
@@ -33074,6 +33288,9 @@
                 });
 
                 // TAB 5: Audio & HUD + Live Recoil Trainer
+                this.bindPillGroup('setting-audio-3d-pills', 'data-audio3d', (val) => { game.userSettings.positionalAudio = val === 'on'; this.saveToStorage(); });
+                this.bindPillGroup('setting-audio-steps-pills', 'data-audiosteps', (val) => { game.userSettings.enemyFootsteps = val === 'on'; this.saveToStorage(); });
+                this.bindPillGroup('setting-lowhp-pills', 'data-lowhp', (val) => { game.userSettings.lowHealthWarning = val === 'on'; this.saveToStorage(); });
                 this.bindPillGroup('setting-audio-mute-pills', 'data-audiomute', (val) => {
                     const on = (val === 'on');
                     game.soundEnabled = on;
@@ -33742,6 +33959,9 @@
                 setActivePill('setting-surface-detail-pills', 'data-detail', cfg.surfaceDetail || 'auto');
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
+                setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
+                setActivePill('setting-audio-steps-pills', 'data-audiosteps', cfg.enemyFootsteps === false ? 'off' : 'on');
+                setActivePill('setting-lowhp-pills', 'data-lowhp', cfg.lowHealthWarning === false ? 'off' : 'on');
                 setActivePill('setting-gp-assist-pills', 'data-gpassist', cfg.gpAimAssist ? 'on' : 'off');
                 setActivePill('setting-gp-vibe-pills', 'data-gpvibe', cfg.gpVibration === false ? 'off' : 'on');
                 setActivePill('setting-flashlights-pills', 'data-flash', cfg.flashLights ? 'on' : 'off');
@@ -35428,6 +35648,10 @@
             updateGunplayAndCrosshair(delta, time, now);
             updateWeaponPosition();
             applyWeaponBobbing(time, game.keys.w || game.keys.a || game.keys.s || game.keys.d);
+            // V1.7: 3D audio listener follows the camera; enemy footsteps; low-health cue
+            soundFX.updateListener();
+            enemyAudio.update();
+            lowHealthFx.update(now);
             
             // Analytic movers + decal cap (render clock)
             updateVisibleObjects(time);
