@@ -2915,7 +2915,7 @@
 <body>
     <div class="loading-screen" id="loading-screen">
         <div class="logo"></div>
-        <div class="loading-text">VALORANT 3D FPS // V1.7 RADIANT EDITION</div>
+        <div class="loading-text">VALORANT 3D FPS // V1.6 RADIANT EDITION</div>
         <div class="progress-bar">
             <div class="progress-fill" id="progress-fill"></div>
         </div>
@@ -4236,43 +4236,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // V1.7 colour pipeline: the renderer outputs sRGB with ACES tone mapping,
-        // so colours authored as sRGB hex are converted to linear exactly once, when
-        // a material is created. Runtime colour writes append .convertSRGBToLinear().
-        // Unlit materials (FX, glows, beams, rings, 3D overlays) skip tone mapping so
-        // they keep their authored brightness; this is a program parameter fixed at
-        // construction, so it never causes a recompile during play.
-        (function patchMaterialColourSpace() {
-            const _setValues = THREE.Material.prototype.setValues;
-            THREE.Material.prototype.setValues = function (v) {
-                _setValues.call(this, v);
-                if (v && v.color !== undefined && this.color) this.color.convertSRGBToLinear();
-                if (v && v.emissive !== undefined && this.emissive) this.emissive.convertSRGBToLinear();
-                if ((!v || v.toneMapped === undefined) &&
-                    (this.isMeshBasicMaterial || this.isLineBasicMaterial || this.isPointsMaterial || this.isSpriteMaterial)) {
-                    this.toneMapped = false;
-                }
-                // Lit "glow props" (emissive authored equal to the colour, e.g. the
-                // 0x38f6ff pylons and weapon accent strips) also skip ACES, which
-                // otherwise washes them toward white.
-                if (v && v.toneMapped === undefined && this.isMeshStandardMaterial &&
-                    v.emissive !== undefined && v.color !== undefined && this.color.equals(this.emissive) &&
-                    (v.emissiveIntensity === undefined ? 1 : v.emissiveIntensity) >= 0.4) {
-                    this.toneMapped = false;
-                }
-            };
-        })();
-        // Cached sRGB hex -> linear THREE.Color for hot paths (instance packing)
-        const _linearHexCache = new Map();
-        function linearColorFromHex(hex) {
-            let c = _linearHexCache.get(hex);
-            if (!c) {
-                c = new THREE.Color(hex).convertSRGBToLinear();
-                _linearHexCache.set(hex, c);
-            }
-            return c;
-        }
-        
         // Game elements
         const loadingScreen = document.getElementById('loading-screen');
         const progressFill = document.getElementById('progress-fill');
@@ -4443,21 +4406,13 @@
         const CONTENT = CONTENT_TIERS[contentTier];
         
         // Graphics profiles: visual budgets only
-        // V1.7 fields:
-        //  - surfaceDetail: procedural grime/contact/roughness on the shared map
-        //    material, driven by a uniform (0 = off), so switching never recompiles.
-        //  - haloBudget: max simultaneous additive glow sprites (pooled).
-        //  - shadowResolution: the shadow camera now covers the whole +/-50.5 m
-        //    arena (142 x 120 m instead of 60 x 60 m), i.e. ~2.4x fewer texels per
-        //    metre at the same size. The old note that 4096 looked identical to 2048
-        //    was measured on the +/-30 m frustum and no longer holds, so High uses
-        //    4096 again. The environment map is on at every tier (one cheap PMREM
-        //    texture that replaced two point lights).
         const GRAPHICS_PROFILES = {
-            low:    { drawDistance: 60,  maxParticles: 5,  maxDecals: 10, shadows: false, shadowResolution: 1024, fogDensity: 0.01,   maxPixelRatio: 1,        surfaceDetail: 0, haloBudget: 4 },
-            medium: { drawDistance: 80,  maxParticles: 10, maxDecals: 20, shadows: true,  shadowResolution: 2048, fogDensity: 0.008,  maxPixelRatio: 1.5,      surfaceDetail: 1, haloBudget: 8 },
-            high:   { drawDistance: 100, maxParticles: 15, maxDecals: 30, shadows: true,  shadowResolution: 4096, fogDensity: 0.005,  maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 12 },
-            ultra:  { drawDistance: 135, maxParticles: 20, maxDecals: 40, shadows: true,  shadowResolution: 4096, fogDensity: 0.0035, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16 }
+            low:    { drawDistance: 60,  maxParticles: 5,  maxDecals: 10, shadows: false, shadowResolution: 1024, fogDensity: 0.01,   maxPixelRatio: 1 },
+            medium: { drawDistance: 80,  maxParticles: 10, maxDecals: 20, shadows: true,  shadowResolution: 2048, fogDensity: 0.008,  maxPixelRatio: 1.5 },
+            // High was 4096; a 4096 vs 2048 pixel comparison at 1920x1080 showed no
+            // pixel differing by more than 16/255. Set back to 4096 to restore.
+            high:   { drawDistance: 100, maxParticles: 15, maxDecals: 30, shadows: true,  shadowResolution: 2048, fogDensity: 0.005,  maxPixelRatio: Infinity },
+            ultra:  { drawDistance: 135, maxParticles: 20, maxDecals: 40, shadows: true,  shadowResolution: 4096, fogDensity: 0.0035, maxPixelRatio: Infinity }
         };
         const QUALITY_ORDER = ['low', 'medium', 'high'];
         
@@ -4468,8 +4423,6 @@
             drawDistance: 80,
             maxParticles: 10,
             maxDecals: 20,
-            surfaceDetail: 1,
-            maxHalos: 8,
             activeDecals: []
         };
         
@@ -5261,9 +5214,6 @@
         if (_gfxQuery.get('power') === 'high') _glParams.powerPreference = 'high-performance';
         if (_gfxQuery.get('power') === 'low') _glParams.powerPreference = 'low-power';
         const renderer = new THREE.WebGLRenderer(_glParams);
-        renderer.outputEncoding = THREE.sRGBEncoding;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.1;
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -5274,248 +5224,47 @@
         perfTelemetry.instrumentGL();
         
         // Create lights
-        // V1.7: the PMREM environment map (scene.environment) is the main fill, so
-        // the ambient term is only a small floor for unlit-by-IBL materials
-        // (Lambert). Intensities are set per atmosphere mode by refreshSceneLighting().
-        const ambientLight = new THREE.AmbientLight(0xcccccc, 0.1);
+        const ambientLight = new THREE.AmbientLight(0xcccccc, 0.5);
         scene.add(ambientLight);
         
-        // Same sun direction as before, moved back so the orthographic shadow camera
-        // can cover the whole +/-50.5 m arena (20 m perimeter walls included):
-        // light-space extents of that box are x +/-70, y -52..65.4, depth 19..127.7.
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(30, 60, 45);
+        directionalLight.position.set(5, 10, 7.5);
         directionalLight.castShadow = true;
         directionalLight.shadow.mapSize.width = 2048;
         directionalLight.shadow.mapSize.height = 2048;
-        directionalLight.shadow.camera.near = 17;
-        directionalLight.shadow.camera.far = 131;
-        directionalLight.shadow.camera.left = -71;
-        directionalLight.shadow.camera.right = 71;
-        directionalLight.shadow.camera.top = 67;
-        directionalLight.shadow.camera.bottom = -53;
-        directionalLight.shadow.bias = -0.0004;
-        directionalLight.shadow.normalBias = 0.03;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 100;
+        directionalLight.shadow.camera.left = -30;
+        directionalLight.shadow.camera.right = 30;
+        directionalLight.shadow.camera.top = 30;
+        directionalLight.shadow.camera.bottom = -30;
         scene.add(directionalLight);
         
-        // Former accent point lights. They are replaced by emissive panels in the
-        // environment map; hidden lights are not counted by r128, so every lit
-        // program is compiled (and warmed) for 0 accent lights + 0..N enemy flashes.
+        // Add accent lights for atmosphere
         const redLight = new THREE.PointLight(0xff4655, 1, 50);
         redLight.position.set(-20, 10, -20);
-        redLight.visible = false;
         scene.add(redLight);
         
         const blueLight = new THREE.PointLight(0x4672ff, 1, 50);
         blueLight.position.set(20, 10, -20);
-        blueLight.visible = false;
         scene.add(blueLight);
         
-        // ---------------------------------------------------------------
-        // Environment lighting (PMREM). One generator, one source scene and
-        // one set of materials live for the whole session: rebuilding only
-        // recolours them and re-renders the cube, so a map or atmosphere change
-        // never compiles or releases a program. The previous env texture is
-        // disposed after the new one replaces it.
-        // ---------------------------------------------------------------
-        const envBuilder = {
-            pmrem: null,
-            scene: null,
-            sky: null,
-            panels: null,
-            texture: null,
-            key: ''
-        };
-        function buildEnvironment(skyHex, groundHex, accentA, accentB, power, sunHex) {
-            const k = power === undefined ? 1 : power;
-            if (!envBuilder.scene) {
-                const env = new THREE.Scene();
-                const geo = new THREE.SphereGeometry(20, 32, 16);
-                geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
-                envBuilder.sky = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide }));
-                env.add(envBuilder.sky);
-                const panel = (x, y, z, w, h) => {
-                    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-                        new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }));
-                    m.position.set(x, y, z);
-                    m.lookAt(0, 0, 0);
-                    env.add(m);
-                    return m;
-                };
-                envBuilder.panels = [
-                    panel(7, 14, 10, 8, 4),     // sun-side softbox
-                    panel(-12, 5, -12, 6, 3),   // replaces redLight
-                    panel(12, 5, -12, 6, 3)     // replaces blueLight
-                ];
-                envBuilder.scene = env;
-                envBuilder.pmrem = new THREE.PMREMGenerator(renderer);
-            }
-            const geo = envBuilder.sky.geometry;
-            const pos = geo.attributes.position, cols = geo.attributes.color.array, c = new THREE.Color();
-            const top = new THREE.Color(skyHex).convertSRGBToLinear().multiplyScalar(2.5 * k);
-            const bottom = new THREE.Color(groundHex).convertSRGBToLinear().multiplyScalar(k);
-            for (let i = 0; i < pos.count; i++) {
-                c.copy(bottom).lerp(top, THREE.MathUtils.smoothstep(pos.getY(i), -6, 10));
-                cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
-            }
-            geo.attributes.color.needsUpdate = true;
-            const setPanel = (m, hex, p) => m.material.color.setHex(hex).convertSRGBToLinear().multiplyScalar(p * k);
-            setPanel(envBuilder.panels[0], sunHex === undefined ? 0xffffff : sunHex, 6);
-            // Accent panels at x1.5 (not x3): at x3 they flooded the dark floors with
-            // saturated grazing reflections and hurt enemy readability.
-            setPanel(envBuilder.panels[1], accentA, 1.5);
-            setPanel(envBuilder.panels[2], accentB, 1.5);
-            const tex = envBuilder.pmrem.fromScene(envBuilder.scene, 0.04).texture;
-            return tex;
-        }
-        
         // Create floor
-        // V1.7: 512 px procedural tile texture, generated once. Neutral light grey
-        // so MAP_PRESETS floorColor still tints it through floorMaterial.color.
-        // Seams sit on the tile borders at 0/128/256/384 (2 px each side), so the
-        // seam at the texture edge is the same width as the inner ones when it
-        // repeats. No roughness map: measured as a second full-screen texture
-        // fetch on the floor (~10% of a fill-bound frame) for a barely visible gain.
-        function createFloorTextures() {
-            const size = 512;
-            const albedo = document.createElement('canvas');
-            albedo.width = albedo.height = size;
-            const ctxA = albedo.getContext('2d');
-            const imgA = ctxA.createImageData(size, size);
-            let seed = 1337;
-            const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-            // Per-tile tone so the floor reads as laid slabs, not a flat sheet
-            const tileTone = [];
-            for (let i = 0; i < 16; i++) tileTone.push((rnd() - 0.5) * 14);
-            for (let y = 0; y < size; y++) {
-                for (let x = 0; x < size; x++) {
-                    const i = (y * size + x) * 4;
-                    const tx = x & 127, ty = y & 127;
-                    const tile = ((y >> 7) << 2) | (x >> 7);
-                    const seamDist = Math.min(tx, ty, 128 - tx, 128 - ty);
-                    let v = 200 + tileTone[tile] + (rnd() - 0.5) * 18;
-                    if (seamDist < 2) v -= 70;
-                    else if (seamDist < 4) v -= 22;
-                    v = Math.max(0, Math.min(255, v));
-                    imgA.data[i] = imgA.data[i + 1] = imgA.data[i + 2] = v;
-                    imgA.data[i + 3] = 255;
-                }
-            }
-            ctxA.putImageData(imgA, 0, 0);
-            const map = new THREE.CanvasTexture(albedo);
-            map.encoding = THREE.sRGBEncoding;
-            map.wrapS = map.wrapT = THREE.RepeatWrapping;
-            map.repeat.set(50, 50);
-            map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-            return { map: map };
-        }
-        const floorTextures = createFloorTextures();
         const floorGeometry = new THREE.PlaneGeometry(200, 200, 20, 20);
         const floorMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x1f2833,
             roughness: 0.8,
-            metalness: 0.2,
-            map: floorTextures.map
+            metalness: 0.2
         });
-        // The authored floor colours were tuned for the old non-sRGB output, where
-        // 0x1f2833 displayed as-is. In linear space they are near-black albedo, so
-        // sun vs shadow barely differed. The tint keeps the preset hue but lifts it
-        // (x2.6 linear) and the floor's env specular is halved so sunlight, not a
-        // grey grazing sheen, sets its brightness and shadows read clearly.
-        const FLOOR_TINT_GAIN = 2.6;
-        function setFloorTint(hex) {
-            floorMaterial.color.setHex(hex).convertSRGBToLinear().multiplyScalar(FLOOR_TINT_GAIN);
-        }
-        setFloorTint(0x1f2833);
-        floorMaterial.envMapIntensity = 0.5;
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
         
-        // V1.7: the 200 m GridHelper is replaced by the tiled floor texture.
-        
-        // Gradient sky dome: one backside sphere (inside camera.far) that follows
-        // the camera. Below the horizon it is exactly the fog/background colour so
-        // the fogged floor edge still blends; above, it brightens toward the
-        // horizon and darkens toward the zenith. Drawn after all opaque geometry
-        // (renderOrder) with depthWrite off, so early-z rejects covered pixels.
-        const skyDome = (function () {
-            const geo = new THREE.SphereGeometry(400, 32, 16);
-            geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
-            geo.attributes.color.setUsage(THREE.DynamicDrawUsage);
-            const mat = new THREE.MeshBasicMaterial({
-                vertexColors: true, side: THREE.BackSide,
-                fog: false, depthWrite: false, toneMapped: false
-            });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.frustumCulled = false;
-            mesh.renderOrder = 10000;
-            mesh.castShadow = false;
-            mesh.receiveShadow = false;
-            return mesh;
-        })();
-        scene.add(skyDome);
-        let skyDomeHex = -1;
-        function recolorSkyDome(skyHex) {
-            if (skyHex === skyDomeHex) return;
-            skyDomeHex = skyHex;
-            const base = new THREE.Color(skyHex);
-            const horizon = base.clone().lerp(new THREE.Color(0xc8d6e5), 0.16).convertSRGBToLinear();
-            const zenith = base.clone().multiplyScalar(0.5).convertSRGBToLinear();
-            const fogC = base.clone().convertSRGBToLinear();
-            const geo = skyDome.geometry;
-            const pos = geo.attributes.position, cols = geo.attributes.color.array, c = new THREE.Color();
-            for (let i = 0; i < pos.count; i++) {
-                const h = pos.getY(i) / 400; // -1..1
-                if (h <= 0.02) c.copy(fogC).lerp(horizon, Math.max(0, h) / 0.02);
-                else c.copy(horizon).lerp(zenith, Math.pow(Math.min(1, (h - 0.02) / 0.75), 0.7));
-                cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
-            }
-            geo.attributes.color.needsUpdate = true;
-        }
-        
-        // Per atmosphere mode lighting. Competitive stays the brightest and most
-        // even so enemies read clearly against walls; night is the darkest.
-        // Exposure/env were calibrated against V1.5 screenshots: the authored map
-        // colours are very dark in linear space and ACES' toe halves dark values,
-        // so exposure 1.1 left shadowed walls near-black. env scales the PMREM
-        // source (sky x2.5 and the panels) for every lit material at once.
-        const ATMOSPHERE_LIGHTING = {
-            competitive: { ambient: 0.16, sun: 1.1, env: 2.4, exposure: 1.65 },
-            daylight:    { ambient: 0.10, sun: 1.0, env: 2.0, exposure: 1.5 },
-            night:       { ambient: 0.06, sun: 0.6, env: 1.0, exposure: 1.15 }
-        };
-        // Applies sun, ambient, exposure, environment map and sky dome for the
-        // active map preset + atmosphere mode. Reads scene.background, which the
-        // map preset / atmosphere code sets just before calling this.
-        function refreshSceneLighting() {
-            const mode = (typeof game !== 'undefined' && game.userSettings && game.userSettings.atmosphereMode) || 'daylight';
-            const look = ATMOSPHERE_LIGHTING[mode] || ATMOSPHERE_LIGHTING.daylight;
-            const presets = (typeof MAP_PRESETS !== 'undefined') ? MAP_PRESETS : null;
-            const preset = presets ? (presets[(typeof game !== 'undefined' && game.mapPreset) || 'ascent'] || presets.ascent) : null;
-            const sunHex = preset && preset.sunColor !== undefined ? preset.sunColor : 0xffffff;
-            const sunIntensity = preset && preset.sunIntensity !== undefined ? preset.sunIntensity : 1.5;
-            directionalLight.color.setHex(sunHex).convertSRGBToLinear();
-            directionalLight.intensity = sunIntensity * look.sun;
-            ambientLight.intensity = look.ambient;
-            renderer.toneMappingExposure = look.exposure;
-            const skyHex = scene.background.getHex();
-            recolorSkyDome(skyHex);
-            const groundHex = preset ? preset.floorColor : 0x1f2833;
-            const accentA = preset && preset.accentA !== undefined ? preset.accentA : 0xff4655;
-            const accentB = preset && preset.accentB !== undefined ? preset.accentB : 0x4672ff;
-            const key = [skyHex, groundHex, accentA, accentB, look.env, sunHex].join(':');
-            if (key !== envBuilder.key) {
-                envBuilder.key = key;
-                const old = scene.environment;
-                scene.environment = buildEnvironment(skyHex, groundHex, accentA, accentB, look.env, sunHex);
-                envBuilder.texture = scene.environment;
-                if (old) old.dispose();
-            }
-        }
-        // First called from initGame() (MAP_PRESETS is declared further down),
-        // before the shader warm-up, so warmed programs include the env map.
+        // Create grid helper
+        const gridHelper = new THREE.GridHelper(200, 100, 0x6ecbff, 0x222233);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
         
         // Compose the local matrix once and stop recomposing it every frame.
         // updateMatrix() also flags matrixWorldNeedsUpdate, so the next scene
@@ -5530,7 +5279,7 @@
         freezeStaticTransform(redLight);
         freezeStaticTransform(blueLight);
         freezeStaticTransform(floor);
-        freezeStaticTransform(skyDome);
+        freezeStaticTransform(gridHelper);
         
         // Only write .visible when it actually changes
         function setVisible(object, visible) {
@@ -5649,239 +5398,6 @@
             light.visible = false;
             scene.add(light);
             enemyFlashLights.push({ object: light, inUse: false, acquireSequence: 0, expireAt: 0 });
-        }
-        
-        // =============================================
-        // V1.7 cheap glow: pooled additive halo quads (no bloom pass)
-        // =============================================
-        // One InstancedMesh of camera-facing quads sharing one radial-gradient
-        // CanvasTexture: every halo together costs one draw call and one program
-        // (compiled and drawn in warmShaderVariants). Each frame the nearest visible
-        // anchors (ability cores, spike core, ult orbs) plus live transient flashes
-        // (enemy muzzle flashes) fill up to GRAPHICS_PROFILES[q].haloBudget slots;
-        // flashes take priority. The player's muzzle flash uses one sprite inside
-        // the viewmodel scene instead (see createWeapons).
-        const HALO_CAPACITY = 16;
-        const HALO_FLASH_POOL = 8;
-        const _haloPos = new THREE.Vector3();
-        const _haloScale = new THREE.Vector3();
-        const _haloMatrix = new THREE.Matrix4();
-        const _haloColor = new THREE.Color();
-        const _haloFwd = new THREE.Vector3();
-        const haloSystem = {
-            mesh: null,
-            texture: null,
-            budget: 8,
-            anchors: [],
-            flashes: [],
-            _sel: [],
-            _selD: [],
-            
-            makeTexture: function() {
-                const size = 64;
-                const canvas = document.createElement('canvas');
-                canvas.width = canvas.height = size;
-                const ctx = canvas.getContext('2d');
-                const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-                g.addColorStop(0, 'rgba(255,255,255,1)');
-                g.addColorStop(0.18, 'rgba(255,255,255,0.55)');
-                g.addColorStop(0.45, 'rgba(255,255,255,0.16)');
-                g.addColorStop(1, 'rgba(255,255,255,0)');
-                ctx.fillStyle = g;
-                ctx.fillRect(0, 0, size, size);
-                const tex = new THREE.CanvasTexture(canvas);
-                tex.encoding = THREE.sRGBEncoding;
-                return tex;
-            },
-            
-            init: function() {
-                this.texture = this.makeTexture();
-                const material = new THREE.MeshBasicMaterial({
-                    map: this.texture,
-                    transparent: true,
-                    depthWrite: false,
-                    blending: THREE.AdditiveBlending,
-                    fog: false,
-                    toneMapped: false
-                });
-                const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), material, HALO_CAPACITY);
-                // instanceColor must exist before the first compile
-                mesh.setColorAt(0, _haloColor.setRGB(1, 1, 1));
-                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
-                mesh.count = 0;
-                mesh.visible = false;
-                mesh.frustumCulled = false; // packed count is the visible set
-                mesh.renderOrder = 1;
-                freezeStaticTransform(mesh);
-                scene.add(mesh);
-                this.mesh = mesh;
-                for (let i = 0; i < HALO_FLASH_POOL; i++) {
-                    this.flashes.push({ inUse: false, x: 0, y: 0, z: 0, color: new THREE.Color(), size: 1, start: 0, end: 0 });
-                }
-            },
-            
-            setBudget: function(n) {
-                this.budget = Math.max(0, Math.min(HALO_CAPACITY, n | 0));
-            },
-            
-            // color is a live THREE.Color (linear), e.g. a material's color/emissive
-            addAnchor: function(object, color, size, strength) {
-                for (let i = 0; i < this.anchors.length; i++) if (this.anchors[i].object === object) return;
-                this.anchors.push({ object: object, color: color, size: size, strength: strength });
-            },
-            
-            flash: function(x, y, z, hex, size, durationMs) {
-                let item = null;
-                for (let i = 0; i < this.flashes.length; i++) {
-                    if (!this.flashes[i].inUse) { item = this.flashes[i]; break; }
-                }
-                if (!item) {
-                    item = this.flashes[0];
-                    for (let i = 1; i < this.flashes.length; i++) {
-                        if (this.flashes[i].start < item.start) item = this.flashes[i];
-                    }
-                }
-                const now = performance.now();
-                item.inUse = true;
-                item.x = x; item.y = y; item.z = z;
-                item.color.copy(linearColorFromHex(hex));
-                item.size = size;
-                item.start = now;
-                item.end = now + durationMs;
-            },
-            
-            // Small additive/unlit "core" meshes of the pooled ability effects
-            // (spheres, octahedra...), found once after the pools exist.
-            collectAbilityAnchors: function() {
-                const coreGeometry = { SphereGeometry: 1, IcosahedronGeometry: 1, OctahedronGeometry: 1, DodecahedronGeometry: 1, TetrahedronGeometry: 1 };
-                scene.traverse(o => {
-                    if (!o.isMesh || o.isInstancedMesh || o === skyDome) return;
-                    const m = o.material;
-                    if (!m || Array.isArray(m) || !m.isMeshBasicMaterial || m.wireframe) return;
-                    if (m.blending !== THREE.AdditiveBlending || !coreGeometry[o.geometry.type]) return;
-                    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
-                    const r = o.geometry.boundingSphere.radius;
-                    if (r < 0.05 || r > 0.7) return;
-                    this.addAnchor(o, m.color, Math.min(2.6, Math.max(0.7, r * 6.5)), 0.55);
-                });
-            },
-            
-            _isShown: function(o) {
-                let n = o;
-                while (n) {
-                    if (!n.visible) return false;
-                    if (n === scene) return true;
-                    n = n.parent;
-                }
-                return false;
-            },
-            
-            _write: function(i, x, y, z, size, color, k) {
-                _haloPos.set(x, y, z);
-                _haloScale.set(size, size, size);
-                _haloMatrix.compose(_haloPos, camera.quaternion, _haloScale);
-                this.mesh.setMatrixAt(i, _haloMatrix);
-                this.mesh.setColorAt(i, _haloColor.copy(color).multiplyScalar(k));
-            },
-            
-            update: function(now) {
-                const mesh = this.mesh;
-                if (!mesh) return;
-                const budget = this.budget;
-                let n = 0;
-                for (let i = 0; i < this.flashes.length; i++) {
-                    const f = this.flashes[i];
-                    if (!f.inUse) continue;
-                    if (now >= f.end) { f.inUse = false; continue; }
-                    if (n >= budget) continue;
-                    const k = 1 - (now - f.start) / (f.end - f.start);
-                    this._write(n++, f.x, f.y, f.z, f.size * (0.7 + 0.3 * k), f.color, 0.9 * k);
-                }
-                const free = budget - n;
-                if (free > 0 && this.anchors.length > 0) {
-                    const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
-                    _haloFwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
-                    const maxD2 = adaptiveSettings.drawDistance * adaptiveSettings.drawDistance;
-                    const sel = this._sel, selD = this._selD;
-                    let count = 0;
-                    for (let i = 0; i < this.anchors.length; i++) {
-                        const a = this.anchors[i];
-                        const o = a.object;
-                        if (!o.visible || !this._isShown(o)) continue;
-                        const m = o.material;
-                        if (m.transparent && m.opacity < 0.05) continue;
-                        // Ranking uses last frame's world matrix; selected anchors refresh it
-                        const e = o.matrixWorld.elements;
-                        const dx = e[12] - cx, dy = e[13] - cy, dz = e[14] - cz;
-                        if (dx * _haloFwd.x + dy * _haloFwd.y + dz * _haloFwd.z < -2) continue;
-                        const d2 = dx * dx + dy * dy + dz * dz;
-                        if (d2 > maxD2) continue;
-                        // keep the nearest `free` anchors (insertion into a tiny sorted list)
-                        let j = count < free ? count++ : free;
-                        if (j === free && d2 >= selD[free - 1]) continue;
-                        if (j === free) j = free - 1;
-                        while (j > 0 && selD[j - 1] > d2) { sel[j] = sel[j - 1]; selD[j] = selD[j - 1]; j--; }
-                        sel[j] = a; selD[j] = d2;
-                    }
-                    for (let s = 0; s < count; s++) {
-                        const a = sel[s];
-                        const o = a.object;
-                        o.updateWorldMatrix(true, false);
-                        const e = o.matrixWorld.elements;
-                        const m = o.material;
-                        const opacity = m.transparent ? m.opacity : 1;
-                        const intensity = m.emissive ? m.emissiveIntensity : 1;
-                        this._write(n++, e[12], e[13], e[14], a.size * o.matrixWorld.getMaxScaleOnAxis(), a.color, a.strength * opacity * intensity);
-                    }
-                }
-                mesh.count = n;
-                if (mesh.visible !== n > 0) mesh.visible = n > 0;
-                if (n > 0) {
-                    perfTelemetry.requestUpload(mesh.instanceMatrix, 0, n * 16);
-                    perfTelemetry.requestUpload(mesh.instanceColor, 0, n * 3);
-                }
-            }
-        };
-        haloSystem.init();
-        
-        // Player muzzle-flash glow: one sprite under each weapon's flash mesh in the
-        // viewmodel scene, shown for the same 50 ms as the flash. Shared material.
-        // The viewmodel holds models at rotation.x = PI (set by recoil/bob/inspect),
-        // which puts the flash mesh at the rear end, behind the camera (pre-existing
-        // V1.5 behaviour, left as is). The halo is placed at the model's forward end
-        // (max local z) so the glow appears where the gun visibly points.
-        let _muzzleHaloMaterial = null;
-        function attachMuzzleHalo(weapon, flashMesh) {
-            if (!_muzzleHaloMaterial) {
-                _muzzleHaloMaterial = new THREE.SpriteMaterial({
-                    map: haloSystem.texture,
-                    color: 0xffcc00,
-                    transparent: true,
-                    opacity: 0.85,
-                    blending: THREE.AdditiveBlending,
-                    depthWrite: false,
-                    fog: false
-                });
-            }
-            const sprite = new THREE.Sprite(_muzzleHaloMaterial);
-            sprite.scale.set(0.42, 0.42, 1);
-            const model = flashMesh.parent;
-            let frontZ = flashMesh.position.z;
-            if (model) {
-                const box = new THREE.Box3();
-                for (const child of model.children) {
-                    if (!child.geometry || child === flashMesh) continue;
-                    if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-                    child.updateMatrix();
-                    box.copy(child.geometry.boundingBox).applyMatrix4(child.matrix);
-                    frontZ = Math.max(frontZ, box.max.z);
-                }
-            }
-            sprite.position.set(0, 0, frontZ + 0.06 - flashMesh.position.z);
-            sprite.visible = false;
-            flashMesh.add(sprite);
-            weapon.muzzleHalo = sprite;
         }
         
         // Actor collections (stable records, reused across respawns)
@@ -6458,11 +5974,6 @@
             adaptiveSettings.maxParticles = profile.maxParticles;
             adaptiveSettings.maxDecals = profile.maxDecals;
             adaptiveSettings.shadowResolution = profile.shadowResolution;
-            adaptiveSettings.surfaceDetail = profile.surfaceDetail;
-            adaptiveSettings.maxHalos = profile.haloBudget;
-            // Uniform only: the detail code is always compiled in, so no recompile
-            mapDetailUniform.value = profile.surfaceDetail;
-            if (typeof haloSystem !== 'undefined') haloSystem.setBudget(profile.haloBudget);
             scene.fog.density = profile.fogDensity;
             
             renderer.shadowMap.enabled = profile.shadows;
@@ -6556,7 +6067,6 @@
             upgradeHoldUntil: 0,
             upgradeBackoffMs: 20000,
             lastWindow: null,
-            shadowHzBefore: 0, // moving-shadow Hz to restore after the controller's 20 Hz cap
             
             startingProfile: function() {
                 return deviceInfo.isMobile ? 'low' : 'medium';
@@ -6614,7 +6124,6 @@
             
             setMovingShadowHz: function(hz) {
                 if (!shadowManager.setMovingHz(hz)) return false;
-                this.shadowHzBefore = 0; // an explicit choice replaces the controller's cap
                 this.log({ kind: 'shadowHz', hz: hz });
                 return true;
             },
@@ -6716,10 +6225,6 @@
                             this.pixelStep++;
                             this.applyPixelRatio();
                             this.resetSamples(now, this.PIXEL_SETTLE_MS);
-                        } else if (trial.kind === 'shadowHz') {
-                            this.shadowHzBefore = shadowManager.MOVING_REFRESH_HZ;
-                            shadowManager.setMovingHz(20);
-                            this.resetSamples(now, this.PIXEL_SETTLE_MS);
                         } else {
                             applyGraphicsProfile(trial.from, 'auto');
                         }
@@ -6761,16 +6266,6 @@
                     this.resetSamples(now, this.PIXEL_SETTLE_MS);
                     return;
                 }
-                // V1.7: full-map shadows make each moving-caster refresh dearer, so
-                // before giving up a profile, cap moving-shadow refreshes at 20 Hz.
-                if (renderer.shadowMap.enabled && shadowManager.MOVING_REFRESH_HZ > 20) {
-                    this.shadowHzBefore = shadowManager.MOVING_REFRESH_HZ;
-                    shadowManager.setMovingHz(20);
-                    this.log({ kind: 'shadowHzDown', from: this.shadowHzBefore, hz: 20, p95: p95, cpuP95: cpuP95 });
-                    this.upgradeHoldUntil = now + this.upgradeBackoffMs;
-                    this.resetSamples(now, this.PIXEL_SETTLE_MS);
-                    return;
-                }
                 const index = QUALITY_ORDER.indexOf(adaptiveSettings.currentQuality);
                 if (index > 0) {
                     const next = QUALITY_ORDER[index - 1];
@@ -6789,15 +6284,6 @@
                     this.resetSamples(now, this.PIXEL_SETTLE_MS);
                     return;
                 }
-                // Undo the controller's own 20 Hz shadow cap first (reversible trial)
-                if (this.shadowHzBefore && shadowManager.MOVING_REFRESH_HZ < this.shadowHzBefore) {
-                    shadowManager.setMovingHz(this.shadowHzBefore);
-                    this.log({ kind: 'shadowHzUp', hz: this.shadowHzBefore, p95: p95 });
-                    this.trial = { kind: 'shadowHz', baselineP95: p95, endAt: now + this.TRIAL_MS };
-                    this.shadowHzBefore = 0;
-                    this.resetSamples(now, this.PIXEL_SETTLE_MS);
-                    return;
-                }
                 const index = QUALITY_ORDER.indexOf(adaptiveSettings.currentQuality);
                 if (index < QUALITY_ORDER.length - 1) {
                     const from = adaptiveSettings.currentQuality;
@@ -6808,13 +6294,7 @@
                 }
             },
             
-            restoreShadowHz: function() {
-                if (this.shadowHzBefore) shadowManager.setMovingHz(this.shadowHzBefore);
-                this.shadowHzBefore = 0;
-            },
-            
             setManual: function(quality) {
-                this.restoreShadowHz();
                 this.auto = false;
                 this.trial = null;
                 this.pixelCheck = null;
@@ -6823,7 +6303,6 @@
             },
             
             setAuto: function() {
-                this.restoreShadowHz();
                 this.auto = true;
                 this.trial = null;
                 this.pixelCheck = null;
@@ -6981,7 +6460,7 @@
                     positions: positions,
                     particleCount: 0,
                     frameCount: 0,
-                    colorR: 1, colorG: 0.0615, colorB: 0.0907,
+                    colorR: 1, colorG: 0.275, colorB: 0.333,
                     opacity: 0.8
                 });
             }
@@ -7012,7 +6491,7 @@
             decalGeometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(decalOpacities, 1));
             decalMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             decalGeometry.attributes.instanceOpacity.setUsage(THREE.DynamicDrawUsage);
-            decalMesh.setColorAt(0, _decalColor.setHex(0x333333).convertSRGBToLinear());
+            decalMesh.setColorAt(0, _decalColor.setHex(0x333333));
             if (decalMesh.instanceColor) decalMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
             scene.add(decalMesh);
             effectBatches.decals = { mesh: decalMesh, opacities: decalOpacities };
@@ -7113,7 +6592,7 @@
                 const item = decals[i];
                 if (!item.inUse || !item.renderVisible) continue;
                 mesh.setMatrixAt(n, item.matrix);
-                mesh.setColorAt(n, linearColorFromHex(0x333333));
+                mesh.setColorAt(n, _decalColor.setHex(0x333333));
                 opacities[n] = item.fadeOpacity;
                 n++;
             }
@@ -7294,39 +6773,6 @@
         const shootProxyMaterial = new THREE.MeshBasicMaterial();
         // One shared lit material; each piece's color comes from instanceColor
         const mapMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.3 });
-        // V1.7 procedural surface detail: world-space value-noise grime, a contact
-        // darkening near the floor and matching roughness variation. Always
-        // compiled in; GRAPHICS_PROFILES.surfaceDetail drives uDetail (0 = off),
-        // so changing quality never recompiles the map program.
-        const mapDetailUniform = { value: 1.0 };
-        mapMaterial.onBeforeCompile = (s) => {
-            s.uniforms.uDetail = mapDetailUniform;
-            s.vertexShader = s.vertexShader
-                .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
-                .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
-                    vec4 wp4 = vec4(transformed, 1.0);
-                    #ifdef USE_INSTANCING
-                        wp4 = instanceMatrix * wp4;
-                    #endif
-                    vWPos = (modelMatrix * wp4).xyz;`);
-            s.fragmentShader = s.fragmentShader
-                .replace('#include <common>', `#include <common>
-                    varying vec3 vWPos; uniform float uDetail;
-                    float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-                    float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
-                        return mix(mix(h21(i), h21(i+vec2(1.0,0.0)), f.x), mix(h21(i+vec2(0.0,1.0)), h21(i+vec2(1.0,1.0)), f.x), f.y); }`)
-                .replace('#include <color_fragment>', `#include <color_fragment>
-                    // Uniform branch (same for every fragment): Low skips the noise
-                    float grime = 0.5;
-                    if (uDetail > 0.0) {
-                        grime = vnoise(vWPos.xz * 0.35 + vWPos.y * 0.5) * 0.6 + vnoise(vWPos.xy * 1.9 + vWPos.zz) * 0.4;
-                        float contact = smoothstep(0.0, 1.5, vWPos.y);
-                        diffuseColor.rgb *= mix(1.0, (0.82 + 0.3 * grime) * mix(0.6, 1.0, contact), uDetail);
-                    }`)
-                .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-                    if (uDetail > 0.0) roughnessFactor = clamp(roughnessFactor * mix(1.0, 0.75 + 0.5 * grime, uDetail), 0.04, 1.0);`);
-        };
-        mapMaterial.customProgramCacheKey = () => 'mapDetail';
         let unitBoxGeometry = null;
         let unitCylinderGeometry = null;
         const _pieceQuaternion = new THREE.Quaternion();
@@ -7340,11 +6786,6 @@
                 name: 'ASCENT',
                 subtitle: 'Venetian Mid Courtyard & Market Plaza',
                 skyColor: 0x1a2530,
-                // V1.7 lighting mood: neutral daylight, Valorant red/blue accents
-                sunColor: 0xfff1e0,
-                sunIntensity: 1.5,
-                accentA: 0xff4655,
-                accentB: 0x4672ff,
                 floorColor: 0x1f2833,
                 wallColor: 0x1f2833,
                 build: function() {
@@ -7380,11 +6821,6 @@
                 name: 'BIND',
                 subtitle: 'Moroccan Solar Desert & Two-Way Teleporters',
                 skyColor: 0x291d12,
-                // V1.7 lighting mood: warm orange desert sun, amber/teleporter-blue accents
-                sunColor: 0xffb26b,
-                sunIntensity: 1.7,
-                accentA: 0xf59e0b,
-                accentB: 0x0ea5e9,
                 floorColor: 0x3b2a1a,
                 wallColor: 0x451a03,
                 build: function() {
@@ -7417,11 +6853,6 @@
                 name: 'HAVEN',
                 subtitle: 'Bhutanese Night Monastery & 3-Lane Courtyard',
                 skyColor: 0x0f172a,
-                // V1.7 lighting mood: soft gold sun, crimson/jade shrine accents
-                sunColor: 0xffd79a,
-                sunIntensity: 1.35,
-                accentA: 0xdc2626,
-                accentB: 0x14b8a6,
                 floorColor: 0x1e293b,
                 wallColor: 0x0f172a,
                 build: function() {
@@ -7452,11 +6883,6 @@
                 name: 'ICEBOX',
                 subtitle: 'Arctic Kingdom Container Port & Sniper Nests',
                 skyColor: 0x0f1e2e,
-                // V1.7 lighting mood: cold white-blue sun, ice-blue/container-orange accents
-                sunColor: 0xdcecff,
-                sunIntensity: 1.6,
-                accentA: 0x38bdf8,
-                accentB: 0xf97316,
                 floorColor: 0x334155,
                 wallColor: 0x1e293b,
                 build: function() {
@@ -7486,11 +6912,6 @@
                 name: 'LOTUS',
                 subtitle: 'Ancient Indian Rock-Cut Temple & Rotating Stone Doors [F]',
                 skyColor: 0x1c141d,
-                // V1.7 lighting mood: warm amber sun, teal/amber temple accents
-                sunColor: 0xffc98a,
-                sunIntensity: 1.5,
-                accentA: 0x14b8a6,
-                accentB: 0xf59e0b,
                 floorColor: 0x4a3525,
                 wallColor: 0x2d1e17,
                 build: function() {
@@ -7523,11 +6944,6 @@
                 name: 'SPLIT',
                 subtitle: 'Tokyo Cyber-Plaza, Heaven Towers & Vertical Ziplines [F]',
                 skyColor: 0x090d16,
-                // V1.7 lighting mood: cool neon night sun, magenta/cyan signage accents
-                sunColor: 0xc7d2fe,
-                sunIntensity: 1.3,
-                accentA: 0xec4899,
-                accentB: 0x06b6d4,
                 floorColor: 0x1e2433,
                 wallColor: 0x111827,
                 build: function() {
@@ -7575,10 +6991,8 @@
             if (scene.background) scene.background.setHex(preset.skyColor);
             if (scene.fog) scene.fog.color.setHex(preset.skyColor);
             if (typeof floorMaterial !== 'undefined' && floorMaterial.color) {
-                setFloorTint(preset.floorColor);
+                floorMaterial.color.setHex(preset.floorColor);
             }
-            // Sun, environment map and sky dome for the new preset (no recompiles)
-            refreshSceneLighting();
 
             // Clear old instanced map batches from scene
             for (let i = 0; i < mapBatches.length; i++) {
@@ -7786,7 +7200,7 @@
             for (const piece of batch.members) {
                 if (!piece.visible) continue;
                 mesh.setMatrixAt(n, piece.matrix);
-                mesh.setColorAt(n, linearColorFromHex(piece.color));
+                mesh.setColorAt(n, _pieceColor.setHex(piece.color));
                 n++;
             }
             mesh.count = n;
@@ -7929,26 +7343,9 @@
             return m.compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(e), new THREE.Vector3(1, 1, 1));
         }
         
-        // V1.7 viewmodel pass: the gun lives in its own scene, drawn after the
-        // world with the depth buffer cleared, so it never clips into walls. Its
-        // camera copies the main camera's transform every frame but keeps a fixed
-        // 75 deg FOV (the default baseFov), so hip-fire framing is unchanged while
-        // the FOV slider and ADS zoom no longer stretch the gun. It has no shadow
-        // casters/receivers and no enemy flash lights, so its programs never vary.
-        const VIEWMODEL_FOV = 75;
-        const viewmodelScene = new THREE.Scene();
-        const viewmodelHemi = new THREE.HemisphereLight(0xbfd4ff, 0x20242c, 0.6);
-        viewmodelScene.add(viewmodelHemi);
-        const viewmodelSun = new THREE.DirectionalLight(0xffffff, 0.9);
-        viewmodelSun.position.set(5, 10, 7.5);
-        viewmodelScene.add(viewmodelSun);
-        const viewmodelCamera = new THREE.PerspectiveCamera(VIEWMODEL_FOV, window.innerWidth / window.innerHeight, 0.01, 50);
-        viewmodelCamera.rotation.order = 'YXZ';
-        viewmodelScene.traverse(o => { if (o !== viewmodelScene) freezeStaticTransform(o); });
-        
         // Create weapon models
         const weaponGroup = new THREE.Group();
-        viewmodelScene.add(weaponGroup);
+        scene.add(weaponGroup);
         
         function createWeapons() {
             // 1. Assault Rifle
@@ -8027,7 +7424,6 @@
             rifleMuzzleFlash.position.z = -0.7;
             rifleGroup.add(rifleMuzzleFlash);
             game.weapons.rifle.muzzleFlash = rifleMuzzleFlash;
-            attachMuzzleHalo(game.weapons.rifle, rifleMuzzleFlash);
             
             // Left and right hands (one merged mesh)
             rifleGroup.add(createHandsMesh(0.2));
@@ -8140,7 +7536,6 @@
             sniperMuzzleFlash.position.z = -1;
             sniperGroup.add(sniperMuzzleFlash);
             game.weapons.sniper.muzzleFlash = sniperMuzzleFlash;
-            attachMuzzleHalo(game.weapons.sniper, sniperMuzzleFlash);
             
             // Hands (one merged mesh)
             sniperGroup.add(createHandsMesh(0.3));
@@ -8228,7 +7623,6 @@
             pistolMuzzleFlash.position.set(0, 0.03, -0.36);
             pistolGroup.add(pistolMuzzleFlash);
             game.weapons.pistol.muzzleFlash = pistolMuzzleFlash;
-            attachMuzzleHalo(game.weapons.pistol, pistolMuzzleFlash);
 
             // Hands
             pistolGroup.add(createHandsMesh(0.16));
@@ -8500,7 +7894,7 @@
             mesh.receiveShadow = true;
             mesh.frustumCulled = true;
             mesh.count = TARGET_PAGE_CAP;
-            mesh.setColorAt(0, _enemyInstanceColor.setHex(0xffffff).convertSRGBToLinear());
+            mesh.setColorAt(0, _enemyInstanceColor.setHex(0xffffff));
             for (let s = 1; s < TARGET_PAGE_CAP; s++) mesh.setColorAt(s, _enemyInstanceColor);
             mesh.count = 0;
             mesh.visible = false;
@@ -8917,7 +8311,7 @@
                 mesh.frustumCulled = true;
                 mesh.count = ENEMY_PAGE_CAP;
                 mesh.visible = false;
-                mesh.setColorAt(0, _enemyInstanceColor.setHex(spec.color).convertSRGBToLinear());
+                mesh.setColorAt(0, _enemyInstanceColor.setHex(spec.color));
                 for (let s = 1; s < ENEMY_PAGE_CAP; s++) mesh.setColorAt(s, _enemyInstanceColor);
                 mesh.count = 0;
                 mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -9377,7 +8771,7 @@
             const palette = [torsoCol, headCol, arch.colors.legs, arch.colors.weapon];
             for (let i = 0; i < actor.rest.length; i++) {
                 const hex = palette[i] !== undefined ? palette[i] : torsoCol;
-                actor.rest[i].color.setHex(hex).convertSRGBToLinear();
+                actor.rest[i].color.setHex(hex);
             }
             
             const group = actor.mesh;
@@ -10199,8 +9593,6 @@
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
-            viewmodelCamera.aspect = camera.aspect;
-            viewmodelCamera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             deviceInfo.screenWidth = window.innerWidth;
             deviceInfo.screenHeight = window.innerHeight;
@@ -10557,7 +9949,7 @@
                 if (nameEl) nameEl.textContent = 'Phantom';
                 if (tagEl) tagEl.textContent = 'SILENCED';
                 if (r.model && r.model.children[0] && r.model.children[0].material) {
-                    r.model.children[0].material.color.setHex(0x164e63).convertSRGBToLinear();
+                    r.model.children[0].material.color.setHex(0x164e63);
                 }
             } else if (variant === 'bulldog') {
                 r.name = 'Bulldog Burst-Rifle';
@@ -10578,7 +9970,7 @@
                 if (nameEl) nameEl.textContent = 'Bulldog';
                 if (tagEl) tagEl.textContent = 'ADS 3-BURST';
                 if (r.model && r.model.children[0] && r.model.children[0].material) {
-                    r.model.children[0].material.color.setHex(0x3f6212).convertSRGBToLinear();
+                    r.model.children[0].material.color.setHex(0x3f6212);
                 }
             } else if (variant === 'judge') {
                 r.name = 'Judge Auto-Shotgun';
@@ -10599,7 +9991,7 @@
                 if (nameEl) nameEl.textContent = 'Judge';
                 if (tagEl) tagEl.textContent = '6-PELLET';
                 if (r.model && r.model.children[0] && r.model.children[0].material) {
-                    r.model.children[0].material.color.setHex(0x78350f).convertSRGBToLinear();
+                    r.model.children[0].material.color.setHex(0x78350f);
                 }
             } else {
                 game.primaryVariant = 'vandal';
@@ -10621,7 +10013,7 @@
                 if (nameEl) nameEl.textContent = 'Vandal';
                 if (tagEl) tagEl.textContent = 'RIFLE';
                 if (r.model && r.model.children[0] && r.model.children[0].material) {
-                    r.model.children[0].material.color.setHex(0x2b2d42).convertSRGBToLinear();
+                    r.model.children[0].material.color.setHex(0x2b2d42);
                 }
             }
 
@@ -10655,7 +10047,7 @@
                 if (nameEl) nameEl.textContent = 'Outlaw';
                 if (tagEl) tagEl.textContent = '2-BARREL';
                 if (s.model && s.model.children[0] && s.model.children[0].material) {
-                    s.model.children[0].material.color.setHex(0xb45309).convertSRGBToLinear();
+                    s.model.children[0].material.color.setHex(0xb45309);
                 }
             } else if (variant === 'marshal') {
                 s.name = 'Marshal Scout Sniper';
@@ -10675,7 +10067,7 @@
                 if (nameEl) nameEl.textContent = 'Marshal';
                 if (tagEl) tagEl.textContent = 'SCOUT';
                 if (s.model && s.model.children[0] && s.model.children[0].material) {
-                    s.model.children[0].material.color.setHex(0x0f766e).convertSRGBToLinear();
+                    s.model.children[0].material.color.setHex(0x0f766e);
                 }
             } else {
                 game.sniperVariant = 'operator';
@@ -10696,7 +10088,7 @@
                 if (nameEl) nameEl.textContent = 'Operator';
                 if (tagEl) tagEl.textContent = '3.75X SCOPE';
                 if (s.model && s.model.children[0] && s.model.children[0].material) {
-                    s.model.children[0].material.color.setHex(0x1b263b).convertSRGBToLinear();
+                    s.model.children[0].material.color.setHex(0x1b263b);
                 }
             }
 
@@ -10730,7 +10122,7 @@
                 if (nameEl) nameEl.textContent = 'Frenzy';
                 if (tagEl) tagEl.textContent = 'FULL-AUTO';
                 if (p.model && p.model.children[0] && p.model.children[0].material) {
-                    p.model.children[0].material.color.setHex(0xd97706).convertSRGBToLinear();
+                    p.model.children[0].material.color.setHex(0xd97706);
                 }
             } else if (variant === 'classic') {
                 game.pistolBurstMode = true;
@@ -10750,7 +10142,7 @@
                 if (nameEl) nameEl.textContent = 'Classic';
                 if (tagEl) tagEl.textContent = '3-BURST';
                 if (p.model && p.model.children[0] && p.model.children[0].material) {
-                    p.model.children[0].material.color.setHex(0x334155).convertSRGBToLinear();
+                    p.model.children[0].material.color.setHex(0x334155);
                 }
             } else {
                 game.pistolVariant = 'sheriff';
@@ -10771,7 +10163,7 @@
                 if (nameEl) nameEl.textContent = 'Sheriff';
                 if (tagEl) tagEl.textContent = 'SIDEARM';
                 if (p.model && p.model.children[0] && p.model.children[0].material) {
-                    p.model.children[0].material.color.setHex(0x1e293b).convertSRGBToLinear();
+                    p.model.children[0].material.color.setHex(0x1e293b);
                 }
             }
 
@@ -11787,8 +11179,8 @@
 
                 if (leafObj) {
                     target.flashUntil[leafIndex] = 0;
-                    leafObj.material.color.set(leafIndex === 3 ? 0xffd166 : 0x00ff00).convertSRGBToLinear();
-                    if (leafObj.material.emissive) leafObj.material.emissive.set(leafIndex === 3 ? 0xffaa00 : 0x00ff00).convertSRGBToLinear();
+                    leafObj.material.color.set(leafIndex === 3 ? 0xffd166 : 0x00ff00);
+                    if (leafObj.material.emissive) leafObj.material.emissive.set(leafIndex === 3 ? 0xffaa00 : 0x00ff00);
                 }
                 target.colorDirty = true;
                 syncTargetBroadphase(target);
@@ -11810,7 +11202,7 @@
             } else {
                 showHitMarker(hitMarkerKind);
                 if (leafObj) {
-                    leafObj.material.color.set(leafIndex === 3 ? 0xffd166 : 0xffaa00).convertSRGBToLinear();
+                    leafObj.material.color.set(leafIndex === 3 ? 0xffd166 : 0xffaa00);
                     target.flashUntil[leafIndex] = effectNow + ACTOR_FLASH_MS;
                     target.colorDirty = true;
                 }
@@ -11921,7 +11313,7 @@
             } else {
                 const flashColor = isHeadshot ? 0xff2a4b : (armorAbsorbed > 0 ? 0x38f6ff : (isLegshot ? 0x94a3b8 : 0xffaa00));
                 for (let j = 0; j < enemy.leaves.length; j++) {
-                    enemy.leaves[j].material.color.set(flashColor).convertSRGBToLinear();
+                    enemy.leaves[j].material.color.set(flashColor);
                     enemy.flashUntil[j] = effectNow + ACTOR_FLASH_MS;
                 }
                 enemy.colorDirty = true;
@@ -17210,7 +16602,7 @@
                 proj.velocity.y += 2.8;
                 proj.gravity = 14.0;
                 proj.detonateAt = now + 1700;
-                proj.mat.color.setHex(0xa3e635).convertSRGBToLinear();
+                proj.mat.color.setHex(0xa3e635);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.gekkoMosh();
@@ -17394,8 +16786,8 @@
                 gg.pickupReadyAt = now + 350;
                 gg.expireAt = now + 14000;
                 const col = kind === 'q' ? 0xfacc15 : (kind === 'x' ? 0xf43f5e : 0xa3e635);
-                gg.coreMat.color.setHex(col).convertSRGBToLinear();
-                gg.ringMat.color.setHex(col).convertSRGBToLinear();
+                gg.coreMat.color.setHex(col);
+                gg.ringMat.color.setHex(col);
                 gg.group.position.copy(gg.position);
                 gg.group.visible = true;
             },
@@ -17413,7 +16805,7 @@
                 proj.velocity.y += 2.6;
                 proj.gravity = 14.5;
                 proj.detonateAt = now + 1650;
-                proj.mat.color.setHex(0x38bdf8).convertSRGBToLinear();
+                proj.mat.color.setHex(0x38bdf8);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.deadlockGravNet();
@@ -17614,7 +17006,7 @@
                 proj.velocity.y += 2.7;
                 proj.gravity = 14.5;
                 proj.detonateAt = now + 1700;
-                proj.mat.color.setHex(0x06b6d4).convertSRGBToLinear();
+                proj.mat.color.setHex(0x06b6d4);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.harborCove();
@@ -17891,7 +17283,7 @@
                 proj.velocity.y += 2.6;
                 proj.gravity = 14.5;
                 proj.detonateAt = now + 1700;
-                proj.mat.color.setHex(0xc084fc).convertSRGBToLinear();
+                proj.mat.color.setHex(0xc084fc);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.vyseRazorvine();
@@ -18028,7 +17420,7 @@
                 proj.velocity.y += 2.4;
                 proj.gravity = 14.0;
                 proj.detonateAt = now + 1500;
-                proj.mat.color.setHex(0xf59e0b).convertSRGBToLinear();
+                proj.mat.color.setHex(0xf59e0b);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.tejoConcuss();
@@ -18139,7 +17531,7 @@
                 proj.velocity.y += 2.2;
                 proj.gravity = 13.5;
                 proj.detonateAt = now + 650;
-                proj.mat.color.setHex(0xfde047).convertSRGBToLinear();
+                proj.mat.color.setHex(0xfde047);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.waylaySaturate();
@@ -18404,7 +17796,7 @@
                 proj.velocity.y += 2.5;
                 proj.gravity = 14.0;
                 proj.detonateAt = now + 1600;
-                proj.mat.color.setHex(0x10b981).convertSRGBToLinear();
+                proj.mat.color.setHex(0x10b981);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.vetoChokehold();
@@ -18498,7 +17890,7 @@
                 proj.velocity.y += 2.4;
                 proj.gravity = 14.0;
                 proj.detonateAt = now + 1500;
-                proj.mat.color.setHex(0xec4899).convertSRGBToLinear();
+                proj.mat.color.setHex(0xec4899);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.miksMPulse();
@@ -18832,7 +18224,7 @@
                 proj.velocity.y += 2.6;
                 proj.gravity = 13.5;
                 proj.detonateAt = now + 1600;
-                proj.mat.color.setHex(0xf472b6).convertSRGBToLinear();
+                proj.mat.color.setHex(0xf472b6);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.cloveMeddle();
@@ -18921,7 +18313,7 @@
                 proj.gravity = 16.0;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 680;
-                proj.mesh.material.color.setHex(0xa855f7).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xa855f7);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.fadeHaunt();
@@ -18978,7 +18370,7 @@
                 proj.gravity = 14.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 850;
-                proj.mesh.material.color.setHex(0xc084fc).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xc084fc);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.fadeHaunt();
@@ -19073,7 +18465,7 @@
                 proj.gravity = 2.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 520;
-                proj.mesh.material.color.setHex(0xfb923c).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xfb923c);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.flash();
@@ -19144,7 +18536,7 @@
                 proj.gravity = 15.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1500;
-                proj.mesh.material.color.setHex(0x6366f1).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x6366f1);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.kayoFragment();
@@ -19184,7 +18576,7 @@
                 proj.gravity = isPopFlash ? 9.5 : 11.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + (isPopFlash ? 520 : 820);
-                proj.mesh.material.color.setHex(0x818cf8).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x818cf8);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.flash();
@@ -19202,7 +18594,7 @@
                 proj.gravity = 6.0;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1700;
-                proj.mesh.material.color.setHex(0x6366f1).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x6366f1);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.kayoSuppress();
@@ -19436,7 +18828,7 @@
                 proj.gravity = 9.0;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1200;
-                proj.mesh.material.color.setHex(0x00f5d4).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x00f5d4);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.neonSlide();
@@ -19549,8 +18941,8 @@
                     this.neonBeam.group.lookAt(_abilityTempVec);
                     this.neonBeam.outerMesh.scale.set(0.65, 0.65, beamLen);
                     this.neonBeam.coreMesh.scale.set(0.75, 0.75, beamLen);
-                    this.neonBeam.outerMat.color.setHex(0x00f5d4).convertSRGBToLinear();
-                    this.neonBeam.coreMat.color.setHex(0xfef08a).convertSRGBToLinear();
+                    this.neonBeam.outerMat.color.setHex(0x00f5d4);
+                    this.neonBeam.coreMat.color.setHex(0xfef08a);
                     this.neonBeam.group.visible = true;
                     this.neonBeam.active = true;
                     this.neonBeam.startAt = now;
@@ -19594,8 +18986,8 @@
                 tm.position.set(tx, floorY, tz);
                 tm.startAt = now;
                 tm.expireAt = now + 24000;
-                tm.rotorMat.color.setHex(0xf59e0b).convertSRGBToLinear();
-                tm.ringMat.color.setHex(0xfbbf24).convertSRGBToLinear();
+                tm.rotorMat.color.setHex(0xf59e0b);
+                tm.ringMat.color.setHex(0xfbbf24);
                 tm.ringMesh.scale.set(2.2, 2.2, 1);
                 tm.group.position.copy(tm.position);
                 tm.group.visible = true;
@@ -19656,8 +19048,8 @@
                     this.neonBeam.group.lookAt(_abilityTempVec);
                     this.neonBeam.outerMesh.scale.set(0.42, 0.42, beamLen);
                     this.neonBeam.coreMesh.scale.set(0.55, 0.55, beamLen);
-                    this.neonBeam.outerMat.color.setHex(0xf59e0b).convertSRGBToLinear();
-                    this.neonBeam.coreMat.color.setHex(0xfef08a).convertSRGBToLinear();
+                    this.neonBeam.outerMat.color.setHex(0xf59e0b);
+                    this.neonBeam.coreMat.color.setHex(0xfef08a);
                     this.neonBeam.group.visible = true;
                     this.neonBeam.active = true;
                     this.neonBeam.startAt = now;
@@ -19806,8 +19198,8 @@
                     this.neonBeam.group.lookAt(_abilityTempVec);
                     this.neonBeam.outerMesh.scale.set(0.85, 0.85, beamLen);
                     this.neonBeam.coreMesh.scale.set(0.95, 0.95, beamLen);
-                    this.neonBeam.outerMat.color.setHex(0xf59e0b).convertSRGBToLinear();
-                    this.neonBeam.coreMat.color.setHex(0xfef08a).convertSRGBToLinear();
+                    this.neonBeam.outerMat.color.setHex(0xf59e0b);
+                    this.neonBeam.coreMat.color.setHex(0xfef08a);
                     this.neonBeam.group.visible = true;
                     this.neonBeam.active = true;
                     this.neonBeam.startAt = now;
@@ -19854,7 +19246,7 @@
                 proj.gravity = 15.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1550;
-                proj.mesh.material.color.setHex(0x22c55e).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x22c55e);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.viperToxin();
@@ -19937,7 +19329,7 @@
                 proj.gravity = 9.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 520;
-                proj.mesh.material.color.setHex(0x3b82f6).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x3b82f6);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.yoruRift();
@@ -20013,8 +19405,8 @@
                 wire.position.set(wx, floorY, wz);
                 wire.startAt = now;
                 wire.expireAt = now + 20000;
-                wire.beamMat.color.setHex(0x38bdf8).convertSRGBToLinear();
-                wire.ringMat.color.setHex(0x38bdf8).convertSRGBToLinear();
+                wire.beamMat.color.setHex(0x38bdf8);
+                wire.ringMat.color.setHex(0x38bdf8);
                 wire.group.position.copy(wire.position);
                 wire.group.rotation.set(0, yaw, 0);
                 wire.group.visible = true;
@@ -20120,7 +19512,7 @@
                 proj.gravity = 15.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1650;
-                proj.mesh.material.color.setHex(0xf97316).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xf97316);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.molly();
@@ -20192,10 +19584,10 @@
                 bot.velocity.set(fwdX * speed, 0, fwdZ * speed);
                 bot.startAt = now;
                 bot.expireAt = now + (isAlarmbot ? 12000 : 7500);
-                bot.bodyMat.color.setHex(isAlarmbot ? 0xfacc15 : 0xfb923c).convertSRGBToLinear();
-                bot.bodyMat.emissive.setHex(isAlarmbot ? 0x854d0e : 0x9a3412).convertSRGBToLinear();
-                bot.domeMat.color.setHex(isAlarmbot ? 0xe879f9 : 0xfef08a).convertSRGBToLinear();
-                bot.ringMat.color.setHex(isAlarmbot ? 0xfacc15 : 0xfb923c).convertSRGBToLinear();
+                bot.bodyMat.color.setHex(isAlarmbot ? 0xfacc15 : 0xfb923c);
+                bot.bodyMat.emissive.setHex(isAlarmbot ? 0x854d0e : 0x9a3412);
+                bot.domeMat.color.setHex(isAlarmbot ? 0xe879f9 : 0xfef08a);
+                bot.ringMat.color.setHex(isAlarmbot ? 0xfacc15 : 0xfb923c);
                 bot.group.position.copy(bot.position);
                 bot.group.visible = true;
 
@@ -20249,7 +19641,7 @@
                 proj.gravity = 15.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1250;
-                proj.mesh.material.color.setHex(0xfb923c).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xfb923c);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.blastPack();
@@ -20269,7 +19661,7 @@
                 proj.gravity = 2.2;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1600;
-                proj.mesh.material.color.setHex(0xff5500).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xff5500);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
 
@@ -20298,7 +19690,7 @@
                 proj.gravity = 15.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1500;
-                proj.mesh.material.color.setHex(0xfacc15).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xfacc15);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.molly();
@@ -20397,7 +19789,7 @@
                 proj.gravity = 5.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1800;
-                proj.mesh.material.color.setHex(0x38f6ff).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x38f6ff);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.sonar();
@@ -20436,7 +19828,7 @@
                 proj.gravity = 2.0;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 420;
-                proj.mesh.material.color.setHex(0xffe066).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xffe066);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.flash();
@@ -20453,7 +19845,7 @@
                 proj.gravity = 7.5;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1800;
-                proj.mesh.material.color.setHex(0x7cc4ff).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x7cc4ff);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.shock();
@@ -20471,7 +19863,7 @@
                 proj.gravity = 15.0;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1600;
-                proj.mesh.material.color.setHex(0x10b981).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0x10b981);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.slowZone();
@@ -20492,7 +19884,7 @@
                 proj.gravity = 6.0;
                 proj.spawnAt = now;
                 proj.detonateAt = now + airburstSec * 1000;
-                proj.mesh.material.color.setHex(colorHex).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(colorHex);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.smoke();
@@ -20510,7 +19902,7 @@
                 proj.gravity = 16.0;
                 proj.spawnAt = now;
                 proj.detonateAt = now + 1600;
-                proj.mesh.material.color.setHex(0xff6b00).convertSRGBToLinear();
+                proj.mesh.material.color.setHex(0xff6b00);
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.molly();
@@ -20558,7 +19950,7 @@
                 wall.group.position.set(wx, floorY + sizeY * 0.5, wz);
                 wall.group.visible = true;
                 wall.mat.opacity = 0.92;
-                wall.mat.color.setHex(0x34d399).convertSRGBToLinear();
+                wall.mat.color.setHex(0x34d399);
 
                 // Register dynamic collider in collisionIndex so players can stand on it & enemies collide with it
                 const wallBounds = new THREE.Box3(
@@ -20626,9 +20018,9 @@
             damageIceWall: function(wall, dmg) {
                 if (!wall || !wall.inUse) return;
                 wall.health -= dmg;
-                wall.mat.color.setHex(0x6ee7b7).convertSRGBToLinear();
+                wall.mat.color.setHex(0x6ee7b7);
                 setTimeout(() => {
-                    if (wall.inUse) wall.mat.color.setHex(0x34d399).convertSRGBToLinear();
+                    if (wall.inUse) wall.mat.color.setHex(0x34d399);
                 }, 80);
                 if (wall.health <= 0) {
                     this.spawnFlashBurst(wall.group.position.x, wall.group.position.y, wall.group.position.z, 0x34d399, 3.2, 280, performance.now());
@@ -21474,7 +20866,7 @@
             applyEnemyBlind: function(enemy, now, durationMs) {
                 enemy.blindedUntil = Math.max(enemy.blindedUntil, now + durationMs);
                 for (let j = 0; j < enemy.leaves.length; j++) {
-                    enemy.leaves[j].material.color.setHex(0xffe066).convertSRGBToLinear();
+                    enemy.leaves[j].material.color.setHex(0xffe066);
                     enemy.flashUntil[j] = enemy.blindedUntil;
                 }
                 enemy.colorDirty = true;
@@ -21502,7 +20894,7 @@
                 item.startAt = now;
                 item.expireAt = now + 420;
                 item.maxScale = maxScale;
-                item.mat.color.setHex(colorHex).convertSRGBToLinear();
+                item.mat.color.setHex(colorHex);
                 item.mat.opacity = 0.8;
                 item.mesh.position.set(x, y, z);
                 item.mesh.scale.set(0.4, 0.4, 0.4);
@@ -21527,39 +20919,39 @@
                 item.isNebulaSmoke = (colorHex === 0xa855f7);
                 item.isWaveformSmoke = (colorHex === 0xec4899);
                 if (item.isDarkCover) {
-                    item.outerMat.color.setHex(0x312e81).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x1e1b4b).convertSRGBToLinear();
-                    item.innerMat.color.setHex(0x818cf8).convertSRGBToLinear();
+                    item.outerMat.color.setHex(0x312e81);
+                    item.outerMat.emissive.setHex(0x1e1b4b);
+                    item.innerMat.color.setHex(0x818cf8);
                 } else if (item.isCyberCage) {
-                    item.outerMat.color.setHex(0x0284c7).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x0369a1).convertSRGBToLinear();
-                    item.innerMat.color.setHex(0xe0f2fe).convertSRGBToLinear();
+                    item.outerMat.color.setHex(0x0284c7);
+                    item.outerMat.emissive.setHex(0x0369a1);
+                    item.innerMat.color.setHex(0xe0f2fe);
                 } else if (item.isPoisonCloud) {
-                    item.outerMat.color.setHex(0x15803d).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x14532d).convertSRGBToLinear();
-                    item.innerMat.color.setHex(0x86efac).convertSRGBToLinear();
+                    item.outerMat.color.setHex(0x15803d);
+                    item.outerMat.emissive.setHex(0x14532d);
+                    item.innerMat.color.setHex(0x86efac);
                 } else if (item.isRuseSmoke) {
-                    item.outerMat.color.setHex(0x9d174d).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x500724).convertSRGBToLinear();
-                    item.innerMat.color.setHex(0xfbcfe8).convertSRGBToLinear();
+                    item.outerMat.color.setHex(0x9d174d);
+                    item.outerMat.emissive.setHex(0x500724);
+                    item.innerMat.color.setHex(0xfbcfe8);
                 } else if (item.isNebulaSmoke) {
-                    item.outerMat.color.setHex(0x581c87).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x3b0764).convertSRGBToLinear();
-                    item.innerMat.color.setHex(0xfde047).convertSRGBToLinear();
+                    item.outerMat.color.setHex(0x581c87);
+                    item.outerMat.emissive.setHex(0x3b0764);
+                    item.innerMat.color.setHex(0xfde047);
                 } else if (item.isWaveformSmoke) {
-                    item.outerMat.color.setHex(0x9d174d).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x4c0519).convertSRGBToLinear();
-                    item.innerMat.color.setHex(0x22d3ee).convertSRGBToLinear();
+                    item.outerMat.color.setHex(0x9d174d);
+                    item.outerMat.emissive.setHex(0x4c0519);
+                    item.innerMat.color.setHex(0x22d3ee);
                 } else if (colorHex === 0xd97706) {
-                    item.outerMat.color.setHex(0x9a3412).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x7c2d12).convertSRGBToLinear();
-                    item.innerMat.color.setHex(0xfde68a).convertSRGBToLinear();
+                    item.outerMat.color.setHex(0x9a3412);
+                    item.outerMat.emissive.setHex(0x7c2d12);
+                    item.innerMat.color.setHex(0xfde68a);
                 } else {
-                    item.outerMat.color.setHex(colorHex === 0x57a8ff ? 0x6ea8e6 : 0x7fd4e6).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x164e63).convertSRGBToLinear();
-                    item.innerMat.color.setHex(0xcffafe).convertSRGBToLinear();
+                    item.outerMat.color.setHex(colorHex === 0x57a8ff ? 0x6ea8e6 : 0x7fd4e6);
+                    item.outerMat.emissive.setHex(0x164e63);
+                    item.innerMat.color.setHex(0xcffafe);
                 }
-                item.ringMat.color.setHex(colorHex).convertSRGBToLinear();
+                item.ringMat.color.setHex(colorHex);
                 item.group.position.copy(item.position);
                 item.group.scale.set(0.2, 0.2, 0.2);
                 item.group.visible = true;
@@ -21580,8 +20972,8 @@
                 item.startAt = now;
                 item.expireAt = now + (isIncendiary ? 7500 : (isSnakeBite ? 6500 : (isNanoswarm ? 6000 : 6500)));
                 item.nextTickAt = now + 100;
-                item.discMat.color.setHex(isSnakeBite ? 0x22c55e : (isNanoswarm ? 0xfacc15 : (isIncendiary ? 0xef4444 : 0xff5500))).convertSRGBToLinear();
-                item.crownMat.color.setHex(isSnakeBite ? 0x86efac : (isNanoswarm ? 0xe879f9 : (isIncendiary ? 0xf97316 : 0xff7b00))).convertSRGBToLinear();
+                item.discMat.color.setHex(isSnakeBite ? 0x22c55e : (isNanoswarm ? 0xfacc15 : (isIncendiary ? 0xef4444 : 0xff5500)));
+                item.crownMat.color.setHex(isSnakeBite ? 0x86efac : (isNanoswarm ? 0xe879f9 : (isIncendiary ? 0xf97316 : 0xff7b00)));
                 item.group.position.copy(item.position);
                 item.group.scale.set(item.radius, 1, item.radius);
                 item.group.visible = true;
@@ -21615,7 +21007,7 @@
                 item.startAt = now;
                 item.expireAt = now + durationMs;
                 item.maxRadius = maxRadius;
-                item.mat.color.setHex(colorHex).convertSRGBToLinear();
+                item.mat.color.setHex(colorHex);
                 item.mat.opacity = 0.9;
                 item.mesh.position.copy(item.position);
                 item.mesh.scale.set(0.3, 0.3, 0.3);
@@ -24988,7 +24380,7 @@
                     const pulse = wire.triggered
                         ? (0.6 + 0.4 * Math.sin(time * 0.04))
                         : (0.75 + 0.25 * Math.sin(time * 0.012 + i));
-                    wire.beamMat.color.setHex(wire.triggered ? 0xfacc15 : 0x38bdf8).convertSRGBToLinear();
+                    wire.beamMat.color.setHex(wire.triggered ? 0xfacc15 : 0x38bdf8);
                     wire.beamMat.opacity = 0.92 * pulse;
                     wire.ringMat.opacity = (wire.triggered ? 0.85 : 0.45) * pulse;
                 }
@@ -25109,7 +24501,7 @@
                     const pulse = 1.0 + (tm.triggered ? 0.25 : 0.1) * Math.sin(time * (tm.triggered ? 0.032 : 0.012) + i);
                     tm.rotorMesh.rotation.y = time * (tm.triggered ? 0.025 : 0.008);
                     tm.ringMesh.scale.set(pulse * 2.2, pulse * 2.2, 1);
-                    tm.rotorMat.color.setHex(tm.triggered ? 0xef4444 : 0xf59e0b).convertSRGBToLinear();
+                    tm.rotorMat.color.setHex(tm.triggered ? 0xef4444 : 0xf59e0b);
                 }
                 if (this.chamberAnchor && this.chamberAnchor.active) {
                     const ca = this.chamberAnchor;
@@ -27706,7 +27098,7 @@
                         orb.ready = true;
                         orb.progress = 0;
                         orb.coreMesh.visible = true;
-                        orb.baseRing.material.color.setHex(0x38f6ff).convertSRGBToLinear();
+                        orb.baseRing.material.color.setHex(0x38f6ff);
                         orb.baseRing.material.opacity = 0.65;
                     }
 
@@ -27738,7 +27130,7 @@
                             nearActiveOrb.progress = 0;
                             nearActiveOrb.respawnAt = now + 35000;
                             nearActiveOrb.coreMesh.visible = false;
-                            nearActiveOrb.baseRing.material.color.setHex(0x475569).convertSRGBToLinear();
+                            nearActiveOrb.baseRing.material.color.setHex(0x475569);
                             nearActiveOrb.baseRing.material.opacity = 0.28;
 
                             soundFX.orbCapture();
@@ -28404,8 +27796,8 @@
                     this.spikeDefuseCheckpoint = 0;
                     this.enemyDefuseProgress = 0;
                     if (this.spikeCanister) this.spikeCanister.visible = false;
-                    if (this.spikeBeaconRing) this.spikeBeaconRing.material.color.setHex(0xffd166).convertSRGBToLinear();
-                    if (this.spikeBeaconRingB) this.spikeBeaconRingB.material.color.setHex(0x38f6ff).convertSRGBToLinear();
+                    if (this.spikeBeaconRing) this.spikeBeaconRing.material.color.setHex(0xffd166);
+                    if (this.spikeBeaconRingB) this.spikeBeaconRingB.material.color.setHex(0x38f6ff);
                     if (roundTimerEl) roundTimerEl.classList.remove('spike-planted');
                     if (rangeChallengeHud) rangeChallengeHud.classList.remove('visible');
                     if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
@@ -28434,8 +27826,8 @@
                 this.spikeDetonateAt = now + this.spikeDetonateDurationMs;
                 this.lastSpikeBeepAt = now;
 
-                if (this.spikeBeaconRing) this.spikeBeaconRing.material.color.setHex(siteKey === 'A' ? 0xff4655 : 0xffd166).convertSRGBToLinear();
-                if (this.spikeBeaconRingB) this.spikeBeaconRingB.material.color.setHex(siteKey === 'B' ? 0xff4655 : 0x38f6ff).convertSRGBToLinear();
+                if (this.spikeBeaconRing) this.spikeBeaconRing.material.color.setHex(siteKey === 'A' ? 0xff4655 : 0xffd166);
+                if (this.spikeBeaconRingB) this.spikeBeaconRingB.material.color.setHex(siteKey === 'B' ? 0xff4655 : 0x38f6ff);
                 if (this.spikeCanister) {
                     this.spikeCanister.position.set(siteInfo.pos.x, 0, siteInfo.pos.z);
                     this.spikeCanister.visible = true;
@@ -28513,8 +27905,8 @@
                 this.spikeDefuseCheckpoint = 0;
                 this.enemyDefuseProgress = 0;
                 if (this.spikeCanister) this.spikeCanister.visible = false;
-                if (this.spikeBeaconRing) this.spikeBeaconRing.material.color.setHex(0xffd166).convertSRGBToLinear();
-                if (this.spikeBeaconRingB) this.spikeBeaconRingB.material.color.setHex(0x38f6ff).convertSRGBToLinear();
+                if (this.spikeBeaconRing) this.spikeBeaconRing.material.color.setHex(0xffd166);
+                if (this.spikeBeaconRingB) this.spikeBeaconRingB.material.color.setHex(0x38f6ff);
                 if (roundTimerEl) roundTimerEl.classList.remove('spike-planted');
 
                 const bonusCreds = 800;
@@ -28656,7 +28048,7 @@
                         this.lastSpikeBeepAt = now;
                         soundFX.spikeBeep(remSec <= 7);
                         if (this.spikeCoreMesh) {
-                            this.spikeCoreMesh.material.color.setHex(remSec <= 7 ? 0xff2a4b : 0xffd166).convertSRGBToLinear();
+                            this.spikeCoreMesh.material.color.setHex(remSec <= 7 ? 0xff2a4b : 0xffd166);
                         }
                     }
                     if (this.spikeCanister) {
@@ -28789,7 +28181,7 @@
                 this.spikeDetonateDurationMs = 30000;
                 this.spikeDetonateAt = now + this.spikeDetonateDurationMs;
                 this.lastSpikeBeepAt = now;
-                if (siteInfo.ring) siteInfo.ring.material.color.setHex(0xff4655).convertSRGBToLinear();
+                if (siteInfo.ring) siteInfo.ring.material.color.setHex(0xff4655);
                 if (this.spikeCanister) {
                     this.spikeCanister.visible = true;
                     this.spikeCanister.position.set(siteInfo.pos.x, 0, siteInfo.pos.z);
@@ -29323,7 +28715,7 @@
                 if (buyMapCardTitle) {
                     buyMapCardTitle.textContent = `Map: ${presetDef.name}`;
                 }
-                if (typeof soundFX.abilityCast === 'function') soundFX.abilityCast(); // V1.7: method never existed; the throw aborted the map-change notification
+                soundFX.abilityCast();
                 showNotification(`MAP PRESET: ${presetDef.name} — ${presetDef.subtitle}`, 2600);
             },
 
@@ -29437,7 +28829,7 @@
                         hz.discMesh.visible = false;
                         hz.orbMesh.visible = true;
                         hz.orbMesh.scale.setScalar(0.38);
-                        hz.orbMat.color.setHex(0xfbbf24).convertSRGBToLinear();
+                        hz.orbMat.color.setHex(0xfbbf24);
                         hz.orbMat.opacity = 0.92;
                         hz.group.visible = true;
                     }
@@ -29479,7 +28871,7 @@
                             hz.group.position.set(hz.x, hz.y, hz.z);
                             hz.ringMesh.visible = true;
                             hz.ringMesh.scale.setScalar(0.25);
-                            hz.ringMat.color.setHex(0x38bdf8).convertSRGBToLinear();
+                            hz.ringMat.color.setHex(0x38bdf8);
                             hz.ringMat.opacity = 0.88;
                             hz.discMesh.visible = false;
                             hz.orbMesh.visible = false;
@@ -29510,11 +28902,11 @@
                         hz.group.position.set(hz.x, hz.y, hz.z);
                         hz.ringMesh.visible = true;
                         hz.ringMesh.scale.setScalar(1.0);
-                        hz.ringMat.color.setHex(0xff4655).convertSRGBToLinear();
+                        hz.ringMat.color.setHex(0xff4655);
                         hz.ringMat.opacity = 0.9;
                         hz.discMesh.visible = true;
                         hz.discMesh.scale.setScalar(0.3);
-                        hz.discMat.color.setHex(0xf97316).convertSRGBToLinear();
+                        hz.discMat.color.setHex(0xf97316);
                         hz.discMat.opacity = 0.22;
                         hz.orbMesh.visible = false;
                         hz.group.visible = true;
@@ -29543,7 +28935,7 @@
                         hz.discMesh.visible = false;
                         hz.orbMesh.visible = true;
                         hz.orbMesh.scale.setScalar(3.4);
-                        hz.orbMat.color.setHex(0x991b1b).convertSRGBToLinear();
+                        hz.orbMat.color.setHex(0x991b1b);
                         hz.orbMat.opacity = 0.52;
                         hz.group.visible = true;
                         soundFX.smokeDeploy();
@@ -29567,7 +28959,7 @@
                         if (!hz.detonated && now >= hz.detonateAt) {
                             hz.detonated = true;
                             hz.orbMesh.scale.setScalar(1.8);
-                            hz.orbMat.color.setHex(0xffffff).convertSRGBToLinear();
+                            hz.orbMat.color.setHex(0xffffff);
                             soundFX.phoenixFlash();
 
                             // Check if player is within 17m and looking toward the Curveball Flash Orb
@@ -29924,13 +29316,8 @@
                 // Show muzzle flash (slightly dimmer for suppressed Phantom)
                 if (weapon.muzzleFlash) {
                     weapon.muzzleFlash.material.opacity = weapon.stealthTracers ? 0.35 : 1;
-                    if (weapon.muzzleHalo) {
-                        weapon.muzzleHalo.material.opacity = weapon.stealthTracers ? 0.3 : 0.85;
-                        weapon.muzzleHalo.visible = true;
-                    }
                     setTimeout(() => {
                         if (weapon.muzzleFlash) weapon.muzzleFlash.material.opacity = 0;
-                        if (weapon.muzzleHalo) weapon.muzzleHalo.visible = false;
                     }, 50);
                 }
 
@@ -30221,9 +29608,8 @@
             // Reset per-acquisition state
             poolItem.frameCount = 0;
             poolItem.opacity = 0.8;
-            // Linear values of the original sRGB 0.8 grey and (1, 0.275, 0.333) red
-            if (isWall) { poolItem.colorR = 0.604; poolItem.colorG = 0.604; poolItem.colorB = 0.604; }
-            else { poolItem.colorR = 1; poolItem.colorG = 0.0615; poolItem.colorB = 0.0907; }
+            if (isWall) { poolItem.colorR = 0.8; poolItem.colorG = 0.8; poolItem.colorB = 0.8; }
+            else { poolItem.colorR = 1; poolItem.colorG = 0.275; poolItem.colorB = 0.333; }
             
             // Per-effect particle count from the current quality preset
             const particleCount = Math.min(adaptiveSettings.maxParticles, MAX_HIT_PARTICLES);
@@ -31019,9 +30405,8 @@
             // Flag enemy as actively firing for the 2D Minimap radar ping ring
             enemy.lastFiredPingUntil = perfNow + 1800;
 
-            // Pooled muzzle-flash light (expired by updatePooledEffects) + glow halo
+            // Pooled muzzle-flash light (expired by updatePooledEffects)
             acquireEnemyFlash(muzzleX, muzzleY, muzzleZ);
-            haloSystem.flash(muzzleX, muzzleY, muzzleZ, 0xffcc00, 1.2, ENEMY_FLASH_DURATION_MS);
             
             // Create bullet trail from enemy (using pool)
             _enemyShotDirection.set(dirX, dirY, dirZ).normalize();
@@ -31206,7 +30591,7 @@
             
             const particleBatch = effectBatches.particles;
             particleBatch.positions.set([p.x, p.y, p.z]);
-            particleBatch.colors.set([1, 0.0615, 0.0907]);
+            particleBatch.colors.set([1, 0.275, 0.333]);
             particleBatch.alphas[0] = 0.8;
             particleBatch.mesh.geometry.setDrawRange(0, 1);
             particleBatch.mesh.geometry.attributes.position.needsUpdate = true;
@@ -31221,7 +30606,7 @@
             _decalDummy.lookAt(camera.position);
             _decalDummy.updateMatrix();
             decalBatch.mesh.setMatrixAt(0, _decalDummy.matrix);
-            decalBatch.mesh.setColorAt(0, _decalColor.setHex(0x333333).convertSRGBToLinear());
+            decalBatch.mesh.setColorAt(0, _decalColor.setHex(0x333333));
             decalBatch.opacities[0] = 0.8;
             decalBatch.mesh.count = 1;
             decalBatch.mesh.instanceMatrix.needsUpdate = true;
@@ -31244,15 +30629,6 @@
             if (game.weapons.knife) game.weapons.knife.model.visible = true;
             if (tacticalDirector && tacticalDirector.spikeCanister) tacticalDirector.spikeCanister.visible = true;
             renderer.compile(scene, camera);
-            // Viewmodel programs (env map + its own fixed light set). Also drawn once
-            // so drivers that finish compiling on first draw do it here.
-            viewmodelScene.environment = scene.environment;
-            syncViewmodelCamera();
-            renderer.compile(viewmodelScene, viewmodelCamera);
-            const muzzleHalos = ['rifle', 'sniper', 'pistol'].map(k => game.weapons[k] && game.weapons[k].muzzleHalo).filter(Boolean);
-            for (const h of muzzleHalos) h.visible = true;
-            renderer.render(viewmodelScene, viewmodelCamera);
-            for (const h of muzzleHalos) h.visible = false;
 
             game.weapons.rifle.model.visible = rifleWas;
             game.weapons.sniper.model.visible = sniperWas;
@@ -31260,14 +30636,7 @@
             if (game.weapons.knife) game.weapons.knife.model.visible = knifeWas;
             if (tacticalDirector && tacticalDirector.spikeCanister) tacticalDirector.spikeCanister.visible = spikeWas;
             
-            // Halo batch: one instance in front of the camera for the warm draws
-            haloSystem._write(0, p.x, p.y, p.z, 1, linearColorFromHex(0xffcc00), 1);
-            haloSystem.mesh.count = 1;
-            haloSystem.mesh.instanceMatrix.needsUpdate = true;
-            haloSystem.mesh.instanceColor.needsUpdate = true;
-            haloSystem.mesh.visible = true;
-            
-            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh];
+            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh];
             for (let i = 0; i < agentSystem.warmupMeshes.length; i++) {
                 const wm = agentSystem.warmupMeshes[i];
                 wm.position.copy(p);
@@ -31286,7 +30655,6 @@
             particleBatch.mesh.geometry.setDrawRange(0, 0);
             trailBatch.mesh.geometry.setDrawRange(0, 0);
             decalBatch.mesh.count = 0;
-            haloSystem.mesh.count = 0;
             for (let i = 0; i < enemyFlashLights.length; i++) {
                 enemyFlashLights[i].object.visible = false;
             }
@@ -32348,12 +31716,12 @@
                     const torsoCol = hlTorso !== null ? hlTorso : arch.torsoColor;
                     const headCol = hlHead !== null ? hlHead : arch.headColor;
                     if (enemy.rest && enemy.rest[0]) {
-                        enemy.rest[0].color.setHex(torsoCol).convertSRGBToLinear();
-                        enemy.leaves[0].material.color.setHex(torsoCol).convertSRGBToLinear();
+                        enemy.rest[0].color.setHex(torsoCol);
+                        enemy.leaves[0].material.color.setHex(torsoCol);
                     }
                     if (enemy.rest && enemy.rest[1]) {
-                        enemy.rest[1].color.setHex(headCol).convertSRGBToLinear();
-                        enemy.leaves[1].material.color.setHex(headCol).convertSRGBToLinear();
+                        enemy.rest[1].color.setHex(headCol);
+                        enemy.leaves[1].material.color.setHex(headCol);
                     }
                     enemy.colorDirty = true;
                 }
@@ -32369,18 +31737,21 @@
                     scene.background.setHex(0x1e293b);
                     scene.fog.color.setHex(0x1e293b);
                     scene.fog.density = 0.0012;
+                    ambientLight.intensity = 0.82;
+                    directionalLight.intensity = 1.0;
                 } else if (mode === 'night') {
                     scene.background.setHex(0x060b14);
                     scene.fog.color.setHex(0x060b14);
                     scene.fog.density = Math.max(0.0035, 0.013 - (d - 60) * 0.0001);
+                    ambientLight.intensity = 0.34;
+                    directionalLight.intensity = 0.62;
                 } else {
                     scene.background.setHex(baseSky);
                     scene.fog.color.setHex(baseSky);
                     scene.fog.density = Math.max(0.0025, 0.012 - (d - 60) * 0.0001);
+                    ambientLight.intensity = 0.5;
+                    directionalLight.intensity = 0.8;
                 }
-                // V1.7: ambient/sun/exposure per mode (ATMOSPHERE_LIGHTING, scaled by
-                // the map's sunIntensity), env map and sky dome follow the new sky.
-                refreshSceneLighting();
             },
 
             applyWeaponSkin: function(skinId) {
@@ -32389,7 +31760,7 @@
                 if (badge) badge.textContent = theme.label;
 
                 if (effectBatches && effectBatches.trail && effectBatches.trail.mesh) {
-                    effectBatches.trail.mesh.material.color.setHex(theme.tracer).convertSRGBToLinear();
+                    effectBatches.trail.mesh.material.color.setHex(theme.tracer);
                 }
 
                 const weaponKeys = ['rifle', 'sniper', 'pistol', 'knife'];
@@ -32401,20 +31772,20 @@
                         const mesh = children[i];
                         if (!mesh || !mesh.material || mesh === wObj.muzzleFlash) continue;
                         // Skip skin-tone hands mesh (last child with color 0xffdbac)
-                        if (i === children.length - 1 && mesh.material.color && mesh.material.color.equals(linearColorFromHex(0xffdbac))) {
+                        if (i === children.length - 1 && mesh.material.color && mesh.material.color.getHex() === 0xffdbac) {
                             continue;
                         }
                         if (mesh.material.emissive && mesh.material.emissiveIntensity > 0.2) {
-                            mesh.material.color.setHex(theme.accent).convertSRGBToLinear();
-                            mesh.material.emissive.setHex(theme.accent).convertSRGBToLinear();
+                            mesh.material.color.setHex(theme.accent);
+                            mesh.material.emissive.setHex(theme.accent);
                         } else if (i === 0) {
-                            mesh.material.color.setHex(theme.body).convertSRGBToLinear();
+                            mesh.material.color.setHex(theme.body);
                             if (mesh.material.isMeshStandardMaterial) {
                                 mesh.material.metalness = theme.metalness;
                                 mesh.material.roughness = theme.roughness;
                             }
                         } else if (i % 2 === 1) {
-                            mesh.material.color.setHex(theme.secondary).convertSRGBToLinear();
+                            mesh.material.color.setHex(theme.secondary);
                         }
                     }
                 });
@@ -33266,7 +32637,7 @@
                 group.add(halo1);
 
                 const halo2 = new THREE.Mesh(haloGeo, haloMat.clone());
-                halo2.material.color.setHex(secondaryHex).convertSRGBToLinear();
+                halo2.material.color.setHex(secondaryHex);
                 halo2.position.y = 2.4;
                 halo2.rotation.y = Math.PI * 0.45;
                 group.add(halo2);
@@ -33702,8 +33073,8 @@
                             door.isOpen = !door.isOpen;
                             door.targetAngle = door.isOpen ? (Math.PI * 0.5) : 0;
                             const colHex = door.isOpen ? 0x10b981 : 0xf43f5e;
-                            door.crystalMat.color.setHex(colHex).convertSRGBToLinear();
-                            door.ringMat.color.setHex(colHex).convertSRGBToLinear();
+                            door.crystalMat.color.setHex(colHex);
+                            door.ringMat.color.setHex(colHex);
                             this.playStoneDoorSound();
                             showNotification(`${door.name}: ${door.isOpen ? 'ROTATING OPEN [PASSAGE UNLOCKED]' : 'ROTATING CLOSED [PASSAGE SEALED]'}`, 2000);
                         }
@@ -33827,7 +33198,7 @@
                     const b = this.wingmanBots[i];
                     if (b.hudEl) b.hudEl.classList.toggle('visible', this.wingmanEnabled);
                 }
-                if (typeof soundFX.abilityCast === 'function') soundFX.abilityCast(); // V1.7: method never existed; the throw aborted this notification
+                soundFX.abilityCast();
                 showNotification(`FRIENDLY AI WINGMAN SQUAD [F6]: ${this.wingmanEnabled ? 'DEPLOYED (ALPHA & BRAVO ACTIVE)' : 'STANDBY (SOLO MODE)'}`, 2200);
             },
 
@@ -34243,9 +33614,6 @@
             
             // Create weapons
             createWeapons();
-            // Viewmodel keeps its authored saturation: no ACES on gun materials
-            // (set before the warm-up compile, so it never triggers a recompile)
-            weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material)) o.material.toneMapped = false; });
             
             // Initialize object pools
             initObjectPools();
@@ -34270,17 +33638,6 @@
             settingsManager.init();
             tacticalEnhancements.init();
             
-            // Glow halo anchors: pooled ability cores, the spike core, ult orbs
-            haloSystem.collectAbilityAnchors();
-            if (tacticalDirector.spikeCoreMesh) {
-                haloSystem.addAnchor(tacticalDirector.spikeCoreMesh, tacticalDirector.spikeCoreMesh.material.color, 1.5, 0.6);
-            }
-            if (tacticalDirector.ultOrbs) {
-                for (const orb of tacticalDirector.ultOrbs) {
-                    if (orb.coreMesh) haloSystem.addAnchor(orb.coreMesh, orb.coreMesh.material.emissive, 2.2, 0.5);
-                }
-            }
-            
             // Setup mobile controls if needed
             if (deviceInfo.touchEnabled) {
                 setupMobileControls();
@@ -34294,18 +33651,15 @@
             // matrices (scene.autoUpdate stays true).
             freezeStaticTransform(scene);
             
-            // Lighting/env map must exist before warm-up so the compiled lit programs
-            // already include the environment map (no first-frame recompiles).
-            refreshSceneLighting();
             shadowManager.init();
             warmShaderVariants();
             gameInitialized = true;
             
             // Show welcome message
             if (deviceInfo.touchEnabled) {
-                showNotification("Welcome to V1.7! [P] Settings, [K/N] Rank & Combat Report, [F4] 6 Maps (Lotus/Split), [F6] Wingman AI!", 5000);
+                showNotification("Welcome to V1.6! [P] Settings, [K/N] Rank & Combat Report, [F4] 6 Maps (Lotus/Split), [F6] Wingman AI!", 5000);
             } else {
-                showNotification("Valorant V1.7 Ready! [K/N] Career Rank & Hit Matrix • [F4] 6 Maps (Lotus Doors & Split Ziplines) • [F6] Wingman AI • [T] 3D Ping", 5500);
+                showNotification("Valorant V1.6 Ready! [K/N] Career Rank & Hit Matrix • [F4] 6 Maps (Lotus Doors & Split Ziplines) • [F6] Wingman AI • [T] 3D Ping", 5500);
                 setTimeout(() => {
                     showNotification("NEW: Click the Minimap Radar to drop Sky-Smokes/Pings • Press [K] for Competitive Rank RR • Final Kills trigger 3D Skin Finishers!", 5400);
                 }, 5800);
@@ -34330,13 +33684,7 @@
             if (typeof qualityController !== 'undefined') qualityController.invalidateTrials();
         });
         
-        renderer.info.autoReset = false; // reset manually so shadow + main + viewmodel passes are counted together
-        renderer.autoClear = false;      // animate() clears once, then draws world + viewmodel
-        
-        function syncViewmodelCamera() {
-            viewmodelCamera.position.copy(camera.position);
-            viewmodelCamera.quaternion.copy(camera.quaternion);
-        }
+        renderer.info.autoReset = false; // reset manually so shadow + main passes are counted together
         
         function animate(time) {
             requestAnimationFrame(animate);
@@ -34453,27 +33801,13 @@
             updateMapVisibility();
             updateTargetVisibility();
             
-            // Glow halos (after effects/abilities moved, before the render)
-            haloSystem.update(now);
-            
             if (shadowManager.beforeRender(now)) {
                 perfTelemetry.shadowRefreshes++;
             }
             
-            // Render scene: world, then the viewmodel over a cleared depth buffer
-            // (autoClear is off; info.autoReset is off and reset here)
+            // Render scene
             renderer.info.reset();
-            skyDome.position.copy(camera.position);
-            skyDome.updateMatrix();
-            // With autoClear off, r128's background pass only sets the clear colour,
-            // so set it before the single manual clear (the sky dome covers it anyway)
-            renderer.setClearColor(scene.background, 1);
-            renderer.clear();
             renderer.render(scene, camera);
-            renderer.clearDepth();
-            viewmodelScene.environment = scene.environment;
-            syncViewmodelCamera();
-            renderer.render(viewmodelScene, viewmodelCamera);
             perfTelemetry.summary.drawCalls = renderer.info.render.calls;
             perfTelemetry.summary.triangles = renderer.info.render.triangles;
             const programCount = renderer.info.programs ? renderer.info.programs.length : 0;
