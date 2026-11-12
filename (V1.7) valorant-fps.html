@@ -5890,12 +5890,8 @@
         };
         haloSystem.init();
         
-        // Player muzzle-flash glow: one sprite under each weapon's flash mesh in the
+        // Player muzzle-flash glow: one sprite on each weapon's flash mesh in the
         // viewmodel scene, shown for the same 50 ms as the flash. Shared material.
-        // The viewmodel holds models at rotation.x = PI (set by recoil/bob/inspect),
-        // which puts the flash mesh at the rear end, behind the camera (pre-existing
-        // V1.5 behaviour, left as is). The halo is placed at the model's forward end
-        // (max local z) so the glow appears where the gun visibly points.
         let _muzzleHaloMaterial = null;
         function attachMuzzleHalo(weapon, flashMesh) {
             if (!_muzzleHaloMaterial) {
@@ -5911,19 +5907,7 @@
             }
             const sprite = new THREE.Sprite(_muzzleHaloMaterial);
             sprite.scale.set(0.42, 0.42, 1);
-            const model = flashMesh.parent;
-            let frontZ = flashMesh.position.z;
-            if (model) {
-                const box = new THREE.Box3();
-                for (const child of model.children) {
-                    if (!child.geometry || child === flashMesh) continue;
-                    if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-                    child.updateMatrix();
-                    box.copy(child.geometry.boundingBox).applyMatrix4(child.matrix);
-                    frontZ = Math.max(frontZ, box.max.z);
-                }
-            }
-            sprite.position.set(0, 0, frontZ + 0.06 - flashMesh.position.z);
+            sprite.position.set(0, 0, -0.04); // just past the muzzle (barrel points -Z)
             sprite.visible = false;
             flashMesh.add(sprite);
             weapon.muzzleHalo = sprite;
@@ -10295,9 +10279,11 @@
                     0.1
                 );
                 
+                // V1.7 fix: models are authored barrel -Z / grip -Y, so rest pitch is 0.
+                // The old PI base drew every gun upside-down and backwards.
                 activeWeapon.rotation.x = THREE.MathUtils.lerp(
                     activeWeapon.rotation.x,
-                    Math.PI + moveY * 0.0005 * swayScale,
+                    moveY * 0.0005 * swayScale,
                     0.1
                 );
             }
@@ -10326,10 +10312,10 @@
                 activeWeapon.position.y = THREE.MathUtils.lerp(activeWeapon.position.y, baseY + 0.09 * wave, 0.25);
                 activeWeapon.position.z = THREE.MathUtils.lerp(activeWeapon.position.z, baseZ + 0.06 * wave, 0.25);
                 if (weapon.isMelee) {
-                    activeWeapon.rotation.x = Math.PI + p * Math.PI * 2;
+                    activeWeapon.rotation.x = p * Math.PI * 2;
                     activeWeapon.rotation.z = Math.sin(p * Math.PI * 2) * 0.55;
                 } else {
-                    activeWeapon.rotation.x = Math.PI - 0.24 * Math.sin(p * Math.PI * 2);
+                    activeWeapon.rotation.x = 0.24 * Math.sin(p * Math.PI * 2); // muzzle tips up
                     activeWeapon.rotation.z = 0.65 * Math.sin(p * Math.PI);
                 }
                 return;
@@ -10569,12 +10555,12 @@
             const hip = selected.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
             const handSign = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
             weaponModel.position.set(hip.x * handSign, hip.y - 0.2, hip.z);
-            weaponModel.rotation.set(Math.PI + 0.3, 0, selected.isMelee ? -0.35 : 0);
+            weaponModel.rotation.set(0.3, 0, selected.isMelee ? -0.35 : 0); // V1.7 fix: no PI base (see applyWeaponBobbing)
             
             setTimeout(() => {
                 if (game.activeWeapon === weaponName && !game.reloading) {
                     weaponModel.position.y = hip.y;
-                    weaponModel.rotation.x = Math.PI;
+                    weaponModel.rotation.x = 0;
                     weaponModel.rotation.z = 0;
                 }
             }, 180);
@@ -11235,6 +11221,65 @@
                     osc.stop(t0 + durationSec + 0.01);
                 } catch (e) {}
             },
+            // V1.7 fix: helpers/aliases that were called but never defined (each call threw).
+            // Used by the synthesized stingers (skin finishers, rank-up, doors, pings).
+            init: function() {
+                return this.ensureContext();
+            },
+            get muted() {
+                return !game.soundEnabled;
+            },
+            _noiseBuffer: null,
+            // Filtered white-noise burst (impacts, blasts, whooshes). One shared 1 s buffer.
+            playNoise: function(durationSec, gainVal = 0.12, delaySec = 0, cutoffHz = 1800) {
+                const ctx = this.ensureContext();
+                if (!ctx) return;
+                const masterMult = (game.userSettings && typeof game.userSettings.masterVolume === 'number')
+                    ? (game.userSettings.masterVolume / 100)
+                    : 1.0;
+                const scaledGain = Math.min(0.4, Math.max(0, gainVal * masterMult));
+                if (scaledGain <= 0.0002) return;
+                try {
+                    if (!this._noiseBuffer || this._noiseBuffer.sampleRate !== ctx.sampleRate) {
+                        const len = ctx.sampleRate;
+                        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+                        const data = buf.getChannelData(0);
+                        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+                        this._noiseBuffer = buf;
+                    }
+                    const t0 = ctx.currentTime + delaySec;
+                    const dur = Math.max(0.03, Math.min(durationSec, 0.95));
+                    const src = ctx.createBufferSource();
+                    src.buffer = this._noiseBuffer;
+                    const filter = ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(cutoffHz, t0);
+                    filter.frequency.exponentialRampToValueAtTime(Math.max(120, cutoffHz * 0.18), t0 + dur);
+                    const gain = ctx.createGain();
+                    gain.gain.setValueAtTime(0.0001, t0);
+                    gain.gain.linearRampToValueAtTime(scaledGain, t0 + Math.min(0.012, dur * 0.2));
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+                    src.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(ctx.destination);
+                    src.start(t0, Math.random() * 0.04);
+                    src.stop(t0 + dur + 0.02);
+                } catch (e) {}
+            },
+            abilityCast: function() {
+                this.playTone(520, 880, 0.14, 'triangle', 0.10, 0);
+                this.playTone(1040, 1320, 0.12, 'sine', 0.06, 0.05);
+            },
+            flashbang: function() { this.flash(); },
+            alarmLock: function() {
+                this.playTone(980, 980, 0.08, 'square', 0.08, 0);
+                this.playTone(740, 740, 0.12, 'square', 0.08, 0.1);
+            },
+            jettDash: function() { this.dash(); },
+            sovaSonarPing: function() { this.sonar(); },
+            mollyCast: function() { this.molly(); },
+            smokeDeploy: function() { this.smoke(); },
+            phoenixFlash: function() { this.flash(); },
             dash: function() {
                 this.playTone(540, 140, 0.22, 'triangle', 0.14, 0);
                 this.playTone(880, 260, 0.18, 'sine', 0.08, 0.02);
@@ -13121,7 +13166,8 @@
                         gravity: 0,
                         spawnAt: 0,
                         detonateAt: 0,
-                        mesh: mesh
+                        mesh: mesh,
+                        mat: projMat // V1.7 fix: newer kits recolour through proj.mat
                     });
                 }
 
@@ -16790,7 +16836,7 @@
                     mkpCoreMesh.position.y = 0.55;
                     const mkpRingMesh = new THREE.Mesh(mollyRingGeo, mkpRingMat);
                     mkpRingMesh.position.y = 0.05;
-                    mkpRingMesh.scale.set(6.8, 6.8, 1);
+                    mkpRingMesh.scale.set(6.8, 1, 6.8); // geometry is already flat (XZ)
                     const mkpWaveMesh = new THREE.Mesh(mkpWaveGeo, mkpWaveMat);
                     mkpWaveMesh.position.y = 0.35;
                     mkpCoreMesh.frustumCulled = false;
@@ -16803,6 +16849,8 @@
                     if (i === 0) this.warmupMeshes.push(mkpGroup);
                     this.miksMPulses.push({
                         active: false,
+                        inUse: false,                  // V1.7 fix: spawn/update/radar use inUse + position
+                        position: new THREE.Vector3(),
                         x: 0, y: 0, z: 0,
                         radius: 6.8,
                         startAt: 0,
@@ -18566,13 +18614,13 @@
                     if (!this.miksMPulses[i].inUse) { mp = this.miksMPulses[i]; break; }
                 }
                 mp.inUse = true;
+                mp.active = true;
                 mp.position.set(x, Math.max(0.02, y), z);
                 mp.radius = 6.8;
                 mp.startAt = now;
                 mp.expireAt = now + 6000;
                 mp.nextPulseAt = now + 500;
-                mp.discMesh.scale.set(mp.radius, mp.radius, 1);
-                mp.ringMesh.scale.set(mp.radius, mp.radius, 1);
+                mp.ringMesh.scale.set(mp.radius, 1, mp.radius);
                 mp.group.position.copy(mp.position);
                 mp.group.visible = true;
                 soundFX.miksMPulse();
@@ -20554,6 +20602,175 @@
                 showNotification("SMOKE SCREEN DEPLOYED!", 1200);
             },
 
+            // =====================================================================
+            // V1.7 fix: Reyna and Omen kits. castAbility() dispatched to these and
+            // every cast threw. They drive the pools and update loops that already
+            // existed (soulOrbs, leerEyes, soulTether, paranoiaWaves, shadowPortals).
+            // =====================================================================
+            refundCharge: function(slotKey, now) {
+                const st = this.stateByAgent[game.activeAgent] && this.stateByAgent[game.activeAgent][slotKey];
+                if (!st) return;
+                st.charges = Math.min(st.maxCharges, st.charges + 1);
+                if (st.charges === st.maxCharges) st.rechargeEnd = 0;
+                this.syncHud(now, true);
+            },
+
+            // Kills drop a Soul Orb for 3.5 s (oldest one is recycled when all are live)
+            spawnSoulOrb: function(worldPos, now) {
+                let orb = null;
+                for (let i = 0; i < this.soulOrbs.length; i++) {
+                    if (!this.soulOrbs[i].inUse) { orb = this.soulOrbs[i]; break; }
+                }
+                if (!orb) {
+                    orb = this.soulOrbs[0];
+                    for (let i = 1; i < this.soulOrbs.length; i++) {
+                        if (this.soulOrbs[i].startAt < orb.startAt) orb = this.soulOrbs[i];
+                    }
+                }
+                if (!orb) return;
+                orb.inUse = true;
+                orb.position.set(worldPos.x, Math.max(1.0, worldPos.y + 1.0), worldPos.z);
+                orb.startAt = now;
+                orb.expireAt = now + 3500;
+                orb.group.position.copy(orb.position);
+                orb.group.visible = true;
+            },
+
+            // Nearest live Soul Orb within range of the player, or null
+            findNearestSoulOrb: function(range) {
+                let best = null, bestD = range * range;
+                const p = characterController.position;
+                for (let i = 0; i < this.soulOrbs.length; i++) {
+                    const orb = this.soulOrbs[i];
+                    if (!orb.inUse) continue;
+                    const dx = orb.position.x - p.x, dy = orb.position.y - p.y, dz = orb.position.z - p.z;
+                    const d = dx * dx + dy * dy + dz * dz;
+                    if (d <= bestD) { bestD = d; best = orb; }
+                }
+                return best;
+            },
+
+            consumeSoulOrb: function(orb, now) {
+                orb.inUse = false;
+                orb.group.visible = false;
+                if (this.soulTether) {
+                    this.soulTether.active = true;
+                    this.soulTether.origin.copy(orb.position);
+                    this.soulTether.startAt = now;
+                    this.soulTether.expireAt = now + 950;
+                    this.soulTether.mesh.visible = true;
+                }
+            },
+
+            castReynaLeer: function(now) {
+                const hit = this.getAimGroundPoint(18.0);
+                let eye = this.leerEyes[0];
+                for (let i = 0; i < this.leerEyes.length; i++) {
+                    if (!this.leerEyes[i].inUse) { eye = this.leerEyes[i]; break; }
+                }
+                eye.inUse = true;
+                eye.position.set(hit.x, hit.y + 1.6, hit.z);
+                eye.startAt = now;
+                eye.expireAt = now + 2000;
+                eye.nextPulseAt = now;
+                eye.group.position.copy(eye.position);
+                eye.group.visible = true;
+                soundFX.reynaLeer();
+                showNotification("LEER! Ethereal Eye Nearsights Every Hostile That Sees It!", 1500);
+            },
+
+            castReynaDevour: function(now) {
+                const orb = this.findNearestSoulOrb(15.0);
+                if (!orb) {
+                    this.refundCharge('q', now);
+                    showNotification("DEVOUR: No Soul Orb in range (get a kill first)", 1400);
+                    return;
+                }
+                this.consumeSoulOrb(orb, now);
+                this.healPlayer(50, now);
+                game.maxShield = Math.max(game.maxShield || 25, 50);
+                game.shield = Math.min(50, (game.shield || 0) + 25);
+                if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
+                soundFX.reynaDevour();
+                showNotification("DEVOUR! Soul Consumed: +50 HP & +25 Overshield", 1500);
+            },
+
+            castReynaDismiss: function(now) {
+                const orb = this.findNearestSoulOrb(15.0);
+                if (!orb) {
+                    this.refundCharge('e', now);
+                    showNotification("DISMISS: No Soul Orb in range (get a kill first)", 1400);
+                    return;
+                }
+                this.consumeSoulOrb(orb, now);
+                // Existing intangible state: enemies cannot hit you and you move +45% faster
+                this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + 2000);
+                this.dashFxUntil = now + 420;
+                soundFX.reynaDismiss();
+                showNotification("DISMISS! Intangible & Hasted for 2s", 1400);
+            },
+
+            castOmenShroudedStep: function(now, isUlt) {
+                const range = isUlt ? 30.0 : 15.0;
+                const hit = this.getAimGroundPoint(range);
+                const originX = characterController.position.x;
+                const originY = Math.max(0.05, characterController.position.y - characterController.height);
+                const originZ = characterController.position.z;
+                this.spawnShadowPortal(originX, originY, originZ, now);
+                this.spawnShadowPortal(hit.x, hit.y, hit.z, now);
+                characterController.position.set(hit.x, hit.y + characterController.height, hit.z);
+                characterController.prevSimPosition.copy(characterController.position);
+                characterController.velocity.set(0, 0, 0);
+                this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + 600);
+                this.dashFxUntil = now + 380;
+                soundFX.omenTeleport();
+                showNotification(isUlt ? "FROM THE SHADOWS! Long-Range Shadow Blink" : "SHROUDED STEP! Teleported to Crosshair", 1300);
+            },
+
+            spawnShadowPortal: function(x, y, z, now) {
+                let portal = null;
+                for (let i = 0; i < this.shadowPortals.length; i++) {
+                    if (!this.shadowPortals[i].inUse) { portal = this.shadowPortals[i]; break; }
+                }
+                if (!portal) {
+                    portal = this.shadowPortals[0];
+                    for (let i = 1; i < this.shadowPortals.length; i++) {
+                        if (this.shadowPortals[i].startAt < portal.startAt) portal = this.shadowPortals[i];
+                    }
+                }
+                if (!portal) return;
+                portal.inUse = true;
+                portal.position.set(x, Math.max(0.02, y), z);
+                portal.startAt = now;
+                portal.expireAt = now + 900;
+                portal.group.position.copy(portal.position);
+                portal.group.visible = true;
+            },
+
+            castOmenParanoia: function(now) {
+                camera.updateMatrixWorld();
+                _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
+                let wave = this.paranoiaWaves[0];
+                for (let i = 0; i < this.paranoiaWaves.length; i++) {
+                    if (!this.paranoiaWaves[i].inUse) { wave = this.paranoiaWaves[i]; break; }
+                }
+                wave.inUse = true;
+                wave.position.copy(camera.position).addScaledVector(_abilityForward, 1.2);
+                wave.velocity.copy(_abilityForward).multiplyScalar(24);
+                wave.startAt = now;
+                wave.expireAt = now + 1300; // ~31 m, passes through walls
+                wave.hitSet.clear();
+                wave.group.position.copy(wave.position);
+                wave.group.visible = true;
+                soundFX.omenParanoia();
+                showNotification("PARANOIA! Shadow Wave Nearsights Everything It Passes Through", 1400);
+            },
+
+            castOmenDarkCover: function(now) {
+                // Long-lasting purple controller smoke through the shared smoke system
+                this.castSmokeProjectile(now, 0x6d28d9, 0.8, 4.8, 15000);
+            },
+
             castPhoenixHotHands: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
@@ -20622,7 +20839,7 @@
                 );
                 wall.mesh.updateMatrixWorld(true);
                 const colliderRec = {
-                    id: nextColliderId++,
+                    id: ++colliderIdCounter, // V1.7 fix: was an undeclared nextColliderId
                     kind: 'dynamic',
                     shape: 'box',
                     owner: { active: true },
@@ -21337,6 +21554,68 @@
                 showNotification("RUN IT BACK! Reborn at Solar Anchor with 100 HP!", 3200);
                 this.syncHud(now, true);
                 return true;
+            },
+
+            // V1.7 fix: shared helpers that ability code called but that never existed.
+            // Crosshair ground point within maxDist: stops 0.6 m short of the first
+            // wall, otherwise lands where the view ray meets the floor (or at maxDist).
+            getAimGroundPoint: function(maxDist) {
+                camera.updateMatrixWorld();
+                _abilityOrigin.copy(camera.position);
+                _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
+                let dist = maxDist;
+                if (_abilityForward.y < -0.02) {
+                    const toFloor = (_abilityOrigin.y - characterController.supportY) / -_abilityForward.y;
+                    if (toFloor > 0) dist = Math.min(dist, toFloor);
+                }
+                const savedFar = raycaster.far;
+                raycaster.ray.origin.copy(_abilityOrigin);
+                raycaster.ray.direction.copy(_abilityForward);
+                raycaster.far = maxDist;
+                _shotHits.length = 0;
+                envShotIndex.raycast(raycaster.ray, maxDist);
+                if (_shotHits.length > 0) {
+                    _shotHits.sort(compareHitDistance);
+                    dist = Math.min(dist, Math.max(0.5, _shotHits[0].distance - 0.6));
+                }
+                _shotHits.length = 0;
+                raycaster.far = savedFar;
+                const x = Math.max(-45, Math.min(45, _abilityOrigin.x + _abilityForward.x * dist));
+                const z = Math.max(-45, Math.min(45, _abilityOrigin.z + _abilityForward.z * dist));
+                const y = this.findSupportFloorY(x, Math.max(_abilityOrigin.y, _abilityOrigin.y + _abilityForward.y * dist) + 0.5, z);
+                return new THREE.Vector3(x, y, z);
+            },
+
+            // Same rules as a kill: no gain while the ult is active, capped at max
+            addUltPoint: function(points) {
+                const now = performance.now();
+                if (this.isUltActive(now) || game.ultPoints >= game.maxUltPoints) return;
+                game.ultPoints = Math.min(game.maxUltPoints, game.ultPoints + (points || 1));
+                if (game.ultPoints === game.maxUltPoints) {
+                    soundFX.ult();
+                    showNotification(`ULTIMATE READY! Press X for ${AGENT_DEFS[game.activeAgent].abilities.x.name}`, 2600);
+                }
+                this.syncHud(now, true);
+            },
+
+            // Full-screen colour wash that fades out over durationMs (teleports, flashes)
+            _washEl: null,
+            _washTimer: 0,
+            triggerScreenWash: function(cssColor, durationMs) {
+                let el = this._washEl;
+                if (!el) {
+                    el = document.createElement('div');
+                    el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:850;opacity:0;';
+                    document.body.appendChild(el);
+                    this._washEl = el;
+                }
+                const ms = Math.max(60, durationMs || 400);
+                el.style.transition = 'none';
+                el.style.background = cssColor;
+                el.style.opacity = '1';
+                void el.offsetWidth; // commit the full-opacity frame before fading
+                el.style.transition = `opacity ${ms}ms ease-out`;
+                el.style.opacity = '0';
             },
 
             onActorEliminated: function(kind, worldPos) {
@@ -24619,6 +24898,7 @@
                     if (!mp.inUse) continue;
                     if (now >= mp.expireAt) {
                         mp.inUse = false;
+                        mp.active = false;
                         mp.group.visible = false;
                         continue;
                     }
@@ -25703,13 +25983,12 @@
                     const rem = mp.expireAt - now;
                     const fade = rem < 400 ? Math.max(0, rem / 400) : 1;
                     const beat = 0.92 + 0.16 * Math.sin(time * 0.034 + i);
-                    mp.speakerMesh.rotation.y = time * 0.028;
-                    mp.speakerMesh.position.y = 0.55 + 0.1 * Math.sin(time * 0.022 + i);
-                    mp.waveRingMesh.rotation.z = -time * 0.024;
-                    mp.waveRingMesh.scale.set(mp.radius * beat * 0.72, mp.radius * beat * 0.72, 1);
-                    mp.discMesh.scale.set(mp.radius * beat, mp.radius * beat, 1);
-                    mp.ringMesh.scale.set(mp.radius * beat, mp.radius * beat, 1);
-                    mp.discMat.opacity = 0.42 * fade;
+                    // V1.7 fix: use the pool's real meshes (speaker = core, wave ring = waveMesh)
+                    mp.coreMesh.rotation.y = time * 0.028;
+                    mp.coreMesh.position.y = 0.55 + 0.1 * Math.sin(time * 0.022 + i);
+                    mp.waveMesh.rotation.y = -time * 0.024;
+                    mp.waveMesh.scale.set(mp.radius * beat * 0.72, 1, mp.radius * beat * 0.72);
+                    mp.ringMesh.scale.set(mp.radius * beat, 1, mp.radius * beat);
                     mp.ringMat.opacity = 0.92 * fade;
                     mp.waveMat.opacity = 0.85 * fade;
                 }
@@ -25719,12 +25998,13 @@
                     const fade = rem < 450 ? Math.max(0, rem / 450) : 1;
                     const beat = 0.94 + 0.14 * Math.sin(time * 0.036);
                     mh.group.position.set(characterController.position.x, 0.06, characterController.position.z);
-                    mh.eqRingMesh.rotation.z = time * 0.026;
-                    mh.innerRingMesh.rotation.z = -time * 0.032;
-                    mh.eqRingMesh.scale.set(5.2 * beat, 5.2 * beat, 1);
-                    mh.innerRingMesh.scale.set(3.2 * beat, 3.2 * beat, 1);
-                    mh.eqMat.opacity = 0.85 * fade;
-                    mh.innerMat.opacity = 0.72 * fade;
+                    // V1.7 fix: use the halo's real meshes (ring + equalizer cylinder)
+                    mh.ringMesh.rotation.y = time * 0.026;
+                    mh.eqMesh.rotation.y = -time * 0.032;
+                    mh.ringMesh.scale.set(beat, 1, beat);
+                    mh.eqMesh.scale.set(beat, 1, beat);
+                    mh.eqMat.opacity = 0.6 * fade;
+                    mh.ringMat.opacity = 0.72 * fade;
                 }
                 if (this.miksBassquake && this.miksBassquake.active) {
                     const bq = this.miksBassquake;
@@ -29378,7 +29658,7 @@
                 if (buyMapCardTitle) {
                     buyMapCardTitle.textContent = `Map: ${presetDef.name}`;
                 }
-                if (typeof soundFX.abilityCast === 'function') soundFX.abilityCast(); // V1.7: method never existed; the throw aborted the map-change notification
+                soundFX.abilityCast();
                 showNotification(`MAP PRESET: ${presetDef.name} — ${presetDef.subtitle}`, 2600);
             },
 
@@ -29722,24 +30002,24 @@
                 if (knifeModel) {
                     if (isHeavy) {
                         knifeModel.position.set(hip.x - 0.14, hip.y + 0.05, hip.z - 0.42);
-                        knifeModel.rotation.set(Math.PI - 0.38, 0.18, 0.55);
+                        knifeModel.rotation.set(-0.38, 0.18, 0.55);
                         setTimeout(() => {
                             if (game.activeWeapon === 'knife') {
                                 knifeModel.position.set(hip.x, hip.y, hip.z);
-                                knifeModel.rotation.set(Math.PI, 0, 0);
+                                knifeModel.rotation.set(0, 0, 0);
                             }
                         }, 260);
                     } else {
                         knifeModel.position.set(hip.x - 0.28, hip.y + 0.06, hip.z - 0.24);
-                        knifeModel.rotation.set(Math.PI - 0.18, 0.35, 0.78);
+                        knifeModel.rotation.set(-0.18, 0.35, 0.78);
                         setTimeout(() => {
                             if (game.activeWeapon === 'knife') {
                                 knifeModel.position.set(hip.x + 0.08, hip.y - 0.04, hip.z);
-                                knifeModel.rotation.set(Math.PI + 0.1, -0.15, -0.35);
+                                knifeModel.rotation.set(0.1, -0.15, -0.35);
                                 setTimeout(() => {
                                     if (game.activeWeapon === 'knife') {
                                         knifeModel.position.set(hip.x, hip.y, hip.z);
-                                        knifeModel.rotation.set(Math.PI, 0, 0);
+                                        knifeModel.rotation.set(0, 0, 0);
                                     }
                                 }, 120);
                             }
@@ -30009,12 +30289,12 @@
                 const hip = weapon.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
                 const ads = weapon.adsPos || hip;
                 const restY = hip.y + (ads.y - hip.y) * adsProgress;
-                weapon.model.rotation.x = Math.PI + recoilAmount;
+                weapon.model.rotation.x = recoilAmount; // muzzle kicks up (barrel is -Z)
                 weapon.model.position.y = restY - recoilAmount * 3.5;
 
                 setTimeout(() => {
                     if (!game.reloading && game.weapons[game.activeWeapon] === weapon) {
-                        weapon.model.rotation.x = Math.PI;
+                        weapon.model.rotation.x = 0;
                     }
                 }, 160);
 
@@ -30536,13 +30816,13 @@
                 const spinInterval = setInterval(() => {
                     const p = Math.min(1, (performance.now() - t0) / 480);
                     if (knifeModel) {
-                        knifeModel.rotation.x = Math.PI + p * Math.PI * 2;
+                        knifeModel.rotation.x = p * Math.PI * 2;
                         knifeModel.rotation.z = Math.sin(p * Math.PI) * 0.45;
                     }
                     if (p >= 1) {
                         clearInterval(spinInterval);
                         if (knifeModel) {
-                            knifeModel.rotation.x = Math.PI;
+                            knifeModel.rotation.x = 0;
                             knifeModel.rotation.z = 0;
                         }
                         game.reloading = false;
@@ -30582,7 +30862,7 @@
             // Different reload animations depending on weapon
             if (game.activeWeapon === 'rifle') {
                 weaponModel.position.y = -0.1;
-                weaponModel.rotation.x = Math.PI - 0.3;
+                weaponModel.rotation.x = -0.3;
                 weaponModel.rotation.z = 0.5;
                 
                 setTimeout(() => {
@@ -30598,7 +30878,7 @@
                         
                         setTimeout(() => {
                             weaponModel.position.set(hip.x, hip.y, hip.z);
-                            weaponModel.rotation.x = Math.PI;
+                            weaponModel.rotation.x = 0;
                             weaponModel.rotation.z = 0;
                         }, weapon.reloadTime * 1000 * 0.3);
                     }, weapon.reloadTime * 1000 * 0.4);
@@ -30621,7 +30901,7 @@
             } else if (game.activeWeapon === 'pistol') {
                 // Sheriff Sidearm reload animation: drop magazine, insert fresh mag, rack top slide
                 weaponModel.position.y = -0.14;
-                weaponModel.rotation.x = Math.PI - 0.24;
+                weaponModel.rotation.x = -0.24;
                 weaponModel.rotation.z = 0.38;
                 if (weapon.slide) weapon.slide.position.z = 0.04;
 
@@ -30633,7 +30913,7 @@
                         soundFX.ads(true, false);
                         setTimeout(() => {
                             weaponModel.position.set(hip.x, hip.y, hip.z);
-                            weaponModel.rotation.x = Math.PI;
+                            weaponModel.rotation.x = 0;
                             weaponModel.rotation.z = 0;
                         }, weapon.reloadTime * 1000 * 0.28);
                     }, weapon.reloadTime * 1000 * 0.42);
@@ -32609,6 +32889,25 @@
                 });
             },
 
+            // V1.7 fix: per-frame counter-strafe pill (was called but never defined)
+            _strafePillEl: null,
+            _strafePillState: null,
+            updateRecoilTrainerMovement: function() {
+                const pill = this._strafePillEl || (this._strafePillEl = document.getElementById('recoil-strafe-pill'));
+                if (!pill) return;
+                const hSpeed = Math.hypot(characterController.velocity.x, characterController.velocity.z);
+                const isDeadzone = hSpeed < 0.032 && characterController.grounded;
+                if (isDeadzone === this._strafePillState) return;
+                this._strafePillState = isDeadzone;
+                pill.textContent = isDeadzone ? 'DEADZONE (100%)' : 'MOVING (BLOOM)';
+                pill.classList.toggle('moving', !isDeadzone);
+            },
+
+            // V1.7 fix: the career modal closes settings through this name
+            toggleModal: function(forceState) {
+                this.toggleSettings(forceState);
+            },
+
             recordSprayShot: function(offsetX, offsetY, isDeadzoneAccurate) {
                 const now = performance.now();
                 if (now - this.lastSprayAt > 950) {
@@ -33913,7 +34212,7 @@
                     const b = this.wingmanBots[i];
                     if (b.hudEl) b.hudEl.classList.toggle('visible', this.wingmanEnabled);
                 }
-                if (typeof soundFX.abilityCast === 'function') soundFX.abilityCast(); // V1.7: method never existed; the throw aborted this notification
+                soundFX.abilityCast();
                 showNotification(`FRIENDLY AI WINGMAN SQUAD [F6]: ${this.wingmanEnabled ? 'DEPLOYED (ALPHA & BRAVO ACTIVE)' : 'STANDBY (SOLO MODE)'}`, 2200);
             },
 
