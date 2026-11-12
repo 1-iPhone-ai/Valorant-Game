@@ -3585,6 +3585,17 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>High Detail Characters &amp; Guns</strong>
+                                    <small>Rounded, more detailed bots, wingmen, guns &amp; hands. Looks only: hitboxes are unchanged (off on Low)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-char-detail-pills">
+                                    <button class="settings-pill-opt active" data-chardetail="off">OFF</button>
+                                    <button class="settings-pill-opt" data-chardetail="on">ON</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Glow Halos</strong>
                                     <small>Additive glow around ability cores, spike, ult orbs &amp; enemy muzzle flashes (one draw call)</small>
                                 </div>
@@ -5060,6 +5071,7 @@
                 flashLights: true,
                 surfaceDetail: 'auto', // V1.7: 'auto' (quality profile) | 'on' | 'off'
                 mapDetail: 'off',      // V1.7: High Detail Maps, 'off' (default) | 'on'
+                charDetail: 'off',     // V1.7: High Detail Characters & Guns, 'off' (default) | 'on'
                 gpLookSens: 1.0,       // V1.7 controller: right-stick look sensitivity (0.3-3.0x)
                 gpDeadzone: 12,        // V1.7 controller: stick deadzone % (5-30)
                 gpInvertY: false,
@@ -6750,6 +6762,9 @@
             const hiDetail = cfg.mapDetail === 'on' && adaptiveSettings.currentQuality !== 'low';
             adaptiveSettings.mapHiDetail = hiDetail;
             mapHiDetail.set(hiDetail);
+            const charDetail = cfg.charDetail === 'on' && adaptiveSettings.currentQuality !== 'low';
+            adaptiveSettings.charHiDetail = charDetail;
+            characterDetail.set(charDetail);
         }
         
         // Applies visual budgets only. Population, AI radius and enemy shot rules
@@ -9316,6 +9331,33 @@
         // of 12. Left hand at (0.08, -0.05, z); right hand at (-0.08, -0.05, z)
         // rotated PI about Y, exactly as the separate hand groups were placed.
         function createHandsMesh(handZ) {
+            const mesh = new THREE.Mesh(createHandsGeometry(handZ, false), new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.3 }));
+            mesh.userData.isHands = true;
+            mesh.userData.handZ = handZ;
+            return mesh;
+        }
+        
+        // V1.7 High Detail: rounded palm, two-joint fingers and a thumb, same placement
+        function createHandsGeometry(handZ, detailed) {
+            if (detailed) {
+                const palm = roundedBoxGeometry(0.042, 0.08, 0.062, 0.012, 2);
+                const knuckle = roundedBoxGeometry(0.018, 0.03, 0.019, 0.007, 2);
+                const tip = roundedBoxGeometry(0.016, 0.026, 0.017, 0.007, 2);
+                const thumb = roundedBoxGeometry(0.021, 0.042, 0.021, 0.008, 2);
+                const parts = [];
+                for (const hand of [partMatrix(0.08, -0.05, handZ, 0, 0, 0), partMatrix(-0.08, -0.05, handZ, 0, Math.PI, 0)]) {
+                    parts.push({ geometry: palm, matrix: hand.clone() });
+                    for (let i = 0; i < 4; i++) {
+                        const base = hand.clone().multiply(partMatrix((i - 1.5) * 0.022, 0.054, -0.026, -0.3, 0, 0));
+                        parts.push({ geometry: knuckle, matrix: base.clone() });
+                        parts.push({ geometry: tip, matrix: base.clone().multiply(partMatrix(0, 0.026, -0.006, -0.5, 0, 0)) });
+                    }
+                    parts.push({ geometry: thumb, matrix: hand.clone().multiply(partMatrix(0.03, 0.02, 0, 0, 0, Math.PI / 4)) });
+                }
+                const merged = mergeGeometryParts(parts);
+                for (const g of [palm, knuckle, tip, thumb]) g.dispose();
+                return merged;
+            }
             const palmGeometry = new THREE.BoxGeometry(0.04, 0.08, 0.06);
             const fingerGeometry = new THREE.BoxGeometry(0.018, 0.05, 0.018);
             const thumbGeometry = new THREE.BoxGeometry(0.02, 0.04, 0.02);
@@ -9338,7 +9380,7 @@
             palmGeometry.dispose();
             fingerGeometry.dispose();
             thumbGeometry.dispose();
-            return new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.3 }));
+            return merged;
         }
         
         // =============================================
@@ -10314,6 +10356,331 @@
             return actor;
         }
         
+        // =============================================
+        // V1.7 High Detail Characters & Guns (Settings > Video, off by default)
+        // =============================================
+        // Box with rounded edges and corners: a subdivided unit box whose vertices
+        // are pushed onto spheres of radius r around an inner box, with matching
+        // smooth normals. Indexed, with position/normal/uv like BoxGeometry, so it
+        // merges with mergeGeometryParts.
+        function roundedBoxGeometry(w, h, d, r, seg) {
+            seg = seg || 2;
+            const n = seg * 2 + 1;
+            const g = new THREE.BoxGeometry(1, 1, 1, n, n, n);
+            const half = [w / 2, h / 2, d / 2];
+            r = Math.max(0, Math.min(r, half[0], half[1], half[2]));
+            const pos = g.attributes.position.array, nor = g.attributes.normal.array;
+            const p = [0, 0, 0], c = [0, 0, 0];
+            for (let i = 0; i < pos.length; i += 3) {
+                for (let a = 0; a < 3; a++) {
+                    const k = Math.round((pos[i + a] + 0.5) * n);
+                    const hh = half[a];
+                    p[a] = k <= seg ? -hh + r * (k / seg) : hh - r * ((n - k) / seg);
+                    const lim = hh - r;
+                    c[a] = Math.max(-lim, Math.min(lim, p[a]));
+                }
+                const dx = p[0] - c[0], dy = p[1] - c[1], dz = p[2] - c[2];
+                const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if (len > 1e-7) {
+                    pos[i] = c[0] + dx / len * r; pos[i + 1] = c[1] + dy / len * r; pos[i + 2] = c[2] + dz / len * r;
+                    nor[i] = dx / len; nor[i + 1] = dy / len; nor[i + 2] = dz / len;
+                } else {
+                    pos[i] = p[0]; pos[i + 1] = p[1]; pos[i + 2] = p[2];
+                }
+            }
+            g.computeBoundingBox();
+            g.computeBoundingSphere();
+            return g;
+        }
+
+        // Detailed enemy look. Only what is drawn changes: the hit proxies (the
+        // actors' leaves) keep the original boxes, so hit zones and damage are
+        // identical. Every part stays inside its original hit volume, so a visible
+        // limb is always hittable. Same local space as actorTemplates; forward is -z.
+        function buildDetailedEnemyGeometry() {
+            const rb = (w, h, d, r, x, y, z, rx) => ({ geometry: roundedBoxGeometry(w, h, d, r, 2), matrix: partMatrix(x, y, z, rx || 0, 0, 0) });
+            const cyl = (rt, rbm, h, x, y, z, rx, rz) => ({ geometry: new THREE.CylinderGeometry(rt, rbm, h, 14), matrix: partMatrix(x, y, z, rx || 0, 0, rz || 0) });
+            const merge = (parts) => {
+                const m = mergeGeometryParts(parts);
+                for (const p of parts) p.geometry.dispose();
+                return m;
+            };
+            const out = {};
+            // Torso part: pelvis, abdomen, chest, chest plate, shoulder pads, backpack, arms
+            const torso = [
+                rb(0.7, 0.26, 0.44, 0.08, 0, 0.93, 0),
+                rb(0.64, 0.34, 0.42, 0.1, 0, 1.18, 0),
+                rb(0.9, 0.5, 0.54, 0.14, 0, 1.4, 0),
+                rb(0.62, 0.36, 0.08, 0.035, 0, 1.38, -0.28),
+                rb(0.6, 0.66, 0.16, 0.06, 0, 1.24, 0.25),
+                cyl(0.13, 0.15, 0.14, 0, 1.66, 0)
+            ];
+            // Arms sit inside each tier's arm hit volume (the low tier's arms block is narrower)
+            const armX = CONTENT.detailedModels ? 0.63 : 0.52;
+            for (const s of [-1, 1]) {
+                torso.push(rb(0.3, 0.2, 0.42, 0.08, s * (armX - 0.08), 1.56, 0)); // shoulder pad
+                torso.push(rb(0.24, 0.4, 0.24, 0.09, s * armX, 1.3, 0));          // upper arm
+                torso.push(rb(0.22, 0.36, 0.22, 0.08, s * armX, 0.94, -0.02));    // forearm
+            }
+            out.torso = merge(torso);
+            // Head part: helmet, jaw, ear pieces
+            out.head = merge([
+                rb(0.56, 0.5, 0.58, 0.2, 0, 1.96, 0),
+                rb(0.42, 0.24, 0.42, 0.1, 0, 1.73, -0.02),
+                cyl(0.07, 0.07, 0.08, -0.29, 1.92, 0, 0, Math.PI / 2),
+                cyl(0.07, 0.07, 0.08, 0.29, 1.92, 0, 0, Math.PI / 2)
+            ]);
+            // Legs part: thighs, knee pads, shins
+            const legs = [];
+            for (const s of [-1, 1]) {
+                legs.push(rb(0.3, 0.44, 0.32, 0.1, s * 0.2, 0.6, 0));
+                legs.push(rb(0.22, 0.16, 0.08, 0.035, s * 0.2, 0.42, -0.17));
+                legs.push(rb(0.26, 0.38, 0.28, 0.09, s * 0.2, 0.28, 0));
+            }
+            out.legs = merge(legs);
+            // Dark gear part (the enemy weapon's material): rifle, visor, belt, gloves, boots
+            const gear = [
+                rb(0.12, 0.16, 0.6, 0.03, 0.6, 1.1, -0.4),
+                cyl(0.03, 0.03, 0.3, 0.6, 1.12, -0.84, Math.PI / 2),
+                rb(0.08, 0.2, 0.1, 0.02, 0.6, 0.95, -0.42, 0.2),
+                rb(0.1, 0.12, 0.24, 0.03, 0.6, 1.06, -0.02),
+                cyl(0.035, 0.035, 0.16, 0.6, 1.22, -0.36, Math.PI / 2),
+                rb(0.46, 0.14, 0.08, 0.04, 0, 1.97, -0.27),
+                rb(0.74, 0.08, 0.48, 0.03, 0, 1.06, 0)
+            ];
+            for (const s of [-1, 1]) {
+                gear.push(rb(0.2, 0.16, 0.22, 0.07, s * armX, 0.7, -0.02));
+                gear.push(rb(0.28, 0.14, 0.4, 0.05, s * 0.2, 0.07, -0.04));
+            }
+            out.weapon = merge(gear);
+            return out;
+        }
+
+        const characterDetail = {
+            enabled: false,
+            built: false,
+            simple: {},        // enemy part name -> original render geometry
+            detailed: {},      // enemy part name -> detailed render geometry
+            gunSwaps: [],      // { mesh, simple, detailed }
+            kits: [],          // per-weapon groups of extra parts
+            wingmanKits: [],
+            buildMs: 0,
+
+            build: function () {
+                if (this.built) return;
+                const t0 = performance.now();
+                const T = actorTemplates;
+                this.simple = { torso: T.enemyTorso, head: T.enemyHead, legs: T.enemyLegs, weapon: T.enemyWeapon };
+                this.detailed = buildDetailedEnemyGeometry();
+                this._buildGuns();
+                this._buildWingmen();
+                this.built = true;
+                this.buildMs = performance.now() - t0;
+            },
+
+            // Rounded versions of every box and smoother cylinders, plus a kit of
+            // small parts per gun. Kits reuse the gun's own materials, so skins
+            // recolour them and no new shader programs are needed.
+            _buildGuns: function () {
+                const roundOf = (geo) => {
+                    const p = geo.parameters;
+                    if (geo.type === 'BoxGeometry') {
+                        return roundedBoxGeometry(p.width, p.height, p.depth, Math.min(0.012, 0.25 * Math.min(p.width, p.height, p.depth)), 2);
+                    }
+                    if (geo.type === 'CylinderGeometry') {
+                        return new THREE.CylinderGeometry(p.radiusTop, p.radiusBottom, p.height, 24, 1, p.openEnded);
+                    }
+                    return null;
+                };
+                const kitDefs = this._gunKits();
+                for (const key of ['rifle', 'sniper', 'pistol', 'knife']) {
+                    const w = game.weapons[key];
+                    if (!w || !w.model) continue;
+                    const children = w.model.children.slice();
+                    for (const child of children) {
+                        if (!child.isMesh || child === w.muzzleFlash) continue;
+                        let detailed = null;
+                        if (child.userData.isHands) detailed = createHandsGeometry(child.userData.handZ, true);
+                        else detailed = roundOf(child.geometry);
+                        if (detailed) this.gunSwaps.push({ mesh: child, simple: child.geometry, detailed: detailed });
+                    }
+                    const def = kitDefs[key];
+                    if (!def) continue;
+                    // Materials by role, taken from the gun's existing parts
+                    const mats = def.materials(children);
+                    const kit = new THREE.Group();
+                    kit.name = key + 'DetailKit';
+                    const slideKit = new THREE.Group();
+                    for (const part of def.parts) {
+                        const geo = part.box ? roundedBoxGeometry(part.box[0], part.box[1], part.box[2], part.r || 0.004, 2)
+                            : new THREE.CylinderGeometry(part.cyl[0], part.cyl[1], part.cyl[2], 20);
+                        const mesh = new THREE.Mesh(geo, mats[part.mat]);
+                        mesh.position.set(part.at[0], part.at[1], part.at[2]);
+                        if (part.rot) mesh.rotation.set(part.rot[0], part.rot[1], part.rot[2]);
+                        mesh.updateMatrix();
+                        mesh.matrixAutoUpdate = false;
+                        (part.onSlide ? slideKit : kit).add(mesh);
+                    }
+                    for (const [group, parent] of [[kit, w.model], [slideKit, w.slide]]) {
+                        if (!group.children.length || !parent) continue;
+                        group.visible = false;
+                        group.updateMatrix();
+                        group.matrixAutoUpdate = false;
+                        parent.add(group);
+                        this.kits.push(group);
+                    }
+                }
+            },
+
+            // Positions are in each gun's local space (same as createWeapons)
+            _gunKits: function () {
+                const X = Math.PI / 2;
+                const byIndex = (map) => (children) => {
+                    const out = {};
+                    for (const role in map) out[role] = children[map[role]].material;
+                    return out;
+                };
+                return {
+                    // children: 0 body, 1 barrel, 2 stock, 3 grip, 4 mag, 5 scope, 6 accent
+                    rifle: {
+                        materials: byIndex({ body: 0, dark: 1, black: 5, accent: 6 }),
+                        parts: [
+                            { box: [0.092, 0.084, 0.26], r: 0.012, at: [0, -0.004, -0.42], mat: 'dark' },  // handguard
+                            { box: [0.006, 0.018, 0.04], at: [0.047, -0.004, -0.36], mat: 'black' },          // vents
+                            { box: [0.006, 0.018, 0.04], at: [0.047, -0.004, -0.42], mat: 'black' },
+                            { box: [0.006, 0.018, 0.04], at: [0.047, -0.004, -0.48], mat: 'black' },
+                            { box: [0.006, 0.018, 0.04], at: [-0.047, -0.004, -0.36], mat: 'black' },
+                            { box: [0.006, 0.018, 0.04], at: [-0.047, -0.004, -0.42], mat: 'black' },
+                            { box: [0.006, 0.018, 0.04], at: [-0.047, -0.004, -0.48], mat: 'black' },
+                            { cyl: [0.03, 0.03, 0.07], at: [0, 0, -0.73], rot: [X, 0, 0], mat: 'black' },   // muzzle brake
+                            { box: [0.064, 0.008, 0.012], at: [0, -0.008, -0.73], mat: 'dark' },
+                            { box: [0.05, 0.012, 0.016], at: [0, 0.056, -0.24], mat: 'black' },            // top rail
+                            { box: [0.05, 0.012, 0.016], at: [0, 0.056, -0.2], mat: 'black' },
+                            { box: [0.05, 0.012, 0.016], at: [0, 0.056, -0.16], mat: 'black' },
+                            { box: [0.05, 0.012, 0.016], at: [0, 0.056, -0.12], mat: 'black' },
+                            { box: [0.05, 0.012, 0.016], at: [0, 0.056, 0.12], mat: 'black' },
+                            { box: [0.05, 0.012, 0.016], at: [0, 0.056, 0.16], mat: 'black' },
+                            { box: [0.07, 0.016, 0.03], at: [0, 0.054, 0.27], mat: 'dark' },               // charging handle
+                            { box: [0.006, 0.032, 0.08], at: [0.051, 0.012, 0.03], mat: 'black' },          // ejection port
+                            { box: [0.012, 0.01, 0.075], at: [0, -0.088, 0.13], mat: 'dark' },              // trigger guard
+                            { box: [0.008, 0.032, 0.01], at: [0, -0.068, 0.14], mat: 'black' },             // trigger
+                            { box: [0.088, 0.105, 0.03], r: 0.01, at: [0, -0.012, 0.61], mat: 'black' },    // butt pad
+                            { box: [0.104, 0.006, 0.36], at: [0, -0.02, 0.0], mat: 'accent' }               // side accent line
+                        ]
+                    },
+                    // children: 0 body, 1 barrel, 2 stock, 3 grip, 4 mag, 5 scope, 6 lens, 7 accent
+                    sniper: {
+                        materials: byIndex({ body: 0, dark: 1, black: 5 }),
+                        parts: [
+                            { cyl: [0.034, 0.034, 0.09], at: [0, 0, -1.03], rot: [X, 0, 0], mat: 'black' },  // muzzle brake
+                            { box: [0.074, 0.01, 0.014], at: [0, 0, -1.03], mat: 'dark' },
+                            { cyl: [0.026, 0.022, 0.2], at: [0, 0, -0.45], rot: [X, 0, 0], mat: 'dark' },    // barrel shroud
+                            { box: [0.088, 0.03, 0.2], r: 0.012, at: [0, 0.074, 0.56], mat: 'dark' },       // cheek rest
+                            { box: [0.09, 0.11, 0.03], r: 0.01, at: [0, -0.01, 0.81], mat: 'black' },       // butt pad
+                            { cyl: [0.009, 0.009, 0.07], at: [0.075, 0.025, 0.24], rot: [0, 0, X], mat: 'dark' }, // bolt
+                            { box: [0.022, 0.022, 0.022], r: 0.009, at: [0.112, 0.025, 0.24], mat: 'black' },
+                            { box: [0.012, 0.01, 0.08], at: [0, -0.1, 0.24], mat: 'dark' },                 // trigger guard
+                            { box: [0.008, 0.034, 0.01], at: [0, -0.08, 0.25], mat: 'black' }               // trigger
+                        ]
+                    },
+                    // children: 0 frame, 1 slide, 2 barrel, 3 grip, 4 mag, 5 accent, 6 front sight
+                    pistol: {
+                        materials: byIndex({ frame: 0, slide: 1, black: 2, grip: 3 }),
+                        parts: [
+                            // On the slide (positions relative to it), so they move when it cycles
+                            { box: [0.074, 0.03, 0.006], at: [0, 0.008, 0.1], mat: 'black', onSlide: true },  // serrations
+                            { box: [0.074, 0.03, 0.006], at: [0, 0.008, 0.115], mat: 'black', onSlide: true },
+                            { box: [0.074, 0.03, 0.006], at: [0, 0.008, 0.13], mat: 'black', onSlide: true },
+                            { box: [0.074, 0.03, 0.006], at: [0, 0.008, 0.145], mat: 'black', onSlide: true },
+                            // Rear sight: two posts with a notch, so the glowing front sight shows through
+                            { box: [0.01, 0.016, 0.014], at: [-0.011, 0.032, 0.16], mat: 'black', onSlide: true },
+                            { box: [0.01, 0.016, 0.014], at: [0.011, 0.032, 0.16], mat: 'black', onSlide: true },
+                            { box: [0.012, 0.01, 0.07], at: [0, -0.052, 0.04], mat: 'frame' },              // trigger guard
+                            { box: [0.012, 0.03, 0.01], at: [0, -0.038, 0.005], mat: 'frame' },
+                            { box: [0.008, 0.028, 0.01], at: [0, -0.04, 0.05], mat: 'black' },              // trigger
+                            { box: [0.06, 0.008, 0.07], at: [0, -0.07, -0.05], mat: 'black' },              // accessory rail
+                            { box: [0.062, 0.1, 0.004], at: [0, -0.1, 0.177], rot: [0.22, 0, 0], mat: 'black' } // grip texture panel
+                        ]
+                    },
+                    // children: 0 handle, 1 ring, 2 guard, 3 blade, 4 edge, 5 tip
+                    knife: {
+                        materials: byIndex({ handle: 0, blade: 3 }),
+                        parts: [
+                            { cyl: [0.03, 0.03, 0.012], at: [0, -0.02, 0.02], rot: [X, 0, 0], mat: 'handle' }, // grip wraps
+                            { cyl: [0.031, 0.031, 0.012], at: [0, -0.02, 0.07], rot: [X, 0, 0], mat: 'handle' },
+                            { cyl: [0.032, 0.032, 0.012], at: [0, -0.02, 0.12], rot: [X, 0, 0], mat: 'handle' },
+                            { box: [0.014, 0.008, 0.2], at: [0, -0.03, -0.14], mat: 'handle' }                 // blade spine
+                        ]
+                    }
+                };
+            },
+
+            // Wingmen: legs, arms, shoulder pads, visor and a proper rifle, using
+            // their existing materials (plus one plain dark material for the visor)
+            _buildWingmen: function () {
+                const td = (typeof tacticalEnhancements !== 'undefined') ? tacticalEnhancements : null;
+                if (!td || !td.wingmanBots) return;
+                const visorMat = new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: 0.2, metalness: 0.6 });
+                for (const bot of td.wingmanBots) {
+                    const g = bot.group;
+                    const torsoMat = g.children[0].material, headMat = g.children[1].material, gunMat = bot.gunMesh.material;
+                    const kit = new THREE.Group();
+                    const add = (geo, mat, x, y, z, rx) => {
+                        const m = new THREE.Mesh(geo, mat);
+                        m.position.set(x, y, z);
+                        if (rx) m.rotation.x = rx;
+                        kit.add(m);
+                    };
+                    for (const s of [-1, 1]) {
+                        add(roundedBoxGeometry(0.2, 0.42, 0.22, 0.08, 2), torsoMat, s * 0.17, 0.22, 0);       // legs
+                        add(roundedBoxGeometry(0.26, 0.12, 0.34, 0.05, 2), visorMat, s * 0.17, 0.04, -0.04);  // boots
+                        add(roundedBoxGeometry(0.26, 0.16, 0.36, 0.07, 2), headMat, s * 0.48, 1.38, 0);       // shoulder pads
+                        add(roundedBoxGeometry(0.16, 0.5, 0.16, 0.06, 2), torsoMat, s * 0.52, 1.02, -0.04);   // arms
+                    }
+                    add(roundedBoxGeometry(0.4, 0.12, 0.1, 0.04, 2), visorMat, 0, 1.74, -0.27);               // visor
+                    add(roundedBoxGeometry(0.1, 0.12, 0.3, 0.03, 2), gunMat, 0.38, 1.12, -0.86);              // rifle front
+                    add(new THREE.CylinderGeometry(0.025, 0.025, 0.3, 12), visorMat, 0.38, 1.14, -1.12, Math.PI / 2);
+                    add(roundedBoxGeometry(0.07, 0.18, 0.09, 0.02, 2), visorMat, 0.38, 0.98, -0.3);           // magazine
+                    kit.visible = false;
+                    g.add(kit);
+                    this.wingmanKits.push({ kit: kit, gun: bot.gunMesh, simple: bot.gunMesh.geometry, detailed: roundedBoxGeometry(0.14, 0.16, 0.85, 0.035, 2) });
+                }
+            },
+
+            ready: false,      // set once the weapons, enemies and wingmen exist (end of initGame)
+            wanted: false,
+
+            set: function (on) {
+                on = !!on;
+                this.wanted = on;
+                if (!this.ready) return;
+                if (on) this.build();
+                if (on === this.enabled) return;
+                this.enabled = on;
+                // Enemies: the page meshes draw spec.geometry; swap it everywhere
+                for (const spec of enemyPartSpecs) {
+                    const src = on ? this.detailed[spec.name] : this.simple[spec.name];
+                    if (!src) continue;
+                    spec.geometry = src;
+                    const swap = (mesh) => {
+                        const geom = mesh.geometry;
+                        geom.setIndex(src.index);
+                        for (const name of ['position', 'normal', 'uv']) geom.setAttribute(name, src.attributes[name]);
+                    };
+                    const p = enemyPartSpecs.indexOf(spec);
+                    for (const chunk of enemyChunks.values()) for (const page of chunk.pages) if (page.meshes[p]) swap(page.meshes[p]);
+                    for (const page of enemyPageFree) if (page.meshes[p]) swap(page.meshes[p]);
+                }
+                for (const s of this.gunSwaps) s.mesh.geometry = on ? s.detailed : s.simple;
+                for (const kit of this.kits) kit.visible = on;
+                for (const w of this.wingmanKits) {
+                    w.kit.visible = on;
+                    w.gun.geometry = on ? w.detailed : w.simple;
+                }
+                if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
+            }
+        };
+
         // (Re)activate an enemy with a complete state reset & archetype specialization
         function activateEnemy(actor, x, y, z, archetypeOverride) {
             actor.generation++;
@@ -33392,6 +33759,7 @@
             flashLights: true,
             surfaceDetail: 'auto',
             mapDetail: 'off',
+            charDetail: 'off',
             glowHalos: 'auto',
             brightness: 100,
             gpLookSens: 1.0,
@@ -33804,6 +34172,12 @@
 
                 this.bindPillGroup('setting-map-detail-pills', 'data-mapdetail', (val) => {
                     game.userSettings.mapDetail = val === 'on' ? 'on' : 'off';
+                    applyVisualOverrides();
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-char-detail-pills', 'data-chardetail', (val) => {
+                    game.userSettings.charDetail = val === 'on' ? 'on' : 'off';
                     applyVisualOverrides();
                     this.saveToStorage();
                 });
@@ -34440,10 +34814,8 @@
                     for (let i = 0; i < children.length; i++) {
                         const mesh = children[i];
                         if (!mesh || !mesh.material || mesh === wObj.muzzleFlash) continue;
-                        // Skip skin-tone hands mesh (last child with color 0xffdbac)
-                        if (i === children.length - 1 && mesh.material.color && mesh.material.color.equals(linearColorFromHex(0xffdbac))) {
-                            continue;
-                        }
+                        // Skip the skin-tone hands mesh (V1.7: no longer always the last child)
+                        if (mesh.userData.isHands) continue;
                         if (mesh.material.emissive && mesh.material.emissiveIntensity > 0.2) {
                             mesh.material.color.setHex(theme.accent).convertSRGBToLinear();
                             mesh.material.emissive.setHex(theme.accent).convertSRGBToLinear();
@@ -34826,6 +35198,7 @@
                 setActivePill('setting-surface-detail-pills', 'data-detail', cfg.surfaceDetail || 'auto');
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
                 setActivePill('setting-map-detail-pills', 'data-mapdetail', cfg.mapDetail === 'on' ? 'on' : 'off');
+                setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
                 setActivePill('setting-audio-steps-pills', 'data-audiosteps', cfg.enemyFootsteps === false ? 'off' : 'on');
@@ -36388,6 +36761,9 @@
             shadowManager.init();
             warmShaderVariants();
             gameInitialized = true;
+            // V1.7 High Detail Characters & Guns: everything it swaps now exists
+            characterDetail.ready = true;
+            characterDetail.set(characterDetail.wanted);
             
             // Show welcome message
             if (deviceInfo.touchEnabled) {
