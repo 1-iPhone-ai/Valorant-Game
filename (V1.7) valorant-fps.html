@@ -3574,6 +3574,17 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>High Detail Maps</strong>
+                                    <small>Textured walls &amp; crates, rounded edges, soft shading at wall bases, pipes, vents &amp; rubble (costs some FPS; off on Low)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-map-detail-pills">
+                                    <button class="settings-pill-opt active" data-mapdetail="off">OFF</button>
+                                    <button class="settings-pill-opt" data-mapdetail="on">ON</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Glow Halos</strong>
                                     <small>Additive glow around ability cores, spike, ult orbs &amp; enemy muzzle flashes (one draw call)</small>
                                 </div>
@@ -5048,6 +5059,7 @@
                 maxDecals: 20,
                 flashLights: true,
                 surfaceDetail: 'auto', // V1.7: 'auto' (quality profile) | 'on' | 'off'
+                mapDetail: 'off',      // V1.7: High Detail Maps, 'off' (default) | 'on'
                 gpLookSens: 1.0,       // V1.7 controller: right-stick look sensitivity (0.3-3.0x)
                 gpDeadzone: 12,        // V1.7 controller: stick deadzone % (5-30)
                 gpInvertY: false,
@@ -5659,6 +5671,49 @@
         }
         setFloorTint(0x1f2833);
         floorMaterial.envMapIntensity = 0.5;
+        // V1.7 High Detail Maps on the floor: baked contact shading around every
+        // map piece that stands on it (tFloorAO, rebaked per map) plus the tile
+        // relief texture and large faint stains. Compiled in, gated by uFloorHD.
+        const FLOOR_AO_SIZE = 256, FLOOR_AO_EXTENT = 52; // covers x/z in [-52, 52]
+        const floorAOTexture = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
+        floorAOTexture.magFilter = floorAOTexture.minFilter = THREE.LinearFilter;
+        floorAOTexture.generateMipmaps = false;
+        floorAOTexture.needsUpdate = true;
+        const floorHDUniform = { value: 0.0 };
+        floorMaterial.onBeforeCompile = (s) => {
+            s.uniforms.uFloorHD = floorHDUniform;
+            s.uniforms.tFloorAO = { value: floorAOTexture };
+            s.uniforms.tFloorN = { value: surfaceTextureFactory.textures.floor };
+            s.vertexShader = s.vertexShader
+                .replace('#include <common>', '#include <common>\nvarying vec2 vFloorW;')
+                .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+                    vFloorW = (modelMatrix * vec4(transformed, 1.0)).xz;`);
+            s.fragmentShader = s.fragmentShader
+                .replace('#include <common>', `#include <common>
+                    varying vec2 vFloorW; uniform float uFloorHD;
+                    uniform sampler2D tFloorAO; uniform sampler2D tFloorN;
+                    float fh21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+                    float fnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+                        return mix(mix(fh21(i), fh21(i+vec2(1.0,0.0)), f.x), mix(fh21(i+vec2(0.0,1.0)), fh21(i+vec2(1.0,1.0)), f.x), f.y); }`)
+                .replace('#include <color_fragment>', `#include <color_fragment>
+                    vec3 fhdN = vec3(0.0, 1.0, 0.0);
+                    float fhdRough = 1.0;
+                    if (uFloorHD > 0.0) {
+                        float ao = texture2D(tFloorAO, (vFloorW + ${FLOOR_AO_EXTENT.toFixed(1)}) / ${(FLOOR_AO_EXTENT * 2).toFixed(1)}).r;
+                        float stain = fnoise(vFloorW * 0.13) * 0.7 + fnoise(vFloorW * 0.37 + 7.0) * 0.3;
+                        vec4 fn = texture2D(tFloorN, vUv);
+                        diffuseColor.rgb *= mix(1.0, ao * (0.88 + 0.22 * stain) * fn.z * 2.0, uFloorHD);
+                        fhdRough = mix(1.0, fn.w * 2.0 * (0.9 + 0.2 * stain), uFloorHD);
+                        // Tile uv: u runs along world +x, v along world -z
+                        vec2 fxy = fn.xy * 2.0 - 1.0;
+                        fhdN = normalize(vec3(fxy.x, sqrt(max(0.0, 1.0 - dot(fxy, fxy))), -fxy.y));
+                    }`)
+                .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+                    roughnessFactor = clamp(roughnessFactor * fhdRough, 0.04, 1.0);`)
+                .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+                    if (uFloorHD > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(fhdN, 0.0)).xyz, uFloorHD));`);
+        };
+        floorMaterial.customProgramCacheKey = () => 'floorDetail';
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
@@ -6691,6 +6746,10 @@
             adaptiveSettings.maxHalos = halos;
             mapDetailUniform.value = detail;
             haloSystem.setBudget(halos);
+            // High Detail Maps: player opt-in, and never on the Low profile
+            const hiDetail = cfg.mapDetail === 'on' && adaptiveSettings.currentQuality !== 'low';
+            adaptiveSettings.mapHiDetail = hiDetail;
+            mapHiDetail.set(hiDetail);
         }
         
         // Applies visual budgets only. Population, AI radius and enemy shot rules
@@ -7523,6 +7582,302 @@
         // points and face normals are unchanged. They are never added to the scene
         // or rendered, so they are never uploaded to the GPU.
         const shootProxyMaterial = new THREE.MeshBasicMaterial();
+        // =============================================
+        // V1.7 High Detail Maps: procedural surface textures
+        // =============================================
+        // Five tileable 512 px RGBA textures drawn in code (no downloads):
+        // concrete panels, stone blocks, corrugated metal, wood planks and the floor
+        // tiles' relief. Channels: RG = tangent-space normal, B = albedo multiplier
+        // (x2, normalised to a mean of 1 so the tuned lighting does not shift),
+        // A = roughness multiplier (x2). They start as 1x1 placeholders bound to the
+        // shader and are only generated the first time High Detail is turned on, so
+        // players who leave it off pay nothing at load. Filling them is a texture
+        // upload, never a shader compile.
+        const surfaceTextureFactory = (function () {
+            const SIZE = 512, MASK = SIZE - 1;
+            const placeholder = () => {
+                const t = new THREE.DataTexture(new Uint8Array([128, 128, 128, 128]), 1, 1, THREE.RGBAFormat);
+                t.wrapS = t.wrapT = THREE.RepeatWrapping;
+                t.magFilter = THREE.LinearFilter;
+                t.minFilter = THREE.LinearMipmapLinearFilter;
+                t.generateMipmaps = true;
+                t.needsUpdate = true;
+                return t;
+            };
+            const textures = {
+                concrete: placeholder(), stone: placeholder(), metal: placeholder(),
+                wood: placeholder(), floor: placeholder()
+            };
+            const rng = (seed) => {
+                let s = (seed >>> 0) % 2147483647 || 1;
+                return () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+            };
+            const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+            // Periodic value noise: px x py lattice cells across the texture
+            const makeNoise = (seed) => {
+                const r = rng(seed);
+                const tab = new Float32Array(65536);
+                for (let i = 0; i < tab.length; i++) tab[i] = r();
+                const noise = (u, v, px, py) => {
+                    const x = u * px, y = v * py;
+                    const xi = Math.floor(x), yi = Math.floor(y);
+                    let fx = x - xi, fy = y - yi;
+                    fx = fx * fx * (3 - 2 * fx);
+                    fy = fy * fy * (3 - 2 * fy);
+                    const x0 = ((xi % px) + px) % px, x1 = (x0 + 1) % px;
+                    const y0 = ((yi % py) + py) % py, y1 = (y0 + 1) % py;
+                    const a = tab[((y0 & 255) << 8) | (x0 & 255)], b = tab[((y0 & 255) << 8) | (x1 & 255)];
+                    const c = tab[((y1 & 255) << 8) | (x0 & 255)], d = tab[((y1 & 255) << 8) | (x1 & 255)];
+                    return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fy;
+                };
+                const fbm = (u, v, px, py, oct) => {
+                    let sum = 0, amp = 0.5, norm = 0;
+                    for (let o = 0; o < oct; o++) {
+                        sum += noise(u, v, Math.min(256, px << o), Math.min(256, py << o)) * amp;
+                        norm += amp;
+                        amp *= 0.5;
+                    }
+                    return sum / norm;
+                };
+                return { noise, fbm };
+            };
+            // Row of tiling cut positions (block or plank joints) in [0, SIZE)
+            const makeCuts = (r, minLen, maxLen) => {
+                const cuts = [];
+                let x = r() * SIZE;
+                const start = x;
+                while (true) {
+                    cuts.push(Math.floor(x) & MASK);
+                    const len = minLen + r() * (maxLen - minLen);
+                    if (x + len > start + SIZE - minLen * 0.8) break;
+                    x += len;
+                }
+                return cuts.sort((a, b) => a - b);
+            };
+            const cutInfo = (cuts, x) => {
+                let dist = SIZE, id = cuts.length - 1;
+                for (let i = 0; i < cuts.length; i++) {
+                    const d = Math.abs(x - cuts[i]);
+                    dist = Math.min(dist, d, SIZE - d);
+                    if (x >= cuts[i]) id = i;
+                }
+                return { dist, id };
+            };
+            const N = SIZE * SIZE;
+
+            function concrete() {
+                const { noise, fbm } = makeNoise(11);
+                const r = rng(101);
+                const tone = [];
+                for (let i = 0; i < 8; i++) tone.push((r() - 0.5) * 0.12);
+                const H = new Float32Array(N), A = new Float32Array(N), R = new Float32Array(N);
+                for (let y = 0; y < SIZE; y++) {
+                    const v = y / SIZE;
+                    for (let x = 0; x < SIZE; x++) {
+                        const u = x / SIZE, i = y * SIZE + x;
+                        // 2 m x 1 m cast panels: 256 x 128 px
+                        const lx = x & 255, ly = y & 127;
+                        const sd = Math.min(lx, 256 - lx, ly, 128 - ly);
+                        let h = smooth(0, 4, sd);
+                        // Form-tie holes at the panel quarter points
+                        const tx = lx < 128 ? lx - 64 : lx - 192, ty = ly - 64;
+                        const td = Math.sqrt(tx * tx + ty * ty);
+                        const tie = td < 5 ? 1 - td / 5 : 0;
+                        h -= 0.7 * tie;
+                        const fine = fbm(u, v, 64, 64, 3);
+                        const pore = noise(u, v, 160, 160);
+                        h += (fine - 0.5) * 0.35 - Math.max(0, pore - 0.84) * 3.0;
+                        const stain = fbm(u, v, 4, 4, 3);
+                        const streak = noise(u, v, 48, 3);
+                        let a = (1 + tone[((y >> 7) << 1) | (x >> 8)]) * (0.86 + 0.28 * stain) * (1 - 0.18 * streak * streak);
+                        a *= 0.62 + 0.38 * h * h;
+                        a *= 1 - 0.45 * tie;
+                        H[i] = h; A[i] = a;
+                        R[i] = 1.0 + (fine - 0.5) * 0.3 + (1 - h) * 0.2;
+                    }
+                }
+                return pack(H, A, R, 1.2);
+            }
+
+            function stone() {
+                const { noise, fbm } = makeNoise(23);
+                const r = rng(203);
+                // 0.5 m courses (64 px) of 0.9-1.6 m blocks, staggered
+                const rows = [];
+                for (let i = 0; i < 8; i++) rows.push(makeCuts(r, 112, 200));
+                const tones = [];
+                for (let i = 0; i < 64; i++) tones.push((r() - 0.5) * 0.22);
+                const H = new Float32Array(N), A = new Float32Array(N), R = new Float32Array(N);
+                for (let y = 0; y < SIZE; y++) {
+                    const v = y / SIZE, row = y >> 6, ly = y & 63;
+                    const cuts = rows[row];
+                    for (let x = 0; x < SIZE; x++) {
+                        const u = x / SIZE, i = y * SIZE + x;
+                        const c = cutInfo(cuts, x);
+                        const sd = Math.min(c.dist, ly, 64 - ly);
+                        const mottle = fbm(u, v, 8, 8, 4);
+                        const chip = fbm(u, v, 32, 32, 3);
+                        let h = smooth(1.5, 9, sd);
+                        // Chipped arrises near the joints
+                        if (sd < 12) h -= Math.max(0, chip - 0.58) * 2.2 * (1 - sd / 12);
+                        h += (fbm(u, v, 96, 96, 2) - 0.5) * 0.18;
+                        const blockTone = tones[(row * 8 + c.id) & 63];
+                        let a = sd < 2.5 ? 0.66 : (1 + blockTone) * (0.84 + 0.32 * mottle);
+                        a *= 0.8 + 0.2 * Math.max(0, Math.min(1, h));
+                        H[i] = h; A[i] = a;
+                        R[i] = 1.05 + (mottle - 0.5) * 0.25 + (sd < 2.5 ? 0.15 : 0);
+                    }
+                }
+                return pack(H, A, R, 1.0);
+            }
+
+            function metal() {
+                const { fbm } = makeNoise(37);
+                const r = rng(307);
+                // Scratches: short bright, smoother lines
+                const scratch = new Float32Array(N);
+                for (let s = 0; s < 90; s++) {
+                    let x = r() * SIZE, y = r() * SIZE;
+                    const ang = (r() - 0.5) * 1.2 + (r() < 0.5 ? 0 : Math.PI);
+                    const len = 20 + r() * 70;
+                    const dx = Math.cos(ang), dy = Math.sin(ang);
+                    for (let t = 0; t < len; t++) {
+                        scratch[((y | 0) & MASK) * SIZE + ((x | 0) & MASK)] = 0.6 + 0.4 * r();
+                        x += dx; y += dy;
+                    }
+                }
+                const H = new Float32Array(N), A = new Float32Array(N), R = new Float32Array(N);
+                for (let y = 0; y < SIZE; y++) {
+                    const v = y / SIZE, ly = y & 255;
+                    for (let x = 0; x < SIZE; x++) {
+                        const u = x / SIZE, i = y * SIZE + x;
+                        // Corrugation: 12.5 cm ribs (32 px), trapezoid profile
+                        const t = (x & 31) / 32;
+                        let h = (smooth(0.08, 0.24, t) - smooth(0.56, 0.72, t)) * 0.9;
+                        // Horizontal sheet seam every metre with a rivet on each rib
+                        const seam = Math.min(ly, 256 - ly);
+                        if (seam < 3) h -= 0.5 * (1 - seam / 3);
+                        const rx = (x & 31) - 13, ry = Math.min(Math.abs(ly - 10), Math.abs(ly - 246));
+                        const rd = Math.sqrt(rx * rx + ry * ry);
+                        if (rd < 3) h += 0.5 * (1 - rd / 3);
+                        const sc = scratch[i];
+                        h -= 0.08 * sc;
+                        const grime = fbm(u, v, 6, 6, 4);
+                        const dirt = smooth(0.6, 0.85, grime);
+                        let a = (0.93 + 0.14 * fbm(u, v, 24, 24, 2)) * (1 - 0.14 * dirt) * (1 + 0.4 * sc);
+                        if (seam < 3) a *= 0.7;
+                        H[i] = h; A[i] = a;
+                        R[i] = Math.max(0.2, 0.82 + 0.25 * dirt - 0.45 * sc);
+                    }
+                }
+                return pack(H, A, R, 1.4);
+            }
+
+            function wood() {
+                const { noise, fbm } = makeNoise(41);
+                const r = rng(409);
+                // 25 cm planks (64 px) with one or two butt joints per 2 m
+                const rows = [];
+                for (let i = 0; i < 8; i++) rows.push(makeCuts(r, 200, 380));
+                const tones = [];
+                for (let i = 0; i < 64; i++) tones.push((r() - 0.5) * 0.26);
+                const H = new Float32Array(N), A = new Float32Array(N), R = new Float32Array(N);
+                for (let y = 0; y < SIZE; y++) {
+                    const v = y / SIZE, row = y >> 6, ly = y & 63;
+                    for (let x = 0; x < SIZE; x++) {
+                        const u = x / SIZE, i = y * SIZE + x;
+                        const c = cutInfo(rows[row], x);
+                        const sd = Math.min(c.dist, ly, 64 - ly);
+                        let h = smooth(0, 3.5, sd);
+                        // Grain runs along the plank (u): fast variation across it
+                        const warp = fbm(u, v, 3, 12, 3);
+                        const grain = 0.5 + 0.5 * Math.sin((y + warp * 40) * 0.9 + noise(u, v, 2, 64) * 6);
+                        const fibre = noise(u, v, 4, 256);
+                        h += (grain - 0.5) * 0.06 + (fibre - 0.5) * 0.05;
+                        // Nail heads near each joint
+                        let nail = 0;
+                        const jx = rows[row][c.id];
+                        for (let k = 0; k < 4; k++) {
+                            const dxn = Math.abs(x - (jx + (k & 1 ? 7 : -7)));
+                            const dyn = Math.abs(ly - (k < 2 ? 16 : 48));
+                            const d = Math.sqrt(dxn * dxn + dyn * dyn);
+                            if (d < 2.5) nail = Math.max(nail, 1 - d / 2.5);
+                        }
+                        h += 0.25 * nail;
+                        const tone = tones[(row * 8 + c.id) & 63];
+                        let a = (1 + tone) * (0.8 + 0.22 * grain + 0.1 * fibre) * (0.7 + 0.3 * h);
+                        a *= 1 - 0.55 * nail;
+                        H[i] = h; A[i] = a;
+                        R[i] = 1.12 - 0.2 * nail + (fibre - 0.5) * 0.1;
+                    }
+                }
+                return pack(H, A, R, 1.0);
+            }
+
+            // Matches createFloorTextures(): 1 m tiles of 128 px, seams on the borders
+            function floor() {
+                const { fbm } = makeNoise(53);
+                const H = new Float32Array(N), A = new Float32Array(N), R = new Float32Array(N);
+                for (let y = 0; y < SIZE; y++) {
+                    const v = y / SIZE;
+                    for (let x = 0; x < SIZE; x++) {
+                        const u = x / SIZE, i = y * SIZE + x;
+                        const tx = x & 127, ty = y & 127;
+                        const sd = Math.min(tx, ty, 128 - tx, 128 - ty);
+                        const grit = fbm(u, v, 64, 64, 3);
+                        H[i] = smooth(0, 5, sd) + (grit - 0.5) * 0.08;
+                        A[i] = 0.95 + 0.1 * grit;
+                        R[i] = 1.0 + (grit - 0.5) * 0.3;
+                    }
+                }
+                return pack(H, A, R, 1.0);
+            }
+
+            // Height -> tangent-space normal (u right, v up); albedo normalised to mean 1
+            function pack(H, A, R, k) {
+                let mean = 0;
+                for (let i = 0; i < N; i++) mean += A[i];
+                mean /= N;
+                const data = new Uint8Array(N * 4);
+                for (let y = 0; y < SIZE; y++) {
+                    const yd = ((y - 1) & MASK) * SIZE, yu = ((y + 1) & MASK) * SIZE, yr = y * SIZE;
+                    for (let x = 0; x < SIZE; x++) {
+                        const i = yr + x;
+                        let nx = (H[yr + ((x - 1) & MASK)] - H[yr + ((x + 1) & MASK)]) * k;
+                        let ny = (H[yd + x] - H[yu + x]) * k;
+                        const inv = 1 / Math.sqrt(nx * nx + ny * ny + 1);
+                        const o = i * 4;
+                        data[o] = Math.round((nx * inv * 0.5 + 0.5) * 255);
+                        data[o + 1] = Math.round((ny * inv * 0.5 + 0.5) * 255);
+                        data[o + 2] = Math.max(0, Math.min(255, Math.round(A[i] / mean * 127.5)));
+                        data[o + 3] = Math.max(0, Math.min(255, Math.round(R[i] * 127.5)));
+                    }
+                }
+                return data;
+            }
+
+            let ready = false;
+            return {
+                textures: textures,
+                get ready() { return ready; },
+                // ~0.3 s of CPU on a desktop; runs once, the first time High Detail is enabled
+                generate: function () {
+                    if (ready) return 0;
+                    const t0 = performance.now();
+                    const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+                    const gens = { concrete, stone, metal, wood, floor };
+                    for (const key in gens) {
+                        const tex = textures[key];
+                        tex.image = { data: gens[key](), width: SIZE, height: SIZE };
+                        tex.anisotropy = aniso;
+                        tex.needsUpdate = true;
+                    }
+                    ready = true;
+                    return performance.now() - t0;
+                }
+            };
+        })();
+
         // One shared lit material; each piece's color comes from instanceColor
         const mapMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.3 });
         // V1.7 procedural surface detail: world-space value-noise grime, a contact
@@ -7530,19 +7885,43 @@
         // compiled in; GRAPHICS_PROFILES.surfaceDetail drives uDetail (0 = off),
         // so changing quality never recompiles the map program.
         const mapDetailUniform = { value: 1.0 };
+        // V1.7 High Detail Maps (Settings > Video, off by default). Per-instance
+        // aSurf = (surface id [+10 for cylinders], seed, slice offset x, slice
+        // offset z) picks one of the procedural textures; the shader adds its
+        // relief and albedo, rounded-looking edges (the normal bends over the last
+        // few cm of every edge), edge wear, a 15 cm frame on crates and contact
+        // shading under raised pieces. Also always compiled in: uHiDetail = 0 skips
+        // all of it with one uniform branch.
+        const mapHiDetailUniform = { value: 0.0 };
+        const MAP_SURF = { none: 0, concrete: 1, stone: 2, metal: 3, wood: 4 };
         mapMaterial.onBeforeCompile = (s) => {
             s.uniforms.uDetail = mapDetailUniform;
+            s.uniforms.uHiDetail = mapHiDetailUniform;
+            const tx = surfaceTextureFactory.textures;
+            s.uniforms.tSurf0 = { value: tx.concrete };
+            s.uniforms.tSurf1 = { value: tx.stone };
+            s.uniforms.tSurf2 = { value: tx.metal };
+            s.uniforms.tSurf3 = { value: tx.wood };
             s.vertexShader = s.vertexShader
-                .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+                .replace('#include <common>', `#include <common>
+                    varying vec3 vWPos;
+                    attribute vec4 aSurf;
+                    varying vec4 vSurf; varying vec3 vLocal; varying vec3 vScale;`)
                 .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
                     vec4 wp4 = vec4(transformed, 1.0);
+                    vLocal = transformed;
+                    vScale = vec3(1.0);
                     #ifdef USE_INSTANCING
                         wp4 = instanceMatrix * wp4;
+                        vScale = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
                     #endif
-                    vWPos = (modelMatrix * wp4).xyz;`);
+                    vWPos = (modelMatrix * wp4).xyz;
+                    vSurf = aSurf;`);
             s.fragmentShader = s.fragmentShader
                 .replace('#include <common>', `#include <common>
-                    varying vec3 vWPos; uniform float uDetail;
+                    varying vec3 vWPos; uniform float uDetail; uniform float uHiDetail;
+                    varying vec4 vSurf; varying vec3 vLocal; varying vec3 vScale;
+                    uniform sampler2D tSurf0; uniform sampler2D tSurf1; uniform sampler2D tSurf2; uniform sampler2D tSurf3;
                     float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
                     float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
                         return mix(mix(h21(i), h21(i+vec2(1.0,0.0)), f.x), mix(h21(i+vec2(0.0,1.0)), h21(i+vec2(1.0,1.0)), f.x), f.y); }`)
@@ -7553,9 +7932,83 @@
                         grime = vnoise(vWPos.xz * 0.35 + vWPos.y * 0.5) * 0.6 + vnoise(vWPos.xy * 1.9 + vWPos.zz) * 0.4;
                         float contact = smoothstep(0.0, 1.5, vWPos.y);
                         diffuseColor.rgb *= mix(1.0, (0.82 + 0.3 * grime) * mix(0.6, 1.0, contact), uDetail);
+                    }
+                    vec3 hdN = vec3(0.0, 1.0, 0.0);
+                    float hdRough = 1.0;
+                    float hdOn = 0.0;
+                    if (uHiDetail > 0.0 && vSurf.x > 0.5) {
+                        hdOn = uHiDetail;
+                        float cyl = step(9.5, vSurf.x);
+                        float sid = vSurf.x - 10.0 * cyl;
+                        // World-space geometric normal (map pieces are never rotated)
+                        vec3 wN = normalize((vec4(normalize(vNormal), 0.0) * viewMatrix).xyz);
+                        vec3 an = abs(wN);
+                        vec3 lp = vLocal;
+                        vec3 S = vScale;
+                        // Metres from the piece's min corner, continuous across render slices
+                        vec3 pc = (lp + 0.5) * S + vec3(vSurf.z, 0.0, vSurf.w);
+                        vec2 uv; vec3 tU; vec3 tV; vec3 tilt; float ed;
+                        if (cyl < 0.5) {
+                            vec3 e = (0.5 - abs(lp)) * S;
+                            vec3 sg = sign(lp);
+                            float R = clamp(0.035 * min(S.x, min(S.y, S.z)), 0.025, 0.07);
+                            vec3 w = vec3(1.0) - smoothstep(vec3(0.0), vec3(R), e);
+                            if (an.x > 0.5) { uv = pc.zy; tU = vec3(0.0, 0.0, 1.0); tV = vec3(0.0, 1.0, 0.0); ed = min(e.y, e.z); tilt = vec3(0.0, sg.y * w.y, sg.z * w.z); }
+                            else if (an.y > 0.5) { uv = pc.xz; tU = vec3(1.0, 0.0, 0.0); tV = vec3(0.0, 0.0, 1.0); ed = min(e.x, e.z); tilt = vec3(sg.x * w.x, 0.0, sg.z * w.z); }
+                            else { uv = pc.xy; tU = vec3(1.0, 0.0, 0.0); tV = vec3(0.0, 1.0, 0.0); ed = min(e.x, e.y); tilt = vec3(sg.x * w.x, sg.y * w.y, 0.0); }
+                        } else {
+                            float r = S.x;
+                            float R = clamp(0.05 * r, 0.02, 0.06);
+                            if (an.y < 0.5) {
+                                float ang = atan(lp.z, lp.x);
+                                uv = vec2(ang * r, pc.y);
+                                tU = vec3(-sin(ang), 0.0, cos(ang)); tV = vec3(0.0, 1.0, 0.0);
+                                ed = (0.5 - abs(lp.y)) * S.y;
+                                tilt = vec3(0.0, sign(lp.y) * (1.0 - smoothstep(0.0, R, ed)), 0.0);
+                            } else {
+                                uv = lp.xz * r; tU = vec3(1.0, 0.0, 0.0); tV = vec3(0.0, 0.0, 1.0);
+                                ed = (1.0 - length(lp.xz)) * r;
+                                tilt = normalize(vec3(lp.x, 0.0, lp.z) + 1e-4) * (1.0 - smoothstep(0.0, R, ed));
+                            }
+                        }
+                        // Concrete/stone tile every 4 m, metal/wood every 2 m. The seed
+                        // shifts whole panels so neighbours differ but seams stay on edges.
+                        float per = sid < 2.5 ? 4.0 : 2.0;
+                        vec2 tuv = uv / per + floor(vSurf.y * 4.0) * vec2(0.5, 0.25);
+                        vec4 tex;
+                        if (sid < 1.5) tex = texture2D(tSurf0, tuv);
+                        else if (sid < 2.5) tex = texture2D(tSurf1, tuv);
+                        else if (sid < 3.5) tex = texture2D(tSurf2, tuv);
+                        else tex = texture2D(tSurf3, tuv);
+                        vec2 txy = tex.xy * 2.0 - 1.0;
+                        vec3 tn = vec3(txy, sqrt(max(0.0, 1.0 - dot(txy, txy))));
+                        float alb = tex.z * 2.0;
+                        float rgh = tex.w * 2.0;
+                        float wear = (1.0 - smoothstep(0.0, 0.16, ed)) * smoothstep(0.42, 0.78, vnoise(uv * 7.0 + vSurf.y * 31.0));
+                        if (sid > 3.5) {
+                            // Crate frame: 15 cm border with a dark groove on its inner edge
+                            float frame = 1.0 - smoothstep(0.145, 0.155, ed);
+                            float groove = smoothstep(0.13, 0.15, ed) * (1.0 - smoothstep(0.155, 0.18, ed));
+                            alb *= mix(1.0, 0.8, frame) * (1.0 - 0.5 * groove) * (1.0 - 0.15 * wear);
+                        } else if (sid > 2.5) {
+                            alb *= 1.0 + 0.45 * wear;
+                            rgh *= 1.0 - 0.5 * wear;
+                        } else {
+                            alb *= 1.0 + 0.25 * wear;
+                        }
+                        // Contact shading on the lower sides of pieces resting on others
+                        float lift = (lp.y + 0.5) * S.y;
+                        float raised = step(0.3, vWPos.y - lift) * (1.0 - an.y);
+                        float ao = mix(1.0, mix(0.68, 1.0, smoothstep(0.0, 0.6, lift)), raised);
+                        diffuseColor.rgb *= mix(1.0, alb * ao, uHiDetail);
+                        hdRough = mix(1.0, rgh, uHiDetail);
+                        hdN = normalize(wN * tn.z + tU * tn.x + tV * tn.y + tilt * 0.9);
                     }`)
                 .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-                    if (uDetail > 0.0) roughnessFactor = clamp(roughnessFactor * mix(1.0, 0.75 + 0.5 * grime, uDetail), 0.04, 1.0);`);
+                    if (uDetail > 0.0) roughnessFactor = clamp(roughnessFactor * mix(1.0, 0.75 + 0.5 * grime, uDetail), 0.04, 1.0);
+                    roughnessFactor = clamp(roughnessFactor * hdRough, 0.04, 1.0);`)
+                .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+                    if (hdOn > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(hdN, 0.0)).xyz, hdOn));`);
         };
         mapMaterial.customProgramCacheKey = () => 'mapDetail';
         let unitBoxGeometry = null;
@@ -7831,6 +8284,7 @@
 
             createMap();
             buildMapBatches();
+            mapHiDetail.onMapBuilt();
 
             collisionIndex.cells.clear();
             collisionIndex.revision++;
@@ -7910,7 +8364,9 @@
                 scaleX: scaleX, scaleY: scaleY, scaleZ: scaleZ,
                 visible: true,
                 batch: null,
-                slices: null
+                slices: null,
+                surf: classifyMapSurface(shape, scaleX, scaleY, scaleZ, color),
+                seed: mapSurfaceSeed(x, y, z)
             };
             buildRenderSlices(piece);
             mapPieces.push(piece);
@@ -7947,14 +8403,17 @@
                 slices.push({
                     matrix: matrix, bounds: bounds, x: cx, z: cz,
                     shape: piece.shape, color: piece.color,
-                    visible: true, batch: null, piece: piece
+                    visible: true, batch: null, piece: piece,
+                    // Offset from the piece's min corner, so High Detail textures run on across slices
+                    offX: (cx - ssx * 0.5) - (piece.x - sx * 0.5),
+                    offZ: (cz - ssz * 0.5) - (piece.z - sz * 0.5)
                 });
             };
             if (sx <= limit && sz <= limit) {
                 slices.push({
                     matrix: piece.matrix, bounds: piece.bounds, x: piece.x, z: piece.z,
                     shape: piece.shape, color: piece.color,
-                    visible: true, batch: null, piece: piece
+                    visible: true, batch: null, piece: piece, offX: 0, offZ: 0
                 });
             } else if (sx >= sz) {
                 const n = Math.ceil(sx / limit);
@@ -7990,6 +8449,9 @@
                 for (const name in source.attributes) {
                     geometry.setAttribute(name, source.attributes[name]);
                 }
+                const surfAttr = new THREE.InstancedBufferAttribute(new Float32Array(members.length * 4), 4);
+                surfAttr.setUsage(THREE.DynamicDrawUsage);
+                geometry.setAttribute('aSurf', surfAttr);
                 const bounds = new THREE.Box3();
                 for (const piece of members) bounds.union(piece.bounds);
                 geometry.boundingBox = bounds;
@@ -8013,11 +8475,13 @@
         // Rewrite a batch's instance buffers with its currently visible members
         function refreshMapBatch(batch) {
             const mesh = batch.mesh;
+            const surfAttr = mesh.geometry.attributes.aSurf;
             let n = 0;
             for (const piece of batch.members) {
                 if (!piece.visible) continue;
                 mesh.setMatrixAt(n, piece.matrix);
                 mesh.setColorAt(n, linearColorFromHex(piece.color));
+                if (surfAttr) surfAttr.setXYZW(n, piece.piece.surf || 0, piece.piece.seed || 0, piece.offX || 0, piece.offZ || 0);
                 n++;
             }
             mesh.count = n;
@@ -8028,11 +8492,305 @@
                 }
                 perfTelemetry.requestUpload(mesh.instanceMatrix, 0, n * 16);
                 if (mesh.instanceColor) perfTelemetry.requestUpload(mesh.instanceColor, 0, n * 3);
+                if (surfAttr) perfTelemetry.requestUpload(surfAttr, 0, n * 4);
             }
             batch.visibleCount = n;
             batch.dirty = false;
         }
         
+        // =============================================
+        // V1.7 High Detail Maps: surface ids, decor props, controller
+        // =============================================
+        const SURF_STONE_MAPS = { bind: true, haven: true, lotus: true };
+        // Which procedural texture a map piece uses (+10 marks a cylinder)
+        function classifyMapSurface(shape, sx, sy, sz, color) {
+            const preset = (typeof game !== 'undefined' && game.mapPreset) || 'ascent';
+            const metalMap = preset === 'icebox' || preset === 'split';
+            const cyl = shape === 'cylinder';
+            let id;
+            if (cyl) id = metalMap ? MAP_SURF.metal : MAP_SURF.stone;
+            else if (Math.max(sx, sz) >= 90 && Math.min(sx, sz) <= 1.5) id = SURF_STONE_MAPS[preset] ? MAP_SURF.stone : MAP_SURF.concrete;
+            else if (Math.max(sx, sz) <= 3.2 && sy <= 3.2) id = metalMap ? MAP_SURF.metal : MAP_SURF.wood;
+            else if (sy <= 1.2) id = MAP_SURF.metal;
+            else if (preset === 'icebox') id = (color === 0x475569 || color === 0x1e293b) ? MAP_SURF.concrete : MAP_SURF.metal;
+            else if (preset === 'split') id = MAP_SURF.concrete;
+            else id = MAP_SURF.stone;
+            return id + (cyl ? 10 : 0);
+        }
+        function mapSurfaceSeed(x, y, z) {
+            const s = Math.sin(x * 12.9898 + y * 4.1414 + z * 78.233) * 43758.5453;
+            return s - Math.floor(s);
+        }
+
+        // Purely visual props built from the current map: plinths and cornice
+        // bands on large blocks, pilasters, pipes and vents on the perimeter walls,
+        // and rubble along wall bases. No colliders, hit proxies or AI data: they
+        // never change movement, shots or sight lines. Instanced with mapMaterial
+        // (same program as the map), so showing them never compiles anything.
+        const mapDecor = {
+            group: new THREE.Group(),
+            batches: [],
+            instanceCount: 0,
+
+            clear: function () {
+                for (const b of this.batches) {
+                    this.group.remove(b);
+                    b.geometry.dispose();
+                    if (b.dispose) b.dispose();
+                }
+                this.batches.length = 0;
+                this.instanceCount = 0;
+            },
+
+            build: function () {
+                this.clear();
+                ensureUnitMapGeometry();
+                const preset = MAP_PRESETS[game.mapPreset] || MAP_PRESETS.ascent;
+                const items = [];
+                let seed = 977;
+                for (let i = 0; i < preset.id.length; i++) seed = (seed * 31 + preset.id.charCodeAt(i)) % 2147483647;
+                const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+                const q = new THREE.Quaternion();
+                const add = (shape, x, y, z, sx, sy, sz, hex, gain, surf, rot) => {
+                    const m = new THREE.Matrix4().compose(_piecePosition.set(x, y, z), rot || q.identity(), _pieceScale.set(sx, sy, sz));
+                    const unit = shape === 'box' ? 0.5 : 1;
+                    const bounds = new THREE.Box3(new THREE.Vector3(-unit, -0.5, -unit), new THREE.Vector3(unit, 0.5, unit)).applyMatrix4(m);
+                    items.push({ shape, matrix: m, bounds, hex, gain, surf: surf || 0, seed: mapSurfaceSeed(x, y, z), x, z });
+                };
+                const insidePiece = (x, z, pad) => {
+                    for (const p of mapPieces) {
+                        const b = p.bounds;
+                        if (b.min.y > 0.4) continue;
+                        if (x > b.min.x - pad && x < b.max.x + pad && z > b.min.z - pad && z < b.max.z + pad) return true;
+                    }
+                    return false;
+                };
+                const rubble = (x, z, hex) => {
+                    if (insidePiece(x, z, 0.04)) return;
+                    const s = 0.07 + rnd() * 0.18;
+                    const r = new THREE.Quaternion().setFromAxisAngle(_yAxisDecor, rnd() * Math.PI);
+                    add('box', x, s * 0.35, z, s * (0.8 + rnd() * 0.6), s * 0.7, s * (0.8 + rnd() * 0.6), hex, 0.7 + rnd() * 0.25, 0, r);
+                };
+
+                const pipeHex = 0x4b5563, ventHex = 0x2b3038;
+                for (const p of mapPieces) {
+                    if (p.shape === 'cylinder') {
+                        // Base and capital rings on standing columns
+                        const b = p.bounds;
+                        if (b.min.y > 0.05) continue;
+                        const r = p.scaleX, surf = classifyMapSurface('cylinder', r, p.scaleY, r, p.color) - 10;
+                        add('cylinder', p.x, 0.17, p.z, r * 1.2, 0.34, r * 1.2, p.color, 0.6, surf);
+                        add('cylinder', p.x, 0.45, p.z, r * 1.08, 0.22, r * 1.08, p.color, 0.8, surf);
+                        add('cylinder', p.x, b.max.y - 0.3, p.z, r * 1.12, 0.26, r * 1.12, p.color, 1.15, surf);
+                        continue;
+                    }
+                    if (p.shape !== 'box') continue;
+                    const b = p.bounds;
+                    const sx = b.max.x - b.min.x, sy = b.max.y - b.min.y, sz = b.max.z - b.min.z;
+                    const surf = classifyMapSurface('box', sx, sy, sz, p.color);
+                    const grounded = b.min.y <= 0.05;
+                    const perimeter = Math.max(sx, sz) >= 90 && Math.min(sx, sz) <= 1.5;
+                    if (perimeter) {
+                        // Inner face: the side facing the arena centre
+                        const alongX = sx > sz;
+                        const sign = alongX ? -Math.sign(p.z) : -Math.sign(p.x);
+                        const face = alongX ? (sign > 0 ? b.max.z : b.min.z) : (sign > 0 ? b.max.x : b.min.x);
+                        const len = alongX ? sx : sz;
+                        const at = (along, out) => alongX ? [along, face + sign * out] : [face + sign * out, along];
+                        const span = (along, out, w, h, d, y, hex, gain, s, rot) => {
+                            const [x, z] = at(along, out);
+                            if (alongX) add('box', x, y, z, w, h, d, hex, gain, s, rot);
+                            else add('box', x, y, z, d, h, w, hex, gain, s, rot);
+                        };
+                        // Plinth and a cornice band at 7.5 m
+                        span(0, 0.035, len - 1, 0.26, 0.07, 0.13, p.color, 0.55, surf);
+                        span(0, 0.05, len - 1, 0.24, 0.1, 7.5, p.color, 1.15, surf);
+                        // Pilasters every 12.5 m (not at the centre, where the pipes drop)
+                        for (const a of [-37.5, -25, -12.5, 12.5, 25, 37.5]) {
+                            span(a, 0.11, 0.8, 20, 0.22, 10, p.color, 1.12, surf);
+                            span(a, 0.16, 1.0, 0.36, 0.32, 0.18, p.color, 0.6, surf);
+                        }
+                        // Two pipe runs at 5.2 m / 5.65 m, in 25 m lengths, on brackets
+                        const pipeRot = new THREE.Quaternion().setFromAxisAngle(alongX ? _zAxisDecor : _xAxisDecor, Math.PI / 2);
+                        for (let k = 0; k < 4; k++) {
+                            const mid = -37.5 + k * 25;
+                            const [x1, z1] = at(mid, 0.4);
+                            add('cylinder', x1, 5.2, z1, 0.14, 25, 0.14, pipeHex, 1, 0, pipeRot);
+                            const [x2, z2] = at(mid, 0.38);
+                            add('cylinder', x2, 5.65, z2, 0.085, 25, 0.085, preset.accentA || pipeHex, 0.55, 0, pipeRot);
+                        }
+                        for (let a = -43.75; a < 45; a += 6.25) {
+                            if (Math.abs(a % 12.5) < 0.01) continue;
+                            span(a, 0.27, 0.12, 0.7, 0.54, 5.4, ventHex, 1, MAP_SURF.metal);
+                        }
+                        // Drop pipe to the floor at the wall's centre
+                        const [dx, dz] = at(0, 0.4);
+                        add('cylinder', dx, 2.6, dz, 0.14, 5.2, 0.14, pipeHex, 1, 0);
+                        add('cylinder', dx, 0.08, dz, 0.24, 0.16, 0.24, pipeHex, 0.8, 0);
+                        // Vents: frame plus four louvres, between the pilasters
+                        for (const a of [-31.25, -6.25, 18.75]) {
+                            span(a, 0.04, 1.4, 0.9, 0.08, 2.4, ventHex, 1, MAP_SURF.metal);
+                            for (let l = 0; l < 4; l++) span(a, 0.1, 1.24, 0.07, 0.12, 2.1 + l * 0.2, ventHex, 1.35, MAP_SURF.metal);
+                        }
+                        // Rubble along the base
+                        for (let n = 0; n < 26; n++) {
+                            const [x, z] = at((rnd() - 0.5) * (len - 4), 0.12 + rnd() * 0.5);
+                            rubble(x, z, p.color);
+                        }
+                        continue;
+                    }
+                    if (!grounded || sy < 2.5 || Math.max(sx, sz) < 4) continue;
+                    // Plinth on all four sides, and a cornice band 0.35 m under the top of tall blocks
+                    const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    const ring = (y, h, out, gain) => {
+                        add('box', cx, y, b.max.z + out / 2, sx + out * 2, h, out, p.color, gain, surf);
+                        add('box', cx, y, b.min.z - out / 2, sx + out * 2, h, out, p.color, gain, surf);
+                        add('box', b.max.x + out / 2, y, cz, out, h, sz, p.color, gain, surf);
+                        add('box', b.min.x - out / 2, y, cz, out, h, sz, p.color, gain, surf);
+                    };
+                    ring(0.12, 0.24, 0.06, 0.55);
+                    if (sy >= 4) ring(b.max.y - 0.35, 0.2, 0.07, 1.18);
+                    // A little rubble at the foot of each face
+                    const n = Math.min(10, Math.round((sx + sz) / 3));
+                    for (let i = 0; i < n; i++) {
+                        const side = Math.floor(rnd() * 4);
+                        const off = 0.12 + rnd() * 0.45;
+                        let x, z;
+                        if (side < 2) { x = b.min.x + rnd() * sx; z = side === 0 ? b.max.z + off : b.min.z - off; }
+                        else { z = b.min.z + rnd() * sz; x = side === 2 ? b.max.x + off : b.min.x - off; }
+                        rubble(x, z, p.color);
+                    }
+                }
+
+                // Batch by shape and chunk, like the map itself
+                const groups = new Map();
+                for (const it of items) {
+                    const key = it.shape + ':' + Math.floor(it.x / MAP_CHUNK_SIZE) + ',' + Math.floor(it.z / MAP_CHUNK_SIZE);
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(it);
+                }
+                for (const [, members] of groups) {
+                    const source = members[0].shape === 'box' ? unitBoxGeometry : unitCylinderGeometry;
+                    const geometry = new THREE.BufferGeometry();
+                    geometry.setIndex(source.index);
+                    for (const name in source.attributes) geometry.setAttribute(name, source.attributes[name]);
+                    const surfAttr = new THREE.InstancedBufferAttribute(new Float32Array(members.length * 4), 4);
+                    geometry.setAttribute('aSurf', surfAttr);
+                    const bounds = new THREE.Box3();
+                    for (const it of members) bounds.union(it.bounds);
+                    geometry.boundingBox = bounds;
+                    geometry.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
+                    const mesh = new THREE.InstancedMesh(geometry, mapMaterial, members.length);
+                    members.forEach((it, i) => {
+                        mesh.setMatrixAt(i, it.matrix);
+                        mesh.setColorAt(i, _pieceColor.copy(linearColorFromHex(it.hex)).multiplyScalar(it.gain));
+                        surfAttr.setXYZW(i, it.surf + (it.shape === 'cylinder' && it.surf ? 10 : 0), it.seed, 0, 0);
+                    });
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    mesh.frustumCulled = true;
+                    freezeStaticTransform(mesh);
+                    this.group.add(mesh);
+                    this.batches.push(mesh);
+                    this.instanceCount += members.length;
+                }
+            }
+        };
+        const _xAxisDecor = new THREE.Vector3(1, 0, 0);
+        const _yAxisDecor = new THREE.Vector3(0, 1, 0);
+        const _zAxisDecor = new THREE.Vector3(0, 0, 1);
+        mapDecor.group.visible = false;
+        mapDecor.group.name = 'mapDecor';
+        freezeStaticTransform(mapDecor.group);
+        scene.add(mapDecor.group);
+
+        // Turns High Detail on/off. Everything it touches is a uniform, a
+        // visibility flag or a texture upload, so it is safe at any time.
+        const mapHiDetail = {
+            enabled: false,
+            aoStale: true,
+            lastBakeMs: 0,
+            lastGenerateMs: 0,
+
+            set: function (on) {
+                on = !!on;
+                if (on) this._prepare();
+                if (on === this.enabled) return;
+                this.enabled = on;
+                mapHiDetailUniform.value = on ? 1 : 0;
+                floorHDUniform.value = on ? 1 : 0;
+                mapDecor.group.visible = on;
+                if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
+            },
+
+            // Called after the map pieces for a preset have been (re)built
+            onMapBuilt: function () {
+                mapDecor.build();
+                this.aoStale = true;
+                if (this.enabled) this._prepare();
+            },
+
+            _prepare: function () {
+                if (!surfaceTextureFactory.ready) this.lastGenerateMs = surfaceTextureFactory.generate();
+                if (this.aoStale && mapPieces.length) this.bakeFloorAO();
+            },
+
+            // Footprints of everything standing on the floor, blurred into a soft
+            // darkening that reaches ~1.5 m out from each base
+            bakeFloorAO: function () {
+                const t0 = performance.now();
+                const n = FLOOR_AO_SIZE, ext = FLOOR_AO_EXTENT, cell = (ext * 2) / n;
+                let cov = new Float32Array(n * n);
+                for (const p of mapPieces) {
+                    const b = p.bounds;
+                    if (b.min.y > 0.3) continue;
+                    const x0 = Math.max(0, Math.floor((b.min.x + ext) / cell)), x1 = Math.min(n - 1, Math.ceil((b.max.x + ext) / cell) - 1);
+                    const z0 = Math.max(0, Math.floor((b.min.z + ext) / cell)), z1 = Math.min(n - 1, Math.ceil((b.max.z + ext) / cell) - 1);
+                    const cyl = p.shape === 'cylinder';
+                    for (let z = z0; z <= z1; z++) {
+                        for (let x = x0; x <= x1; x++) {
+                            if (cyl) {
+                                const wx = (x + 0.5) * cell - ext - p.x, wz = (z + 0.5) * cell - ext - p.z;
+                                if (wx * wx + wz * wz > p.scaleX * p.scaleX) continue;
+                            }
+                            cov[z * n + x] = 1;
+                        }
+                    }
+                }
+                // Three separable box blurs (radius 2 cells) approximate a gaussian
+                let tmp = new Float32Array(n * n);
+                const rad = 2, w = 1 / (rad * 2 + 1);
+                for (let pass = 0; pass < 3; pass++) {
+                    for (let z = 0; z < n; z++) {
+                        for (let x = 0; x < n; x++) {
+                            let s = 0;
+                            for (let k = -rad; k <= rad; k++) s += cov[z * n + Math.min(n - 1, Math.max(0, x + k))];
+                            tmp[z * n + x] = s * w;
+                        }
+                    }
+                    for (let z = 0; z < n; z++) {
+                        for (let x = 0; x < n; x++) {
+                            let s = 0;
+                            for (let k = -rad; k <= rad; k++) s += tmp[Math.min(n - 1, Math.max(0, z + k)) * n + x];
+                            cov[z * n + x] = s * w;
+                        }
+                    }
+                }
+                // Row z maps to texture v: v = (worldZ + ext) / (2 ext), as the shader samples it
+                const data = new Uint8Array(n * n * 4);
+                for (let i = 0; i < n * n; i++) {
+                    const ao = 1 - 0.55 * Math.min(1, cov[i] * 1.7);
+                    const v = Math.round(ao * 255);
+                    data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = v;
+                    data[i * 4 + 3] = 255;
+                }
+                floorAOTexture.image = { data: data, width: n, height: n };
+                floorAOTexture.needsUpdate = true;
+                this.aoStale = false;
+                this.lastBakeMs = performance.now() - t0;
+            }
+        };
+
         function pointAabbDistanceSq(px, py, pz, b) {
             const dx = px < b.min.x ? b.min.x - px : (px > b.max.x ? px - b.max.x : 0);
             const dy = py < b.min.y ? b.min.y - py : (py > b.max.y ? py - b.max.y : 0);
@@ -32633,6 +33391,7 @@
             maxDecals: 20,
             flashLights: true,
             surfaceDetail: 'auto',
+            mapDetail: 'off',
             glowHalos: 'auto',
             brightness: 100,
             gpLookSens: 1.0,
@@ -33039,6 +33798,12 @@
 
                 this.bindPillGroup('setting-surface-detail-pills', 'data-detail', (val) => {
                     game.userSettings.surfaceDetail = val || 'auto';
+                    applyVisualOverrides();
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-map-detail-pills', 'data-mapdetail', (val) => {
+                    game.userSettings.mapDetail = val === 'on' ? 'on' : 'off';
                     applyVisualOverrides();
                     this.saveToStorage();
                 });
@@ -34060,6 +34825,7 @@
                 setActivePill('setting-shadow-hz-pills', 'data-shz', cfg.shadowHz);
                 setActivePill('setting-surface-detail-pills', 'data-detail', cfg.surfaceDetail || 'auto');
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
+                setActivePill('setting-map-detail-pills', 'data-mapdetail', cfg.mapDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
                 setActivePill('setting-audio-steps-pills', 'data-audiosteps', cfg.enemyFootsteps === false ? 'off' : 'on');
@@ -35559,6 +36325,7 @@
             // Map: render batches, hit proxies, collider records
             createMap();
             buildMapBatches();
+            mapHiDetail.onMapBuilt();
             
             // Create weapons
             createWeapons();
