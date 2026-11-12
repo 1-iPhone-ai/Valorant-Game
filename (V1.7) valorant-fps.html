@@ -806,6 +806,13 @@
             z-index: 2;
         }
 
+        /* V1.7 controller menu focus */
+        .gp-focus {
+            outline: 2px solid #38f6ff !important;
+            outline-offset: 2px;
+            box-shadow: 0 0 12px rgba(56, 246, 255, 0.55) !important;
+        }
+
         .ability-key {
             background: rgba(0, 0, 0, 0.65);
             border: 1px solid rgba(255, 255, 255, 0.35);
@@ -3890,6 +3897,85 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="settings-section-box">
+                            <div class="settings-section-title">
+                                <span>CONTROLLER (PS4 / PS5 / XBOX)</span>
+                                <span class="settings-val-badge" id="setting-gp-status">NOT CONNECTED</span>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Look Sensitivity</strong>
+                                    <small>Right-stick turn speed (ADS scaling follows the multiplier above)</small>
+                                </div>
+                                <div class="settings-control-right">
+                                    <input type="range" class="settings-slider" id="setting-gp-sens" min="0.3" max="3" step="0.05" value="1">
+                                    <span class="settings-val-badge" id="setting-gp-sens-val">1.00x</span>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Stick Deadzone</strong>
+                                    <small>Raise it if the view or movement drifts on its own</small>
+                                </div>
+                                <div class="settings-control-right">
+                                    <input type="range" class="settings-slider" id="setting-gp-deadzone" min="5" max="30" step="1" value="12">
+                                    <span class="settings-val-badge" id="setting-gp-deadzone-val">12%</span>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Invert Look (Y)</strong>
+                                    <small>Push up to look down</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-gp-invert-pills">
+                                    <button class="settings-pill-opt active" data-gpinv="off">OFF</button>
+                                    <button class="settings-pill-opt" data-gpinv="on">ON</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Aim Assist</strong>
+                                    <small>Slows turning while the crosshair is on a visible enemy. Never pulls your aim.</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-gp-assist-pills">
+                                    <button class="settings-pill-opt active" data-gpassist="off">OFF</button>
+                                    <button class="settings-pill-opt" data-gpassist="on">ON</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Vibration</strong>
+                                    <small>Rumble when firing and taking damage (where the browser supports it)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-gp-vibe-pills">
+                                    <button class="settings-pill-opt active" data-gpvibe="on">ON</button>
+                                    <button class="settings-pill-opt" data-gpvibe="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="keybind-grid" id="setting-gp-layout">
+                                <div class="keybind-item"><span>Move / Sprint (click)</span><b>Left stick / L3</b></div>
+                                <div class="keybind-item"><span>Look / Inspect (click)</span><b>Right stick / R3</b></div>
+                                <div class="keybind-item"><span>Fire</span><b data-gp="RT">RT</b></div>
+                                <div class="keybind-item"><span>Aim down sights</span><b data-gp="LT">LT</b></div>
+                                <div class="keybind-item"><span>Jump</span><b data-gp="A">A</b></div>
+                                <div class="keybind-item"><span>Crouch (toggle)</span><b data-gp="B">B</b></div>
+                                <div class="keybind-item"><span>Reload</span><b data-gp="X">X</b></div>
+                                <div class="keybind-item"><span>Next weapon / hold: Buy</span><b data-gp="Y">Y</b></div>
+                                <div class="keybind-item"><span>Ability 2 / Ability 3</span><b><span data-gp="LB">LB</span> / <span data-gp="RB">RB</span></b></div>
+                                <div class="keybind-item"><span>Ability 1 / Ultimate</span><b>D← / D↑</b></div>
+                                <div class="keybind-item"><span>Plant-Defuse (hold) / Ping</span><b>D↓ / D→</b></div>
+                                <div class="keybind-item"><span>Scoreboard / hold: Agents</span><b data-gp="VIEW">View</b></div>
+                                <div class="keybind-item"><span>Settings</span><b data-gp="MENU">Menu</b></div>
+                                <div class="keybind-item"><span>Menus: move / select / back / tabs</span><b>D-pad / <span data-gp="A">A</span> / <span data-gp="B">B</span> / <span data-gp="LB">LB</span>·<span data-gp="RB">RB</span></b></div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- TAB 5: AUDIO & HUD -->
@@ -4863,6 +4949,11 @@
                 maxDecals: 20,
                 flashLights: true,
                 surfaceDetail: 'auto', // V1.7: 'auto' (quality profile) | 'on' | 'off'
+                gpLookSens: 1.0,       // V1.7 controller: right-stick look sensitivity (0.3-3.0x)
+                gpDeadzone: 12,        // V1.7 controller: stick deadzone % (5-30)
+                gpInvertY: false,
+                gpAimAssist: false,    // V1.7 controller: slowdown-only aim assist, off by default
+                gpVibration: true,
                 glowHalos: 'auto',     // V1.7: 'auto' (profile budget) | 'off' | 'max'
                 brightness: 100,       // V1.7: % of the atmosphere mode's exposure (70-140)
                 fpsCap: 0,
@@ -6085,6 +6176,11 @@
                     const invDiag = 0.70710678;
                     moveX *= invDiag;
                     moveZ *= invDiag;
+                }
+                // V1.7: analog left stick overrides WASD (partial tilt = slower walk)
+                if (gamepadController.moveActive) {
+                    moveX = gamepadController.moveX;
+                    moveZ = gamepadController.moveZ;
                 }
                 
                 // Calculate current move speed (sprint or walk, scaled by Crouch & Ultimate/Agent/Knife buff)
@@ -10232,6 +10328,454 @@
                     break;
             }
         });
+
+        // =============================================
+        // V1.7 Controller support (PS4 / PS5 / Xbox via the browser Gamepad API)
+        // =============================================
+        // Polled once per frame from animate(); does nothing until a controller
+        // connects. Every action goes through the same functions keyboard/mouse
+        // use (shoot, reload, setAdsState, castAbility, switchWeapon...), so
+        // gameplay rules are identical. Movement is analog (characterController
+        // reads moveX/moveZ while the stick is active). Standard mapping:
+        //  0 A/Cross  1 B/Circle  2 X/Square  3 Y/Triangle  4 LB/L1  5 RB/R1
+        //  6 LT/L2  7 RT/R2  8 View/Share  9 Menu/Options  10 L3  11 R3
+        //  12-15 D-pad up/down/left/right  16 Home/PS  17 Touchpad (PlayStation)
+        const GP = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15, HOME: 16, PAD: 17 };
+        const GP_HOLD_MS = 450;
+        const _gpAimDir = new THREE.Vector3();
+        const _gpToEnemy = new THREE.Vector3();
+        const _gpEyeTarget = new THREE.Vector3();
+        const gamepadController = {
+            index: -1,           // connected pad in use (-1 = none)
+            id: '',
+            family: 'xbox',      // 'playstation' | 'xbox' (button glyphs)
+            active: false,       // last input came from the controller (HUD prompts)
+            moveActive: false,   // left stick outside the deadzone this frame
+            moveX: 0,            // analog strafe  (-1 left .. 1 right)
+            moveZ: 0,            // analog forward (-1 forward .. 1 back), like WASD moveZ
+            prev: new Array(18).fill(false),
+            downAt: new Array(18).fill(0),
+            holdFired: new Array(18).fill(false),
+            ownedKeys: { w: false, a: false, s: false, d: false },
+            lookHeldMs: 0,
+            sprintLatched: false,
+            navRepeatAt: 0,
+            navFocus: null,
+            assistActive: false,
+            
+            init: function() {
+                if (!navigator.getGamepads) return;
+                window.addEventListener('gamepadconnected', (e) => this.onConnect(e.gamepad));
+                window.addEventListener('gamepaddisconnected', (e) => {
+                    if (e.gamepad.index !== this.index) return;
+                    this.releaseAll();
+                    this.index = -1;
+                    this.setActive(false);
+                    showNotification('🎮 Controller disconnected', 1800);
+                    if (typeof settingsManager !== 'undefined' && settingsManager.syncControllerStatus) settingsManager.syncControllerStatus();
+                });
+                // Pads already connected before load only appear after a button press
+                const pads = navigator.getGamepads();
+                for (let i = 0; i < pads.length; i++) if (pads[i]) { this.onConnect(pads[i]); break; }
+                // Any mouse/keyboard input switches HUD prompts back
+                const toKeyboard = () => { if (this.active) this.setActive(false); };
+                document.addEventListener('keydown', toKeyboard, true);
+                document.addEventListener('mousedown', toKeyboard, true);
+            },
+            
+            onConnect: function(pad) {
+                if (this.index !== -1 && this.index !== pad.index) return;
+                this.index = pad.index;
+                this.id = pad.id || '';
+                // Xbox first: "Xbox Wireless Controller" would otherwise match the PS4
+                // pad's Chrome name ("Wireless Controller ... Vendor: 054c")
+                this.family = /xbox|xinput|045e/i.test(this.id) ? 'xbox'
+                    : /054c|playstation|dualsense|dualshock|wireless controller|ps[345]/i.test(this.id) ? 'playstation' : 'xbox';
+                this.prev.fill(false);
+                const name = this.family === 'playstation' ? 'PlayStation' : 'Xbox';
+                showNotification(`🎮 ${name} controller connected — [${this.glyph('MENU')}] Settings & controller layout`, 2600);
+                if (typeof settingsManager !== 'undefined' && settingsManager.syncControllerStatus) settingsManager.syncControllerStatus();
+            },
+            
+            glyph: function(name) {
+                const ps = this.family === 'playstation';
+                const t = {
+                    A: ps ? '✕' : 'A', B: ps ? '◯' : 'B', X: ps ? '□' : 'X', Y: ps ? '△' : 'Y',
+                    LB: ps ? 'L1' : 'LB', RB: ps ? 'R1' : 'RB', LT: ps ? 'L2' : 'LT', RT: ps ? 'R2' : 'RT',
+                    VIEW: ps ? 'Touchpad' : 'View', MENU: ps ? 'Options' : 'Menu', L3: 'L3', R3: 'R3',
+                    UP: 'D↑', DOWN: 'D↓', LEFT: 'D←', RIGHT: 'D→'
+                };
+                return t[name] || name;
+            },
+            
+            // Ability bar keycaps show controller glyphs while the controller is in use
+            setActive: function(on) {
+                this.active = on;
+                const map = { c: 'LEFT', q: 'LB', e: 'RB', x: 'UP' };
+                for (const slot in map) {
+                    const el = abilitySlots[slot] && abilitySlots[slot].querySelector('.ability-key');
+                    if (!el) continue;
+                    if (el.dataset.kbLabel === undefined) el.dataset.kbLabel = el.textContent;
+                    el.textContent = on ? this.glyph(map[slot]) : el.dataset.kbLabel;
+                }
+            },
+            
+            cfg: function() {
+                return (game.userSettings) || {};
+            },
+            
+            // Radial deadzone with rescale, so output starts at 0 at the deadzone edge
+            stick: function(x, y, dz) {
+                const mag = Math.hypot(x, y);
+                if (mag <= dz) return null;
+                const scaled = Math.min(1, (mag - dz) / (1 - dz));
+                return { x: x / mag * scaled, y: y / mag * scaled, mag: scaled };
+            },
+            
+            rumble: function(strong, weak, ms) {
+                if (this.cfg().gpVibration === false || this.index === -1) return;
+                const pad = navigator.getGamepads()[this.index];
+                const act = pad && pad.vibrationActuator;
+                if (act && act.playEffect) {
+                    act.playEffect('dual-rumble', { startDelay: 0, duration: ms, strongMagnitude: strong, weakMagnitude: weak }).catch(() => {});
+                }
+            },
+            
+            menuOpen: function() {
+                return game.settingsOpen || game.buyMenuOpen || game.agentPickerOpen ||
+                    (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen);
+            },
+            
+            // Release everything the controller is holding (menus, disconnect)
+            releaseAll: function() {
+                this.stopFire();
+                if (game.adsActive && game.rightMouseDown) { game.rightMouseDown = false; setAdsState(false); }
+                for (const k in this.ownedKeys) {
+                    if (this.ownedKeys[k]) { game.keys[k] = false; this.ownedKeys[k] = false; }
+                }
+                this.moveActive = false;
+                this.moveX = 0; this.moveZ = 0;
+                if (this.sprintLatched) { this.sprintLatched = false; characterController.setSprinting(false); }
+                if (this.prev[GP.A]) game.keys.space = false;
+                if (this.prev[GP.DOWN]) game.keys.f = false;
+            },
+            
+            fireOnce: function() {
+                const w = game.weapons[game.activeWeapon];
+                const before = w ? w.ammo : 0;
+                shoot();
+                if (w && w.ammo !== before) this.rumble(0.25, 0.55, 45);
+            },
+            
+            startFire: function() {
+                if (game.mouseDown) return;
+                game.mouseDown = true;
+                this.fireOnce();
+                const w = game.weapons[game.activeWeapon];
+                if (w && w.automatic && game.autoShootInterval === null) {
+                    game.autoShootInterval = setInterval(() => { if (game.mouseDown) this.fireOnce(); }, 35);
+                }
+            },
+            
+            stopFire: function() {
+                if (!game.mouseDown) return;
+                game.mouseDown = false;
+                if (game.autoShootInterval !== null) {
+                    clearInterval(game.autoShootInterval);
+                    game.autoShootInterval = null;
+                }
+            },
+            
+            nextWeapon: function() {
+                if (game.reloading) return;
+                const idx = WEAPON_SLOT_ORDER.indexOf(game.activeWeapon);
+                if (idx === -1) return;
+                switchWeapon(WEAPON_SLOT_ORDER[(idx + 1) % WEAPON_SLOT_ORDER.length]);
+            },
+            
+            poll: function(delta, now) {
+                if (this.index === -1) return;
+                const pad = navigator.getGamepads()[this.index];
+                if (!pad || !pad.connected) return;
+                const cfg = this.cfg();
+                const dz = Math.max(0.03, Math.min(0.4, (cfg.gpDeadzone || 12) / 100));
+                const btn = (i) => {
+                    const b = pad.buttons[i];
+                    if (!b) return false;
+                    return (i === GP.LT || i === GP.RT) ? b.value > 0.4 : b.pressed;
+                };
+                const cur = this._cur || (this._cur = new Array(18).fill(false));
+                let anyInput = false;
+                for (let i = 0; i < 18; i++) {
+                    cur[i] = btn(i);
+                    if (cur[i]) anyInput = true;
+                }
+                const ax = pad.axes;
+                const left = this.stick(ax[0] || 0, ax[1] || 0, dz);
+                const right = this.stick(ax[2] || 0, ax[3] || 0, dz);
+                if (left || right) anyInput = true;
+                if (anyInput && !this.active) this.setActive(true);
+                
+                const pressed = (i) => cur[i] && !this.prev[i];
+                const released = (i) => !cur[i] && this.prev[i];
+                for (let i = 0; i < 18; i++) {
+                    if (pressed(i)) { this.downAt[i] = now; this.holdFired[i] = false; }
+                }
+                const heldFor = (i) => cur[i] ? now - this.downAt[i] : 0;
+                
+                if (this.menuOpen()) {
+                    if (!this._wasMenu) this.releaseAll();
+                    this._wasMenu = true;
+                    this.navigate(pad, cur, pressed, left, now);
+                } else {
+                    if (this._wasMenu) { this._wasMenu = false; this.clearNavFocus(); }
+                    this.gameplay(cur, pressed, released, heldFor, left, right, delta, now);
+                }
+                for (let i = 0; i < 18; i++) this.prev[i] = cur[i];
+            },
+            
+            gameplay: function(cur, pressed, released, heldFor, left, right, delta, now) {
+                const cfg = this.cfg();
+                // --- Movement (analog) + key flags for code that reads WASD state
+                this.moveActive = !!left;
+                this.moveX = left ? left.x : 0;
+                this.moveZ = left ? left.y : 0;
+                const want = { w: !!left && left.y < -0.35, s: !!left && left.y > 0.35, a: !!left && left.x < -0.35, d: !!left && left.x > 0.35 };
+                for (const k in want) {
+                    if (want[k] && !game.keys[k]) { game.keys[k] = true; this.ownedKeys[k] = true; }
+                    else if (!want[k] && this.ownedKeys[k]) { game.keys[k] = false; this.ownedKeys[k] = false; }
+                }
+                // L3 latches sprint until the stick is released or L3 is pressed again
+                if (pressed(GP.L3)) {
+                    this.sprintLatched = !this.sprintLatched;
+                    characterController.setSprinting(this.sprintLatched);
+                }
+                if (this.sprintLatched && (!left || left.mag < 0.3)) {
+                    this.sprintLatched = false;
+                    characterController.setSprinting(false);
+                }
+                
+                // --- Look
+                if (right) this.look(right, delta);
+                else this.lookHeldMs = 0;
+                
+                // --- Triggers
+                if (pressed(GP.RT)) this.startFire();
+                if (released(GP.RT)) this.stopFire();
+                if (pressed(GP.LT)) {
+                    game.rightMouseDown = true;
+                    if (game.activeWeapon === 'knife') meleeAttack(true);
+                    else if (game.activeWeapon === 'pistol' && game.pistolBurstMode) shoot(true);
+                    else setAdsState(true);
+                }
+                if (released(GP.LT)) {
+                    game.rightMouseDown = false;
+                    if (game.activeWeapon !== 'knife' && !(game.activeWeapon === 'pistol' && game.pistolBurstMode)) setAdsState(false);
+                }
+                
+                // --- Face buttons
+                if (pressed(GP.A)) { game.keys.space = true; jumpQueued = true; }
+                if (released(GP.A)) game.keys.space = false;
+                if (pressed(GP.B)) characterController.setCrouching(!characterController.isCrouching);
+                if (pressed(GP.X) && !game.reloading) reload();
+                // Y: tap = next weapon, hold = buy menu
+                if (cur[GP.Y] && !this.holdFired[GP.Y] && heldFor(GP.Y) >= GP_HOLD_MS) {
+                    this.holdFired[GP.Y] = true;
+                    if (typeof tacticalDirector !== 'undefined') tacticalDirector.toggleBuyMenu(true);
+                }
+                if (released(GP.Y) && !this.holdFired[GP.Y]) this.nextWeapon();
+                
+                // --- Abilities
+                if (pressed(GP.LEFT)) agentSystem.castAbility('c');
+                if (pressed(GP.LB)) agentSystem.castAbility('q');
+                if (pressed(GP.RB)) agentSystem.castAbility('e');
+                if (pressed(GP.UP)) agentSystem.castAbility('x');
+                
+                // --- Plant / defuse (hold), ping, inspect
+                if (pressed(GP.DOWN)) game.keys.f = true;
+                if (released(GP.DOWN)) game.keys.f = false;
+                if (pressed(GP.RIGHT) && typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.triggerCrosshairPing) {
+                    tacticalEnhancements.triggerCrosshairPing();
+                }
+                if (pressed(GP.R3)) inspectWeapon();
+                
+                // --- Menus. View/Touchpad: tap = scoreboard, hold = agent picker
+                if (pressed(GP.MENU) && typeof settingsManager !== 'undefined') settingsManager.toggleSettings(true);
+                const viewBtn = cur[GP.PAD] ? GP.PAD : GP.VIEW;
+                if (cur[viewBtn] && !this.holdFired[viewBtn] && heldFor(viewBtn) >= GP_HOLD_MS) {
+                    this.holdFired[viewBtn] = true;
+                    if (typeof tacticalDirector !== 'undefined' && tacticalDirector.toggleAgentPicker) tacticalDirector.toggleAgentPicker(true);
+                }
+                for (const vb of [GP.VIEW, GP.PAD]) {
+                    if (released(vb) && !this.holdFired[vb] && typeof tacticalEnhancements !== 'undefined') {
+                        tacticalEnhancements.toggleCareerModal(true, 'scoreboard');
+                    }
+                }
+            },
+            
+            // Right stick: response curve, short full-tilt acceleration, ADS scaling
+            // identical to the mouse path, optional aim-assist slowdown.
+            look: function(right, delta) {
+                const cfg = this.cfg();
+                const sens = cfg.gpLookSens || 1.0;
+                const curve = (v) => Math.sign(v) * Math.pow(Math.abs(v), 1.8);
+                if (right.mag > 0.95) this.lookHeldMs += delta * 1000; else this.lookHeldMs = 0;
+                const accel = 1 + 0.6 * Math.min(1, Math.max(0, (this.lookHeldMs - 180) / 350));
+                const fovRatio = (camera && game.baseFov) ? (camera.fov / game.baseFov) : 1.0;
+                const userAdsMult = (game.adsProgress > 0.05) ? (cfg.adsSensitivityMult || 1.0) : 1.0;
+                const adsScale = (0.28 + 0.72 * fovRatio) * userAdsMult;
+                let k = sens * adsScale * accel * delta;
+                this.assistActive = false;
+                if (cfg.gpAimAssist && this.aimAssistTarget()) {
+                    k *= 0.5; // slowdown only: never pulls the crosshair
+                    this.assistActive = true;
+                }
+                const yawRate = 3.4;   // rad/s at full tilt (~195 deg/s)
+                const pitchRate = 2.4;
+                const dYaw = -curve(right.x) * yawRate * k;
+                const dPitch = -curve(right.y) * pitchRate * k * (cfg.gpInvertY ? -1 : 1);
+                camera.rotation.y += dYaw;
+                camera.rotation.x = Math.max(mouseLookController.maxLookDown, Math.min(mouseLookController.maxLookUp, camera.rotation.x + dPitch));
+                applyWeaponSway(dYaw * 500, dPitch * 500);
+            },
+            
+            // True when a visible, live enemy sits within a small cone of the crosshair
+            aimAssistTarget: function() {
+                camera.updateMatrixWorld();
+                _gpAimDir.set(0, 0, -1).transformDirection(camera.matrixWorld);
+                const origin = camera.position;
+                let best = null, bestDist = Infinity;
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    if (!e.isActive || e.hit) continue;
+                    _gpToEnemy.set(e.mesh.position.x - origin.x, e.mesh.position.y + 1.3 - origin.y, e.mesh.position.z - origin.z);
+                    const dist = _gpToEnemy.length();
+                    if (dist < 1 || dist > 60) continue;
+                    const along = _gpToEnemy.dot(_gpAimDir);
+                    if (along <= 0) continue;
+                    const off = Math.sqrt(Math.max(0, dist * dist - along * along)); // metres from the aim ray
+                    if (off > 0.9 + dist * 0.012) continue;                          // ~body width + a little
+                    if (dist < bestDist) { bestDist = dist; best = e; }
+                }
+                if (!best) return null;
+                _gpEyeTarget.set(best.mesh.position.x, best.mesh.position.y + 1.3, best.mesh.position.z);
+                if (agentSystem.isBlockedBySmoke(origin, _gpEyeTarget)) return null;
+                if (!agentSystem.hasWallLineOfSight(origin, _gpEyeTarget, bestDist)) return null;
+                return best;
+            },
+            
+            // ---------- Menu navigation (settings, buy menu, agent picker, scoreboard)
+            menuRoot: function() {
+                if (game.settingsOpen) return document.getElementById('settings-panel');
+                if (game.agentPickerOpen) return document.getElementById('agent-picker-overlay');
+                if (game.buyMenuOpen) return document.getElementById('buy-menu-overlay');
+                if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) return document.getElementById('career-modal-overlay');
+                return null;
+            },
+            
+            focusables: function(root) {
+                const list = root.querySelectorAll('button, input[type=range], select, .buy-card, .agent-picker-card, .skin-card-btn, [data-tab]');
+                const out = [];
+                for (let i = 0; i < list.length; i++) {
+                    const el = list[i];
+                    if (el.disabled || el.offsetParent === null) continue;
+                    const r = el.getBoundingClientRect();
+                    if (r.width < 2 || r.height < 2) continue;
+                    out.push(el);
+                }
+                return out;
+            },
+            
+            setNavFocus: function(el) {
+                if (this.navFocus === el) return;
+                this.clearNavFocus();
+                this.navFocus = el;
+                if (el) {
+                    el.classList.add('gp-focus');
+                    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                }
+            },
+            
+            clearNavFocus: function() {
+                if (this.navFocus) this.navFocus.classList.remove('gp-focus');
+                this.navFocus = null;
+            },
+            
+            // Move to the nearest focusable in the pressed direction
+            moveFocus: function(root, dx, dy) {
+                const items = this.focusables(root);
+                if (!items.length) return;
+                if (!this.navFocus || !root.contains(this.navFocus) || items.indexOf(this.navFocus) === -1) {
+                    this.setNavFocus(items[0]);
+                    return;
+                }
+                const a = this.navFocus.getBoundingClientRect();
+                const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+                let best = null, bestScore = Infinity;
+                for (const el of items) {
+                    if (el === this.navFocus) continue;
+                    const b = el.getBoundingClientRect();
+                    const vx = b.left + b.width / 2 - ax, vy = b.top + b.height / 2 - ay;
+                    const along = vx * dx + vy * dy;
+                    if (along <= 4) continue;
+                    const across = Math.abs(vx * dy - vy * dx);
+                    const score = along + across * 2.5;
+                    if (score < bestScore) { bestScore = score; best = el; }
+                }
+                if (best) this.setNavFocus(best);
+            },
+            
+            closeMenus: function() {
+                if (game.settingsOpen && typeof settingsManager !== 'undefined') { settingsManager.toggleSettings(false); return; }
+                if (game.agentPickerOpen && tacticalDirector.toggleAgentPicker) { tacticalDirector.toggleAgentPicker(false); return; }
+                if (game.buyMenuOpen) { tacticalDirector.toggleBuyMenu(false); return; }
+                if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) tacticalEnhancements.toggleCareerModal(false);
+            },
+            
+            navigate: function(pad, cur, pressed, left, now) {
+                const root = this.menuRoot();
+                if (!root) return;
+                let dx = 0, dy = 0;
+                if (cur[GP.UP]) dy = -1; else if (cur[GP.DOWN]) dy = 1;
+                else if (cur[GP.LEFT]) dx = -1; else if (cur[GP.RIGHT]) dx = 1;
+                else if (left && left.mag > 0.5) {
+                    if (Math.abs(left.x) > Math.abs(left.y)) dx = Math.sign(left.x); else dy = Math.sign(left.y);
+                }
+                const dirPressed = pressed(GP.UP) || pressed(GP.DOWN) || pressed(GP.LEFT) || pressed(GP.RIGHT);
+                if ((dx || dy) && (dirPressed || now >= this.navRepeatAt)) {
+                    this.navRepeatAt = now + (dirPressed ? 380 : 140);
+                    const f = this.navFocus;
+                    if (dx && f && f.matches && f.matches('input[type=range]') && root.contains(f)) {
+                        const step = parseFloat(f.step) || 1;
+                        const v = Math.max(parseFloat(f.min), Math.min(parseFloat(f.max), parseFloat(f.value) + dx * step));
+                        f.value = String(v);
+                        f.dispatchEvent(new Event('input', { bubbles: true }));
+                        f.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else {
+                        this.moveFocus(root, dx, dy);
+                    }
+                } else if (!dx && !dy) {
+                    this.navRepeatAt = 0;
+                }
+                if (pressed(GP.A)) {
+                    if (!this.navFocus || !root.contains(this.navFocus)) this.moveFocus(root, 0, 1);
+                    else this.navFocus.click();
+                }
+                if (pressed(GP.B)) { this.closeMenus(); this.clearNavFocus(); }
+                if ((pressed(GP.VIEW) || pressed(GP.PAD)) && typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) {
+                    tacticalEnhancements.toggleCareerModal(false);
+                    this.clearNavFocus();
+                }
+                if (pressed(GP.MENU) && game.settingsOpen) { settingsManager.toggleSettings(false); this.clearNavFocus(); }
+                // Settings tabs with the bumpers
+                if (game.settingsOpen && (pressed(GP.LB) || pressed(GP.RB))) {
+                    const tabs = Array.from(root.querySelectorAll('.settings-tab-btn'));
+                    const idx = tabs.findIndex(t => t.classList.contains('active'));
+                    const next = tabs[(idx + (pressed(GP.RB) ? 1 : tabs.length - 1)) % tabs.length];
+                    if (next) { next.click(); this.clearNavFocus(); }
+                }
+            }
+        };
         
         // Window resize handling. The shadow map is in light space and does not
         // depend on the canvas size, so a resize does not invalidate it.
@@ -31000,6 +31544,7 @@
             }
 
             game.health = Math.max(0, game.health - healthDamage);
+            gamepadController.rumble(0.85, 0.4, 140);
             
             // Update health & shield HUD displays
             healthFill.style.width = `${game.health}%`;
@@ -31776,6 +32321,11 @@
             surfaceDetail: 'auto',
             glowHalos: 'auto',
             brightness: 100,
+            gpLookSens: 1.0,
+            gpDeadzone: 12,
+            gpInvertY: false,
+            gpAimAssist: false,
+            gpVibration: true,
             fpsCap: 0,
             fpsDisplayMode: 'compact',
             showSparkline: true,
@@ -32175,6 +32725,28 @@
                 this.bindPillGroup('setting-glow-halos-pills', 'data-halos', (val) => {
                     game.userSettings.glowHalos = val || 'auto';
                     applyVisualOverrides();
+                    this.saveToStorage();
+                });
+
+                // V1.7 controller settings
+                const bindGpSlider = (id, badgeId, key, fmt) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.addEventListener('input', (e) => {
+                        const v = parseFloat(e.target.value);
+                        game.userSettings[key] = v;
+                        const badge = document.getElementById(badgeId);
+                        if (badge) badge.textContent = fmt(v);
+                        this.saveToStorage();
+                    });
+                };
+                bindGpSlider('setting-gp-sens', 'setting-gp-sens-val', 'gpLookSens', v => `${v.toFixed(2)}x`);
+                bindGpSlider('setting-gp-deadzone', 'setting-gp-deadzone-val', 'gpDeadzone', v => `${Math.round(v)}%`);
+                this.bindPillGroup('setting-gp-invert-pills', 'data-gpinv', (val) => { game.userSettings.gpInvertY = val === 'on'; this.saveToStorage(); });
+                this.bindPillGroup('setting-gp-assist-pills', 'data-gpassist', (val) => { game.userSettings.gpAimAssist = val === 'on'; this.saveToStorage(); });
+                this.bindPillGroup('setting-gp-vibe-pills', 'data-gpvibe', (val) => {
+                    game.userSettings.gpVibration = val === 'on';
+                    if (val === 'on') gamepadController.rumble(0.4, 0.6, 120);
                     this.saveToStorage();
                 });
 
@@ -32920,6 +33492,19 @@
                 pill.classList.toggle('moving', !isDeadzone);
             },
 
+            // V1.7: controller status badge + layout glyphs (PlayStation vs Xbox)
+            syncControllerStatus: function() {
+                const gp = gamepadController;
+                const badge = document.getElementById('setting-gp-status');
+                if (badge) {
+                    badge.textContent = gp.index === -1 ? 'NOT CONNECTED (PRESS ANY BUTTON)'
+                        : (gp.family === 'playstation' ? 'PLAYSTATION CONNECTED' : 'XBOX CONNECTED');
+                }
+                document.querySelectorAll('#setting-gp-layout [data-gp]').forEach(el => {
+                    el.textContent = gp.glyph(el.getAttribute('data-gp'));
+                });
+            },
+
             // V1.7 fix: the career modal closes settings through this name
             toggleModal: function(forceState) {
                 this.toggleSettings(forceState);
@@ -33156,6 +33741,9 @@
                 setActivePill('setting-shadow-hz-pills', 'data-shz', cfg.shadowHz);
                 setActivePill('setting-surface-detail-pills', 'data-detail', cfg.surfaceDetail || 'auto');
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
+                setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
+                setActivePill('setting-gp-assist-pills', 'data-gpassist', cfg.gpAimAssist ? 'on' : 'off');
+                setActivePill('setting-gp-vibe-pills', 'data-gpvibe', cfg.gpVibration === false ? 'off' : 'on');
                 setActivePill('setting-flashlights-pills', 'data-flash', cfg.flashLights ? 'on' : 'off');
                 setActivePill('setting-fps-cap-pills', 'data-fpscap', cfg.fpsCap);
                 setActivePill('setting-fps-mode-pills', 'data-fpsmode', cfg.fpsDisplayMode);
@@ -33190,6 +33778,9 @@
                 setSlider('setting-res-scale', 'setting-res-scale-val', cfg.resolutionScale, `${cfg.resolutionScale}%`);
                 setSlider('setting-draw-dist', 'setting-draw-dist-val', cfg.drawDistance, `${cfg.drawDistance}m`);
                 setSlider('setting-brightness', 'setting-brightness-val', cfg.brightness || 100, `${cfg.brightness || 100}%`);
+                setSlider('setting-gp-sens', 'setting-gp-sens-val', cfg.gpLookSens || 1, `${(cfg.gpLookSens || 1).toFixed(2)}x`);
+                setSlider('setting-gp-deadzone', 'setting-gp-deadzone-val', cfg.gpDeadzone || 12, `${cfg.gpDeadzone || 12}%`);
+                this.syncControllerStatus();
                 setSlider('setting-decals', 'setting-decals-val', cfg.maxDecals, `${cfg.maxDecals} Decals`);
                 setSlider('setting-ch-dot-size', 'setting-ch-dot-size-val', cfg.crosshairDotSize, `${cfg.crosshairDotSize}px`);
                 setSlider('setting-ch-length', 'setting-ch-length-val', cfg.crosshairLength, `${cfg.crosshairLength}px`);
@@ -34671,6 +35262,7 @@
             tacticalDirector.init();
             settingsManager.init();
             tacticalEnhancements.init();
+            gamepadController.init();
             
             // Glow halo anchors: pooled ability cores, the spike core, ult orbs
             haloSystem.collectAbilityAnchors();
@@ -34810,6 +35402,7 @@
             }
             
             // Look stays on the display clock so aim is never queued behind sim catch-up
+            gamepadController.poll(delta, time);
             mouseLookController.update(delta);
             
             if (game.keys.space && !spaceWasDown) jumpQueued = true;
