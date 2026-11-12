@@ -16,7 +16,9 @@ const { chromium } = require('playwright');
 const GAME_FILE = path.resolve(__dirname, '..', process.env.GAME_FILE || '(V1.7) valorant-fps.html');
 const THREE_JS = fs.readFileSync(require.resolve('three/build/three.min.js'));
 
-const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+// Autoplay is allowed so the Web Audio graph runs without a user gesture (the
+// audio tests inspect the nodes the game creates; nothing needs to be heard).
+const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'];
 
 let browserPromise = null;
 function getBrowser() {
