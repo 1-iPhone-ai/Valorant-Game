@@ -26,7 +26,7 @@ test('all agents: every ability and ultimate casts cleanly; ground rings stay ci
                 if (!g.boundingBox) g.computeBoundingBox();
                 g.boundingBox.getSize(box);
                 const m = Math.max(box.x, box.y, box.z);
-                if (m === 0 || !(box.y < m * 0.02 && box.x > m * 0.5 && box.z > m * 0.5)) return;
+                if (m === 0 || !(box.y < m * 0.1 && box.x > m * 0.5 && box.z > m * 0.5)) return;
                 const sx = o.scale.x, sz = o.scale.z;
                 if (Math.abs(sx - sz) > 0.05 * Math.max(Math.abs(sx), Math.abs(sz), 0.01)) __flatBad.add(tag + ': ' + g.type + ' scale ' + sx.toFixed(2) + ',' + sz.toFixed(2));
             });
@@ -57,6 +57,16 @@ test('all agents: every ability and ultimate casts cleanly; ground rings stay ci
         }
         for (let i = 0; i < 3; i++) { await frames(5); await page.evaluate((tag) => __scanFlat(tag), `${agent} (after)`); }
     }
+    // Non-ability ground effects with flat rings, triggered directly so the audit
+    // never depends on timing: ACE finisher, skin finisher seal, 3D ping marker.
+    await page.evaluate(() => {
+        const p = characterController.position.clone().setZ(characterController.position.z - 6);
+        const now = performance.now();
+        tacticalDirector.spawnAceFinisher3D(p, now);
+        tacticalEnhancements.spawnSkinFinisher3D(p, 'prime', now);
+        tacticalEnhancements.spawnWorldPing(p.x + 2, 0, p.z, false, 'TEST');
+    });
+    for (let i = 0; i < 4; i++) { await frames(4); await page.evaluate(() => __scanFlat('finishers/ping')); }
     assert.deepEqual(failures, [], 'ability casts threw');
     assert.deepEqual(await page.evaluate(() => [...__flatBad]), [], 'flat ground effects must be scaled on X and Z');
     const [programs, watermark] = await programState(page);
