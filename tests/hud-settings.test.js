@@ -21,17 +21,22 @@ test('HUD at 1280x720: FPS cluster clear of the mode bar; help clear of the abil
     for (const sel of ['#fps-display', '#quality-toggle', '#fps-sparkline-widget']) {
         assert.ok(!overlap(await rect(page, sel), top), `${sel} must not cover the mode bar`);
     }
-    // Shown at start, clear of the centred agent/ability bars
-    const help = await rect(page, '#controls-hint-box');
-    assert.ok(help.shown, 'help is shown at start');
-    assert.ok(!overlap(help, await rect(page, '#ability-bar')), 'help must not cover the ability bar');
-    assert.ok(!overlap(help, await rect(page, '#agent-switcher-bar')), 'help must not cover the agent bar');
-    // Collapses to the pill after 12 s; I toggles it
+    // Opens at start on a 1280x720 window. (Booting under load can take longer
+    // than the 12 s auto-hide, so the start state is recorded, not sampled late.)
+    assert.equal(await page.evaluate(() => controlsHelp.startedExpanded), true, 'help is shown at start');
+    // Collapses to the pill after 12 s
     await page.waitForFunction(() => !controlsHelp.expanded, null, { timeout: 30000 });
-    await frames(2);
+    // The pill fades in: wait for the fade rather than a fixed number of frames
+    await page.waitForFunction(() => parseFloat(getComputedStyle(document.getElementById('controls-hint-pill')).opacity) > 0.8, null, { timeout: 10000 });
     assert.equal((await rect(page, '#controls-hint-pill')).shown, true, 'pill shows after auto-collapse');
+    // I re-opens it, clear of the centred agent/ability bars
     await page.keyboard.press('KeyI');
     assert.equal(await page.evaluate(() => controlsHelp.expanded), true, 'I re-opens the help');
+    await page.waitForFunction(() => parseFloat(getComputedStyle(document.getElementById('controls-hint-box')).opacity) > 0.95, null, { timeout: 10000 });
+    const help = await rect(page, '#controls-hint-box');
+    assert.ok(help.shown);
+    assert.ok(!overlap(help, await rect(page, '#ability-bar')), 'help must not cover the ability bar');
+    assert.ok(!overlap(help, await rect(page, '#agent-switcher-bar')), 'help must not cover the agent bar');
     await page.keyboard.press('KeyI');
     assert.equal(await page.evaluate(() => controlsHelp.expanded), false);
     // The HUD "hints" setting hides the pill too

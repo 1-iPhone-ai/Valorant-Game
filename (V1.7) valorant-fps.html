@@ -133,6 +133,73 @@
         #low-health-vignette.active {
             animation: lowHpPulse 0.9s ease-in-out infinite;
         }
+        /* V1.7 death recap (bottom centre, above the agent bar) */
+        .death-recap {
+            position: absolute;
+            left: 50%;
+            bottom: 230px;
+            transform: translateX(-50%) translateY(10px);
+            min-width: 340px;
+            max-width: 90vw;
+            padding: 10px 14px;
+            background: rgba(10, 14, 22, 0.88);
+            border: 1px solid rgba(255, 70, 85, 0.6);
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 12px;
+            z-index: 960;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        .death-recap.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .death-recap-title { font-weight: 900; letter-spacing: 1px; margin-bottom: 6px; font-size: 13px; }
+        .death-recap-title small { color: #94a3b8; font-weight: 600; margin-left: 6px; }
+        .death-recap-row { display: flex; justify-content: space-between; gap: 14px; padding: 2px 0; }
+        .death-recap-foot { margin-top: 6px; color: #94a3b8; }
+
+        /* V1.7 match result screen */
+        .match-result {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(5, 8, 14, 0.72);
+            z-index: 1300;
+        }
+        .match-result.visible { display: flex; }
+        .match-result-card {
+            min-width: 420px;
+            padding: 24px 30px;
+            background: rgba(15, 23, 42, 0.96);
+            border: 2px solid #ff4655;
+            border-radius: 8px;
+            color: #e2e8f0;
+            text-align: center;
+        }
+        .match-result-card.won { border-color: #00e5a3; }
+        .match-result-title { font-size: 40px; font-weight: 900; letter-spacing: 6px; color: #ff4655; }
+        .match-result-card.won .match-result-title { color: #00e5a3; }
+        .match-result-score { font-size: 28px; font-weight: 800; margin: 4px 0 14px; }
+        .match-result-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+        .match-result-grid div { display: flex; flex-direction: column; background: rgba(255, 255, 255, 0.05); padding: 8px 4px; border-radius: 4px; }
+        .match-result-grid b { font-size: 20px; }
+        .match-result-grid span { font-size: 10px; color: #94a3b8; letter-spacing: 1px; }
+        .match-result-meta { color: #94a3b8; font-size: 12px; margin-bottom: 14px; }
+        .match-result-actions button {
+            margin: 0 6px;
+            padding: 8px 16px;
+            background: #ff4655;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            cursor: pointer;
+        }
+        .match-result-actions button + button { background: #334155; }
+
         /* V1.7 accessibility: Reduce Flashes keeps the warning but drops the pulse */
         body.reduce-flashes #low-health-vignette.active {
             animation: none;
@@ -2773,6 +2840,9 @@
             transform: translate3d(-9999px, -9999px, 0);
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
         }
+        /* V1.7 fix: the 'visible' toggle had no style, so tags stayed on screen when
+           wingmen were switched off, in Range/Match, or when behind the camera */
+        .wingman-floating-hud:not(.visible) { display: none; }
         .wingman-hud-top {
             display: flex;
             justify-content: space-between;
@@ -3070,6 +3140,7 @@
                     <span class="round-timer-val" id="round-timer">1:40</span>
                 </div>
                 <button class="mode-pill-btn" id="mode-retake-btn" title="Start Site A/B Post-Plant Retake & Defuse Mode [F3]">[F3] RETAKE DEFUSE</button>
+                <button class="mode-pill-btn" id="mode-match-btn" title="Play a first-to-7 Match against the bots (buy phase, economy, sides swap at half) [F7]">[F7] MATCH</button>
                 <button class="mode-pill-btn" id="map-preset-btn" title="Cycle 6 Valorant Arena Map Presets: Ascent, Bind, Haven, Icebox, Lotus (Doors), Split (Ziplines) [F4]">[F4] MAP: ASCENT</button>
                 <button class="mode-pill-btn active" id="bot-ai-btn" title="Toggle Enemy Bot Ability AI (Rusher Dash/Flash, Sniper Recon/TP, Juggernaut Mortar) [F5]">[F5] BOT AI: ON</button>
                 <button class="mode-pill-btn active" id="wingman-ai-btn" title="Toggle 2 Friendly AI Teammate Wingman Bots for 3v5 Spike & Retake Support [F6]" style="border-color:#2bf0a5; color:#2bf0a5;">[F6] WINGMAN: ON</button>
@@ -10454,6 +10525,155 @@
             radiant:  { reposition: true,  repositionMs: [2000, 3500], flank: true,  flankGapMs: [3500, 6000],   coverWaitMs: [500, 1000],  peekMs: [1300, 2200], maxPeeks: 4, preAim: true }
         };
         const _tacRand = (r) => r[0] + Math.random() * (r[1] - r[0]);
+        // =============================================
+        // V1.7 Bot route-finding: a 1 m walk grid per map + A*
+        // =============================================
+        // Bots used to steer straight at a goal and stall against the first wall in
+        // the way. When they head for a fixed goal (a site to plant, or a planted
+        // spike to defuse) they now follow an A* route over a 100 x 100 grid whose
+        // blocked cells are wherever the bot collision would push a bot out (map
+        // boxes, pillars, the arena edge). Routes are smoothed to straight runs and
+        // re-planned every couple of seconds or when the goal moves.
+        const navGrid = {
+            N: 100,
+            EXT: 50,
+            blocked: null,
+            builtFor: null,
+
+            build: function () {
+                const N = this.N;
+                this.blocked = new Uint8Array(N * N);
+                const p = new THREE.Vector3();
+                for (let j = 0; j < N; j++) {
+                    for (let i = 0; i < N; i++) {
+                        p.set(i - this.EXT + 0.5, 0, j - this.EXT + 0.5);
+                        if (resolveEnemyMapCollision(p, 0.75)) this.blocked[j * N + i] = 1;
+                    }
+                }
+                this.builtFor = game.mapPreset;
+            },
+
+            _cell: function (x, z) {
+                const i = Math.max(0, Math.min(this.N - 1, Math.floor(x + this.EXT)));
+                const j = Math.max(0, Math.min(this.N - 1, Math.floor(z + this.EXT)));
+                return j * this.N + i;
+            },
+
+            // Nearest open cell (start or goal may sit on a blocked one)
+            _open: function (c) {
+                if (!this.blocked[c]) return c;
+                const N = this.N, ci = c % N, cj = (c / N) | 0;
+                for (let r = 1; r < 6; r++) {
+                    for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
+                        const i = ci + di, j = cj + dj;
+                        if (i < 0 || j < 0 || i >= N || j >= N) continue;
+                        if (!this.blocked[j * N + i]) return j * N + i;
+                    }
+                }
+                return -1;
+            },
+
+            _clearLine: function (ax, az, bx, bz) {
+                const d = Math.hypot(bx - ax, bz - az);
+                const steps = Math.ceil(d / 0.5);
+                for (let k = 1; k < steps; k++) {
+                    const t = k / steps;
+                    if (this.blocked[this._cell(ax + (bx - ax) * t, az + (bz - az) * t)]) return false;
+                }
+                return true;
+            },
+
+            // A* (8-way, octile heuristic). Returns smoothed waypoints or null.
+            findPath: function (sx, sz, tx, tz) {
+                if (!this.blocked || this.builtFor !== game.mapPreset) this.build();
+                const N = this.N, total = N * N;
+                const start = this._open(this._cell(sx, sz)), goal = this._open(this._cell(tx, tz));
+                if (start < 0 || goal < 0) return null;
+                const g = new Float32Array(total).fill(Infinity);
+                const came = new Int32Array(total).fill(-1);
+                const closed = new Uint8Array(total);
+                const heap = [];   // [f, cell], binary min-heap
+                const push = (f, c) => {
+                    heap.push([f, c]);
+                    let i = heap.length - 1;
+                    while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; }
+                };
+                const pop = () => {
+                    const top = heap[0], last = heap.pop();
+                    if (heap.length) {
+                        heap[0] = last;
+                        let i = 0;
+                        for (;;) {
+                            const l = 2 * i + 1, r = l + 1;
+                            let m = i;
+                            if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+                            if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+                            if (m === i) break;
+                            [heap[m], heap[i]] = [heap[i], heap[m]];
+                            i = m;
+                        }
+                    }
+                    return top;
+                };
+                const gi = goal % N, gj = (goal / N) | 0;
+                const h = (c) => { const dx = Math.abs(c % N - gi), dz = Math.abs(((c / N) | 0) - gj); return Math.max(dx, dz) + 0.414 * Math.min(dx, dz); };
+                g[start] = 0;
+                push(h(start), start);
+                let found = false;
+                while (heap.length) {
+                    const [, c] = pop();
+                    if (closed[c]) continue;
+                    if (c === goal) { found = true; break; }
+                    closed[c] = 1;
+                    const ci = c % N, cj = (c / N) | 0;
+                    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+                        if (!di && !dj) continue;
+                        const i = ci + di, j = cj + dj;
+                        if (i < 0 || j < 0 || i >= N || j >= N) continue;
+                        const n = j * N + i;
+                        if (this.blocked[n] || closed[n]) continue;
+                        // No corner cutting
+                        if (di && dj && (this.blocked[cj * N + i] || this.blocked[j * N + ci])) continue;
+                        const ng = g[c] + (di && dj ? 1.414 : 1);
+                        if (ng < g[n]) { g[n] = ng; came[n] = c; push(ng + h(n), n); }
+                    }
+                }
+                if (!found) return null;
+                const cells = [];
+                for (let c = goal; c >= 0; c = came[c]) cells.push(c);
+                cells.reverse();
+                const pts = cells.map((c) => ({ x: c % N - this.EXT + 0.5, z: ((c / N) | 0) - this.EXT + 0.5 }));
+                pts[pts.length - 1] = { x: tx, z: tz };
+                // Smooth: keep only the points where a straight run would hit a wall
+                const out = [];
+                let a = { x: sx, z: sz };
+                let k = 0;
+                while (k < pts.length) {
+                    let far = k;
+                    for (let m = pts.length - 1; m > k; m--) {
+                        if (this._clearLine(a.x, a.z, pts[m].x, pts[m].z)) { far = m; break; }
+                    }
+                    out.push(pts[far]);
+                    a = pts[far];
+                    k = far + 1;
+                }
+                return out;
+            },
+
+            // Point to steer at this tick on the way to goal (re-planned every 2 s)
+            steer: function (enemy, pos, goal, now) {
+                if (!enemy.navPath || enemy.navGoalX !== goal.x || enemy.navGoalZ !== goal.z || now >= (enemy.navReplanAt || 0)) {
+                    enemy.navPath = this.findPath(pos.x, pos.z, goal.x, goal.z) || [{ x: goal.x, z: goal.z }];
+                    enemy.navGoalX = goal.x;
+                    enemy.navGoalZ = goal.z;
+                    enemy.navReplanAt = now + 2000 + (enemy.slot % 4) * 150;
+                }
+                const path = enemy.navPath;
+                while (path.length > 1 && Math.hypot(path[0].x - pos.x, path[0].z - pos.z) < 1.2) path.shift();
+                return path[0];
+            }
+        };
+
         const _tacHead = new THREE.Vector3();
         const _tacEye = new THREE.Vector3();
         const enemyTactics = {
@@ -10468,6 +10688,8 @@
             build: function () {
                 this.covers.length = 0;
                 this.owner.clear();
+                // Rebuilt on first use: the map's colliders enter the collision index after this
+                navGrid.blocked = null;
                 const blocked = (x, z) => {
                     if (Math.abs(x) > 47 || Math.abs(z) > 47) return true;
                     for (const p of mapPieces) {
@@ -11784,6 +12006,13 @@
                 }
                 return;
             }
+            if (event.code === 'F7') {
+                event.preventDefault();
+                if (!event.repeat && typeof tacticalDirector !== 'undefined') {
+                    tacticalDirector.setGameMode('match');
+                }
+                return;
+            }
             if (event.code === 'F4') {
                 event.preventDefault();
                 if (!event.repeat && typeof tacticalDirector !== 'undefined' && tacticalDirector.cycleMapPreset) {
@@ -12046,6 +12275,7 @@
                 } else {
                     this.timer = setTimeout(() => this.set(false), this.AUTO_HIDE_MS);
                 }
+                this.startedExpanded = this.expanded;
                 this.sync();
             },
             set: function(expanded) {
@@ -14371,6 +14601,7 @@
             }
             const healthDamage = Math.max(0, finalDamage - armorAbsorbed);
             enemy.health -= healthDamage;
+            deathRecap.onDealt(enemy, finalDamage, sourceLabel);
 
             const arch = ENEMY_ARCHETYPES[enemy.archetype] || ENEMY_ARCHETYPES.standard;
 
@@ -14437,7 +14668,7 @@
                 if (typeof tacticalDirector !== 'undefined' && game.gameMode === 'range' && tacticalDirector.rangeActive) {
                     tacticalDirector.onRangeBotKilled(enemy, isHeadshot, nowMs, effectNow);
                 } else {
-                    if (game.gameMode !== 'retake') {
+                    if (game.gameMode !== 'retake' && game.gameMode !== 'match') {
                         scheduleActorEvent(enemy, effectNow + 10000, respawnEnemy);
                     }
                     if (typeof tacticalDirector !== 'undefined') {
@@ -31176,6 +31407,13 @@
                         this.setGameMode('retake');
                     });
                 }
+                const modeMatchBtn = document.getElementById('mode-match-btn');
+                if (modeMatchBtn) {
+                    modeMatchBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.setGameMode('match');
+                    });
+                }
                 if (rangeRetryBtn) {
                     rangeRetryBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -31451,16 +31689,24 @@
             },
 
             setGameMode: function(mode) {
-                if (mode !== 'wave' && mode !== 'range' && mode !== 'retake') return;
+                if (mode !== 'wave' && mode !== 'range' && mode !== 'retake' && mode !== 'match') return;
+                if (matchMode.active) matchMode.stop();
                 game.gameMode = mode;
                 game.roundKillStreak = 0;
 
                 if (modeWaveBtn) modeWaveBtn.classList.toggle('active', mode === 'wave');
                 if (modeRangeBtn) modeRangeBtn.classList.toggle('active', mode === 'range');
                 if (modeRetakeBtn) modeRetakeBtn.classList.toggle('active', mode === 'retake');
+                const modeMatchBtn = document.getElementById('mode-match-btn');
+                if (modeMatchBtn) modeMatchBtn.classList.toggle('active', mode === 'match');
                 if (rangeScorecard) rangeScorecard.classList.remove('visible');
 
-                if (mode === 'range') {
+                if (mode === 'match') {
+                    this.rangeActive = false;
+                    this.activeRangeBot = null;
+                    if (rangeChallengeHud) rangeChallengeHud.classList.remove('visible');
+                    matchMode.start();
+                } else if (mode === 'range') {
                     if (rangeChallengeHud) rangeChallengeHud.classList.add('visible');
                     if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
                     if (this.spikeGroup) this.spikeGroup.visible = false;
@@ -31565,6 +31811,10 @@
             // Wave Mode & Spike Plant / Detonation / Defuse Objective
             // =============================================
             onWaveEnemyKilled: function(enemy, isHeadshot, effectNow) {
+                if (game.gameMode === 'match') {
+                    matchMode.onEnemyKilled(enemy, isHeadshot, effectNow);
+                    return;
+                }
                 if (game.gameMode === 'retake') {
                     this.updateWaveHUD(effectNow);
                     return;
@@ -31627,6 +31877,7 @@
 
             updateWaveHUD: function(now) {
                 if (game.gameMode === 'range') return;
+                if (game.gameMode === 'match') { matchMode.updateHUD(now); return; }
 
                 if (game.gameMode === 'retake') {
                     let aliveDefenders = 0;
@@ -31676,7 +31927,7 @@
                 if (this.spikeBeaconRingB) this.spikeBeaconRingB.rotation.z -= delta * 0.45;
 
                 // 1. Unplanted / Planting State (Wave Mode: Plant at Site A or Site B)
-                if (game.gameMode === 'wave' && (this.spikeState === 'unplanted' || this.spikeState === 'planting')) {
+                if ((game.gameMode === 'wave' || (game.gameMode === 'match' && matchMode.canPlayerPlant())) && (this.spikeState === 'unplanted' || this.spikeState === 'planting')) {
                     if (nearSiteKey) {
                         const siteInfo = this.spikeSites[nearSiteKey];
                         this.activeSpikeSiteKey = nearSiteKey;
@@ -31742,7 +31993,7 @@
                     }
 
                     // A) RETAKE MODE: Player Defuses Spike (with Valorant 50% Half-Defuse Checkpoint!)
-                    if (game.gameMode === 'retake') {
+                    if (game.gameMode === 'retake' || (game.gameMode === 'match' && matchMode.playerDefuses())) {
                         const distToPlanted = Math.hypot(px - sitePos.x, pz - sitePos.z);
                         const inPlantedSite = distToPlanted <= this.spikeSiteRadius;
 
@@ -31770,6 +32021,7 @@
                                 scoreValue.textContent = game.score;
                                 this.awardCreds(350);
                                 if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
+                                if (game.gameMode === 'match') { matchMode.onSpike('defused', now); return; }
                                 this.advanceWave(`SPIKE DEFUSED AT SITE ${this.activeSpikeSiteKey}`, now);
                                 return;
                             }
@@ -31788,6 +32040,7 @@
 
                         if (remMs <= 0) {
                             soundFX.spikeDetonate();
+                            if (game.gameMode === 'match') { matchMode.onSpike('detonated', now); return; }
                             showNotification(`SPIKE DETONATED AT SITE ${this.activeSpikeSiteKey}! Retake Failed — Resetting Site...`, 3200);
                             this.startRetakeRound(now);
                         }
@@ -31814,6 +32067,7 @@
                             showNotification(`🚨 WARNING: HOSTILE DEFUSING SPIKE AT SITE ${this.activeSpikeSiteKey}! (${(this.enemyDefuseProgress * 100).toFixed(0)}%)`, 1400);
                         }
                         if (this.enemyDefuseProgress >= 1) {
+                            if (game.gameMode === 'match') { matchMode.onSpike('botDefused', now); return; }
                             soundFX.buyDeny();
                             this.spikeState = 'unplanted';
                             this.spikePlantProgress = 0;
@@ -31846,6 +32100,7 @@
 
                     if (remMs <= 0) {
                         soundFX.spikeDetonate();
+                        if (game.gameMode === 'match') { matchMode.onSpike('detonated', now); return; }
                         game.score += 600;
                         scoreValue.textContent = game.score;
                         this.awardCreds(250);
@@ -31855,6 +32110,28 @@
                 }
             },
 
+            // V1.7 Match: the attacking bots finished planting at siteKey
+            matchBotPlant: function(siteKey, now) {
+                const siteInfo = this.spikeSites[siteKey] || this.spikeSites.A;
+                this.activeSpikeSiteKey = siteKey;
+                this.activeSpikeSitePos.copy(siteInfo.pos);
+                this.spikeState = 'planted';
+                this.spikePlantProgress = 1;
+                this.spikeDefuseProgress = 0;
+                this.spikeDefuseCheckpoint = 0;
+                this.enemyDefuseProgress = 0;
+                this.spikeDetonateDurationMs = MATCH.spikeMs;
+                this.spikeDetonateAt = now + this.spikeDetonateDurationMs;
+                this.lastSpikeBeepAt = now;
+                if (this.spikeCanister) {
+                    this.spikeCanister.visible = true;
+                    this.spikeCanister.position.set(siteInfo.pos.x, 0, siteInfo.pos.z);
+                }
+                soundFX.at(siteInfo.pos.x, 0.6, siteInfo.pos.z, () => soundFX.spikePlant());
+                addCustomKillFeedMessage(`<span style="color:#ff4655;font-weight:900;">[SPIKE PLANTED]</span> The bots planted at <b>SITE ${siteKey}</b> — defuse it [HOLD F]`);
+                showNotification(`BOTS PLANTED AT SITE ${siteKey}! Defuse within ${MATCH.spikeMs / 1000}s [HOLD F]`, 3200);
+            },
+
             completeSpikePlant: function(now, siteKey = 'A') {
                 const siteInfo = this.spikeSites[siteKey] || this.spikeSites.A;
                 this.activeSpikeSiteKey = siteKey;
@@ -31862,8 +32139,9 @@
                 this.spikeState = 'planted';
                 this.spikePlantProgress = 1;
                 this.enemyDefuseProgress = 0;
-                this.spikeDetonateDurationMs = 30000;
+                this.spikeDetonateDurationMs = game.gameMode === 'match' ? MATCH.spikeMs : 30000;
                 this.spikeDetonateAt = now + this.spikeDetonateDurationMs;
+                if (game.gameMode === 'match') matchMode.onSpike('planted', now);
                 this.lastSpikeBeepAt = now;
                 if (siteInfo.ring) siteInfo.ring.material.color.setHex(0xff4655).convertSRGBToLinear();
                 if (this.spikeCanister) {
@@ -32685,7 +32963,7 @@
                                 const px = characterController.position.x - hz.x;
                                 const pz = characterController.position.z - hz.z;
                                 if (px * px + pz * pz <= hz.radius * hz.radius) {
-                                    takeDamage(4, hz.group.position);
+                                    takeDamage(4, hz.group.position, { label: 'Incendiary Mortar' });
                                 }
                             }
                         }
@@ -32709,6 +32987,9 @@
                     if (this.rangeActive) {
                         this.updateRangeHUD(now);
                     }
+                } else if (game.gameMode === 'match') {
+                    if (matchMode.phase === 'live') this.updateSpikeSystem(delta, now);
+                    matchMode.update(delta, now);
                 } else {
                     this.updateSpikeSystem(delta, now);
                     this.updateWaveHUD(now);
@@ -32863,6 +33144,8 @@
             const shotStart = performance.now();
             try {
                 if (game.reloading) return;
+                // V1.7: no shooting while down, or during a Match buy phase
+                if (game.health <= 0 || matchMode.blocksPlayer()) return;
                 game.inspectUntil = 0;
 
                 const effectNow = performance.now();
@@ -33754,7 +34037,7 @@
             if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
         }
         
-        function takeDamage(amount, sourcePos = null) {
+        function takeDamage(amount, sourcePos = null, source = null) {
             const now = performance.now();
             // V1.7 fix: already down and waiting to respawn. Without this, every hit
             // during the 3 s respawn delay counted another death and queued another
@@ -33798,6 +34081,7 @@
             }
 
             game.health = Math.max(0, game.health - healthDamage);
+            deathRecap.onPlayerHit(source, amount, sourcePos);
             gamepadController.rumble(0.85, 0.4, 140);
             
             // Update health & shield HUD displays
@@ -33816,10 +34100,19 @@
             // Check for game over
             if (game.health <= 0) {
                 game.playerDeaths = (game.playerDeaths || 0) + 1;
+                deathRecap.show();
+                // Match: one life per round, no respawn
+                if (game.gameMode === 'match' && matchMode.active) {
+                    matchMode.onPlayerDied(now);
+                    return;
+                }
                 showNotification("AGENT DOWN — RESPAWNING...", 3000);
                 
                 // Reset player after 3 seconds
                 setTimeout(() => {
+                    deathRecap.hide();
+                    deathRecap.reset();
+                    if (game.gameMode === 'match') return;
                     game.health = 100;
                     game.shield = Math.min(game.maxShield || 25, 25);
                     healthFill.style.width = "100%";
@@ -33897,9 +34190,12 @@
             const patrolTime = time * 0.0005;
             const patrolSin = Math.sin(patrolTime);
             const patrolCos = Math.cos(patrolTime);
-            const postPlantDefuseGoal = (game.gameMode === 'wave' && typeof tacticalDirector !== 'undefined' && tacticalDirector.spikeState === 'planted')
+            if (matchMode.botsFrozen()) return;
+            // Bots head for this spot when they cannot see the player: the planted
+            // spike (to defuse it) or, attacking in a Match, the site they will plant
+            const postPlantDefuseGoal = ((game.gameMode === 'wave' || (game.gameMode === 'match' && matchMode.side === 'attack')) && typeof tacticalDirector !== 'undefined' && tacticalDirector.spikeState === 'planted')
                 ? tacticalDirector.activeSpikeSitePos
-                : null;
+                : matchMode.botGoal();
             
             for (let i = 0; i < enemyObjects.length; i++) {
                 const enemy = enemyObjects[i];
@@ -34001,9 +34297,14 @@
                         tacticalDirector.tryCastBotAbility(enemy, perfNow, distanceToPlayer, nx, nz, perpX, perpZ);
                     }
 
+                    // A bot that has reached the spike (to defuse it) or its plant site holds
+                    // its ground and works, firing back if it can see the player
+                    const onObjective = !!postPlantDefuseGoal &&
+                        Math.hypot(postPlantDefuseGoal.x - pos.x, postPlantDefuseGoal.z - pos.z) <= 2.6;
+                    if (onObjective && enemy.aiState && enemy.aiState !== 'engage') { enemyTactics.release(enemy); enemy.aiState = 'engage'; }
                     // V1.7 cover / peek / pair-flank decisions (skipped while rushing a planted spike)
-                    const tactic = (!postPlantDefuseGoal || enemy.hasSight) &&
-                        enemyTactics.step(enemy, pos, playerPosition, distanceToPlayer, perfNow, speedMult, arch.scaleY || 1);
+                    const tactic = onObjective || ((!postPlantDefuseGoal || enemy.hasSight) &&
+                        enemyTactics.step(enemy, pos, playerPosition, distanceToPlayer, perfNow, speedMult, arch.scaleY || 1));
 
                     // Only fire when enemy has verified clear Line-of-Sight (never through walls!),
                     // and not while sprinting for cover
@@ -34032,12 +34333,14 @@
                         }
                     } else if (postPlantDefuseGoal) {
                         // Post-Plant Defuse AI: when Spike is planted and sight to player is blocked, rush the planted Spike!
-                        const sdx = postPlantDefuseGoal.x - pos.x;
-                        const sdz = postPlantDefuseGoal.z - pos.z;
-                        const sDist = Math.hypot(sdx, sdz) || 1;
+                        const sDist = Math.hypot(postPlantDefuseGoal.x - pos.x, postPlantDefuseGoal.z - pos.z) || 1;
                         if (sDist > 2.2) {
-                            pos.x += (sdx / sDist) * 0.065 * speedMult + perpX * strafeStep * 0.5;
-                            pos.z += (sdz / sDist) * 0.065 * speedMult + perpZ * strafeStep * 0.5;
+                            // V1.7: follow a route round walls instead of pushing into them
+                            const wp = navGrid.steer(enemy, pos, postPlantDefuseGoal, perfNow);
+                            const wdx = wp.x - pos.x, wdz = wp.z - pos.z;
+                            const wd = Math.hypot(wdx, wdz) || 1;
+                            pos.x += (wdx / wd) * 0.065 * speedMult + perpX * strafeStep * 0.25;
+                            pos.z += (wdz / wd) * 0.065 * speedMult + perpZ * strafeStep * 0.25;
                         }
                     } else {
                         // Sight occluded by wall or smoke: flank laterally + advance to peek around cover
@@ -34059,13 +34362,21 @@
                         enemy.nextDecisionAt = time - (enemy.slot % 4) * (ENEMY_MEDIUM_DECISION_MS / 4);
                     }
                     if (time >= enemy.nextDecisionAt) {
-                        const nx = gdx / distToGoal;
-                        const nz = gdz / distToGoal;
+                        // V1.7: a fixed goal (site / planted spike) is reached by route, not straight line
+                        let sx = gdx, sz = gdz, sd = distToGoal;
+                        if (postPlantDefuseGoal) {
+                            const wp = navGrid.steer(enemy, pos, postPlantDefuseGoal, perfNow);
+                            sx = wp.x - pos.x; sz = wp.z - pos.z; sd = Math.hypot(sx, sz) || 0.001;
+                        }
+                        const nx = sx / sd;
+                        const nz = sz / sd;
                         const perpX = -nz * (enemy.strafeDir || 1) * 0.35;
                         const perpZ = nx * (enemy.strafeDir || 1) * 0.35;
                         enemy.turnTarget = Math.atan2(gdx, gdz);
-                        enemy.moveVX = distToGoal > 2.4 ? (nx + perpX) * ENEMY_MEDIUM_SPEED * (postPlantDefuseGoal ? 1.25 : 1.0) : 0;
-                        enemy.moveVZ = distToGoal > 2.4 ? (nz + perpZ) * ENEMY_MEDIUM_SPEED * (postPlantDefuseGoal ? 1.25 : 1.0) : 0;
+                        // Rushing a planted spike: a bit faster; carrying it to a site in a Match: running
+                        const goalSpeed = postPlantDefuseGoal ? (matchMode.botGoal() ? 3.0 : 1.25) : 1.0;
+                        enemy.moveVX = distToGoal > 2.4 ? (nx + perpX) * ENEMY_MEDIUM_SPEED * goalSpeed : 0;
+                        enemy.moveVZ = distToGoal > 2.4 ? (nz + perpZ) * ENEMY_MEDIUM_SPEED * goalSpeed : 0;
                         const next = enemy.nextDecisionAt + ENEMY_MEDIUM_DECISION_MS;
                         enemy.nextDecisionAt = next > time ? next : time + ENEMY_MEDIUM_DECISION_MS;
                     }
@@ -34225,7 +34536,7 @@
                 const baseDmg = arch.baseDamage || 16;
                 const distDrop = enemy.archetype === 'sniper' ? 0.1 : 0.28;
                 const damage = Math.max(5, Math.floor(baseDmg - distance * distDrop));
-                takeDamage(damage, enemy.mesh.position);
+                takeDamage(damage, enemy.mesh.position, { enemy: enemy });
             }
         }
         
@@ -34233,7 +34544,8 @@
         // animation and particle steps. Camera look and weapon follow stay on the
         // render clock so aiming stays immediate.
         function stepSimulation(dt, timeMs) {
-            characterController.update(dt);
+            // Match: no moving during the buy phase or while down
+            if (!matchMode.blocksPlayer()) characterController.update(dt);
             agentSystem.stepSimulation(dt, timeMs);
             updateEnemies(timeMs, dt);
             stepActorAnimations();
@@ -34750,6 +35062,398 @@
                 crosshairThickness: 2,
                 crosshairBaseGap: 13,
                 crosshairBloom: 'dynamic'
+            }
+        };
+
+        // =============================================
+        // V1.7 Match mode ([F7]): first to 7 rounds against the bots
+        // =============================================
+        // Rounds 1-6 the player attacks (plant the spike or eliminate the
+        // defenders); then sides swap and the bots attack, carrying the spike to a
+        // site and planting it (defuse it, or eliminate them before the plant). A
+        // 6-6 score goes to a deciding 13th round. Each round: 15 s buy phase
+        // (movement and shooting locked, [B] buy menu open), 100 s to plant, 45 s
+        // spike. One life per round. Economy: 800 at the start of each half, +3000
+        // per round won, 1900/2400/2900 for consecutive losses, kills as usual.
+        const MATCH = { winTarget: 7, halfRounds: 6, buyMs: 15000, roundMs: 100000, spikeMs: 45000, postMs: 4500, startCreds: 800 };
+        const MATCH_SPAWN = { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } };
+        const matchMode = {
+            active: false,
+            phase: 'idle',      // 'buy' | 'live' | 'post' | 'over'
+            round: 0,
+            us: 0,
+            them: 0,
+            side: 'attack',
+            lossStreak: 0,
+            phaseEndsAt: 0,
+            plantSiteKey: 'A',
+            botPlantProgress: 0,
+            playerDead: false,
+            stats: null,
+            overlay: null,
+
+            start: function () {
+                const now = performance.now();
+                this.active = true;
+                this.round = 0;
+                this.us = 0;
+                this.them = 0;
+                this.lossStreak = 0;
+                this.stats = { kills: 0, headshots: 0, deaths: 0, damage: 0, plants: 0, defuses: 0, roundsAttack: 0, roundsDefend: 0, startedAt: now };
+                game.creds = MATCH.startCreds;
+                this.hideOverlay();
+                addCustomKillFeedMessage(`<span style="color:#ffd166;font-weight:900;">[MATCH]</span> First to ${MATCH.winTarget} rounds. You attack first; sides swap after round ${MATCH.halfRounds}.`);
+                this.startRound(now);
+            },
+
+            stop: function () {
+                this.active = false;
+                this.phase = 'idle';
+                this.hideOverlay();
+                deathRecap.hide();
+                if (game.health <= 0) {
+                    game.health = 100;
+                    tacticalDirector.updateVitalsHUD();
+                }
+            },
+
+            sideForRound: function (r) {
+                if (r <= MATCH.halfRounds) return 'attack';
+                if (r <= MATCH.halfRounds * 2) return 'defend';
+                return 'attack';
+            },
+
+            startRound: function (now) {
+                const td = tacticalDirector;
+                this.round++;
+                const prevSide = this.side;
+                this.side = this.sideForRound(this.round);
+                if (this.round === MATCH.halfRounds + 1 || (this.round === MATCH.halfRounds * 2 + 1)) {
+                    // New half: economy resets
+                    game.creds = MATCH.startCreds;
+                    this.lossStreak = 0;
+                    if (prevSide !== this.side || this.round > MATCH.halfRounds * 2) {
+                        showNotification(this.round > MATCH.halfRounds * 2 ? 'OVERTIME — DECIDING ROUND' : 'HALFTIME — SWITCHING SIDES', 3000);
+                    }
+                }
+                // Spike back to the start
+                td.spikeState = 'unplanted';
+                td.spikePlantProgress = 0;
+                td.spikeDefuseProgress = 0;
+                td.spikeDefuseCheckpoint = 0;
+                td.enemyDefuseProgress = 0;
+                if (td.spikeCanister) td.spikeCanister.visible = false;
+                if (td.spikeGroup) td.spikeGroup.visible = true;
+                if (roundTimerEl) roundTimerEl.classList.remove('spike-planted');
+                if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
+                this.botPlantProgress = 0;
+                this.plantSiteKey = Math.random() < 0.5 ? 'A' : 'B';
+
+                // Player: full health, armour kept only if they survived the last round
+                if (this.playerDead || game.health <= 0) game.shield = 0;
+                this.playerDead = false;
+                game.health = 100;
+                const sp = MATCH_SPAWN[this.side];
+                characterController.setCrouching(false);
+                characterController.position.set(sp.x, characterController.standHeight, sp.z);
+                characterController.prevSimPosition.copy(characterController.position);
+                characterController.velocity.set(0, 0, 0);
+                camera.rotation.set(0, sp.yaw, 0);
+                td.updateVitalsHUD();
+                deathRecap.reset();
+                deathRecap.hide();
+
+                // Bots: defenders split across both sites, or attackers stacked at their spawn
+                const count = Math.min(5, enemyObjects.length);
+                const spots = [];
+                if (this.side === 'attack') {
+                    const a = td.spikeSites.A.pos, b = td.spikeSites.B.pos;
+                    spots.push([a.x - 4, a.z + 3], [b.x + 4, b.z - 3], [a.x + 4, a.z - 2], [b.x - 4, b.z + 2], [8, 0]);
+                } else {
+                    const o = MATCH_SPAWN.attack;
+                    spots.push([o.x, o.z - 3], [o.x, o.z + 3], [o.x + 2, o.z], [o.x - 2, o.z - 5], [o.x - 2, o.z + 5]);
+                }
+                const order = ['standard', 'rusher', 'armored', 'sniper', 'standard'];
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    e.rangeStrafeAmp = 0;
+                    if (i < count) {
+                        activateEnemy(e, spots[i][0], 0, spots[i][1], order[i % order.length]);
+                    } else {
+                        e.isActive = false;
+                        e.hit = true;
+                        e.renderActive = false;
+                        setCasterVisible(e.mesh, false, true);
+                        if (e.broadKeys) actorBroadphase.remove(e);
+                    }
+                }
+                packEnemyBatches();
+
+                this.phase = 'buy';
+                this.phaseEndsAt = now + MATCH.buyMs;
+                const what = this.side === 'attack'
+                    ? 'ATTACK — plant the spike or eliminate the defenders'
+                    : `DEFEND — stop the bots planting (they are heading for a site)`;
+                showNotification(`ROUND ${this.round} • ${what} • BUY PHASE [B]`, 3500);
+                this.updateHUD(now);
+            },
+
+            botsAlive: function () {
+                let n = 0;
+                for (let i = 0; i < enemyObjects.length; i++) if (enemyObjects[i].isActive && !enemyObjects[i].hit) n++;
+                return n;
+            },
+
+            blocksPlayer: function () {
+                return this.active && game.gameMode === 'match' && (this.phase === 'buy' || this.phase === 'over' || this.playerDead);
+            },
+            botsFrozen: function () {
+                return this.active && game.gameMode === 'match' && this.phase !== 'live';
+            },
+            canPlayerPlant: function () {
+                return this.active && this.phase === 'live' && this.side === 'attack' && !this.playerDead;
+            },
+            playerDefuses: function () {
+                return this.active && this.side === 'defend';
+            },
+            // Where attacking bots head before the plant (null otherwise)
+            botGoal: function () {
+                if (!this.active || this.phase !== 'live' || this.side !== 'defend') return null;
+                if (tacticalDirector.spikeState === 'planted') return null;
+                return tacticalDirector.spikeSites[this.plantSiteKey].pos;
+            },
+
+            update: function (delta, now) {
+                if (!this.active) return;
+                if (this.phase === 'buy' && now >= this.phaseEndsAt) {
+                    this.phase = 'live';
+                    this.phaseEndsAt = now + MATCH.roundMs;
+                    if (game.buyMenuOpen) tacticalDirector.toggleBuyMenu(false);
+                    soundFX.abilityCast();
+                    showNotification(`ROUND ${this.round} — GO!`, 1500);
+                } else if (this.phase === 'live') {
+                    const td = tacticalDirector;
+                    if (td.spikeState !== 'planted' && now >= this.phaseEndsAt) {
+                        this.endRound(this.side === 'defend', 'TIME RAN OUT', now);
+                        return;
+                    }
+                    // Attacking bots: any bot standing on the target site plants (4 s)
+                    if (this.side === 'defend' && td.spikeState !== 'planted') {
+                        const site = td.spikeSites[this.plantSiteKey].pos;
+                        let planter = null;
+                        for (let i = 0; i < enemyObjects.length; i++) {
+                            const e = enemyObjects[i];
+                            if (!e.isActive || e.hit || e.blindedUntil > now) continue;
+                            if (Math.hypot(e.mesh.position.x - site.x, e.mesh.position.z - site.z) <= 2.8) { planter = e; break; }
+                        }
+                        if (planter) {
+                            this.botPlantProgress = Math.min(1, this.botPlantProgress + delta / 4);
+                            if (this.botPlantProgress >= 1) td.matchBotPlant(this.plantSiteKey, now);
+                        } else {
+                            this.botPlantProgress = Math.max(0, this.botPlantProgress - delta * 0.5);
+                        }
+                    }
+                } else if (this.phase === 'post' && now >= this.phaseEndsAt) {
+                    if (this.us >= MATCH.winTarget || this.them >= MATCH.winTarget) this.finish(now);
+                    else this.startRound(now);
+                }
+                this.updateHUD(now);
+            },
+
+            onEnemyKilled: function (enemy, isHeadshot, now) {
+                if (!this.active) return;
+                this.stats.kills++;
+                if (isHeadshot) this.stats.headshots++;
+                if (this.phase !== 'live' || this.botsAlive() > 0) return;
+                if (this.side === 'attack') this.endRound(true, 'ALL DEFENDERS ELIMINATED', now);
+                else if (tacticalDirector.spikeState !== 'planted') this.endRound(true, 'ALL ATTACKERS ELIMINATED', now);
+                else showNotification('ALL ATTACKERS DOWN — DEFUSE THE SPIKE! [HOLD F]', 2500);
+            },
+
+            onPlayerDied: function (now) {
+                if (!this.active || this.phase !== 'live') return;
+                this.playerDead = true;
+                this.stats.deaths++;
+                // An attacker who dies after planting can still win if the spike goes off
+                if (this.side === 'attack' && tacticalDirector.spikeState === 'planted') {
+                    showNotification('YOU ARE DOWN — THE SPIKE IS STILL ARMED', 2500);
+                    return;
+                }
+                this.endRound(false, 'YOU WERE ELIMINATED', now);
+            },
+
+            onSpike: function (event, now) {
+                if (!this.active) return;
+                if (event === 'planted') this.stats.plants++;
+                if (event === 'defused') this.stats.defuses++;
+                if (event === 'detonated') this.endRound(this.side === 'attack', 'SPIKE DETONATED', now);
+                else if (event === 'defused') this.endRound(true, 'SPIKE DEFUSED', now);
+                else if (event === 'botDefused') this.endRound(false, 'THE BOTS DEFUSED THE SPIKE', now);
+            },
+
+            endRound: function (won, reason, now) {
+                if (this.phase !== 'live') return;
+                const td = tacticalDirector;
+                if (won) {
+                    this.us++;
+                    this.lossStreak = 0;
+                    if (this.side === 'attack') this.stats.roundsAttack++; else this.stats.roundsDefend++;
+                    td.awardCreds(3000);
+                    soundFX.ult();
+                } else {
+                    this.them++;
+                    td.awardCreds(1900 + 500 * Math.min(2, this.lossStreak));
+                    this.lossStreak++;
+                    soundFX.buyDeny();
+                }
+                // Freeze the spike where it is for the scoreboard pause
+                td.spikeState = 'unplanted';
+                if (td.spikeCanister) td.spikeCanister.visible = false;
+                if (roundTimerEl) roundTimerEl.classList.remove('spike-planted');
+                if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
+                this.phase = 'post';
+                this.phaseEndsAt = now + MATCH.postMs;
+                const tag = won ? '<span style="color:#00e5a3;font-weight:900;">[ROUND WON]</span>' : '<span style="color:#ff4655;font-weight:900;">[ROUND LOST]</span>';
+                addCustomKillFeedMessage(`${tag} ${reason} — ${this.us} : ${this.them}`);
+                showNotification(`${won ? 'ROUND WON' : 'ROUND LOST'} — ${reason} (${this.us} : ${this.them})`, 3500);
+                this.updateHUD(now);
+            },
+
+            finish: function (now) {
+                this.phase = 'over';
+                const won = this.us > this.them;
+                const s = this.stats;
+                const hs = s.kills ? Math.round(s.headshots / s.kills * 100) : 0;
+                const mins = Math.max(1, Math.round((now - s.startedAt) / 60000));
+                if (!this.overlay) {
+                    const el = document.createElement('div');
+                    el.id = 'match-result';
+                    el.className = 'match-result';
+                    document.getElementById('ui-root').appendChild(el);
+                    el.addEventListener('mousedown', (e) => e.stopPropagation());
+                    this.overlay = el;
+                }
+                this.overlay.innerHTML = `
+                    <div class="match-result-card ${won ? 'won' : 'lost'}">
+                        <div class="match-result-title">${won ? 'VICTORY' : 'DEFEAT'}</div>
+                        <div class="match-result-score">${this.us} : ${this.them}</div>
+                        <div class="match-result-grid">
+                            <div><b>${s.kills}</b><span>KILLS</span></div>
+                            <div><b>${s.deaths}</b><span>DEATHS</span></div>
+                            <div><b>${hs}%</b><span>HEADSHOTS</span></div>
+                            <div><b>${s.damage}</b><span>DAMAGE</span></div>
+                            <div><b>${s.roundsAttack}</b><span>ATTACK ROUNDS WON</span></div>
+                            <div><b>${s.roundsDefend}</b><span>DEFENCE ROUNDS WON</span></div>
+                            <div><b>${s.plants}</b><span>PLANTS</span></div>
+                            <div><b>${s.defuses}</b><span>DEFUSES</span></div>
+                        </div>
+                        <div class="match-result-meta">${this.round} rounds • about ${mins} min</div>
+                        <div class="match-result-actions">
+                            <button id="match-again-btn">PLAY AGAIN</button>
+                            <button id="match-exit-btn">BACK TO WAVE MODE</button>
+                        </div>
+                    </div>`;
+                this.overlay.classList.add('visible');
+                document.getElementById('match-again-btn').addEventListener('click', () => this.start());
+                document.getElementById('match-exit-btn').addEventListener('click', () => tacticalDirector.setGameMode('wave'));
+                if (document.pointerLockElement) document.exitPointerLock();
+                soundFX.ult();
+            },
+
+            hideOverlay: function () {
+                if (this.overlay) this.overlay.classList.remove('visible');
+            },
+
+            updateHUD: function (now) {
+                if (!this.active) return;
+                const sideTxt = this.side === 'attack' ? 'ATTACK' : 'DEFENCE';
+                if (roundTitleEl) roundTitleEl.textContent = `MATCH ${this.us} : ${this.them} • R${this.round} ${sideTxt}`;
+                const td = tacticalDirector;
+                if (roundTimerEl && td.spikeState !== 'planted') {
+                    const rem = Math.max(0, (this.phaseEndsAt - now) / 1000);
+                    roundTimerEl.textContent = this.phase === 'post' || this.phase === 'over' ? '--:--'
+                        : `${Math.floor(rem / 60)}:${String(Math.floor(rem % 60)).padStart(2, '0')}`;
+                }
+                if (!roundSubstatusEl) return;
+                let txt;
+                if (this.phase === 'buy') txt = `BUY PHASE — [B] BUY • ¤${game.creds} • ${sideTxt === 'ATTACK' ? 'PLANT AT SITE A OR B [HOLD F]' : 'THE BOTS WILL TRY TO PLANT'}`;
+                else if (this.phase === 'post') txt = `NEXT ROUND IN ${Math.ceil(Math.max(0, this.phaseEndsAt - now) / 1000)}s`;
+                else if (this.phase === 'over') txt = 'MATCH OVER';
+                else if (td.spikeState === 'planted') txt = this.side === 'attack' ? `SPIKE PLANTED AT ${td.activeSpikeSiteKey} — HOLD THE SITE` : `SPIKE AT ${td.activeSpikeSiteKey} — DEFUSE IT [HOLD F]`;
+                else txt = this.side === 'attack' ? `DEFENDERS ALIVE: ${this.botsAlive()} • PLANT AT SITE A OR B [HOLD F]` : `ATTACKERS ALIVE: ${this.botsAlive()}${this.botPlantProgress > 0 ? ` • BOTS PLANTING ${(this.botPlantProgress * 100).toFixed(0)}%!` : ''}`;
+                roundSubstatusEl.textContent = txt;
+            }
+        };
+
+        // =============================================
+        // V1.7 Death recap: who killed you, and the damage each way this life
+        // =============================================
+        const deathRecap = {
+            taken: new Map(),   // key -> { name, dmg, hits, enemy }
+            dealt: new Map(),   // enemy -> { dmg, hits }
+            el: null,
+            last: null,
+
+            reset: function () {
+                this.taken.clear();
+                this.dealt.clear();
+                this.last = null;
+            },
+
+            sourceInfo: function (source) {
+                if (source && source.enemy) {
+                    const arch = ENEMY_ARCHETYPES[source.enemy.archetype] || ENEMY_ARCHETYPES.standard;
+                    return { key: source.enemy, name: arch.shortName, badge: arch.badgeColor, enemy: source.enemy };
+                }
+                const name = (source && source.label) || 'Unknown';
+                return { key: name, name: name, badge: '#94a3b8', enemy: null };
+            },
+
+            onPlayerHit: function (source, amount, pos) {
+                const s = this.sourceInfo(source);
+                let r = this.taken.get(s.key);
+                if (!r) { r = { name: s.name, badge: s.badge, enemy: s.enemy, dmg: 0, hits: 0 }; this.taken.set(s.key, r); }
+                r.dmg += amount;
+                r.hits++;
+                this.last = { info: r, pos: pos ? { x: pos.x, z: pos.z } : null };
+            },
+
+            onDealt: function (enemy, amount, sourceLabel) {
+                if (typeof sourceLabel === 'string' && /wingman/i.test(sourceLabel)) return;
+                let r = this.dealt.get(enemy);
+                if (!r) { r = { dmg: 0, hits: 0 }; this.dealt.set(enemy, r); }
+                r.dmg += amount;
+                r.hits++;
+                if (matchMode.active && matchMode.stats) matchMode.stats.damage += amount;
+            },
+
+            show: function () {
+                if (!this.el) {
+                    this.el = document.createElement('div');
+                    this.el.id = 'death-recap';
+                    this.el.className = 'death-recap';
+                    document.getElementById('ui-root').appendChild(this.el);
+                }
+                const k = this.last && this.last.info;
+                const p = characterController.position;
+                const dist = (this.last && this.last.pos) ? Math.round(Math.hypot(this.last.pos.x - p.x, this.last.pos.z - p.z)) : null;
+                const rows = [...this.taken.values()].sort((a, b) => b.dmg - a.dmg).slice(0, 4).map((r) => {
+                    const back = r.enemy ? this.dealt.get(r.enemy) : null;
+                    return `<div class="death-recap-row"><span style="color:${r.badge}">${r.name}</span>
+                        <span>took ${r.dmg} (${r.hits} hit${r.hits === 1 ? '' : 's'})</span>
+                        <span>dealt ${back ? back.dmg : 0}</span></div>`;
+                }).join('');
+                let dealtTotal = 0;
+                for (const v of this.dealt.values()) dealtTotal += v.dmg;
+                this.el.innerHTML = `
+                    <div class="death-recap-title">KILLED BY <span style="color:${k ? k.badge : '#fff'}">${k ? k.name : 'UNKNOWN'}</span>${dist !== null ? ` <small>${dist} m</small>` : ''}</div>
+                    ${rows || '<div class="death-recap-row">No damage recorded</div>'}
+                    <div class="death-recap-foot">Damage you dealt this life: <b>${dealtTotal}</b></div>`;
+                this.el.classList.add('visible');
+            },
+
+            hide: function () {
+                if (this.el) this.el.classList.remove('visible');
             }
         };
 
@@ -37170,7 +37874,7 @@
 
             updateWingmanBots: function(delta, now) {
                 if (!this.wingmanGroup) return;
-                const showWingman = this.wingmanEnabled && (game.gameMode !== 'range');
+                const showWingman = this.wingmanEnabled && (game.gameMode !== 'range') && (game.gameMode !== 'match');
                 if (this.wingmanGroup.visible !== showWingman) {
                     this.wingmanGroup.visible = showWingman;
                 }
