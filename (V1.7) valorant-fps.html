@@ -8300,6 +8300,7 @@
             createMap();
             buildMapBatches();
             mapHiDetail.onMapBuilt();
+            enemyTactics.build();
 
             collisionIndex.cells.clear();
             collisionIndex.revision++;
@@ -10356,6 +10357,260 @@
             return hitWall;
         }
 
+        // =============================================
+        // V1.7 Smarter bots: cover, peeking, pair flanking
+        // =============================================
+        // Cover points are generated per map from the box pieces tall enough to hide
+        // behind (>= 1.6 m): spots 0.95 m out from each face, every ~3 m along it.
+        // In close combat each bot runs a small state machine on top of the existing
+        // strafe-and-shoot behaviour:
+        //   engage  -> (hurt, hit twice quickly, partner just died, or time to
+        //               reposition) -> toCover -> cover -> peek -> cover ... -> engage
+        //   engage  -> (odd slot of a pair, partner has sight) -> flank -> engage
+        // Bots in a pair (slots 0/1, 2/3, ...) cross-fire: one holds and peeks while
+        // the other swings wide round the player. Everything uses the existing
+        // collision and wall line-of-sight checks, so bots still never shoot
+        // through walls.
+        const _tacHead = new THREE.Vector3();
+        const _tacEye = new THREE.Vector3();
+        const enemyTactics = {
+            covers: [],
+            owner: new Map(),   // cover index -> enemy holding it
+
+            build: function () {
+                this.covers.length = 0;
+                this.owner.clear();
+                const blocked = (x, z) => {
+                    if (Math.abs(x) > 47 || Math.abs(z) > 47) return true;
+                    for (const p of mapPieces) {
+                        const b = p.bounds;
+                        if (b.min.y > 1.2) continue;
+                        if (p.shape === 'cylinder') {
+                            const r = p.scaleX + 0.7;
+                            if ((x - p.x) * (x - p.x) + (z - p.z) * (z - p.z) < r * r) return true;
+                        } else if (x > b.min.x - 0.7 && x < b.max.x + 0.7 && z > b.min.z - 0.7 && z < b.max.z + 0.7) return true;
+                    }
+                    return false;
+                };
+                for (const p of mapPieces) {
+                    if (p.shape !== 'box') continue;
+                    const b = p.bounds;
+                    if (b.min.y > 0.3 || b.max.y < 1.6) continue;
+                    const sx = b.max.x - b.min.x, sz = b.max.z - b.min.z;
+                    if (Math.max(sx, sz) >= 90) continue; // perimeter walls
+                    const faces = [
+                        { nx: 1, nz: 0, x: b.max.x, z0: b.min.z, z1: b.max.z },
+                        { nx: -1, nz: 0, x: b.min.x, z0: b.min.z, z1: b.max.z },
+                        { nx: 0, nz: 1, z: b.max.z, x0: b.min.x, x1: b.max.x },
+                        { nx: 0, nz: -1, z: b.min.z, x0: b.min.x, x1: b.max.x }
+                    ];
+                    for (const f of faces) {
+                        const alongX = f.nz !== 0;
+                        const a0 = alongX ? f.x0 : f.z0, a1 = alongX ? f.x1 : f.z1;
+                        const len = a1 - a0;
+                        const n = Math.max(1, Math.round(len / 3));
+                        for (let k = 0; k < n; k++) {
+                            const a = a0 + len * (k + 0.5) / n;
+                            const x = alongX ? a : f.x + f.nx * 0.95;
+                            const z = alongX ? f.z + f.nz * 0.95 : a;
+                            if (blocked(x, z)) continue;
+                            // Tangent along the face, and how far each face end is from here
+                            this.covers.push({
+                                x, z, nx: f.nx, nz: f.nz,
+                                tx: alongX ? 1 : 0, tz: alongX ? 0 : 1,
+                                endPos: a1 - a, endNeg: a - a0
+                            });
+                        }
+                    }
+                }
+            },
+
+            release: function (enemy) {
+                if (enemy.coverIdx >= 0 && this.owner.get(enemy.coverIdx) === enemy) this.owner.delete(enemy.coverIdx);
+                enemy.coverIdx = -1;
+            },
+
+            reset: function (enemy) {
+                this.release(enemy);
+                enemy.aiState = 'engage';
+                enemy.aiUntil = 0;
+                enemy.peeks = 0;
+                enemy.recentHits = 0;
+                enemy.lastHitAt = 0;
+                enemy.forceCover = false;
+                const now = performance.now();
+                enemy.nextCoverAllowed = now + 1500;
+                enemy.repositionAt = now + 3000 + Math.random() * 2500;
+                enemy.nextFlankAt = now + 2000 + Math.random() * 3000;
+            },
+
+            // Hidden from the player at standing head height?
+            _hidden: function (x, z, player, scaleY) {
+                _tacHead.set(x, 1.38 * scaleY, z);
+                _tacEye.set(player.x, player.y - 0.18, player.z);
+                const d = _tacHead.distanceTo(_tacEye);
+                return !agentSystem.hasWallLineOfSight(_tacHead, _tacEye, d);
+            },
+
+            _pickCover: function (enemy, pos, player, scaleY) {
+                const cands = [];
+                for (let i = 0; i < this.covers.length; i++) {
+                    const c = this.covers[i];
+                    const holder = this.owner.get(i);
+                    if (holder && holder !== enemy) continue;
+                    const de = Math.hypot(c.x - pos.x, c.z - pos.z);
+                    if (de > 12) continue;
+                    const px = player.x - c.x, pz = player.z - c.z;
+                    const dp = Math.hypot(px, pz);
+                    if (dp < 6 || dp > 26) continue;
+                    // The piece must sit between this spot and the player
+                    if ((px * c.nx + pz * c.nz) / dp > -0.35) continue;
+                    // Do not run toward the player to reach it
+                    const toward = ((c.x - pos.x) * (player.x - pos.x) + (c.z - pos.z) * (player.z - pos.z)) / Math.max(0.01, de * Math.hypot(player.x - pos.x, player.z - pos.z));
+                    if (de > 3 && toward > 0.6) continue;
+                    cands.push({ i, score: de + Math.abs(dp - 13) * 0.35 });
+                }
+                cands.sort((a, b) => a.score - b.score);
+                for (let k = 0; k < Math.min(4, cands.length); k++) {
+                    const c = this.covers[cands[k].i];
+                    if (this._hidden(c.x, c.z, player, scaleY)) return cands[k].i;
+                }
+                return -1;
+            },
+
+            // Step past the nearer face end until the player is visible
+            _pickPeek: function (enemy, player, scaleY) {
+                const c = this.covers[enemy.coverIdx];
+                if (!c) return null;
+                const sides = c.endPos < c.endNeg ? [1, -1] : [-1, 1];
+                for (const s of sides) {
+                    const reach = (s > 0 ? c.endPos : c.endNeg) + 0.85;
+                    if (reach > 4.5) continue;
+                    const x = c.x + c.tx * s * reach, z = c.z + c.tz * s * reach;
+                    if (!this._hidden(x, z, player, scaleY)) return { x, z };
+                }
+                return null;
+            },
+
+            _moveToward: function (pos, x, z, step) {
+                const dx = x - pos.x, dz = z - pos.z;
+                const d = Math.hypot(dx, dz);
+                if (d <= step) { pos.x = x; pos.z = z; return 0; }
+                pos.x += dx / d * step;
+                pos.z += dz / d * step;
+                return d - step;
+            },
+
+            onHit: function (enemy, now) {
+                enemy.recentHits = (now - (enemy.lastHitAt || 0) < 1500) ? (enemy.recentHits || 0) + 1 : 1;
+                enemy.lastHitAt = now;
+            },
+
+            onKilled: function (enemy) {
+                this.release(enemy);
+                const partner = enemyObjects[enemy.slot ^ 1];
+                if (partner && partner.isActive && !partner.hit) partner.forceCover = true;
+            },
+
+            // Returns true when this tick's movement was decided here
+            step: function (enemy, pos, player, dist, perfNow, speedMult, scaleY) {
+                if (enemy.aiState === undefined) this.reset(enemy);
+                const st = enemy.aiState;
+                if (st === 'engage') {
+                    const hurt = enemy.health / Math.max(1, enemy.maxHealth) < 0.5;
+                    const want = enemy.forceCover || enemy.recentHits >= 2 ||
+                        (perfNow >= enemy.nextCoverAllowed && (hurt || perfNow >= enemy.repositionAt));
+                    if (want) {
+                        enemy.forceCover = false;
+                        enemy.recentHits = 0;
+                        const idx = this._pickCover(enemy, pos, player, scaleY);
+                        if (idx >= 0) {
+                            this.release(enemy);
+                            enemy.coverIdx = idx;
+                            this.owner.set(idx, enemy);
+                            enemy.aiState = 'toCover';
+                            enemy.aiUntil = perfNow + 3500;
+                            enemy.peeks = 0;
+                            return true;
+                        }
+                        enemy.nextCoverAllowed = perfNow + 2500;
+                        enemy.repositionAt = perfNow + 4000 + Math.random() * 2000;
+                    }
+                    // Odd slot of a pair: swing wide while the partner holds the player's attention
+                    const partner = enemyObjects[enemy.slot ^ 1];
+                    if ((enemy.slot & 1) && partner && partner.isActive && !partner.hit && partner.hasSight &&
+                        perfNow >= enemy.nextFlankAt && dist > 7 && dist < 22) {
+                        const ax = pos.x - player.x, az = pos.z - player.z;
+                        const base = Math.atan2(ax, az);
+                        // Rotate 70 degrees round the player, away from the partner's side
+                        const pAng = Math.atan2(partner.mesh.position.x - player.x, partner.mesh.position.z - player.z);
+                        let side = Math.sin(base - pAng) >= 0 ? 1 : -1;
+                        const r = Math.min(13, Math.max(8, dist));
+                        let tx = player.x + Math.sin(base + side * 1.22) * r, tz = player.z + Math.cos(base + side * 1.22) * r;
+                        tx = Math.max(-46, Math.min(46, tx));
+                        tz = Math.max(-46, Math.min(46, tz));
+                        enemy.flankX = tx;
+                        enemy.flankZ = tz;
+                        enemy.aiState = 'flank';
+                        enemy.aiUntil = perfNow + 4000;
+                        return true;
+                    }
+                    return false;
+                }
+                if (st === 'toCover') {
+                    const c = this.covers[enemy.coverIdx];
+                    if (!c || perfNow > enemy.aiUntil) { this.release(enemy); enemy.aiState = 'engage'; enemy.nextCoverAllowed = perfNow + 3000; return false; }
+                    if (this._moveToward(pos, c.x, c.z, 0.065 * speedMult) < 0.3) {
+                        enemy.aiState = 'cover';
+                        enemy.aiUntil = perfNow + 900 + Math.random() * 900;
+                    }
+                    return true;
+                }
+                if (st === 'cover') {
+                    const c = this.covers[enemy.coverIdx];
+                    if (!c) { enemy.aiState = 'engage'; return false; }
+                    this._moveToward(pos, c.x, c.z, 0.03);
+                    // The player walked round the cover: fight from here
+                    if (enemy.hasSight || perfNow >= enemy.aiUntil) {
+                        const peek = enemy.hasSight ? { x: pos.x, z: pos.z } : this._pickPeek(enemy, player, scaleY);
+                        if (peek && enemy.peeks < 3) {
+                            enemy.peekX = peek.x;
+                            enemy.peekZ = peek.z;
+                            enemy.peeks++;
+                            enemy.aiState = 'peek';
+                            enemy.aiUntil = perfNow + 1100 + Math.random() * 700;
+                        } else {
+                            // No angle left (or peeked enough): push out and fight
+                            this.release(enemy);
+                            enemy.aiState = 'engage';
+                            enemy.nextCoverAllowed = perfNow + 6000;
+                            enemy.repositionAt = perfNow + 6000 + Math.random() * 3000;
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                if (st === 'peek') {
+                    this._moveToward(pos, enemy.peekX, enemy.peekZ, 0.07 * speedMult);
+                    if (perfNow >= enemy.aiUntil) {
+                        enemy.aiState = 'toCover';
+                        enemy.aiUntil = perfNow + 2500;
+                    }
+                    return true;
+                }
+                if (st === 'flank') {
+                    if (this._moveToward(pos, enemy.flankX, enemy.flankZ, 0.068 * speedMult) < 0.5 || perfNow > enemy.aiUntil) {
+                        enemy.aiState = 'engage';
+                        enemy.nextFlankAt = perfNow + 7000 + Math.random() * 4000;
+                        return false;
+                    }
+                    return true;
+                }
+                enemy.aiState = 'engage';
+                return false;
+            }
+        };
+
         function createEnemyActor(defaultArchetype = 'standard') {
             const T = actorTemplates;
             const group = new THREE.Group();
@@ -10829,6 +11084,7 @@
             actor.animAmt = 0;
             actor.animFlinch = 0;
             actor.animRecoil = 0;
+            enemyTactics.reset(actor);
             restoreRestAppearance(actor);
             group.visible = true;
             actor.poseDirty = true;
@@ -14059,6 +14315,7 @@
                     }
                 }
                 agentSystem.onActorEliminated('enemy', enemy.mesh.position);
+                enemyTactics.onKilled(enemy);
                 return true;
             } else {
                 // V1.7: body/armour hit sound (headshots already ding) + controller rumble
@@ -14066,6 +14323,7 @@
                 gamepadController.rumble(isHeadshot ? 0.45 : 0.15, isHeadshot ? 0.85 : 0.4, isHeadshot ? 70 : 40);
                 const flashColor = isHeadshot ? 0xff2a4b : (armorAbsorbed > 0 ? 0x38f6ff : (isLegshot ? 0x94a3b8 : 0xffaa00));
                 enemy.animFlinch = isHeadshot ? 1 : (isLegshot ? 0.35 : 0.7);
+                enemyTactics.onHit(enemy, performance.now());
                 for (let j = 0; j < enemy.leaves.length; j++) {
                     enemy.leaves[j].material.color.set(flashColor).convertSRGBToLinear();
                     enemy.flashUntil[j] = effectNow + ACTOR_FLASH_MS;
@@ -33329,13 +33587,20 @@
                         tacticalDirector.tryCastBotAbility(enemy, perfNow, distanceToPlayer, nx, nz, perpX, perpZ);
                     }
 
-                    if (enemy.hasSight) {
-                        // Only fire when enemy has verified clear Line-of-Sight (never through walls!)
-                        if (now - enemy.lastShot > enemy.shotDelay * diffShotDelayMult) {
-                            enemy.lastShot = now;
-                            enemyShoot(enemy);
-                        }
+                    // V1.7 cover / peek / pair-flank decisions (skipped while rushing a planted spike)
+                    const tactic = (!postPlantDefuseGoal || enemy.hasSight) &&
+                        enemyTactics.step(enemy, pos, playerPosition, distanceToPlayer, perfNow, speedMult, arch.scaleY || 1);
 
+                    // Only fire when enemy has verified clear Line-of-Sight (never through walls!),
+                    // and not while sprinting for cover
+                    if (enemy.hasSight && enemy.aiState !== 'toCover' && now - enemy.lastShot > enemy.shotDelay * diffShotDelayMult) {
+                        enemy.lastShot = now;
+                        enemyShoot(enemy);
+                    }
+
+                    if (tactic) {
+                        // Movement already decided by enemyTactics this tick
+                    } else if (enemy.hasSight) {
                         // Tactical lateral strafing while keeping archetype's preferred combat range
                         pos.x += perpX * strafeStep;
                         pos.z += perpZ * strafeStep;
@@ -33374,6 +33639,7 @@
                     const gdz = goalZ - pos.z;
                     const distToGoal = Math.hypot(gdx, gdz) || 0.001;
                     enemy.hasSight = false;
+                    if (enemy.aiState && enemy.aiState !== 'engage') { enemyTactics.release(enemy); enemy.aiState = 'engage'; }
                     if (enemy.tier !== 'medium') {
                         enemy.tier = 'medium';
                         enemy.nextDecisionAt = time - (enemy.slot % 4) * (ENEMY_MEDIUM_DECISION_MS / 4);
@@ -36841,6 +37107,7 @@
             createMap();
             buildMapBatches();
             mapHiDetail.onMapBuilt();
+            enemyTactics.build();
             
             // Create weapons
             createWeapons();
