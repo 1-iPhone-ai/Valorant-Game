@@ -9899,8 +9899,71 @@
         let enemyPagesLive = 0;
         const _enemyInstanceColor = new THREE.Color();
         
+        // V1.7 bot animation, done in the vertex shader so the batched (instanced)
+        // bots stay one draw per part. Per instance, instanceAnim = (walk phase,
+        // walk amount, flinch, recoil). Legs swing about the hips, the left arm
+        // swings against the left leg (the right arm holds the rifle), the upper body
+        // bobs with each step and leans back on a hit, and the rifle kicks back on a
+        // shot. Only the drawn shape moves: hit proxies (the actor leaves) are untouched.
+        // uSplitLegs/uArmSwing switch limbs off for shapes where they are not separate.
+        const enemyAnimUniforms = {
+            uSplitLegs: { value: 0 },
+            uArmSwing: { value: 0 }
+        };
+        function syncEnemyAnimUniforms() {
+            const detailed = typeof characterDetail !== 'undefined' && characterDetail.enabled;
+            enemyAnimUniforms.uSplitLegs.value = (CONTENT.detailedModels || detailed) ? 1 : 0;
+            enemyAnimUniforms.uArmSwing.value = detailed ? 1 : 0;
+        }
+        function installEnemyAnimation(material, partIndex) {
+            const uPart = { value: partIndex };
+            material.onBeforeCompile = (shader) => {
+                shader.uniforms.uPart = uPart;
+                shader.uniforms.uSplitLegs = enemyAnimUniforms.uSplitLegs;
+                shader.uniforms.uArmSwing = enemyAnimUniforms.uArmSwing;
+                shader.vertexShader = shader.vertexShader
+                    .replace('#include <common>', `#include <common>
+                        attribute vec4 instanceAnim;
+                        uniform float uPart; uniform float uSplitLegs; uniform float uArmSwing;
+                        vec3 animRotX(vec3 p, float a, float py) {
+                            float c = cos(a), s = sin(a);
+                            p.y -= py;
+                            return vec3(p.x, c * p.y - s * p.z + py, s * p.y + c * p.z);
+                        }
+                        // x: limb angle, y: limb pivot height, z: lean angle, w: upper-body weight
+                        vec4 enemyAnimParams(vec3 p) {
+                            float sw = sin(instanceAnim.x) * instanceAnim.y;
+                            float side = p.x >= 0.0 ? 1.0 : -1.0;
+                            float isLegs = step(1.5, uPart) * step(uPart, 2.5);
+                            float isGear = step(2.5, uPart);
+                            float limb = 0.0, pivot = 0.0;
+                            if (isLegs > 0.5 || (isGear > 0.5 && p.y < 0.26 && abs(p.x) < 0.45)) {
+                                limb = sw * 0.5 * side * uSplitLegs; pivot = 0.86;
+                            } else if ((uPart < 0.5 || isGear > 0.5) && p.x < -0.47 && p.y > 0.55 && p.y < 1.46) {
+                                limb = sw * 0.45 * uArmSwing; pivot = 1.52;
+                            }
+                            float upper = smoothstep(0.8, 1.15, p.y) * (1.0 - isLegs);
+                            return vec4(limb, pivot, instanceAnim.z * 0.26 * upper, upper);
+                        }`)
+                    .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+                        vec4 eAnim = enemyAnimParams(position);
+                        objectNormal = animRotX(animRotX(objectNormal, eAnim.x, 0.0), eAnim.z, 0.0);`)
+                    .replace('#include <begin_vertex>', `#include <begin_vertex>
+                        transformed = animRotX(transformed, eAnim.x, eAnim.y);
+                        // Recoil: the rifle (and, on separate-limb shapes, the right arm) kicks back
+                        if (position.x > 0.42 && position.y > 0.6 && position.y < 1.4) {
+                            if (uPart > 2.5) transformed.z += instanceAnim.w * 0.09;
+                            else if (uPart < 0.5) transformed.z += instanceAnim.w * 0.05 * uArmSwing;
+                        }
+                        transformed.y += abs(sin(instanceAnim.x)) * 0.035 * instanceAnim.y * eAnim.w;
+                        transformed = animRotX(transformed, eAnim.z, 0.9);`);
+            };
+            material.customProgramCacheKey = () => 'enemyAnim';
+        }
+        
         function initEnemyBatches() {
             const T = actorTemplates;
+            syncEnemyAnimUniforms();
             enemyPartSpecs.length = 0;
             enemyPartMaterials.length = 0;
             enemyPartSpecs.push(
@@ -9912,9 +9975,11 @@
                 enemyPartSpecs.push({ name: 'weapon', geometry: T.enemyWeapon, color: 0x222222 });
             }
             for (let p = 0; p < enemyPartSpecs.length; p++) {
-                enemyPartMaterials.push(new THREE.MeshStandardMaterial({
+                const material = new THREE.MeshStandardMaterial({
                     color: 0xffffff, roughness: 0.5, metalness: 0.3
-                }));
+                });
+                installEnemyAnimation(material, p);
+                enemyPartMaterials.push(material);
             }
         }
         
@@ -9942,6 +10007,9 @@
                 for (const name in spec.geometry.attributes) {
                     geometry.setAttribute(name, spec.geometry.attributes[name]);
                 }
+                const anim = new THREE.InstancedBufferAttribute(new Float32Array(ENEMY_PAGE_CAP * 4), 4);
+                anim.setUsage(THREE.DynamicDrawUsage);
+                geometry.setAttribute('instanceAnim', anim);
                 const mesh = new THREE.InstancedMesh(geometry, enemyPartMaterials[p], ENEMY_PAGE_CAP);
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
@@ -9968,7 +10036,7 @@
                 const geom = mesh.geometry;
                 const keep = [];
                 for (const name in geom.attributes) {
-                    if (name !== 'instanceMatrix' && name !== 'instanceColor') keep.push(name);
+                    if (name !== 'instanceMatrix' && name !== 'instanceColor' && name !== 'instanceAnim') keep.push(name);
                 }
                 for (let i = 0; i < keep.length; i++) geom.deleteAttribute(keep[i]);
                 geom.setIndex(null);
@@ -10103,6 +10171,7 @@
                         for (let p = 0; p < parts; p++) {
                             if (writeMatrix) {
                                 meshes[p].setMatrixAt(s, leaves[p].matrixWorld);
+                                meshes[p].geometry.attributes.instanceAnim.setXYZW(s, enemy.animPhase || 0, enemy.animAmt || 0, enemy.animFlinch || 0, enemy.animRecoil || 0);
                                 perfTelemetry.enemyMatrixWrites++;
                             }
                             if (writeColor) {
@@ -10122,6 +10191,7 @@
                         if (n === 0) continue;
                         if (matrixHi >= matrixLo) {
                             perfTelemetry.requestUpload(mesh.instanceMatrix, matrixLo * 16, (matrixHi - matrixLo + 1) * 16);
+                            perfTelemetry.requestUpload(mesh.geometry.attributes.instanceAnim, matrixLo * 4, (matrixHi - matrixLo + 1) * 4);
                         }
                         if (mesh.instanceColor && colorHi >= colorLo) {
                             perfTelemetry.requestUpload(mesh.instanceColor, colorLo * 3, (colorHi - colorLo + 1) * 3);
@@ -10298,6 +10368,8 @@
                 group.add(mesh);
             }
             group.visible = false;
+            // Yaw outermost, so the death topple (rotation.x) falls relative to facing
+            group.rotation.order = 'YXZ';
             
             const leaves = group.children.slice();
             const actor = {
@@ -10671,6 +10743,7 @@
                     for (const chunk of enemyChunks.values()) for (const page of chunk.pages) if (page.meshes[p]) swap(page.meshes[p]);
                     for (const page of enemyPageFree) if (page.meshes[p]) swap(page.meshes[p]);
                 }
+                syncEnemyAnimUniforms();
                 for (const s of this.gunSwaps) s.mesh.geometry = on ? s.detailed : s.simple;
                 for (const kit of this.kits) kit.visible = on;
                 for (const w of this.wingmanKits) {
@@ -10681,6 +10754,18 @@
             }
         };
 
+        // Rest colours of an enemy's parts [torso, head, legs, weapon] for its archetype,
+        // with the Enemy Highlight Color override on torso and head. Shared by spawning
+        // and by the settings change, so both always agree.
+        function enemyPartPalette(arch) {
+            const mode = (game.userSettings && game.userSettings.enemyHighlightColor) || 'red';
+            const c = (arch && arch.colors) || ENEMY_ARCHETYPES.standard.colors;
+            let torso = c.torso, head = c.head;
+            if (mode === 'yellow') { torso = 0xd97706; head = 0xffd166; }
+            else if (mode === 'purple') { torso = 0x7e22ce; head = 0xe879f9; }
+            return [torso, head, c.legs, c.weapon];
+        }
+        
         // (Re)activate an enemy with a complete state reset & archetype specialization
         function activateEnemy(actor, x, y, z, archetypeOverride) {
             actor.generation++;
@@ -10720,19 +10805,9 @@
             actor.slowedUntil = 0;
 
             // Update rest colors for this archetype (Torso=0, Head=1, Legs=2, Weapon=3) + Enemy Highlight Color override
-            const hlMode = (game.userSettings && game.userSettings.enemyHighlightColor) || 'red';
-            let torsoCol = arch.colors.torso;
-            let headCol = arch.colors.head;
-            if (hlMode === 'yellow') {
-                torsoCol = 0xd97706;
-                headCol = 0xffd166;
-            } else if (hlMode === 'purple') {
-                torsoCol = 0x7e22ce;
-                headCol = 0xe879f9;
-            }
-            const palette = [torsoCol, headCol, arch.colors.legs, arch.colors.weapon];
+            const palette = enemyPartPalette(arch);
             for (let i = 0; i < actor.rest.length; i++) {
-                const hex = palette[i] !== undefined ? palette[i] : torsoCol;
+                const hex = palette[i] !== undefined ? palette[i] : palette[0];
                 actor.rest[i].color.setHex(hex).convertSRGBToLinear();
             }
             
@@ -10748,6 +10823,12 @@
 
             // Face the center (0,0,0)
             group.rotation.set(0, Math.atan2(-group.position.x, -group.position.z), 0);
+            actor.animX = group.position.x;
+            actor.animZ = group.position.z;
+            actor.animPhase = 0;
+            actor.animAmt = 0;
+            actor.animFlinch = 0;
+            actor.animRecoil = 0;
             restoreRestAppearance(actor);
             group.visible = true;
             actor.poseDirty = true;
@@ -13984,6 +14065,7 @@
                 if (!isHeadshot) soundFX.hitTick(armorAbsorbed > 0);
                 gamepadController.rumble(isHeadshot ? 0.45 : 0.15, isHeadshot ? 0.85 : 0.4, isHeadshot ? 70 : 40);
                 const flashColor = isHeadshot ? 0xff2a4b : (armorAbsorbed > 0 ? 0x38f6ff : (isLegshot ? 0x94a3b8 : 0xffaa00));
+                enemy.animFlinch = isHeadshot ? 1 : (isLegshot ? 0.35 : 0.7);
                 for (let j = 0; j < enemy.leaves.length; j++) {
                     enemy.leaves[j].material.color.set(flashColor).convertSRGBToLinear();
                     enemy.flashUntil[j] = effectNow + ACTOR_FLASH_MS;
@@ -32687,6 +32769,38 @@
         // Per-frame steps, identical to the old requestAnimationFrame chains
         function stepActorAnimation(anim) {
             const mesh = anim.actor.mesh;
+            if (anim.kind === 'topple') {
+                // Fixed 60 Hz simulation tick. Falls like a toppled post (faster as it
+                // tips), lands with a small bounce, lies for a moment, then sinks.
+                const dt = 1 / 60;
+                const LIE = 1.42;
+                if (anim.t === undefined) { anim.t = 0; anim.angle = 0; anim.vel = 0.6; anim.baseY = mesh.position.y; anim.lieT = -1; }
+                anim.t += dt;
+                const oldY = mesh.position.y;
+                if (anim.lieT < 0) {
+                    anim.vel += (9.8 * Math.sin(anim.angle) + 1.2) * dt;
+                    anim.angle += anim.vel * dt;
+                    if (anim.angle >= LIE) {
+                        anim.angle = LIE;
+                        anim.vel = -anim.vel * 0.22;
+                        if (Math.abs(anim.vel) < 0.35) anim.lieT = anim.t;
+                    }
+                    mesh.rotation.z = anim.rotationSpeed * Math.min(1, anim.angle / LIE);
+                } else if (anim.t - anim.lieT > 0.9) {
+                    anim.baseY -= 1.4 * dt;
+                }
+                mesh.rotation.x = anim.angle;
+                // Lift by the torso's half-depth so the back rests on the floor
+                mesh.position.y = anim.baseY + 0.3 * Math.sin(anim.angle);
+                anim.done = anim.baseY < -1.2 || anim.t > 4;
+                anim.actor.poseDirty = true;
+                shadowManager.markMotion(mesh.position.x, mesh.position.y, mesh.position.z, anim.actor.boundRadius, mesh.position.x, oldY, mesh.position.z);
+                if (anim.done) {
+                    anim.actor.renderActive = false;
+                    setCasterVisible(mesh, false, true);
+                }
+                return;
+            }
             if (anim.kind === 'fall') {
                 anim.fallSpeed += 0.01;
                 mesh.position.y -= anim.fallSpeed;
@@ -32745,8 +32859,39 @@
         
         // Animate enemy death
         function animateEnemyDeath(enemy) {
-            // Make enemy fall to the ground
-            startActorAnimation(enemy, 'fall', Math.random() * 0.05 - 0.025);
+            // V1.7: topple backwards onto the floor, lie there, then sink away
+            // (used to drop straight through the floor in under a second)
+            startActorAnimation(enemy, 'topple', (Math.random() - 0.5) * 0.5);
+        }
+        
+        // Per-tick walk/flinch/recoil state for the vertex-shader animation. Walk phase
+        // follows distance actually moved (one leg cycle per ENEMY_STRIDE metres), so
+        // feet match speed at any frame rate. Teleports and respawns are not steps.
+        const ENEMY_STRIDE = 1.7;
+        function updateEnemyAnimation(dt) {
+            for (let i = 0; i < enemyObjects.length; i++) {
+                const e = enemyObjects[i];
+                if (!e.renderActive) continue;
+                const pos = e.mesh.position;
+                if (e.animX === undefined) { e.animX = pos.x; e.animZ = pos.z; }
+                const d = Math.hypot(pos.x - e.animX, pos.z - e.animZ);
+                e.animX = pos.x;
+                e.animZ = pos.z;
+                const step = (e.hit || d > 2) ? 0 : d;
+                const p0 = e.animPhase || 0, a0 = e.animAmt || 0, f0 = e.animFlinch || 0, r0 = e.animRecoil || 0;
+                const target = Math.min(1, (step / Math.max(dt, 1e-4)) / 3.2);
+                let amt = a0 + (target - a0) * Math.min(1, dt * 10);
+                if (amt < 0.002) amt = 0;
+                let flinch = f0 * Math.exp(-dt * 7);
+                if (flinch < 0.002) flinch = 0;
+                let recoil = r0 * Math.exp(-dt * 16);
+                if (recoil < 0.002) recoil = 0;
+                e.animPhase = (p0 + step / ENEMY_STRIDE * Math.PI * 2) % (Math.PI * 2);
+                e.animAmt = amt;
+                e.animFlinch = flinch;
+                e.animRecoil = recoil;
+                if (e.animPhase !== p0 || amt !== a0 || flinch !== f0 || recoil !== r0) e.poseDirty = true;
+            }
         }
         
         // Restore hit-flash colors once their 100 ms have passed
@@ -33317,6 +33462,7 @@
 
             const arch = enemy.archetypeDef || ENEMY_ARCHETYPES[enemy.archetype] || ENEMY_ARCHETYPES.standard;
             const scaleY = arch.scaleY || 1.0;
+            enemy.animRecoil = 1;
 
             // Target the player's upper torso/head height
             const targetX = characterController.position.x;
@@ -33411,6 +33557,7 @@
             agentSystem.stepSimulation(dt, timeMs);
             updateEnemies(timeMs, dt);
             stepActorAnimations();
+            updateEnemyAnimation(dt);
             const hitEffects = objectPools.hitEffects;
             for (let i = 0; i < hitEffects.length; i++) {
                 if (hitEffects[i].inUse) stepHitEffect(hitEffects[i]);
@@ -34751,23 +34898,18 @@
                 if (tabId === 'crosshair') this.drawCrosshairPreview();
             },
 
+            // V1.7 fix: this read arch.torsoColor / arch.headColor, which do not exist,
+            // so every bot spawned before a respawn was drawn pure black (torso and head).
             applyEnemyHighlightColor: function() {
-                const mode = (game.userSettings && game.userSettings.enemyHighlightColor) || 'red';
-                const hlTorso = mode === 'yellow' ? 0xeab308 : (mode === 'purple' ? 0xc026d3 : null);
-                const hlHead = mode === 'yellow' ? 0xfef08a : (mode === 'purple' ? 0xf0abfc : null);
-
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const enemy = enemyObjects[i];
                     const arch = enemy.archetypeDef || ENEMY_ARCHETYPES[enemy.archetype] || ENEMY_ARCHETYPES.standard;
-                    const torsoCol = hlTorso !== null ? hlTorso : arch.torsoColor;
-                    const headCol = hlHead !== null ? hlHead : arch.headColor;
-                    if (enemy.rest && enemy.rest[0]) {
-                        enemy.rest[0].color.setHex(torsoCol).convertSRGBToLinear();
-                        enemy.leaves[0].material.color.setHex(torsoCol).convertSRGBToLinear();
-                    }
-                    if (enemy.rest && enemy.rest[1]) {
-                        enemy.rest[1].color.setHex(headCol).convertSRGBToLinear();
-                        enemy.leaves[1].material.color.setHex(headCol).convertSRGBToLinear();
+                    const palette = enemyPartPalette(arch);
+                    for (let p = 0; p < 2; p++) {
+                        if (!enemy.rest || !enemy.rest[p]) continue;
+                        enemy.rest[p].color.setHex(palette[p]).convertSRGBToLinear();
+                        // Leave a running hit flash alone; it restores to the new rest colour
+                        if (!enemy.flashUntil[p]) enemy.leaves[p].material.color.copy(enemy.rest[p].color);
                     }
                     enemy.colorDirty = true;
                 }
