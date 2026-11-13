@@ -75,3 +75,50 @@ test('settings are remembered across reloads by default, and the opt-out sticks'
     assert.match(after.label, /OFF/);
     assert.deepEqual(errors, []);
 });
+
+// V1.7 HUD Size: every panel scales together, nothing overlaps or leaves the
+// window at any size, and the size is capped on small windows
+const PANELS = ['#minimap-container', '#tactical-top-bar', '#fps-display', '#quality-toggle', '#fps-sparkline-widget',
+    '#controls-hint-box', '#ability-bar', '#agent-switcher-bar', '.vitals-panel', '.ammo-display', '.score', '#kill-feed'];
+test('HUD Size 80-130%: panels scale together with no overlaps at 1280x720, 1920x1080 and 1024x600', { timeout: 600000 }, async () => {
+    for (const [w, h] of [[1280, 720], [1920, 1080], [1024, 600]]) {
+        const { page, errors, evaluate } = await boot({ viewport: { width: w, height: h } });
+        // Show the help panel so it is checked too
+        await evaluate(() => controlsHelp.set(true));
+        for (const pct of [80, 100, 130]) {
+            const r = await evaluate(([pct, PANELS]) => {
+                const el = document.getElementById('setting-hud-scale');
+                el.value = pct;
+                el.dispatchEvent(new Event('input'));
+                const rects = {};
+                for (const q of PANELS) {
+                    const node = document.querySelector(q);
+                    if (!node) continue;
+                    const cs = getComputedStyle(node);
+                    const b = node.getBoundingClientRect();
+                    if (b.width === 0 || cs.display === 'none' || parseFloat(cs.opacity) < 0.05) continue;
+                    // The kill feed is empty here: reserve room for a few entries
+                    rects[q] = q === '#kill-feed' ? { left: b.left, right: b.right, top: b.top, bottom: b.top + 120 } : b;
+                }
+                const keys = Object.keys(rects), overlaps = [];
+                for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
+                    const a = rects[keys[i]], b = rects[keys[j]];
+                    if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) overlaps.push(`${keys[i]} x ${keys[j]}`);
+                }
+                const offscreen = keys.filter((k) => rects[k].left < -1 || rects[k].top < -1 || rects[k].right > innerWidth + 1 || rects[k].bottom > innerHeight + 1);
+                return {
+                    overlaps, offscreen, scale: hudScale.value(),
+                    minimap: document.getElementById('minimap-container').getBoundingClientRect().width,
+                    saved: JSON.parse(localStorage.getItem('valorant_v16_user_settings') || '{}').hudScale
+                };
+            }, [pct, PANELS]);
+            const tag = `${w}x${h} @ ${pct}%`;
+            assert.deepEqual(r.overlaps, [], `${tag}: no overlapping panels`);
+            assert.deepEqual(r.offscreen, [], `${tag}: everything on screen`);
+            assert.ok(Math.abs(r.minimap - 186 * r.scale) < 2, `${tag}: minimap scaled to ${r.scale}`);
+            assert.ok(r.scale <= pct / 100 + 1e-9 && r.scale >= 0.8, `${tag}: scale ${r.scale} within the chosen size`);
+            assert.equal(r.saved, pct, `${tag}: saved`);
+        }
+        assert.deepEqual(errors, []);
+    }
+});
