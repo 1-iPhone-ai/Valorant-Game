@@ -12275,6 +12275,7 @@
                 } else {
                     this.timer = setTimeout(() => this.set(false), this.AUTO_HIDE_MS);
                 }
+                this.startedExpanded = this.expanded;
                 this.sync();
             },
             set: function(expanded) {
