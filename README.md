@@ -22,6 +22,7 @@ The `tests/` folder holds headless browser tests. They need no GPU, because Chro
 - **HUD and settings:** the HUD has no overlapping panels at common window sizes, and settings survive a reload (and the opt-out sticks).
 - **Audio and hit feedback:** 3D enemy audio and hit feedback work.
 - **Viewmodel animation:** animated draw, a recoil spring that settles, reload with the magazine out and back in, inspect, and shell casings that land and clear; the gun always returns exactly to rest.
+- **Ability effects and camera shake:** ability bursts, ground rings, smokes and fire zones emit sparks, glow, smoke and embers that expire, all drawn by shaders compiled in the warm-up and switched off on Low; nearby blasts shake the view and it returns exactly, with Camera Shake off by setting and with Reduce Flashes.
 - **Cinematic quality:** the level above Ultra is never picked by Auto; its post-processing (AO, bloom, sun shafts, grading, FXAA) compiles in the warm-up, adds no shader programs when switched on, keeps the overall exposure, and turns on both High Detail settings.
 - **Match mode and death recap:** buy-phase lock, round wins and losses with economy, no respawn mid-round, plant/detonate and bot plant/defuse, halftime swap, bots routing to a site on their own, victory screen, and the death recap in Match and Wave modes.
 - **Music, ambience and HUD size:** music and ambience are off by default, play per map when switched on and fade out when switched off; HUD Size 80–130% scales every panel with no overlaps at 1280×720, 1920×1080 and 1024×600.

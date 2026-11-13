@@ -3717,6 +3717,17 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>Camera Shake</strong>
+                                    <small>A small shake from nearby explosions and blasts (always off with Reduce Flashes)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-camera-shake-pills">
+                                    <button class="settings-pill-opt active" data-camshake="on">ON</button>
+                                    <button class="settings-pill-opt" data-camshake="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Draw Distance &amp; Atmospheric Fog</strong>
                                     <small>Maximum render distance for arena geometry and targets (60m – 140m)</small>
                                 </div>
@@ -5225,6 +5236,7 @@
                 glowHalos: 'auto',     // V1.7: 'auto' (profile budget) | 'off' | 'max'
                 brightness: 100,       // V1.7: % of the atmosphere mode's exposure (70-140)
                 reduceFlashes: false,  // V1.7 accessibility: soften full-screen flashes and the low-health pulse
+                cameraShake: true,     // V1.7: subtle shake on nearby blasts (off with Reduce Flashes too)
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -12845,6 +12857,289 @@
             }
         }
         
+        // =============================================
+        // V1.7 Ability effects kit: sparks, glow, smoke, embers, dust, camera shake
+        // =============================================
+        // Shared by every agent through the helpers almost all abilities already
+        // call (spawnFlashBurst, spawnWindRing, projectile detonations, smokes,
+        // fire zones), so all 29 kits gain the same finish without per-ability
+        // rewrites. Two instanced camera-facing particle batches, one additive
+        // (sparks stretched along their velocity, glow, embers) and one alpha-blended
+        // (procedural billowing smoke and dust): two draw calls in total, both
+        // compiled in the warm-up. The simulation is plain JS on pooled records.
+        const FX_KIND = { spark: 0, glow: 1, smoke: 2, ember: 3, dust: 4 };
+        const fxKit = {
+            ADD_CAP: 420,
+            SMOKE_CAP: 160,
+            add: null,
+            smoke: null,
+            parts: [],
+            smokes: [],
+            nextAdd: 0,
+            nextSmoke: 0,
+            trauma: 0,
+            shakeLast: { x: 0, y: 0, z: 0, rx: 0, ry: 0 },
+            _c: new THREE.Color(),
+            _m: new THREE.Matrix4(),
+
+            makeBatch: function (cap, additive) {
+                const geo = new THREE.PlaneGeometry(1, 1);
+                const color = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
+                const params = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); // size, alpha, stretch, kind
+                const vel = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);    // velocity xyz, seed
+                for (const a of [color, params, vel]) a.setUsage(THREE.DynamicDrawUsage);
+                geo.setAttribute('aColor', color);
+                geo.setAttribute('aParams', params);
+                geo.setAttribute('aVel', vel);
+                const mat = new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+                    toneMapped: false,
+                    uniforms: { uTime: { value: 0 } },
+                    vertexShader: `
+                        attribute vec3 aColor; attribute vec4 aParams; attribute vec4 aVel;
+                        varying vec3 vColor; varying vec2 vUv; varying float vAlpha; varying float vKind; varying float vSeed;
+                        void main() {
+                            vColor = aColor; vUv = uv; vAlpha = aParams.y; vKind = aParams.w; vSeed = aVel.w;
+                            vec4 c = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+                            vec2 q = position.xy * aParams.x;
+                            // Sparks and embers stretch along their screen-space velocity
+                            if (aParams.z > 0.0) {
+                                vec3 v = (modelViewMatrix * vec4(aVel.xyz, 0.0)).xyz;
+                                vec2 d = length(v.xy) > 1e-4 ? normalize(v.xy) : vec2(0.0, 1.0);
+                                vec2 n = vec2(d.y, -d.x);   // (a rotation, not a mirror: keeps the quad front-facing)
+                                q = d * position.y * aParams.x * (1.0 + aParams.z) + n * position.x * aParams.x * 0.6;
+                            }
+                            c.xy += q;
+                            gl_Position = projectionMatrix * c;
+                        }`,
+                    fragmentShader: `
+                        uniform float uTime;
+                        varying vec3 vColor; varying vec2 vUv; varying float vAlpha; varying float vKind; varying float vSeed;
+                        float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+                        float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+                            return mix(mix(h21(i), h21(i+vec2(1.0,0.0)), f.x), mix(h21(i+vec2(0.0,1.0)), h21(i+vec2(1.0,1.0)), f.x), f.y); }
+                        void main() {
+                            vec2 p = vUv * 2.0 - 1.0;
+                            float r = length(p);
+                            float a;
+                            vec3 col = vColor;
+                            if (vKind < 0.5 || vKind > 2.5 && vKind < 3.5) {
+                                // spark / ember: hot white core, coloured falloff
+                                // (smoothstep with edge0 > edge1 is undefined in GLSL: use 1 - smoothstep)
+                                a = 1.0 - smoothstep(0.0, 1.0, r);
+                                col = mix(vColor, vec3(1.0), (1.0 - smoothstep(0.0, 0.45, r)) * 0.8);
+                            } else if (vKind < 1.5) {
+                                a = pow(1.0 - smoothstep(0.0, 1.0, r), 2.2);        // glow
+                            } else {
+                                // smoke / dust: billowing noise, soft edge
+                                float n = vn(p * 2.3 + vSeed * 17.0 + uTime * 0.15) * 0.6 + vn(p * 4.7 - vSeed * 9.0) * 0.4;
+                                a = 1.0 - smoothstep(0.25, 1.0, r + (n - 0.5) * 0.6);
+                                col *= 0.75 + 0.5 * n;
+                            }
+                            gl_FragColor = vec4(col, a * vAlpha);
+                        }`
+                });
+                const mesh = new THREE.InstancedMesh(geo, mat, cap);
+                mesh.count = 0;
+                mesh.frustumCulled = false;
+                mesh.renderOrder = additive ? 12 : 11;
+                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                scene.add(mesh);
+                return mesh;
+            },
+
+            init: function () {
+                if (this.add) return;
+                this.add = this.makeBatch(this.ADD_CAP, true);
+                this.smoke = this.makeBatch(this.SMOKE_CAP, false);
+                for (let i = 0; i < this.ADD_CAP; i++) this.parts.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), c: new THREE.Color(), t: 0, life: 1, s0: 0, s1: 0, a0: 1, kind: 0, drag: 0, grav: 0, seed: 0 });
+                for (let i = 0; i < this.SMOKE_CAP; i++) this.smokes.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), c: new THREE.Color(), t: 0, life: 1, s0: 0, s1: 0, a0: 1, kind: 2, drag: 0, grav: 0, seed: 0 });
+            },
+
+            _emit: function (pool, kind, x, y, z, vx, vy, vz, colorHex, life, s0, s1, a0, drag, grav) {
+                const isAdd = pool === this.parts;
+                const idx = isAdd ? this.nextAdd : this.nextSmoke;
+                const r = pool[idx];
+                if (isAdd) this.nextAdd = (idx + 1) % this.ADD_CAP; else this.nextSmoke = (idx + 1) % this.SMOKE_CAP;
+                r.alive = true; r.kind = kind;
+                r.p.set(x, y, z); r.v.set(vx, vy, vz);
+                r.c.setHex(colorHex);
+                r.t = 0; r.life = life; r.s0 = s0; r.s1 = s1; r.a0 = a0; r.drag = drag; r.grav = grav;
+                r.seed = Math.random();
+                return r;
+            },
+
+            enabled: function () { return !!this.add && adaptiveSettings.currentQuality !== 'low'; },
+
+            // Explosion / flash / impact: sparks, a glow flash, smoke for big ones, shake
+            burst: function (x, y, z, colorHex, radius, opts) {
+                if (!this.enabled()) return;
+                opts = opts || {};
+                const R = Math.max(0.5, radius || 2);
+                const bright = this._bright(colorHex);
+                const n = Math.min(60, Math.round((opts.sparks !== undefined ? opts.sparks : 1) * (10 + R * 5)));
+                for (let i = 0; i < n; i++) {
+                    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const sp = (2.5 + Math.random() * 5.5) * Math.min(1.6, 0.5 + R * 0.18);
+                    this._emit(this.parts, FX_KIND.spark, x, y, z, rr * Math.cos(th) * sp, Math.abs(u) * sp * 0.9 + 1.2, rr * Math.sin(th) * sp,
+                        Math.random() < 0.3 ? 0xfff2c4 : bright, 0.35 + Math.random() * 0.4, 0.16 + Math.random() * 0.08, 0.07, 1, 1.8, 9.8);
+                }
+                this._emit(this.parts, FX_KIND.glow, x, y, z, 0, 0, 0, bright, 0.22 + R * 0.02, R * 0.35, R * 1.25, 0.9, 0, 0);
+                if (opts.smoke !== false && R >= 2.5) {
+                    const puffs = Math.min(8, Math.round(R));
+                    for (let i = 0; i < puffs; i++) {
+                        const a = Math.random() * Math.PI * 2, d = Math.random() * R * 0.35;
+                        this._emit(this.smokes, FX_KIND.smoke, x + Math.cos(a) * d, y + Math.random() * 0.6, z + Math.sin(a) * d,
+                            Math.cos(a) * 0.8, 0.5 + Math.random() * 0.5, Math.sin(a) * 0.8,
+                            this._mix(colorHex, 0x3a3f47, 0.75), 1.6 + Math.random() * 1.2, R * 0.35, R * 0.9, 0.42, 1.2, -0.25);
+                    }
+                }
+                if (opts.shake !== false) this.shakeAt(x, y, z, Math.min(1, R / 6) * (opts.shakeScale || 1));
+            },
+
+            // Ground shockwave rings (dashes, stomps, pulses): dust kicked out along the ring
+            ring: function (x, y, z, colorHex, scale) {
+                if (!this.enabled()) return;
+                const n = Math.min(14, 5 + Math.round(scale * 2));
+                for (let i = 0; i < n; i++) {
+                    const a = i / n * Math.PI * 2 + Math.random() * 0.4;
+                    const sp = 2 + scale * 0.8;
+                    this._emit(this.smokes, FX_KIND.dust, x + Math.cos(a) * 0.4, Math.max(0.15, y - 0.2), z + Math.sin(a) * 0.4,
+                        Math.cos(a) * sp, 0.3, Math.sin(a) * sp, this._mix(colorHex, 0x8b8070, 0.6), 0.8, 0.5, 1.6 + scale * 0.2, 0.55, 2.6, 0);
+                }
+                for (let i = 0; i < 6; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    this._emit(this.parts, FX_KIND.spark, x, y, z, Math.cos(a) * 4, 1.5 + Math.random() * 2, Math.sin(a) * 4,
+                        this._bright(colorHex), 0.3, 0.08, 0.04, 0.8, 2.2, 9.8);
+                }
+            },
+
+            // Smoke grenades: rolling puffs that fill the sphere as it forms
+            smokeCloud: function (x, y, z, colorHex, radius) {
+                if (!this.enabled()) return;
+                for (let i = 0; i < 16; i++) {
+                    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const d = radius * (0.4 + Math.random() * 0.5);
+                    this._emit(this.smokes, FX_KIND.smoke, x, y, z, rr * Math.cos(th) * d * 1.4, u * d * 0.9, rr * Math.sin(th) * d * 1.4,
+                        this._mix(colorHex, 0xd7dde5, 0.55), 1.4 + Math.random() * 0.8, radius * 0.3, radius * 0.85, 0.7, 2.2, 0);
+                }
+                this.burst(x, y, z, colorHex, 1.2, { sparks: 0.4, smoke: false, shake: false });
+            },
+
+            // Active smoke spheres: puffs rolling over the surface (called every frame)
+            smokeShell: function (x, y, z, linearColor, radius, dt, fade) {
+                if (!this.enabled()) return;
+                let n = dt * 14 * fade;
+                while (n > 0) {
+                    if (n < 1 && Math.random() > n) break;
+                    n -= 1;
+                    const u = Math.random() * 1.6 - 0.6, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const px = x + rr * Math.cos(th) * radius * 0.92, py = y + u * radius * 0.92, pz = z + rr * Math.sin(th) * radius * 0.92;
+                    this._c.copy(linearColor).convertLinearToSRGB();
+                    const hex = this._mix(this._c.getHex(), 0xe2e8f0, 0.45);
+                    this._emit(this.smokes, FX_KIND.smoke, px, py, pz, -Math.sin(th) * 0.35, 0.08, Math.cos(th) * 0.35,
+                        hex, 2.4 + Math.random() * 1.0, radius * 0.45, radius * 0.8, 0.6, 0.3, 0);
+                }
+            },
+
+            // Fire / acid zones: called every frame per active zone
+            embers: function (x, y, z, colorHex, radius, dt) {
+                if (!this.enabled()) return;
+                let n = dt * (6 + radius * 3);
+                while (n > 0) {
+                    if (n < 1 && Math.random() > n) break;
+                    n -= 1;
+                    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * radius * 0.9;
+                    this._emit(this.parts, FX_KIND.ember, x + Math.cos(a) * d, y + 0.1, z + Math.sin(a) * d,
+                        (Math.random() - 0.5) * 0.6, 1.2 + Math.random() * 1.6, (Math.random() - 0.5) * 0.6,
+                        this._bright(colorHex), 0.8 + Math.random() * 0.8, 0.12, 0.05, 1, 0.6, -0.4);
+                    if (Math.random() < 0.18) {
+                        this._emit(this.smokes, FX_KIND.smoke, x + Math.cos(a) * d, y + 0.4, z + Math.sin(a) * d, 0, 0.9, 0,
+                            0x2e2a27, 1.6, 0.4, 1.4, 0.22, 0.6, -0.2);
+                    }
+                }
+            },
+
+            // Camera shake ("trauma" model): fades with distance; Settings can turn it off
+            shakeAt: function (x, y, z, amount) {
+                const cfg = game.userSettings || {};
+                if (cfg.cameraShake === false || cfg.reduceFlashes) return;
+                const d = Math.hypot(x - camera.position.x, y - camera.position.y, z - camera.position.z);
+                this.trauma = Math.min(1, this.trauma + amount * Math.max(0, 1 - d / 28));
+            },
+
+            _bright: function (hex) {
+                this._c.setHex(hex);
+                const m = Math.max(this._c.r, this._c.g, this._c.b) || 1;
+                this._c.multiplyScalar(1 / m);
+                return this._c.getHex();
+            },
+            _mix: function (a, b, t) {
+                const ca = new THREE.Color(a), cb = new THREE.Color(b);
+                return ca.lerp(cb, t).getHex();
+            },
+
+            update: function (dt, now) {
+                if (!this.add) return;
+                this.add.material.uniforms.uTime.value = now * 0.001;
+                this.smoke.material.uniforms.uTime.value = now * 0.001;
+                this._write(this.parts, this.add, dt);
+                this._write(this.smokes, this.smoke, dt);
+            },
+
+            _write: function (pool, mesh, dt) {
+                const g = mesh.geometry, col = g.attributes.aColor, par = g.attributes.aParams, vel = g.attributes.aVel;
+                const m = this._m.elements;
+                let n = 0;
+                for (let i = 0; i < pool.length; i++) {
+                    const r = pool[i];
+                    if (!r.alive) continue;
+                    r.t += dt;
+                    if (r.t >= r.life) { r.alive = false; continue; }
+                    const k = Math.exp(-r.drag * dt);
+                    r.v.multiplyScalar(k);
+                    r.v.y -= r.grav * dt;
+                    r.p.addScaledVector(r.v, dt);
+                    if (r.kind === FX_KIND.spark && r.p.y < 0.02) { r.p.y = 0.02; r.v.y *= -0.35; r.v.x *= 0.6; r.v.z *= 0.6; }
+                    const f = r.t / r.life;
+                    const size = r.s0 + (r.s1 - r.s0) * Math.sqrt(f);
+                    let alpha = r.a0 * (1 - f);
+                    if (r.kind === FX_KIND.smoke || r.kind === FX_KIND.dust) alpha = r.a0 * Math.min(1, f * 6) * (1 - f) * (1 - f);
+                    const stretch = (r.kind === FX_KIND.spark || r.kind === FX_KIND.ember) ? Math.min(7, r.v.length() * 0.9) : 0;
+                    m[12] = r.p.x; m[13] = r.p.y; m[14] = r.p.z;
+                    mesh.setMatrixAt(n, this._m);
+                    col.setXYZ(n, r.c.r, r.c.g, r.c.b);
+                    par.setXYZW(n, size, alpha, stretch, r.kind);
+                    vel.setXYZW(n, r.v.x, r.v.y, r.v.z, r.seed);
+                    n++;
+                }
+                mesh.count = n;
+                if (n) {
+                    mesh.instanceMatrix.needsUpdate = true;
+                    col.needsUpdate = true; par.needsUpdate = true; vel.needsUpdate = true;
+                }
+            },
+
+            // Applied just before rendering. Position is re-set from the player every
+            // frame, so only the look rotation (changed incrementally by mouse, pad
+            // and recoil) has last frame's shake removed before the new one is added.
+            applyShake: function (now, dt) {
+                const L = this.shakeLast;
+                camera.rotation.x -= L.rx; camera.rotation.y -= L.ry;
+                this.trauma = Math.max(0, this.trauma - dt * 1.6);
+                const s = this.trauma * this.trauma;
+                if (s <= 0) { L.x = L.y = L.z = L.rx = L.ry = 0; return; }
+                const t = now * 0.001;
+                const nz = (o) => Math.sin(t * 37.1 + o) * 0.6 + Math.sin(t * 61.7 + o * 1.7) * 0.4;
+                L.x = nz(1.3) * 0.05 * s; L.y = nz(4.1) * 0.05 * s; L.z = nz(7.9) * 0.03 * s;
+                L.rx = nz(2.2) * 0.022 * s; L.ry = nz(5.5) * 0.022 * s;
+                camera.position.x += L.x; camera.position.y += L.y; camera.position.z += L.z;
+                camera.rotation.x += L.rx; camera.rotation.y += L.ry;
+            }
+        };
+
         // =============================================
         // V1.7 Viewmodel animator: draw, reload, inspect, recoil spring, sprint, landing
         // =============================================
@@ -25133,6 +25428,7 @@
                 item.mesh.position.set(x, y, z);
                 item.mesh.scale.set(0.4, 0.4, 0.4);
                 item.mesh.visible = true;
+                fxKit.ring(x, y, z, colorHex, Math.min(6, maxScale || 1));   // V1.7 dust + sparks
             },
 
             spawnSmokeSphere: function(x, y, z, colorHex, radius, durationMs, now) {
@@ -25142,6 +25438,7 @@
                 }
                 item.inUse = true;
                 item.position.set(x, Math.max(radius * 0.65, y), z);
+                fxKit.smokeCloud(x, item.position.y, z, colorHex, radius);   // V1.7 rolling puffs
                 item.radius = radius;
                 item.startAt = now;
                 item.expireAt = now + durationMs;
@@ -25181,8 +25478,9 @@
                     item.outerMat.emissive.setHex(0x7c2d12).convertSRGBToLinear();
                     item.innerMat.color.setHex(0xfde68a).convertSRGBToLinear();
                 } else {
-                    item.outerMat.color.setHex(colorHex === 0x57a8ff ? 0x6ea8e6 : 0x7fd4e6).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x164e63).convertSRGBToLinear();
+                    // V1.7: a greyer, dimmer cyan so the smoke reads as smoke, not a lamp
+                    item.outerMat.color.setHex(colorHex === 0x57a8ff ? 0x5d8fc4 : 0x63a8b8).convertSRGBToLinear();
+                    item.outerMat.emissive.setHex(0x0c3542).convertSRGBToLinear();
                     item.innerMat.color.setHex(0xcffafe).convertSRGBToLinear();
                 }
                 item.ringMat.color.setHex(colorHex).convertSRGBToLinear();
@@ -25246,6 +25544,7 @@
                 item.mesh.position.copy(item.position);
                 item.mesh.scale.set(0.3, 0.3, 0.3);
                 item.mesh.visible = true;
+                fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
             },
 
             spawnReconBeacon: function(x, y, z, now) {
@@ -28409,8 +28708,11 @@
                     s.outerMesh.rotation.y = time * 0.0008;
                     s.innerMesh.rotation.y = -time * 0.0014;
                     s.outerMat.opacity = 0.56 * fade;
-                    s.innerMat.opacity = 0.26 * fade;
+                    // V1.7: dimmer additive core (it read as a glowing ball, worse with bloom);
+                    // rolling puffs over the surface give the sphere a smoky edge
+                    s.innerMat.opacity = 0.12 * fade;
                     s.ringMat.opacity = 0.72 * fade;
+                    if (grow >= 1) fxKit.smokeShell(s.position.x, s.position.y, s.position.z, s.outerMat.color, s.radius, Math.min(0.05, delta || 0.016), fade);
 
                     if (characterController.position.distanceToSquared(s.position) <= (s.radius * 0.95) * (s.radius * 0.95)) {
                         playerInSmoke = true;
@@ -28443,6 +28745,9 @@
                     m.crownMat.opacity = 0.36 * pulse * fade;
                     m.crownMesh.scale.y = 0.75 + 0.35 * Math.sin(time * 0.018);
                     m.ringMesh.rotation.z = time * 0.002;
+                    // V1.7 embers and drifting smoke over fire / acid zones
+                    fxKit.embers(m.position.x, m.position.y, m.position.z,
+                        m.isSnakeBite ? 0x22c55e : (m.isNanoswarm ? 0xfacc15 : (m.isIncendiary ? 0xef4444 : 0xff7b00)), m.radius * fade, Math.min(0.05, delta || 0.016));
                 }
                 for (let i = 0; i < this.slowZones.length; i++) {
                     const sz = this.slowZones[i];
@@ -28466,7 +28771,9 @@
                     const p = (now - f.startAt) / (f.expireAt - f.startAt);
                     const s = 0.3 + (f.maxRadius - 0.3) * Math.sin(p * Math.PI * 0.5);
                     f.mesh.scale.set(s, s, s);
-                    f.mat.opacity = 0.9 * (1 - p);
+                    // V1.7: with the effects kit's fireball and sparks this becomes a
+                    // thin, quickly fading shock shell instead of a full-screen dome
+                    f.mat.opacity = fxKit.enabled() ? 0.32 * (1 - p) * (1 - p) : 0.9 * (1 - p);
                 }
 
                 // 6. Animate Sova Recon Sonar Spheres
@@ -35053,7 +35360,7 @@
                         float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
                         float k = smoothstep(uThreshold, uThreshold + 0.2, l);
                         gl_FragColor = vec4(c * k, 1.0);
-                    }`, { tSrc: { value: null }, uThreshold: { value: 0.68 }, uTexel: { value: new THREE.Vector2() } });
+                    }`, { tSrc: { value: null }, uThreshold: { value: 0.74 }, uTexel: { value: new THREE.Vector2() } });
                 this.mats.blurDir = sm(`
                     varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uDir;
                     void main() {
@@ -35351,7 +35658,14 @@
             shellFX.mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z));
             shellFX.mesh.count = 1;
             shellFX.mesh.instanceMatrix.needsUpdate = true;
-            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh];
+            for (const b of [fxKit.add, fxKit.smoke]) {
+                b.setMatrixAt(0, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z));
+                b.geometry.attributes.aParams.setXYZW(0, 0.5, 0.5, 0, 1);
+                b.geometry.attributes.aParams.needsUpdate = true;
+                b.count = 1;
+                b.instanceMatrix.needsUpdate = true;
+            }
+            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke];
             for (let i = 0; i < agentSystem.warmupMeshes.length; i++) {
                 const wm = agentSystem.warmupMeshes[i];
                 wm.position.copy(p);
@@ -35373,6 +35687,8 @@
             haloSystem.mesh.count = 0;
             shellFX.mesh.count = 0;
             shellFX.mesh.visible = true;
+            fxKit.add.count = 0; fxKit.add.visible = true;
+            fxKit.smoke.count = 0; fxKit.smoke.visible = true;
             for (let i = 0; i < enemyFlashLights.length; i++) {
                 enemyFlashLights[i].object.visible = false;
             }
@@ -35515,6 +35831,7 @@
             glowHalos: 'auto',
             brightness: 100,
             reduceFlashes: false,
+            cameraShake: true,
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -36257,6 +36574,12 @@
                     game.userSettings.maxDecals = p.maxDecals;
                     this.applyAtmosphereTheme();
                     this.syncAllUI();
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-camera-shake-pills', 'data-camshake', (val) => {
+                    game.userSettings.cameraShake = val !== 'off';
+                    if (!game.userSettings.cameraShake) fxKit.trauma = 0;
                     this.saveToStorage();
                 });
 
@@ -37392,6 +37715,7 @@
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
                 setActivePill('setting-map-detail-pills', 'data-mapdetail', cfg.mapDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-reduce-flash-pills', 'data-reduceflash', cfg.reduceFlashes ? 'on' : 'off');
+                setActivePill('setting-camera-shake-pills', 'data-camshake', cfg.cameraShake === false ? 'off' : 'on');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
@@ -38907,6 +39231,7 @@
             // V1.7: muzzle star cards and pooled shell casings (before the warm-up compile)
             muzzleStar.init();
             shellFX.init();
+            fxKit.init();
             weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material) && o.material !== muzzleStar.mat) o.material.toneMapped = false; });
             
             // Initialize object pools
@@ -39102,6 +39427,7 @@
             updateWeaponPosition();
             applyWeaponBobbing(time, game.keys.w || game.keys.a || game.keys.s || game.keys.d);
             shellFX.update(Math.min(0.05, delta));
+            fxKit.update(Math.min(0.05, delta), now);
             // V1.7: 3D audio listener follows the camera; enemy footsteps; low-health cue
             soundFX.updateListener();
             enemyAudio.update();
@@ -39137,6 +39463,7 @@
             // Render scene: world, then the viewmodel over a cleared depth buffer
             // (autoClear is off; info.autoReset is off and reset here)
             renderer.info.reset();
+            fxKit.applyShake(now, Math.min(0.05, delta));
             skyDome.position.copy(camera.position);
             skyDome.updateMatrix();
             // With autoClear off, r128's background pass only sets the clear colour,
