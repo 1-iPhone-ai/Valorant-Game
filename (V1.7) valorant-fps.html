@@ -3564,6 +3564,7 @@
                                     <button class="settings-pill-opt" data-quality="medium">MEDIUM</button>
                                     <button class="settings-pill-opt" data-quality="high">HIGH</button>
                                     <button class="settings-pill-opt" data-quality="ultra">ULTRA 4K</button>
+                                    <button class="settings-pill-opt" data-quality="cinematic" title="Ambient occlusion, bloom, sun shafts, colour grading and FXAA, plus High Detail maps and characters">CINEMATIC (POST FX)</button>
                                 </div>
                             </div>
 
@@ -4837,7 +4838,10 @@
             low:    { drawDistance: 60,  maxParticles: 5,  maxDecals: 10, shadows: false, shadowResolution: 1024, fogDensity: 0.01,   maxPixelRatio: 1,        surfaceDetail: 0, haloBudget: 4 },
             medium: { drawDistance: 80,  maxParticles: 10, maxDecals: 20, shadows: true,  shadowResolution: 2048, fogDensity: 0.008,  maxPixelRatio: 1.5,      surfaceDetail: 1, haloBudget: 8 },
             high:   { drawDistance: 100, maxParticles: 15, maxDecals: 30, shadows: true,  shadowResolution: 4096, fogDensity: 0.005,  maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 12 },
-            ultra:  { drawDistance: 135, maxParticles: 20, maxDecals: 40, shadows: true,  shadowResolution: 4096, fogDensity: 0.0035, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16 }
+            ultra:  { drawDistance: 135, maxParticles: 20, maxDecals: 40, shadows: true,  shadowResolution: 4096, fogDensity: 0.0035, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16 },
+            // V1.7: above Ultra, manual only (Auto never picks it). Adds the postFX
+            // pipeline and turns on High Detail Maps and Characters & Guns.
+            cinematic: { drawDistance: 150, maxParticles: 20, maxDecals: 40, shadows: true, shadowResolution: 4096, fogDensity: 0.003, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16, post: true }
         };
         const QUALITY_ORDER = ['low', 'medium', 'high'];
         
@@ -6903,10 +6907,11 @@
             mapDetailUniform.value = detail;
             haloSystem.setBudget(halos);
             // High Detail Maps: player opt-in, and never on the Low profile
-            const hiDetail = cfg.mapDetail === 'on' && adaptiveSettings.currentQuality !== 'low';
+            const cinematic = adaptiveSettings.currentQuality === 'cinematic';
+            const hiDetail = (cfg.mapDetail === 'on' || cinematic) && adaptiveSettings.currentQuality !== 'low';
             adaptiveSettings.mapHiDetail = hiDetail;
             mapHiDetail.set(hiDetail);
-            const charDetail = cfg.charDetail === 'on' && adaptiveSettings.currentQuality !== 'low';
+            const charDetail = (cfg.charDetail === 'on' || cinematic) && adaptiveSettings.currentQuality !== 'low';
             adaptiveSettings.charHiDetail = charDetail;
             characterDetail.set(charDetail);
         }
@@ -6920,6 +6925,8 @@
             adaptiveSettings.maxParticles = profile.maxParticles;
             adaptiveSettings.maxDecals = profile.maxDecals;
             adaptiveSettings.shadowResolution = profile.shadowResolution;
+            postFX.enabled = !!profile.post;
+            if (postFX.enabled) postFX.init();
             applyVisualOverrides(profile);
             scene.fog.density = profile.fogDensity;
             
@@ -7279,7 +7286,8 @@
                 this.pixelStep = 0;
                 this.upgradeHoldUntil = 0;
                 this.upgradeBackoffMs = 20000;
-                const baseQuality = adaptiveSettings.currentQuality === 'ultra' ? 'high' : adaptiveSettings.currentQuality;
+                const cq = adaptiveSettings.currentQuality;
+                const baseQuality = (cq === 'ultra' || cq === 'cinematic') ? 'high' : cq;
                 applyGraphicsProfile(baseQuality, 'auto-mode');
                 showNotification('Quality set to AUTO-ADAPTIVE');
             }
@@ -7303,6 +7311,9 @@
                     qualityController.setManual('ultra');
                     break;
                 case 'ultra':
+                    qualityController.setManual('cinematic');
+                    break;
+                case 'cinematic':
                 default:
                     qualityController.setAuto();
                     break;
@@ -34662,6 +34673,361 @@
         // a ~80 ms stall the first time a decal appeared. The effects are drawn
         // in front of the camera inside one task, so the warm-up frames are never
         // presented.
+        // =============================================
+        // V1.7 Cinematic post-processing (quality level above Ultra)
+        // =============================================
+        // When on, the world renders into rtWorld (colour + depth texture) instead
+        // of the screen. rtWorld's texture is tagged sRGB, which is the renderer's
+        // own output encoding, so every material keeps its existing program: no
+        // shader variant is added for rendering off-screen. Then, all in
+        // display-referred space:
+        //   1. Ambient occlusion (half res): hemisphere samples against the depth
+        //      buffer, blurred, multiplied into the world.
+        //   2. The viewmodel is drawn on top (its own cleared depth), so the gun
+        //      gets bloom and grading but no world AO.
+        //   3. Bloom: bright pass, then a 4-level blurred mip chain.
+        //   4. Sun shafts: radial blur toward the sun's screen position from the
+        //      sky pixels (quarter res).
+        //   5. Composite to the screen: FXAA, bloom, shafts, colour grade per
+        //      atmosphere, light vignette, edge chromatic aberration, film grain.
+        // All pass shaders are compiled in the warm-up (postFX.warm), so switching
+        // to Cinematic never stalls on a compile.
+        const postFX = {
+            enabled: false,
+            ready: false,
+            w: 0, h: 0,
+            rt: {},
+            mats: {},
+            quad: null,
+            scene: null,
+            cam: null,
+            _size: new THREE.Vector2(),
+            _sun: new THREE.Vector3(),
+            _sunDir: new THREE.Vector3(),
+            frame: 0,
+
+            init: function () {
+                if (this.ready) return;
+                this.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+                this.scene = new THREE.Scene();
+                this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
+                this.quad.frustumCulled = false;
+                this.scene.add(this.quad);
+                const mk = (opts) => {
+                    const t = new THREE.WebGLRenderTarget(4, 4, Object.assign({
+                        minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+                        format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false
+                    }, opts || {}));
+                    t.texture.generateMipmaps = false;
+                    return t;
+                };
+                this.rt.world = mk({ depthBuffer: true });
+                this.rt.world.texture.encoding = THREE.sRGBEncoding; // same programs as the screen
+                this.rt.world.depthTexture = new THREE.DepthTexture(4, 4);
+                this.rt.world.depthTexture.type = THREE.UnsignedIntType;
+                this.rt.view = mk({ depthBuffer: true });
+                this.rt.view.texture.encoding = THREE.sRGBEncoding;
+                this.rt.ao = mk();
+                this.rt.aoBlur = mk();
+                this.rt.bloom = [mk(), mk(), mk(), mk()];
+                this.rt.bloomTmp = [mk(), mk(), mk(), mk()];
+                this.rt.rays = mk();
+
+                const vs = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+                const sm = (fs, uniforms) => new THREE.ShaderMaterial({
+                    vertexShader: vs, fragmentShader: fs, uniforms: uniforms,
+                    depthTest: false, depthWrite: false, toneMapped: false
+                });
+                const depthFns = `
+                    uniform float uNear; uniform float uFar; uniform vec2 uTanHalf;
+                    float viewZ(float d) { return (uNear * uFar) / ((uFar - uNear) * d - uFar); }
+                    vec3 viewPos(vec2 uv, float d) { float z = viewZ(d); return vec3((uv * 2.0 - 1.0) * uTanHalf * -z, z); }`;
+                // 1. Ambient occlusion
+                const kernel = [];
+                for (let i = 0; i < 12; i++) {
+                    const a = i * 2.39996, r = Math.sqrt((i + 0.5) / 12);
+                    kernel.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0.25 + 0.75 * ((i * 7) % 12) / 12));
+                }
+                this.mats.ao = sm(`
+                    varying vec2 vUv; uniform sampler2D tDepth; uniform vec2 uTexel; uniform float uRadius; uniform float uStrength;
+                    uniform vec3 uKernel[12]; uniform mat4 uProj;
+                    ${depthFns}
+                    float h12(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+                    void main() {
+                        float d = texture2D(tDepth, vUv).x;
+                        if (d >= 0.9999) { gl_FragColor = vec4(1.0); return; }
+                        vec3 P = viewPos(vUv, d);
+                        vec3 Px = viewPos(vUv + vec2(uTexel.x, 0.0), texture2D(tDepth, vUv + vec2(uTexel.x, 0.0)).x);
+                        vec3 Py = viewPos(vUv + vec2(0.0, uTexel.y), texture2D(tDepth, vUv + vec2(0.0, uTexel.y)).x);
+                        vec3 N = normalize(cross(Px - P, Py - P));
+                        // Face the camera. (Not N.z: a level floor seen head-on has N.z ~ 0.)
+                        if (dot(N, P) > 0.0) N = -N;
+                        float ang = h12(gl_FragCoord.xy) * 6.2832;
+                        vec3 T = normalize(vec3(cos(ang), sin(ang), 0.0) - N * dot(vec3(cos(ang), sin(ang), 0.0), N));
+                        vec3 B = cross(N, T);
+                        float occ = 0.0;
+                        for (int i = 0; i < 12; i++) {
+                            vec3 k = uKernel[i];
+                            vec3 S = P + (T * k.x + B * k.y + N * k.z) * uRadius;
+                            vec4 c = uProj * vec4(S, 1.0);
+                            vec2 suv = c.xy / c.w * 0.5 + 0.5;
+                            if (suv.x < 0.0 || suv.y < 0.0 || suv.x > 1.0 || suv.y > 1.0) continue;
+                            float sz = viewZ(texture2D(tDepth, suv).x);
+                            float range = smoothstep(0.0, 1.0, uRadius / max(0.001, abs(P.z - sz)));
+                            occ += (sz >= S.z + 0.03 ? 1.0 : 0.0) * range;
+                        }
+                        float ao = 1.0 - occ / 12.0 * uStrength;
+                        // Fade AO out with distance so far walls stay clean
+                        ao = mix(ao, 1.0, smoothstep(30.0, 70.0, -P.z));
+                        gl_FragColor = vec4(vec3(clamp(ao, 0.0, 1.0)), 1.0);
+                    }`, {
+                    tDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uRadius: { value: 0.7 }, uStrength: { value: 1.25 },
+                    uKernel: { value: kernel }, uProj: { value: new THREE.Matrix4() },
+                    uNear: { value: 0.1 }, uFar: { value: 1000 }, uTanHalf: { value: new THREE.Vector2(1, 1) }
+                });
+                this.mats.blur4 = sm(`
+                    varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uTexel;
+                    void main() {
+                        vec4 s = vec4(0.0);
+                        for (int y = -1; y <= 2; y++) for (int x = -1; x <= 2; x++) s += texture2D(tSrc, vUv + (vec2(float(x), float(y)) - 0.5) * uTexel);
+                        gl_FragColor = s / 16.0;
+                    }`, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } });
+                // 2. World x AO into the view target
+                this.mats.applyAO = sm(`
+                    varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tAO; uniform float uAO;
+                    void main() {
+                        vec4 c = texture2D(tColor, vUv);
+                        float ao = mix(1.0, texture2D(tAO, vUv).r, uAO);
+                        gl_FragColor = vec4(c.rgb * ao, 1.0);
+                    }`, { tColor: { value: null }, tAO: { value: null }, uAO: { value: 1 } });
+                // 3. Bloom
+                this.mats.bright = sm(`
+                    varying vec2 vUv; uniform sampler2D tSrc; uniform float uThreshold; uniform vec2 uTexel;
+                    void main() {
+                        vec3 c = vec3(0.0);
+                        c += texture2D(tSrc, vUv + vec2(-0.5, -0.5) * uTexel).rgb;
+                        c += texture2D(tSrc, vUv + vec2( 0.5, -0.5) * uTexel).rgb;
+                        c += texture2D(tSrc, vUv + vec2(-0.5,  0.5) * uTexel).rgb;
+                        c += texture2D(tSrc, vUv + vec2( 0.5,  0.5) * uTexel).rgb;
+                        c *= 0.25;
+                        // Luminance, so saturated but mid-bright colours (a pink gun skin) do not glow
+                        float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+                        float k = smoothstep(uThreshold, uThreshold + 0.2, l);
+                        gl_FragColor = vec4(c * k, 1.0);
+                    }`, { tSrc: { value: null }, uThreshold: { value: 0.68 }, uTexel: { value: new THREE.Vector2() } });
+                this.mats.blurDir = sm(`
+                    varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uDir;
+                    void main() {
+                        vec3 c = texture2D(tSrc, vUv).rgb * 0.227;
+                        c += (texture2D(tSrc, vUv + uDir * 1.385).rgb + texture2D(tSrc, vUv - uDir * 1.385).rgb) * 0.316;
+                        c += (texture2D(tSrc, vUv + uDir * 3.231).rgb + texture2D(tSrc, vUv - uDir * 3.231).rgb) * 0.070;
+                        gl_FragColor = vec4(c, 1.0);
+                    }`, { tSrc: { value: null }, uDir: { value: new THREE.Vector2() } });
+                // 4. Sun shafts
+                this.mats.rays = sm(`
+                    varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 uSun; uniform float uStrength; uniform float uAspect;
+                    void main() {
+                        vec2 dir = (uSun - vUv) / 24.0;
+                        vec2 uv = vUv;
+                        float decay = 1.0, sum = 0.0;
+                        for (int i = 0; i < 24; i++) {
+                            // Light source: open sky, strongest round the sun itself
+                            float sky = step(0.9999, texture2D(tDepth, uv).x);
+                            vec2 ds = (uv - uSun) * vec2(uAspect, 1.0);
+                            float glow = exp(-dot(ds, ds) * 9.0);
+                            float lum = dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.55, 0.15));
+                            sum += sky * (glow * 1.6 + lum * 0.25) * decay;
+                            decay *= 0.94;
+                            uv += dir;
+                        }
+                        gl_FragColor = vec4(vec3(sum / 24.0 * uStrength), 1.0);
+                    }`, { tColor: { value: null }, tDepth: { value: null }, uSun: { value: new THREE.Vector2(0.5, 0.5) }, uStrength: { value: 0 }, uAspect: { value: 1 } });
+                // 5. Composite
+                this.mats.composite = sm(`
+                    varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tB0; uniform sampler2D tB1; uniform sampler2D tB2; uniform sampler2D tB3;
+                    uniform sampler2D tRays; uniform vec2 uTexel; uniform float uBloom; uniform vec3 uRayTint; uniform float uTime;
+                    uniform float uContrast; uniform float uSaturation; uniform vec3 uShadowTint; uniform vec3 uHighTint;
+                    uniform float uVignette; uniform float uGrain; uniform float uCA;
+                    vec3 fxaa(vec2 uv) {
+                        vec3 rgbM = texture2D(tColor, uv).rgb;
+                        vec3 rgbNW = texture2D(tColor, uv + vec2(-1.0, -1.0) * uTexel).rgb;
+                        vec3 rgbNE = texture2D(tColor, uv + vec2( 1.0, -1.0) * uTexel).rgb;
+                        vec3 rgbSW = texture2D(tColor, uv + vec2(-1.0,  1.0) * uTexel).rgb;
+                        vec3 rgbSE = texture2D(tColor, uv + vec2( 1.0,  1.0) * uTexel).rgb;
+                        vec3 L = vec3(0.299, 0.587, 0.114);
+                        float lNW = dot(rgbNW, L), lNE = dot(rgbNE, L), lSW = dot(rgbSW, L), lSE = dot(rgbSE, L), lM = dot(rgbM, L);
+                        float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));
+                        float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
+                        if (lMax - lMin < max(0.0312, lMax * 0.125)) return rgbM;
+                        vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), ((lNW + lSW) - (lNE + lSE)));
+                        float red = max((lNW + lNE + lSW + lSE) * 0.03125, 0.0078125);
+                        float rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + red);
+                        dir = clamp(dir * rcp, -8.0, 8.0) * uTexel;
+                        vec3 a = 0.5 * (texture2D(tColor, uv + dir * (1.0 / 3.0 - 0.5)).rgb + texture2D(tColor, uv + dir * (2.0 / 3.0 - 0.5)).rgb);
+                        vec3 b = a * 0.5 + 0.25 * (texture2D(tColor, uv - dir * 0.5).rgb + texture2D(tColor, uv + dir * 0.5).rgb);
+                        float lB = dot(b, L);
+                        return (lB < lMin || lB > lMax) ? a : b;
+                    }
+                    float h12(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+                    void main() {
+                        vec2 c = vUv - 0.5;
+                        float r2 = dot(c, c);
+                        vec3 col = fxaa(vUv);
+                        // Slight colour fringing toward the corners only
+                        if (uCA > 0.0) {
+                            vec2 off = c * r2 * uCA * 0.02;
+                            col.r = mix(col.r, texture2D(tColor, vUv - off).r, 0.7);
+                            col.b = mix(col.b, texture2D(tColor, vUv + off).b, 0.7);
+                        }
+                        vec3 bloom = texture2D(tB0, vUv).rgb * 0.42 + texture2D(tB1, vUv).rgb * 0.3 + texture2D(tB2, vUv).rgb * 0.2 + texture2D(tB3, vUv).rgb * 0.18;
+                        col += bloom * uBloom;
+                        col += texture2D(tRays, vUv).rgb * uRayTint;
+                        // Grade: contrast around mid-grey, saturation, split tone
+                        float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+                        col = mix(vec3(l), col, uSaturation);
+                        col = (col - 0.5) * uContrast + 0.5;
+                        col *= mix(uShadowTint, uHighTint, smoothstep(0.1, 0.8, l));
+                        col *= 1.0 - uVignette * smoothstep(0.18, 0.75, r2 * 1.6);
+                        col += (h12(vUv * 913.0 + uTime) - 0.5) * uGrain;
+                        gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+                    }`, {
+                    tColor: { value: null }, tB0: { value: null }, tB1: { value: null }, tB2: { value: null }, tB3: { value: null },
+                    tRays: { value: null }, uTexel: { value: new THREE.Vector2() }, uBloom: { value: 0.75 }, uRayTint: { value: new THREE.Color(1, 0.92, 0.75) },
+                    uTime: { value: 0 }, uContrast: { value: 1.06 }, uSaturation: { value: 1.08 },
+                    uShadowTint: { value: new THREE.Vector3(0.97, 0.99, 1.04) }, uHighTint: { value: new THREE.Vector3(1.03, 1.0, 0.96) },
+                    uVignette: { value: 0.22 }, uGrain: { value: 0.025 }, uCA: { value: 1.0 }
+                });
+                this.ready = true;
+            },
+
+            resize: function () {
+                renderer.getDrawingBufferSize(this._size);
+                const w = Math.max(4, this._size.x | 0), h = Math.max(4, this._size.y | 0);
+                if (w === this.w && h === this.h) return;
+                this.w = w; this.h = h;
+                this.rt.world.setSize(w, h);
+                this.rt.view.setSize(w, h);
+                const hw = Math.max(2, w >> 1), hh = Math.max(2, h >> 1);
+                this.rt.ao.setSize(hw, hh);
+                this.rt.aoBlur.setSize(hw, hh);
+                for (let i = 0; i < 4; i++) {
+                    const s = 1 << (i + 1);
+                    this.rt.bloom[i].setSize(Math.max(2, (w / s) | 0), Math.max(2, (h / s) | 0));
+                    this.rt.bloomTmp[i].setSize(Math.max(2, (w / s) | 0), Math.max(2, (h / s) | 0));
+                }
+                this.rt.rays.setSize(Math.max(2, w >> 2), Math.max(2, h >> 2));
+            },
+
+            _pass: function (mat, target) {
+                this.quad.material = mat;
+                renderer.setRenderTarget(target);
+                renderer.render(this.scene, this.cam);
+            },
+
+            // Per-atmosphere grade: daylight warm and punchy, competitive clean, night cool
+            _grade: function () {
+                const m = (game.userSettings && game.userSettings.atmosphereMode) || 'daylight';
+                const u = this.mats.composite.uniforms;
+                if (m === 'night') {
+                    u.uContrast.value = 1.1; u.uSaturation.value = 0.95;
+                    u.uShadowTint.value.set(0.92, 0.98, 1.1); u.uHighTint.value.set(1.0, 1.0, 1.02);
+                } else if (m === 'competitive') {
+                    u.uContrast.value = 1.04; u.uSaturation.value = 1.04;
+                    u.uShadowTint.value.set(0.99, 1.0, 1.02); u.uHighTint.value.set(1.01, 1.0, 0.99);
+                } else {
+                    u.uContrast.value = 1.07; u.uSaturation.value = 1.1;
+                    u.uShadowTint.value.set(0.96, 0.99, 1.05); u.uHighTint.value.set(1.04, 1.0, 0.95);
+                }
+                u.uCA.value = (game.userSettings && game.userSettings.reduceFlashes) ? 0 : 1;
+            },
+
+            // Replaces the plain "world, clear depth, viewmodel" draw when enabled
+            render: function (now) {
+                this.resize();
+                const R = this.rt, M = this.mats;
+                // World
+                renderer.setRenderTarget(R.world);
+                renderer.setClearColor(scene.background, 1);
+                renderer.clear();
+                renderer.render(scene, camera);
+                // AO (half res) from the world's depth
+                const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5);
+                const ao = M.ao.uniforms;
+                ao.tDepth.value = R.world.depthTexture;
+                ao.uTexel.value.set(1 / R.ao.width, 1 / R.ao.height);
+                ao.uProj.value.copy(camera.projectionMatrix);
+                ao.uNear.value = camera.near; ao.uFar.value = camera.far;
+                ao.uTanHalf.value.set(tanY * camera.aspect, tanY);
+                this._pass(M.ao, R.ao);
+                M.blur4.uniforms.tSrc.value = R.ao.texture;
+                M.blur4.uniforms.uTexel.value.set(1 / R.ao.width, 1 / R.ao.height);
+                this._pass(M.blur4, R.aoBlur);
+                // World x AO, then the viewmodel on top
+                M.applyAO.uniforms.tColor.value = R.world.texture;
+                M.applyAO.uniforms.tAO.value = R.aoBlur.texture;
+                renderer.setRenderTarget(R.view);
+                renderer.clear();
+                this._pass(M.applyAO, R.view);
+                renderer.clearDepth();
+                viewmodelScene.environment = scene.environment;
+                syncViewmodelCamera();
+                renderer.render(viewmodelScene, viewmodelCamera);
+                // Bloom chain
+                let src = R.view.texture, sw = this.w, sh = this.h;
+                for (let i = 0; i < 4; i++) {
+                    const dst = R.bloom[i], tmp = R.bloomTmp[i];
+                    if (i === 0) {
+                        M.bright.uniforms.tSrc.value = src;
+                        M.bright.uniforms.uTexel.value.set(1 / sw, 1 / sh);
+                        this._pass(M.bright, dst);
+                    } else {
+                        M.blur4.uniforms.tSrc.value = src;
+                        M.blur4.uniforms.uTexel.value.set(1 / sw, 1 / sh);
+                        this._pass(M.blur4, dst);
+                    }
+                    M.blurDir.uniforms.tSrc.value = dst.texture;
+                    M.blurDir.uniforms.uDir.value.set(1 / dst.width, 0);
+                    this._pass(M.blurDir, tmp);
+                    M.blurDir.uniforms.tSrc.value = tmp.texture;
+                    M.blurDir.uniforms.uDir.value.set(0, 1 / dst.height);
+                    this._pass(M.blurDir, dst);
+                    src = dst.texture; sw = dst.width; sh = dst.height;
+                }
+                // Sun shafts: sun direction to screen
+                const ru = M.rays.uniforms;
+                const sunDir = this._sunDir.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
+                const sp = this._sun.copy(camera.position).addScaledVector(sunDir, 500).project(camera);
+                const facing = sp.z < 1 && Math.abs(sp.x) < 1.6 && Math.abs(sp.y) < 1.6;
+                const night = game.userSettings && game.userSettings.atmosphereMode === 'night';
+                ru.uSun.value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5);
+                ru.uStrength.value = facing ? (night ? 0.22 : 0.75) * (1 - Math.min(1, Math.hypot(sp.x, sp.y) / 1.6)) : 0;
+                ru.uAspect.value = camera.aspect;
+                ru.tColor.value = R.world.texture;
+                ru.tDepth.value = R.world.depthTexture;
+                this._pass(M.rays, R.rays);
+                // Composite to the screen
+                this._grade();
+                const cu = M.composite.uniforms;
+                cu.tColor.value = R.view.texture;
+                cu.tB0.value = R.bloom[0].texture; cu.tB1.value = R.bloom[1].texture;
+                cu.tB2.value = R.bloom[2].texture; cu.tB3.value = R.bloom[3].texture;
+                cu.tRays.value = R.rays.texture;
+                cu.uTexel.value.set(1 / this.w, 1 / this.h);
+                cu.uTime.value = (now * 0.001) % 100;
+                this._pass(M.composite, null);
+                this.frame++;
+            },
+
+            // Compile every pass up front (called from the shader warm-up)
+            warm: function () {
+                this.init();
+                const was = this.enabled;
+                this.render(performance.now());
+                renderer.setRenderTarget(null);
+                this.enabled = was;
+            }
+        };
+
         function warmShaderVariants() {
             const start = performance.now();
             scene.updateMatrixWorld();
@@ -34768,6 +35134,8 @@
             packEnemyBatches();
             packTargetBatches();
             shadowManager.markEvent();
+            // V1.7: compile the Cinematic post-processing passes now as well
+            postFX.warm();
             perfTelemetry.shaderWarmupMs = performance.now() - start;
             perfTelemetry.programWatermark = renderer.info.programs ? renderer.info.programs.length : 0;
         }
@@ -38524,13 +38892,17 @@
             skyDome.updateMatrix();
             // With autoClear off, r128's background pass only sets the clear colour,
             // so set it before the single manual clear (the sky dome covers it anyway)
-            renderer.setClearColor(scene.background, 1);
-            renderer.clear();
-            renderer.render(scene, camera);
-            renderer.clearDepth();
-            viewmodelScene.environment = scene.environment;
-            syncViewmodelCamera();
-            renderer.render(viewmodelScene, viewmodelCamera);
+            if (postFX.enabled) {
+                postFX.render(now);
+            } else {
+                renderer.setClearColor(scene.background, 1);
+                renderer.clear();
+                renderer.render(scene, camera);
+                renderer.clearDepth();
+                viewmodelScene.environment = scene.environment;
+                syncViewmodelCamera();
+                renderer.render(viewmodelScene, viewmodelCamera);
+            }
             perfTelemetry.summary.drawCalls = renderer.info.render.calls;
             perfTelemetry.summary.triangles = renderer.info.render.triangles;
             const programCount = renderer.info.programs ? renderer.info.programs.length : 0;
