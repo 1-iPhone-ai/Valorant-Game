@@ -12845,6 +12845,328 @@
             }
         }
         
+        // =============================================
+        // V1.7 Viewmodel animator: draw, reload, inspect, recoil spring, sprint, landing
+        // =============================================
+        // Adds a pose offset on top of the existing bob/ADS/sway placement. Each
+        // frame begin() removes last frame's offset, the base placement runs as
+        // before, and end() adds the new one, so the two never fight. Animations
+        // are timelines on the frame clock (smooth at any frame rate), replacing
+        // the old snap-to-pose timeouts. Recoil is a damped spring per channel.
+        const _ease = {
+            out: (t) => 1 - Math.pow(1 - t, 3),
+            inOut: (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+            back: (t) => { const c = 1.6; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); }
+        };
+        // 0 -> 1 over [a, b], eased
+        const _seg = (p, a, b, f) => (f || _ease.inOut)(Math.min(1, Math.max(0, (p - a) / (b - a))));
+        // Smooth bump peaking at c with half-width w
+        const _bump = (p, c, w) => { const x = (p - c) / w; return Math.abs(x) >= 1 ? 0 : 0.5 + 0.5 * Math.cos(x * Math.PI); };
+
+        const vmAnim = {
+            model: null,
+            last: { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 },
+            sp: { z: 0, vz: 0, p: 0, vp: 0, r: 0, vr: 0, y: 0, vy: 0 },
+            clip: null,
+            sprint: 0,
+            lastT: 0,
+            wasGrounded: true,
+            slideKickAt: -1e9,
+
+            play: function (kind, durMs) {
+                this.clip = { kind: kind, start: performance.now(), dur: Math.max(50, durMs), weapon: game.activeWeapon };
+            },
+
+            // Called on every shot: the spring takes it from here
+            fire: function (amount) {
+                const s = this.sp;
+                // Peaks about 50 ms after the shot: ~1x recoil of muzzle rise (as the old
+                // fixed kick), ~0.5x of push-back, ~0.6x of drop
+                s.vp += amount * 80;
+                s.vz += amount * 34;
+                s.vy -= amount * 40;
+                s.vr += (Math.random() - 0.5) * amount * 24;
+                if (game.activeWeapon === 'pistol') this.slideKickAt = performance.now();
+            },
+
+            switched: function () {
+                this.model = null;
+                this.last = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 };
+                this.play('draw', game.activeWeapon === 'knife' ? 280 : 380);
+            },
+
+            begin: function (model) {
+                if (model !== this.model) {
+                    this.model = model;
+                    this.last = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 };
+                    return;
+                }
+                const L = this.last;
+                model.position.x -= L.px; model.position.y -= L.py; model.position.z -= L.pz;
+                model.rotation.x -= L.rx; model.rotation.y -= L.ry; model.rotation.z -= L.rz;
+            },
+
+            end: function (model, now) {
+                const w = game.weapons[game.activeWeapon];
+                const dt = Math.min(0.05, Math.max(0, (now - (this.lastT || now)) / 1000));
+                this.lastT = now;
+                const hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                const o = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 };
+                // Recoil / landing springs
+                const s = this.sp, K = 320, C = 24;
+                s.vz += (-K * s.z - C * s.vz) * dt; s.z += s.vz * dt;
+                s.vp += (-K * s.p - C * s.vp) * dt; s.p += s.vp * dt;
+                s.vr += (-K * s.r - C * s.vr) * dt; s.r += s.vr * dt;
+                s.vy += (-K * s.y - C * s.vy) * dt; s.y += s.vy * dt;
+                o.pz += s.z; o.rx += s.p; o.rz += s.r; o.py += s.y;
+                // Landing dip
+                const grounded = characterController.grounded !== false;
+                if (grounded && !this.wasGrounded) s.vy -= 0.7;
+                this.wasGrounded = grounded;
+                // Sprint: gun lowered and turned in
+                const moving = game.keys.w || game.keys.a || game.keys.s || game.keys.d;
+                const sprintTarget = (characterController.sprinting && moving && !game.adsActive && !game.reloading && !this.clip) ? 1 : 0;
+                this.sprint += (sprintTarget - this.sprint) * Math.min(1, dt * 8);
+                const sb = this.sprint;
+                o.rx += 0.16 * sb; o.ry += 0.38 * sb * hand; o.px += -0.035 * sb * hand; o.py += -0.05 * sb;
+                // Pistol slide kick on each shot
+                if (w && w.slide) {
+                    if (w.slideRestZ === undefined) w.slideRestZ = w.slide.position.z;
+                    const k = Math.max(0, 1 - (now - this.slideKickAt) / 90);
+                    w.slide.position.z = w.slideRestZ + 0.05 * k * (2 - k);
+                }
+                // Timeline clips
+                const c = this.clip;
+                if (c && c.kind === 'inspect' && game.adsActive) this.finishClip(w);
+                if (this.clip) {
+                    const p = (now - c.start) / c.dur;
+                    if (p >= 1 || c.weapon !== game.activeWeapon) {
+                        this.finishClip(w);
+                    } else {
+                        this.pose(c.kind, p, w, o, hand);
+                    }
+                }
+                model.position.x += o.px; model.position.y += o.py; model.position.z += o.pz;
+                model.rotation.x += o.rx; model.rotation.y += o.ry; model.rotation.z += o.rz;
+                this.last = o;
+            },
+
+            finishClip: function (w) {
+                if (w && w.magazine && w.magRestY !== undefined) {
+                    w.magazine.position.y = w.magRestY;
+                    w.magazine.visible = true;
+                }
+                if (w && w.slide && w.slideRestZ !== undefined) w.slide.position.z = w.slideRestZ;
+                this.clip = null;
+            },
+
+            pose: function (kind, p, w, o, hand) {
+                if (kind === 'draw') {
+                    const e = _ease.back(p);
+                    o.py += -0.25 * (1 - e);
+                    o.rx += 0.6 * (1 - e);
+                    o.rz += 0.3 * (1 - e) * hand;
+                    return;
+                }
+                if (kind === 'inspect') {
+                    if (w && w.isMelee) {
+                        // Knife: a flip over the knuckles and back
+                        o.rx += _seg(p, 0.1, 0.6) * Math.PI * 2;
+                        o.rz += Math.sin(p * Math.PI) * 0.5 * hand;
+                        o.py += Math.sin(p * Math.PI) * 0.06;
+                        return;
+                    }
+                    // Show the left side, swing over to the right side, return
+                    const a = _seg(p, 0.0, 0.25), b = _seg(p, 0.38, 0.62), r = _seg(p, 0.78, 1.0);
+                    const yaw = (0.9 * a - 1.6 * b) * (1 - r);
+                    o.ry += yaw * hand;
+                    o.rz += (0.45 * a - 0.2 * b) * (1 - r) * hand;
+                    o.rx += -0.12 * Math.sin(p * Math.PI);
+                    o.px += -0.07 * (a - 0.2 * b) * (1 - r) * hand;
+                    o.py += 0.05 * Math.sin(p * Math.PI);
+                    o.pz += 0.06 * Math.sin(p * Math.PI);
+                    return;
+                }
+                if (kind === 'reload' && w) {
+                    // Tilt in, work the gun, tilt out
+                    const tilt = _seg(p, 0, 0.14) * (1 - _seg(p, 0.86, 1));
+                    o.rz += 0.5 * tilt * hand;
+                    o.rx += -0.14 * tilt;
+                    o.py += 0.04 * tilt;
+                    o.px += -0.03 * tilt * hand;
+                    if (w.magazine) {
+                        if (w.magRestY === undefined) w.magRestY = w.magazine.position.y;
+                        let drop;
+                        if (p < 0.18) drop = 0;
+                        else if (p < 0.34) drop = _seg(p, 0.18, 0.34, _ease.inOut);
+                        else if (p < 0.5) drop = 1;                       // hand fetching a new one
+                        else drop = 1 - _seg(p, 0.5, 0.66, _ease.out);    // seat it
+                        w.magazine.position.y = w.magRestY - 0.36 * drop;
+                        w.magazine.visible = !(p > 0.36 && p < 0.48);
+                        // Seating jolt
+                        o.py += 0.022 * _bump(p, 0.67, 0.04);
+                        o.rx += 0.05 * _bump(p, 0.67, 0.04);
+                    }
+                    if (game.activeWeapon === 'pistol' && w.slide) {
+                        if (w.slideRestZ === undefined) w.slideRestZ = w.slide.position.z;
+                        w.slide.position.z = w.slideRestZ + 0.06 * _bump(p, 0.79, 0.06);
+                        o.pz += 0.02 * _bump(p, 0.79, 0.06);
+                    } else if (game.activeWeapon === 'sniper') {
+                        // Bolt cycle: roll out, pull, push
+                        o.rz += 0.25 * _bump(p, 0.78, 0.1) * hand;
+                        o.pz += 0.05 * _bump(p, 0.76, 0.05) - 0.02 * _bump(p, 0.84, 0.04);
+                    } else {
+                        // Charging handle
+                        o.pz += 0.035 * _bump(p, 0.78, 0.05);
+                        o.rx += -0.06 * _bump(p, 0.78, 0.05);
+                    }
+                }
+            }
+        };
+
+        // =============================================
+        // V1.7 Shell casings: pooled brass ejected from the gun, bouncing on the floor
+        // =============================================
+        const shellFX = {
+            CAP: 40,
+            mesh: null,
+            shells: [],
+            next: 0,
+            _m: new THREE.Matrix4(),
+            _q: new THREE.Quaternion(),
+            _e: new THREE.Euler(),
+            _v: new THREE.Vector3(),
+            _right: new THREE.Vector3(),
+            _up: new THREE.Vector3(),
+            _fwd: new THREE.Vector3(),
+
+            init: function () {
+                if (this.mesh) return;
+                const geo = new THREE.CylinderGeometry(0.0065, 0.0065, 0.026, 8);
+                geo.rotateZ(Math.PI / 2);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.9, roughness: 0.32 });
+                this.mesh = new THREE.InstancedMesh(geo, mat, this.CAP);
+                this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                this.mesh.count = 0;
+                this.mesh.frustumCulled = false;
+                this.mesh.castShadow = false;
+                this.mesh.receiveShadow = true;
+                for (let i = 0; i < this.CAP; i++) this.shells.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), t: 0, floor: 0 });
+                scene.add(this.mesh);
+            },
+
+            eject: function () {
+                if (!this.mesh) return;
+                const key = game.activeWeapon;
+                if (key === 'knife') return;
+                const s = this.shells[this.next];
+                this.next = (this.next + 1) % this.CAP;
+                camera.updateMatrixWorld();
+                const m = camera.matrixWorld.elements;
+                this._right.set(m[0], m[1], m[2]);
+                this._up.set(m[4], m[5], m[6]);
+                this._fwd.set(-m[8], -m[9], -m[10]);
+                const hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                const ads = game.adsProgress || 0;
+                s.p.copy(camera.position)
+                    .addScaledVector(this._right, (0.22 - 0.18 * ads) * hand)
+                    .addScaledVector(this._up, -0.16 + 0.06 * ads)
+                    .addScaledVector(this._fwd, 0.45);
+                s.v.set(0, 0, 0)
+                    .addScaledVector(this._right, (1.5 + Math.random() * 0.8) * hand)
+                    .addScaledVector(this._up, 1.6 + Math.random() * 0.7)
+                    .addScaledVector(this._fwd, -0.4 + Math.random() * 0.3);
+                if (characterController.velocity) s.v.add(characterController.velocity);
+                s.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+                s.w.set((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+                s.t = 0;
+                s.floor = Math.max(0, characterController.position.y - (characterController.height || 1.7)) + 0.007;
+                s.alive = true;
+            },
+
+            update: function (dt) {
+                if (!this.mesh) return;
+                let n = 0;
+                for (let i = 0; i < this.CAP; i++) {
+                    const s = this.shells[i];
+                    if (!s.alive) continue;
+                    s.t += dt;
+                    if (s.t > 3) { s.alive = false; continue; }
+                    if (s.p.y > s.floor || s.v.lengthSq() > 0.01) {
+                        s.v.y -= 9.8 * dt;
+                        s.p.addScaledVector(s.v, dt);
+                        s.r.addScaledVector(s.w, dt);
+                        if (s.p.y < s.floor) {
+                            s.p.y = s.floor;
+                            s.v.y *= -0.32;
+                            s.v.x *= 0.55; s.v.z *= 0.55;
+                            s.w.multiplyScalar(0.5);
+                            if (Math.abs(s.v.y) < 0.25) { s.v.set(0, 0, 0); s.w.set(0, 0, 0); s.r.x = 0; s.r.z = 0; }
+                        }
+                    }
+                    const fade = s.t > 2.5 ? 1 - (s.t - 2.5) / 0.5 : 1;
+                    this._q.setFromEuler(this._e.set(s.r.x, s.r.y, s.r.z));
+                    this._v.set(fade, fade, fade);
+                    this._m.compose(s.p, this._q, this._v);
+                    this.mesh.setMatrixAt(n++, this._m);
+                }
+                this.mesh.count = n;
+                if (n) this.mesh.instanceMatrix.needsUpdate = true;
+            }
+        };
+
+        // =============================================
+        // V1.7 Muzzle flash star: crossed additive cards with a procedural star,
+        // randomly rotated and sized each shot (on top of the existing flash and halo)
+        // =============================================
+        const muzzleStar = {
+            mat: null,
+            cards: {},
+            init: function () {
+                if (this.mat) return;
+                const c = document.createElement('canvas');
+                c.width = c.height = 128;
+                const g = c.getContext('2d');
+                const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+                grd.addColorStop(0, 'rgba(255,255,240,1)');
+                grd.addColorStop(0.25, 'rgba(255,214,120,0.9)');
+                grd.addColorStop(1, 'rgba(255,140,40,0)');
+                g.fillStyle = grd;
+                g.beginPath();
+                for (let i = 0; i < 12; i++) {
+                    const a = i / 12 * Math.PI * 2, r = i % 2 ? 22 : 62;
+                    g.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r);
+                }
+                g.closePath();
+                g.fill();
+                const tex = new THREE.CanvasTexture(c);
+                tex.encoding = THREE.sRGBEncoding;
+                this.mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+                for (const key of ['rifle', 'sniper', 'pistol']) {
+                    const w = game.weapons[key];
+                    if (!w || !w.muzzleFlash) continue;
+                    const grp = new THREE.Group();
+                    const front = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), this.mat);
+                    const side = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.12), this.mat);
+                    side.rotation.y = Math.PI / 2;
+                    side.position.z = -0.08;
+                    grp.add(front, side);
+                    grp.position.copy(w.muzzleFlash.position);
+                    w.model.add(grp);
+                    this.cards[key] = grp;
+                }
+            },
+            flash: function (key, dim) {
+                const g = this.cards[key];
+                if (!g || !this.mat) return;
+                this.mat.opacity = dim ? 0.35 : 0.95;
+                g.rotation.z = Math.random() * Math.PI;
+                const s = (key === 'sniper' ? 1.5 : key === 'pistol' ? 0.85 : 1) * (0.8 + Math.random() * 0.4);
+                g.scale.setScalar(s);
+                setTimeout(() => { if (this.mat) this.mat.opacity = 0; }, 45);
+            }
+        };
+
         // Apply weapon sway based on mouse movement (scaled by viewmodelBob setting)
         function applyWeaponSway(moveX, moveY) {
             const weapon = game.weapons[game.activeWeapon];
@@ -12870,11 +13192,21 @@
             }
         }
         
-        // Weapon bobbing, Left/Right-Handed viewmodel placement, ADS interpolation & [Y] Weapon Inspect Flourish
+        // V1.7: base placement, then the viewmodel animator's offset on top
         function applyWeaponBobbing(time, isMoving) {
             const weapon = game.weapons[game.activeWeapon];
+            const model = weapon ? weapon.model : null;
+            if (!model) return;
+            vmAnim.begin(model);
+            applyWeaponBobbingBase(time, isMoving);
+            vmAnim.end(model, time);
+        }
+
+        // Weapon bobbing, Left/Right-Handed viewmodel placement and ADS interpolation
+        function applyWeaponBobbingBase(time, isMoving) {
+            const weapon = game.weapons[game.activeWeapon];
             const activeWeapon = weapon ? weapon.model : null;
-            if (!activeWeapon || game.reloading) return;
+            if (!activeWeapon) return;
 
             const adsP = game.adsProgress || 0;
             const hip = weapon.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
@@ -12884,24 +13216,7 @@
             const baseY = hip.y + (ads.y - hip.y) * adsP;
             const baseZ = hip.z + (ads.z - hip.z) * adsP;
 
-            // 3D Weapon Flourish / Inspect Animation ([Y] Key)
-            if (game.inspectUntil > time && !game.adsActive) {
-                const dur = Math.max(100, game.inspectUntil - game.inspectStartAt);
-                const p = Math.min(1, Math.max(0, (time - game.inspectStartAt) / dur));
-                const wave = Math.sin(p * Math.PI);
-                activeWeapon.position.x = THREE.MathUtils.lerp(activeWeapon.position.x, baseX - 0.11 * wave * handSign, 0.25);
-                activeWeapon.position.y = THREE.MathUtils.lerp(activeWeapon.position.y, baseY + 0.09 * wave, 0.25);
-                activeWeapon.position.z = THREE.MathUtils.lerp(activeWeapon.position.z, baseZ + 0.06 * wave, 0.25);
-                if (weapon.isMelee) {
-                    activeWeapon.rotation.x = p * Math.PI * 2;
-                    activeWeapon.rotation.z = Math.sin(p * Math.PI * 2) * 0.55;
-                } else {
-                    activeWeapon.rotation.x = 0.24 * Math.sin(p * Math.PI * 2); // muzzle tips up
-                    activeWeapon.rotation.z = 0.65 * Math.sin(p * Math.PI);
-                }
-                return;
-            }
-            
+            // ([Y] inspect is a vmAnim timeline now)
             // Bob intensity: reduced when aiming down sights, crouched, or lowered via Viewmodel Bob slider
             const bobUserScale = (game.userSettings && typeof game.userSettings.viewmodelBob === 'number')
                 ? (game.userSettings.viewmodelBob / 100)
@@ -13135,16 +13450,10 @@
             const weaponModel = selected.model;
             const hip = selected.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
             const handSign = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
-            weaponModel.position.set(hip.x * handSign, hip.y - 0.2, hip.z);
-            weaponModel.rotation.set(0.3, 0, selected.isMelee ? -0.35 : 0); // V1.7 fix: no PI base (see applyWeaponBobbing)
-            
-            setTimeout(() => {
-                if (game.activeWeapon === weaponName && !game.reloading) {
-                    weaponModel.position.y = hip.y;
-                    weaponModel.rotation.x = 0;
-                    weaponModel.rotation.z = 0;
-                }
-            }, 180);
+            weaponModel.position.set(hip.x * handSign, hip.y, hip.z);
+            weaponModel.rotation.set(0, 0, 0); // V1.7 fix: no PI base (see applyWeaponBobbing)
+            // V1.7: animated draw (raise, roll in, settle) on the viewmodel animator
+            vmAnim.switched();
             
             // Show notification
             const extraNote = selected.isMelee ? ' (+25% Move Speed)' : ((weaponName === 'sniper' && game.sniperVariant === 'marshal') ? ' (+12% Scout Speed)' : '');
@@ -13431,7 +13740,8 @@
             if (game.reloading || game.adsActive) return;
             const now = performance.now();
             game.inspectStartAt = now;
-            game.inspectUntil = now + 1150;
+            game.inspectUntil = now + 2400;
+            vmAnim.play('inspect', 2400);
             if (typeof soundFX !== 'undefined') {
                 soundFX.playTone(660, 990, 0.09, 'triangle', 0.06, 0);
                 soundFX.playTone(990, 1320, 0.12, 'sine', 0.05, 0.06);
@@ -33302,15 +33612,13 @@
                         if (weapon.muzzleFlash) weapon.muzzleFlash.material.opacity = 0;
                         if (weapon.muzzleHalo) weapon.muzzleHalo.visible = false;
                     }, 50);
+                    muzzleStar.flash(game.activeWeapon, !!weapon.stealthTracers);
                 }
 
-                // Animate Sheriff Pistol reciprocating top slide on shot
-                if (game.activeWeapon === 'pistol' && weapon.slide) {
-                    weapon.slide.position.z = 0.05;
-                    setTimeout(() => {
-                        if (weapon.slide) weapon.slide.position.z = -0.08;
-                    }, 85);
-                }
+                // V1.7: brass out of the ejection port (the Operator ejects when the bolt cycles).
+                // The pistol slide kick is driven by vmAnim (it used to end 9 cm forward of rest).
+                if (game.activeWeapon === 'sniper') setTimeout(() => shellFX.eject(), 380);
+                else shellFX.eject();
 
                 // Apply viewmodel recoil & progressive camera spray kick (Crouching reduces recoil by 25%)
                 const adsProgress = game.adsProgress || 0;
@@ -33321,17 +33629,8 @@
                 const recoilScale = adsRecoilMult * crouchRecoilMult * ultRecoilScale * (isPistolBurst ? 1.35 : (isBulldogBurst ? 1.15 : 1.0));
 
                 const recoilAmount = weapon.recoil * recoilScale * (Math.random() * 0.4 + 0.8);
-                const hip = weapon.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
-                const ads = weapon.adsPos || hip;
-                const restY = hip.y + (ads.y - hip.y) * adsProgress;
-                weapon.model.rotation.x = recoilAmount; // muzzle kicks up (barrel is -Z)
-                weapon.model.position.y = restY - recoilAmount * 3.5;
-
-                setTimeout(() => {
-                    if (!game.reloading && game.weapons[game.activeWeapon] === weapon) {
-                        weapon.model.rotation.x = 0;
-                    }
-                }, 160);
+                // V1.7: the gun kicks back, rises and rolls on a damped spring (vmAnim)
+                vmAnim.fire(recoilAmount);
 
                 // Progressive vertical climb + horizontal sway spray pattern on camera look
                 const sprayIdx = game.sprayShotCount;
@@ -33953,70 +34252,10 @@
             // Show notification
             showNotification(`Reloading ${weapon.name}...`);
             
-            // Reload animation
-            const weaponModel = weapon.model;
-            const hip = weapon.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
-            
-            // Different reload animations depending on weapon
-            if (game.activeWeapon === 'rifle') {
-                weaponModel.position.y = -0.1;
-                weaponModel.rotation.x = -0.3;
-                weaponModel.rotation.z = 0.5;
-                
-                setTimeout(() => {
-                    const magazine = weaponModel.children.find(c => c.position.y === -0.12 && c.position.z === 0.1);
-                    if (magazine) {
-                        magazine.position.y = -0.4;
-                    }
-                    
-                    setTimeout(() => {
-                        if (magazine) {
-                            magazine.position.y = -0.12;
-                        }
-                        
-                        setTimeout(() => {
-                            weaponModel.position.set(hip.x, hip.y, hip.z);
-                            weaponModel.rotation.x = 0;
-                            weaponModel.rotation.z = 0;
-                        }, weapon.reloadTime * 1000 * 0.3);
-                    }, weapon.reloadTime * 1000 * 0.4);
-                }, weapon.reloadTime * 1000 * 0.2);
-            } else if (game.activeWeapon === 'sniper') {
-                weaponModel.position.y = -0.1;
-                
-                setTimeout(() => {
-                    weaponModel.rotation.z = 0.2;
-                    
-                    setTimeout(() => {
-                        weaponModel.rotation.z = -0.2;
-                        
-                        setTimeout(() => {
-                            weaponModel.position.set(hip.x, hip.y, hip.z);
-                            weaponModel.rotation.z = 0;
-                        }, weapon.reloadTime * 1000 * 0.3);
-                    }, weapon.reloadTime * 1000 * 0.4);
-                }, weapon.reloadTime * 1000 * 0.2);
-            } else if (game.activeWeapon === 'pistol') {
-                // Sheriff Sidearm reload animation: drop magazine, insert fresh mag, rack top slide
-                weaponModel.position.y = -0.14;
-                weaponModel.rotation.x = -0.24;
-                weaponModel.rotation.z = 0.38;
-                if (weapon.slide) weapon.slide.position.z = 0.04;
-
-                setTimeout(() => {
-                    if (weapon.magazine) weapon.magazine.position.y = -0.32;
-                    setTimeout(() => {
-                        if (weapon.magazine) weapon.magazine.position.y = -0.10;
-                        if (weapon.slide) weapon.slide.position.z = -0.08;
-                        soundFX.ads(true, false);
-                        setTimeout(() => {
-                            weaponModel.position.set(hip.x, hip.y, hip.z);
-                            weaponModel.rotation.x = 0;
-                            weaponModel.rotation.z = 0;
-                        }, weapon.reloadTime * 1000 * 0.28);
-                    }, weapon.reloadTime * 1000 * 0.42);
-                }, weapon.reloadTime * 1000 * 0.2);
-            }
+            // V1.7: reload choreography (tilt, magazine out and in, slide/bolt/charging
+            // handle) is a smooth timeline on the viewmodel animator
+            vmAnim.play('reload', weapon.reloadTime * 1000);
+            if (game.activeWeapon === 'sniper') setTimeout(() => { if (game.activeWeapon === 'sniper') shellFX.eject(); }, weapon.reloadTime * 780);
             
             // Complete reload after specified time
             setTimeout(() => {
@@ -35108,7 +35347,11 @@
             haloSystem.mesh.instanceColor.needsUpdate = true;
             haloSystem.mesh.visible = true;
             
-            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh];
+            // Shell casings: one instance in front of the camera for the warm draws
+            shellFX.mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z));
+            shellFX.mesh.count = 1;
+            shellFX.mesh.instanceMatrix.needsUpdate = true;
+            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh];
             for (let i = 0; i < agentSystem.warmupMeshes.length; i++) {
                 const wm = agentSystem.warmupMeshes[i];
                 wm.position.copy(p);
@@ -35128,6 +35371,8 @@
             trailBatch.mesh.geometry.setDrawRange(0, 0);
             decalBatch.mesh.count = 0;
             haloSystem.mesh.count = 0;
+            shellFX.mesh.count = 0;
+            shellFX.mesh.visible = true;
             for (let i = 0; i < enemyFlashLights.length; i++) {
                 enemyFlashLights[i].object.visible = false;
             }
@@ -38659,7 +38904,10 @@
             createWeapons();
             // Viewmodel keeps its authored saturation: no ACES on gun materials
             // (set before the warm-up compile, so it never triggers a recompile)
-            weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material)) o.material.toneMapped = false; });
+            // V1.7: muzzle star cards and pooled shell casings (before the warm-up compile)
+            muzzleStar.init();
+            shellFX.init();
+            weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material) && o.material !== muzzleStar.mat) o.material.toneMapped = false; });
             
             // Initialize object pools
             initObjectPools();
@@ -38853,6 +39101,7 @@
             updateGunplayAndCrosshair(delta, time, now);
             updateWeaponPosition();
             applyWeaponBobbing(time, game.keys.w || game.keys.a || game.keys.s || game.keys.d);
+            shellFX.update(Math.min(0.05, delta));
             // V1.7: 3D audio listener follows the camera; enemy footsteps; low-health cue
             soundFX.updateListener();
             enemyAudio.update();
