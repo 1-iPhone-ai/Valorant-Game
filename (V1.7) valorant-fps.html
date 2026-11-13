@@ -34296,9 +34296,14 @@
                         tacticalDirector.tryCastBotAbility(enemy, perfNow, distanceToPlayer, nx, nz, perpX, perpZ);
                     }
 
+                    // A bot that has reached the spike (to defuse it) or its plant site holds
+                    // its ground and works, firing back if it can see the player
+                    const onObjective = !!postPlantDefuseGoal &&
+                        Math.hypot(postPlantDefuseGoal.x - pos.x, postPlantDefuseGoal.z - pos.z) <= 2.6;
+                    if (onObjective && enemy.aiState && enemy.aiState !== 'engage') { enemyTactics.release(enemy); enemy.aiState = 'engage'; }
                     // V1.7 cover / peek / pair-flank decisions (skipped while rushing a planted spike)
-                    const tactic = (!postPlantDefuseGoal || enemy.hasSight) &&
-                        enemyTactics.step(enemy, pos, playerPosition, distanceToPlayer, perfNow, speedMult, arch.scaleY || 1);
+                    const tactic = onObjective || ((!postPlantDefuseGoal || enemy.hasSight) &&
+                        enemyTactics.step(enemy, pos, playerPosition, distanceToPlayer, perfNow, speedMult, arch.scaleY || 1));
 
                     // Only fire when enemy has verified clear Line-of-Sight (never through walls!),
                     // and not while sprinting for cover
