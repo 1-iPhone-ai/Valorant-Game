@@ -26,7 +26,8 @@ test('HUD at 1280x720: FPS cluster clear of the mode bar; help clear of the abil
     assert.equal(await page.evaluate(() => controlsHelp.startedExpanded), true, 'help is shown at start');
     // Collapses to the pill after 12 s
     await page.waitForFunction(() => !controlsHelp.expanded, null, { timeout: 30000 });
-    await frames(2);
+    // The pill fades in: wait for the fade rather than a fixed number of frames
+    await page.waitForFunction(() => parseFloat(getComputedStyle(document.getElementById('controls-hint-pill')).opacity) > 0.8, null, { timeout: 10000 });
     assert.equal((await rect(page, '#controls-hint-pill')).shown, true, 'pill shows after auto-collapse');
     // I re-opens it, clear of the centred agent/ability bars
     await page.keyboard.press('KeyI');
