@@ -4147,6 +4147,36 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>Music</strong>
+                                    <small>Generated per-map soundtrack that builds when the spike is planted (off by default)</small>
+                                </div>
+                                <div class="settings-control-right">
+                                    <div class="settings-pill-group" id="setting-music-pills">
+                                        <button class="settings-pill-opt active" data-music="off">OFF</button>
+                                        <button class="settings-pill-opt" data-music="on">ON</button>
+                                    </div>
+                                    <input type="range" class="settings-slider" id="setting-music-vol" min="0" max="100" step="5" value="50">
+                                    <span class="settings-val-badge" id="setting-music-vol-val">50%</span>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Ambience</strong>
+                                    <small>Per-map wind or hum, with birds, bells, drips and machinery around you in 3D (off by default)</small>
+                                </div>
+                                <div class="settings-control-right">
+                                    <div class="settings-pill-group" id="setting-ambience-pills">
+                                        <button class="settings-pill-opt active" data-ambience="off">OFF</button>
+                                        <button class="settings-pill-opt" data-ambience="on">ON</button>
+                                    </div>
+                                    <input type="range" class="settings-slider" id="setting-ambience-vol" min="0" max="100" step="5" value="50">
+                                    <span class="settings-val-badge" id="setting-ambience-vol-val">50%</span>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Headshot Dink &amp; Kill Banner Volume</strong>
                                     <small>Boost or lower the crisp metallic headshot dink &amp; multikill chime</small>
                                 </div>
@@ -5120,6 +5150,10 @@
                 invertY: false,
                 soundEnabled: true,
                 masterVolume: 100,
+                musicEnabled: false,   // V1.7: generated per-map music, off by default
+                musicVolume: 50,
+                ambienceEnabled: false, // V1.7: per-map wind/hum bed and placed ambient sounds, off by default
+                ambienceVolume: 50,
                 headshotVolume: 100,
                 showRecoilTrainer: false,
                 showMinimap: true,
@@ -15387,6 +15421,283 @@
             omenDarkCoverMs: 15000     // Dark Cover smoke duration           [15 s]
         };
         
+        // =============================================
+        // V1.7 Music & Ambience (Settings > Audio, both OFF by default)
+        // =============================================
+        // Everything is synthesised with Web Audio (no audio files):
+        //  - Music: a slow pad (detuned oscillator pairs through a low-pass filter)
+        //    walking a 4-chord progression in each map's own key and mode, with
+        //    sparse echoing arpeggio notes. A planted spike adds a pulsing bass and
+        //    opens the filter for tension.
+        //  - Ambience: a looping noise bed shaped per map (warm wind, cold wind,
+        //    city rumble) with slow gusts, an optional hum, and occasional one-shot
+        //    sounds (birds, bells, drips, metal creaks, neon buzz) placed around the
+        //    player through the 3D audio panner.
+        // A 250 ms scheduler looks ahead and books notes on the audio clock, so
+        // frame drops never make the music stutter. Volumes follow Master Volume.
+        const MAP_AUDIO = {
+            ascent: { root: 57, scale: [0, 2, 3, 5, 7, 9, 10], prog: [0, 5, 3, 6], tempo: 72, wave: 'triangle', cutoff: 1400,
+                      bed: { type: 'lowpass', freq: 520, q: 0.4, gain: 0.5 }, hum: 0, events: ['bird', 'bell', 'bird'] },
+            bind:   { root: 50, scale: [0, 1, 4, 5, 7, 8, 10], prog: [0, 1, 0, 6], tempo: 66, wave: 'sawtooth', cutoff: 900,
+                      bed: { type: 'lowpass', freq: 380, q: 0.5, gain: 0.6 }, hum: 0, events: ['chime', 'bird'] },
+            haven:  { root: 52, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 3, 5, 4], tempo: 64, wave: 'triangle', cutoff: 1200,
+                      bed: { type: 'lowpass', freq: 450, q: 0.4, gain: 0.45 }, hum: 0, events: ['bell', 'bird', 'bird'] },
+            icebox: { root: 49, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 6, 4], tempo: 70, wave: 'sine', cutoff: 2400,
+                      bed: { type: 'bandpass', freq: 1100, q: 0.7, gain: 0.55 }, hum: 55, events: ['creak', 'chime'] },
+            lotus:  { root: 55, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 5, 4, 0], tempo: 62, wave: 'triangle', cutoff: 1100,
+                      bed: { type: 'lowpass', freq: 420, q: 0.4, gain: 0.4 }, hum: 0, events: ['drip', 'bell', 'bird'] },
+            split:  { root: 53, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 6, 5, 6], tempo: 76, wave: 'sawtooth', cutoff: 1800,
+                      bed: { type: 'lowpass', freq: 220, q: 0.6, gain: 0.55 }, hum: 120, events: ['neon', 'creak'] }
+        };
+        const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+        const ambientAudio = {
+            ctx: null,
+            musicBus: null,
+            ambBus: null,
+            padFilter: null,
+            echo: null,
+            bed: null,
+            bedFilter: null,
+            bedGain: null,
+            hum: null,
+            humGain: null,
+            presetId: null,
+            nextChordTime: 0,
+            chordIdx: 0,
+            nextGustTime: 0,
+            nextEventAt: 0,
+            tension: 0,
+            chordsPlayed: 0,
+            eventsPlayed: 0,
+            _timer: null,
+
+            init: function () {
+                if (this._timer) return;
+                this._timer = setInterval(() => { try { this.tick(); } catch (e) {} }, 250);
+            },
+
+            _levels: function () {
+                const cfg = game.userSettings || {};
+                const master = (typeof cfg.masterVolume === 'number' ? cfg.masterVolume : 100) / 100;
+                const on = game.soundEnabled !== false;
+                return {
+                    music: (on && cfg.musicEnabled) ? master * (typeof cfg.musicVolume === 'number' ? cfg.musicVolume : 50) / 100 : 0,
+                    amb: (on && cfg.ambienceEnabled) ? master * (typeof cfg.ambienceVolume === 'number' ? cfg.ambienceVolume : 50) / 100 : 0
+                };
+            },
+
+            // Built lazily the first time either layer is switched on
+            _build: function (ctx) {
+                this.ctx = ctx;
+                this.musicBus = ctx.createGain();
+                this.musicBus.gain.value = 0;
+                this.musicBus.connect(ctx.destination);
+                this.ambBus = ctx.createGain();
+                this.ambBus.gain.value = 0;
+                this.ambBus.connect(ctx.destination);
+                this.padFilter = ctx.createBiquadFilter();
+                this.padFilter.type = 'lowpass';
+                this.padFilter.Q.value = 0.6;
+                this.padFilter.connect(this.musicBus);
+                // Echo for the arpeggio notes
+                const delay = ctx.createDelay(1.5);
+                delay.delayTime.value = 0.42;
+                const fb = ctx.createGain();
+                fb.gain.value = 0.38;
+                const wet = ctx.createGain();
+                wet.gain.value = 0.5;
+                delay.connect(fb);
+                fb.connect(delay);
+                delay.connect(wet);
+                wet.connect(this.musicBus);
+                this.echo = ctx.createGain();
+                this.echo.connect(this.musicBus);
+                this.echo.connect(delay);
+                // Ambience bed: 4 s of brown noise, looped
+                const len = ctx.sampleRate * 4;
+                const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+                const d = buf.getChannelData(0);
+                let last = 0;
+                for (let i = 0; i < len; i++) {
+                    last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+                    d[i] = last * 3.2;
+                }
+                // Smooth the loop seam
+                for (let i = 0; i < 2000; i++) d[len - 1 - i] *= i / 2000;
+                this.bed = ctx.createBufferSource();
+                this.bed.buffer = buf;
+                this.bed.loop = true;
+                this.bedFilter = ctx.createBiquadFilter();
+                this.bedGain = ctx.createGain();
+                this.bedGain.gain.value = 0.5;
+                this.bed.connect(this.bedFilter);
+                this.bedFilter.connect(this.bedGain);
+                this.bedGain.connect(this.ambBus);
+                this.bed.start();
+                this.hum = ctx.createOscillator();
+                this.hum.type = 'sawtooth';
+                const humFilter = ctx.createBiquadFilter();
+                humFilter.type = 'lowpass';
+                humFilter.frequency.value = 300;
+                this.humGain = ctx.createGain();
+                this.humGain.gain.value = 0;
+                this.hum.connect(humFilter);
+                humFilter.connect(this.humGain);
+                this.humGain.connect(this.ambBus);
+                this.hum.start();
+                this.nextChordTime = ctx.currentTime + 0.3;
+            },
+
+            _applyPreset: function (id) {
+                const P = MAP_AUDIO[id] || MAP_AUDIO.ascent;
+                this.presetId = MAP_AUDIO[id] ? id : 'ascent';
+                const t = this.ctx.currentTime;
+                this.bedFilter.type = P.bed.type;
+                this.bedFilter.frequency.setTargetAtTime(P.bed.freq, t, 0.8);
+                this.bedFilter.Q.setTargetAtTime(P.bed.q, t, 0.8);
+                this.bedGain.gain.setTargetAtTime(P.bed.gain, t, 0.8);
+                if (P.hum) this.hum.frequency.setTargetAtTime(P.hum, t, 0.5);
+                this.humGain.gain.setTargetAtTime(P.hum ? 0.05 : 0, t, 0.8);
+                this.chordIdx = 0;
+            },
+
+            tick: function () {
+                const lv = this._levels();
+                if (!this.ctx) {
+                    if (lv.music <= 0 && lv.amb <= 0) return;
+                    const ctx = soundFX.ensureContext();
+                    if (!ctx) return;
+                    this._build(ctx);
+                }
+                const ctx = this.ctx;
+                const t = ctx.currentTime;
+                // Music sits under the game: 0.35 at 100%; ambience a little lower
+                this.musicBus.gain.setTargetAtTime(lv.music * 0.35, t, 0.6);
+                this.ambBus.gain.setTargetAtTime(lv.amb * 0.3, t, 0.6);
+                const id = (game.mapPreset && MAP_AUDIO[game.mapPreset]) ? game.mapPreset : 'ascent';
+                if (id !== this.presetId) this._applyPreset(id);
+                const P = MAP_AUDIO[this.presetId];
+                const planted = typeof tacticalDirector !== 'undefined' && tacticalDirector.spikeState === 'planted';
+                this.tension += ((planted ? 1 : 0) - this.tension) * 0.25;
+                this.padFilter.frequency.setTargetAtTime(P.cutoff * (1 + this.tension * 1.2), t, 1.0);
+                if (lv.music > 0) this._scheduleMusic(P, t);
+                else this.nextChordTime = Math.max(this.nextChordTime, t + 0.3);
+                if (lv.amb > 0) this._scheduleAmbience(P, t, lv.amb);
+            },
+
+            _scheduleMusic: function (P, t) {
+                if (this.nextChordTime < t) this.nextChordTime = t + 0.1;
+                const ctx = this.ctx;
+                const beat = 60 / (P.tempo * (1 + this.tension * 0.25));
+                const dur = beat * 8; // two bars per chord
+                while (this.nextChordTime < t + 0.6) {
+                    const start = this.nextChordTime;
+                    const deg = P.prog[this.chordIdx % P.prog.length];
+                    this.chordIdx++;
+                    const notes = [0, 2, 4].map((k) => {
+                        const i = deg + k;
+                        return P.root + P.scale[i % 7] + 12 * Math.floor(i / 7);
+                    });
+                    // Pad: two detuned oscillators per note, slow swell and release
+                    for (const n of notes) {
+                        for (const det of [-7, 7]) {
+                            const o = ctx.createOscillator();
+                            o.type = P.wave;
+                            o.frequency.value = midiHz(n - 12);
+                            o.detune.value = det;
+                            const g = ctx.createGain();
+                            g.gain.setValueAtTime(0.0001, start);
+                            g.gain.linearRampToValueAtTime(0.05, start + Math.min(1.8, dur * 0.3));
+                            g.gain.setValueAtTime(0.05, start + dur * 0.8);
+                            g.gain.linearRampToValueAtTime(0.0001, start + dur + 1.6);
+                            o.connect(g);
+                            g.connect(this.padFilter);
+                            o.start(start);
+                            o.stop(start + dur + 1.7);
+                        }
+                    }
+                    // Sparse arpeggio, an octave up, into the echo
+                    const count = 3 + Math.floor(Math.random() * 3);
+                    for (let k = 0; k < count; k++) {
+                        const at = start + beat * Math.floor(Math.random() * 8);
+                        const o = ctx.createOscillator();
+                        o.type = 'sine';
+                        o.frequency.value = midiHz(notes[Math.floor(Math.random() * 3)] + 12);
+                        const g = ctx.createGain();
+                        g.gain.setValueAtTime(0.0001, at);
+                        g.gain.linearRampToValueAtTime(0.06, at + 0.02);
+                        g.gain.exponentialRampToValueAtTime(0.0001, at + 1.1);
+                        o.connect(g);
+                        g.connect(this.echo);
+                        o.start(at);
+                        o.stop(at + 1.2);
+                    }
+                    // Planted spike: pulsing eighth-note bass on the chord root
+                    if (this.tension > 0.5) {
+                        for (let k = 0; k < 16; k++) {
+                            const at = start + k * beat / 2;
+                            const o = ctx.createOscillator();
+                            o.type = 'square';
+                            o.frequency.value = midiHz(notes[0] - 24);
+                            const g = ctx.createGain();
+                            g.gain.setValueAtTime(0.0001, at);
+                            g.gain.linearRampToValueAtTime(0.045, at + 0.01);
+                            g.gain.exponentialRampToValueAtTime(0.0001, at + beat * 0.45);
+                            o.connect(g);
+                            g.connect(this.padFilter);
+                            o.start(at);
+                            o.stop(at + beat * 0.5);
+                        }
+                    }
+                    this.chordsPlayed++;
+                    this.nextChordTime += dur;
+                }
+            },
+
+            _scheduleAmbience: function (P, t, level) {
+                // Gusts: drift the bed level and filter every few seconds
+                if (t >= this.nextGustTime) {
+                    const g = P.bed.gain * (0.6 + Math.random() * 0.8);
+                    this.bedGain.gain.setTargetAtTime(g, t, 1.5 + Math.random() * 2);
+                    this.bedFilter.frequency.setTargetAtTime(P.bed.freq * (0.7 + Math.random() * 0.7), t, 2);
+                    this.nextGustTime = t + 3 + Math.random() * 4;
+                }
+                // Occasional placed sounds around the player
+                const now = performance.now();
+                if (now < this.nextEventAt) return;
+                this.nextEventAt = now + 4000 + Math.random() * 7000;
+                const kind = P.events[Math.floor(Math.random() * P.events.length)];
+                const p = (typeof characterController !== 'undefined') ? characterController.position : { x: 0, y: 1.7, z: 0 };
+                const a = Math.random() * Math.PI * 2, r = 14 + Math.random() * 26;
+                const x = p.x + Math.sin(a) * r, z = p.z + Math.cos(a) * r, y = kind === 'bird' ? 8 + Math.random() * 6 : 2 + Math.random() * 4;
+                const v = level * 0.6;
+                this.eventsPlayed++;
+                soundFX.at(x, y, z, () => {
+                    if (kind === 'bird') {
+                        const f = 2400 + Math.random() * 1600;
+                        for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) soundFX.playTone(f, f * (1.15 + Math.random() * 0.3), 0.09, 'sine', 0.05 * v, i * 0.13);
+                    } else if (kind === 'bell') {
+                        const f = 300 + Math.random() * 200;
+                        soundFX.playTone(f, f, 2.4, 'sine', 0.06 * v, 0);
+                        soundFX.playTone(f * 2.76, f * 2.76, 1.6, 'sine', 0.025 * v, 0);
+                    } else if (kind === 'chime') {
+                        const f = 900 + Math.random() * 500;
+                        for (let i = 0; i < 3; i++) soundFX.playTone(f * (1 + i * 0.26), f * (1 + i * 0.26), 1.2, 'triangle', 0.03 * v, i * 0.18);
+                    } else if (kind === 'drip') {
+                        const f = 1300 + Math.random() * 700;
+                        soundFX.playTone(f, f * 0.55, 0.12, 'sine', 0.06 * v, 0);
+                    } else if (kind === 'creak') {
+                        const f = 140 + Math.random() * 80;
+                        soundFX.playTone(f, f * 0.7, 0.9, 'sawtooth', 0.03 * v, 0);
+                    } else if (kind === 'neon') {
+                        soundFX.playTone(120, 120, 0.7, 'square', 0.02 * v, 0);
+                        soundFX.playTone(240, 240, 0.5, 'square', 0.012 * v, 0.1);
+                    }
+                });
+            }
+        };
+
         const agentSystem = {
             initialized: false,
             stateByAgent: {},
@@ -34249,6 +34560,10 @@
             invertY: false,
             soundEnabled: true,
             masterVolume: 100,
+            musicEnabled: false,
+            musicVolume: 50,
+            ambienceEnabled: false,
+            ambienceVolume: 50,
             headshotVolume: 100,
             showRecoilTrainer: false,
             showMinimap: true,
@@ -35014,6 +35329,29 @@
                     });
                 }
 
+                // V1.7 music & ambience: switches and volume sliders (ambientAudio reads them)
+                this.bindPillGroup('setting-music-pills', 'data-music', (val) => {
+                    game.userSettings.musicEnabled = val === 'on';
+                    ambientAudio.tick();
+                    this.saveToStorage();
+                });
+                this.bindPillGroup('setting-ambience-pills', 'data-ambience', (val) => {
+                    game.userSettings.ambienceEnabled = val === 'on';
+                    ambientAudio.tick();
+                    this.saveToStorage();
+                });
+                for (const [id, key] of [['setting-music-vol', 'musicVolume'], ['setting-ambience-vol', 'ambienceVolume']]) {
+                    const el = document.getElementById(id);
+                    if (!el) continue;
+                    el.addEventListener('input', (e) => {
+                        const v = parseInt(e.target.value, 10);
+                        game.userSettings[key] = isNaN(v) ? 50 : v;
+                        const b = document.getElementById(id + '-val');
+                        if (b) b.textContent = `${game.userSettings[key]}%`;
+                        this.saveToStorage();
+                    });
+                }
+
                 const hsVolSlider = document.getElementById('setting-hs-vol');
                 if (hsVolSlider) {
                     hsVolSlider.addEventListener('input', (e) => {
@@ -35719,6 +36057,10 @@
                 setSlider('setting-viewmodel-bob', 'setting-viewmodel-bob-val', cfg.viewmodelBob !== undefined ? cfg.viewmodelBob : 100, `${cfg.viewmodelBob !== undefined ? cfg.viewmodelBob : 100}%`);
                 setSlider('setting-master-vol', 'setting-master-vol-val', cfg.masterVolume, `${cfg.masterVolume}%`);
                 setSlider('setting-hs-vol', 'setting-hs-vol-val', cfg.headshotVolume, `${cfg.headshotVolume}%`);
+                setSlider('setting-music-vol', 'setting-music-vol-val', cfg.musicVolume !== undefined ? cfg.musicVolume : 50, `${cfg.musicVolume !== undefined ? cfg.musicVolume : 50}%`);
+                setSlider('setting-ambience-vol', 'setting-ambience-vol-val', cfg.ambienceVolume !== undefined ? cfg.ambienceVolume : 50, `${cfg.ambienceVolume !== undefined ? cfg.ambienceVolume : 50}%`);
+                setActivePill('setting-music-pills', 'data-music', cfg.musicEnabled ? 'on' : 'off');
+                setActivePill('setting-ambience-pills', 'data-ambience', cfg.ambienceEnabled ? 'on' : 'off');
 
                 if (invertYCheckbox) invertYCheckbox.checked = !!cfg.invertY;
                 const invBadge = document.getElementById('setting-inverty-val');
@@ -37197,6 +37539,7 @@
             tacticalEnhancements.init();
             gamepadController.init();
             controlsHelp.init();
+            ambientAudio.init();
             
             // Glow halo anchors: pooled ability cores, the spike core, ult orbs
             haloSystem.collectAbilityAnchors();
