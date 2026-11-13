@@ -133,6 +133,11 @@
         #low-health-vignette.active {
             animation: lowHpPulse 0.9s ease-in-out infinite;
         }
+        /* V1.7 accessibility: Reduce Flashes keeps the warning but drops the pulse */
+        body.reduce-flashes #low-health-vignette.active {
+            animation: none;
+            opacity: 0.6;
+        }
         @keyframes lowHpPulse {
             0%, 100% { opacity: 0.55; }
             50% { opacity: 1; }
@@ -3491,6 +3496,7 @@
                                     <button class="settings-pill-opt active" data-enemycol="red" style="border-left: 3px solid #ff4655;">🔴 VALORANT RED</button>
                                     <button class="settings-pill-opt" data-enemycol="yellow" style="border-left: 3px solid #ffd166;">🟡 PRO YELLOW (DEUTERANOPIA)</button>
                                     <button class="settings-pill-opt" data-enemycol="purple" style="border-left: 3px solid #d946ef;">🟣 NEON PURPLE (TRITANOPIA)</button>
+                                    <button class="settings-pill-opt" data-enemycol="cyan" style="border-left: 3px solid #22d3ee;">🔵 CYAN (PROTANOPIA)</button>
                                 </div>
                             </div>
 
@@ -3614,6 +3620,17 @@
                                 <div class="settings-control-right">
                                     <input type="range" class="settings-slider" id="setting-brightness" min="70" max="140" step="5" value="100">
                                     <span class="settings-val-badge" id="setting-brightness-val">100%</span>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Reduce Flashes (Accessibility)</strong>
+                                    <small>Softens flashbangs and full-screen colour flashes, and stops the low-health pulse (for light sensitivity)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-reduce-flash-pills">
+                                    <button class="settings-pill-opt active" data-reduceflash="off">OFF</button>
+                                    <button class="settings-pill-opt" data-reduceflash="on">ON</button>
                                 </div>
                             </div>
 
@@ -4266,7 +4283,7 @@
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>Enemy Bot Skill &amp; Reaction Speed</strong>
-                                    <small>Adjust bot accuracy, fire-rate cadence, and strafe evasion speed across all modes</small>
+                                    <small>Adjust bot accuracy, fire-rate cadence, strafe speed and tactics (Iron: hides only when hurt, never flanks; Radiant: flanks often, peeks pre-aimed)</small>
                                 </div>
                                 <div class="settings-pill-group" id="setting-bot-diff-pills">
                                     <button class="settings-pill-opt" data-botdiff="iron">IRON (RELAXED)</button>
@@ -5082,6 +5099,7 @@
                 lowHealthWarning: true,
                 glowHalos: 'auto',     // V1.7: 'auto' (profile budget) | 'off' | 'max'
                 brightness: 100,       // V1.7: % of the atmosphere mode's exposure (70-140)
+                reduceFlashes: false,  // V1.7 accessibility: soften full-screen flashes and the low-health pulse
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -10371,11 +10389,26 @@
         // the other swings wide round the player. Everything uses the existing
         // collision and wall line-of-sight checks, so bots still never shoot
         // through walls.
+        // How the cover/flank tactics scale with Bot Skill (Settings > Practice).
+        // Iron only hides when hurt, never flanks and peeks slowly; Radiant
+        // repositions and flanks often and comes round corners already aimed.
+        const BOT_TACTIC_LEVELS = {
+            iron:     { reposition: false, repositionMs: [0, 0],       flank: false, flankGapMs: [0, 0],         coverWaitMs: [1600, 2600], peekMs: [800, 1200],  maxPeeks: 2, preAim: false },
+            gold:     { reposition: true,  repositionMs: [3000, 5500], flank: true,  flankGapMs: [7000, 11000],  coverWaitMs: [900, 1800],  peekMs: [1100, 1800], maxPeeks: 3, preAim: false },
+            immortal: { reposition: true,  repositionMs: [2500, 4500], flank: true,  flankGapMs: [5000, 8000],   coverWaitMs: [700, 1300],  peekMs: [1200, 2000], maxPeeks: 3, preAim: false },
+            radiant:  { reposition: true,  repositionMs: [2000, 3500], flank: true,  flankGapMs: [3500, 6000],   coverWaitMs: [500, 1000],  peekMs: [1300, 2200], maxPeeks: 4, preAim: true }
+        };
+        const _tacRand = (r) => r[0] + Math.random() * (r[1] - r[0]);
         const _tacHead = new THREE.Vector3();
         const _tacEye = new THREE.Vector3();
         const enemyTactics = {
             covers: [],
             owner: new Map(),   // cover index -> enemy holding it
+
+            level: function () {
+                const d = (game.userSettings && game.userSettings.botDifficulty) || 'gold';
+                return BOT_TACTIC_LEVELS[d] || BOT_TACTIC_LEVELS.gold;
+            },
 
             build: function () {
                 this.covers.length = 0;
@@ -10439,8 +10472,9 @@
                 enemy.lastHitAt = 0;
                 enemy.forceCover = false;
                 const now = performance.now();
+                const L = this.level();
                 enemy.nextCoverAllowed = now + 1500;
-                enemy.repositionAt = now + 3000 + Math.random() * 2500;
+                enemy.repositionAt = L.reposition ? now + _tacRand(L.repositionMs) : Infinity;
                 enemy.nextFlankAt = now + 2000 + Math.random() * 3000;
             },
 
@@ -10516,10 +10550,11 @@
             step: function (enemy, pos, player, dist, perfNow, speedMult, scaleY) {
                 if (enemy.aiState === undefined) this.reset(enemy);
                 const st = enemy.aiState;
+                const L = this.level();
                 if (st === 'engage') {
                     const hurt = enemy.health / Math.max(1, enemy.maxHealth) < 0.5;
                     const want = enemy.forceCover || enemy.recentHits >= 2 ||
-                        (perfNow >= enemy.nextCoverAllowed && (hurt || perfNow >= enemy.repositionAt));
+                        (perfNow >= enemy.nextCoverAllowed && (hurt || (L.reposition && perfNow >= enemy.repositionAt)));
                     if (want) {
                         enemy.forceCover = false;
                         enemy.recentHits = 0;
@@ -10534,11 +10569,11 @@
                             return true;
                         }
                         enemy.nextCoverAllowed = perfNow + 2500;
-                        enemy.repositionAt = perfNow + 4000 + Math.random() * 2000;
+                        enemy.repositionAt = L.reposition ? perfNow + 1000 + _tacRand(L.repositionMs) : Infinity;
                     }
                     // Odd slot of a pair: swing wide while the partner holds the player's attention
                     const partner = enemyObjects[enemy.slot ^ 1];
-                    if ((enemy.slot & 1) && partner && partner.isActive && !partner.hit && partner.hasSight &&
+                    if (L.flank && (enemy.slot & 1) && partner && partner.isActive && !partner.hit && partner.hasSight &&
                         perfNow >= enemy.nextFlankAt && dist > 7 && dist < 22) {
                         const ax = pos.x - player.x, az = pos.z - player.z;
                         const base = Math.atan2(ax, az);
@@ -10562,7 +10597,7 @@
                     if (!c || perfNow > enemy.aiUntil) { this.release(enemy); enemy.aiState = 'engage'; enemy.nextCoverAllowed = perfNow + 3000; return false; }
                     if (this._moveToward(pos, c.x, c.z, 0.065 * speedMult) < 0.3) {
                         enemy.aiState = 'cover';
-                        enemy.aiUntil = perfNow + 900 + Math.random() * 900;
+                        enemy.aiUntil = perfNow + _tacRand(L.coverWaitMs);
                     }
                     return true;
                 }
@@ -10573,18 +10608,20 @@
                     // The player walked round the cover: fight from here
                     if (enemy.hasSight || perfNow >= enemy.aiUntil) {
                         const peek = enemy.hasSight ? { x: pos.x, z: pos.z } : this._pickPeek(enemy, player, scaleY);
-                        if (peek && enemy.peeks < 3) {
+                        if (peek && enemy.peeks < L.maxPeeks) {
                             enemy.peekX = peek.x;
                             enemy.peekZ = peek.z;
                             enemy.peeks++;
                             enemy.aiState = 'peek';
-                            enemy.aiUntil = perfNow + 1100 + Math.random() * 700;
+                            enemy.aiUntil = perfNow + _tacRand(L.peekMs);
+                            // Radiant: comes round the corner already aimed (fires on first sight)
+                            if (L.preAim) enemy.lastShot = 0;
                         } else {
                             // No angle left (or peeked enough): push out and fight
                             this.release(enemy);
                             enemy.aiState = 'engage';
                             enemy.nextCoverAllowed = perfNow + 6000;
-                            enemy.repositionAt = perfNow + 6000 + Math.random() * 3000;
+                            enemy.repositionAt = L.reposition ? perfNow + 3000 + _tacRand(L.repositionMs) : Infinity;
                             return false;
                         }
                     }
@@ -10601,7 +10638,7 @@
                 if (st === 'flank') {
                     if (this._moveToward(pos, enemy.flankX, enemy.flankZ, 0.068 * speedMult) < 0.5 || perfNow > enemy.aiUntil) {
                         enemy.aiState = 'engage';
-                        enemy.nextFlankAt = perfNow + 7000 + Math.random() * 4000;
+                        enemy.nextFlankAt = perfNow + _tacRand(L.flankGapMs);
                         return false;
                     }
                     return true;
@@ -11018,6 +11055,7 @@
             let torso = c.torso, head = c.head;
             if (mode === 'yellow') { torso = 0xd97706; head = 0xffd166; }
             else if (mode === 'purple') { torso = 0x7e22ce; head = 0xe879f9; }
+            else if (mode === 'cyan') { torso = 0x0891b2; head = 0x67e8f9; } // V1.7: protanopia
             return [torso, head, c.legs, c.weapon];
         }
         
@@ -23929,6 +23967,12 @@
             _washEl: null,
             _washTimer: 0,
             triggerScreenWash: function(cssColor, durationMs) {
+                // V1.7 Reduce Flashes: a third of the strength, and short
+                if (game.userSettings && game.userSettings.reduceFlashes) {
+                    cssColor = String(cssColor).replace(/rgba\(([^,]+),([^,]+),([^,]+),\s*([0-9.]+)\s*\)/,
+                        (m, r, g, b, a) => `rgba(${r},${g},${b}, ${(parseFloat(a) * 0.3).toFixed(3)})`);
+                    durationMs = Math.min(durationMs || 400, 280);
+                }
                 let el = this._washEl;
                 if (!el) {
                     el = document.createElement('div');
@@ -28367,7 +28411,8 @@
                 if (fxFlash) {
                     if (now < this.playerBlindUntil) {
                         const remFrac = (this.playerBlindUntil - now) / 450;
-                        fxFlash.style.opacity = (this.playerBlindPeak * remFrac).toFixed(2);
+                        const flashScale = (game.userSettings && game.userSettings.reduceFlashes) ? 0.35 : 1;
+                        fxFlash.style.opacity = (this.playerBlindPeak * remFrac * flashScale).toFixed(2);
                     } else {
                         fxFlash.style.opacity = '0';
                     }
@@ -34175,6 +34220,7 @@
             charDetail: 'off',
             glowHalos: 'auto',
             brightness: 100,
+            reduceFlashes: false,
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -34520,6 +34566,12 @@
                     game.userSettings.maxDecals = p.maxDecals;
                     this.applyAtmosphereTheme();
                     this.syncAllUI();
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-reduce-flash-pills', 'data-reduceflash', (val) => {
+                    game.userSettings.reduceFlashes = val === 'on';
+                    this.applyAccessibility();
                     this.saveToStorage();
                 });
 
@@ -35166,6 +35218,10 @@
 
             // V1.7 fix: this read arch.torsoColor / arch.headColor, which do not exist,
             // so every bot spawned before a respawn was drawn pure black (torso and head).
+            applyAccessibility: function() {
+                document.body.classList.toggle('reduce-flashes', !!(game.userSettings && game.userSettings.reduceFlashes));
+            },
+
             applyEnemyHighlightColor: function() {
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const enemy = enemyObjects[i];
@@ -35539,6 +35595,7 @@
                 game.soundEnabled = cfg.soundEnabled !== false;
 
                 this.applyEnemyHighlightColor();
+                this.applyAccessibility();
                 this.applyAtmosphereTheme();
                 this.applyWeaponSkin(cfg.weaponSkin || 'standard');
                 this.applyCrosshairStyle();
@@ -35606,6 +35663,7 @@
                 setActivePill('setting-surface-detail-pills', 'data-detail', cfg.surfaceDetail || 'auto');
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
                 setActivePill('setting-map-detail-pills', 'data-mapdetail', cfg.mapDetail === 'on' ? 'on' : 'off');
+                setActivePill('setting-reduce-flash-pills', 'data-reduceflash', cfg.reduceFlashes ? 'on' : 'off');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
