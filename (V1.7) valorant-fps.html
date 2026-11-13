@@ -13168,8 +13168,9 @@
             wasGrounded: true,
             slideKickAt: -1e9,
 
+            slashSide: 1,
             play: function (kind, durMs) {
-                this.clip = { kind: kind, start: performance.now(), dur: Math.max(50, durMs), weapon: game.activeWeapon };
+                this.clip = { kind: kind, start: performance.now(), dur: Math.max(50, durMs), weapon: game.activeWeapon, side: this.slashSide };
             },
 
             // Called on every shot: the spring takes it from here
@@ -13241,6 +13242,8 @@
                         this.pose(c.kind, p, w, o, hand);
                     }
                 }
+                // Ability cast gesture (off-hand) layered on top
+                castFX.apply(now, o, hand);
                 model.position.x += o.px; model.position.y += o.py; model.position.z += o.pz;
                 model.rotation.x += o.rx; model.rotation.y += o.ry; model.rotation.z += o.rz;
                 this.last = o;
@@ -13255,7 +13258,41 @@
                 this.clip = null;
             },
 
+            // Keyframed offsets: keys = [[t, px, py, pz, rx, ry, rz], ...], eased between keys
+            _keys: function (keys, p, o, hand, side) {
+                let i = 0;
+                while (i < keys.length - 2 && p > keys[i + 1][0]) i++;
+                const a = keys[i], b = keys[i + 1];
+                const t = _ease.inOut(Math.min(1, Math.max(0, (p - a[0]) / (b[0] - a[0]))));
+                const v = (j) => a[j] + (b[j] - a[j]) * t;
+                const sx = hand * side;
+                o.px += v(1) * sx; o.py += v(2); o.pz += v(3);
+                o.rx += v(4); o.ry += v(5) * sx; o.rz += v(6) * sx;
+            },
+
             pose: function (kind, p, w, o, hand) {
+                if (kind === 'slash') {
+                    // Wind up high on one side, cut down across, recover
+                    this._keys([
+                        [0, 0, 0, 0, 0, 0, 0],
+                        [0.18, 0.06, 0.13, 0.03, 0.35, -0.25, -0.55],
+                        [0.46, -0.27, 0.02, -0.22, -0.2, 0.38, 0.85],
+                        [0.6, -0.25, 0.0, -0.18, -0.15, 0.32, 0.7],
+                        [1, 0, 0, 0, 0, 0, 0]
+                    ], p, o, hand, (this.clip && this.clip.side) || 1);
+                    return;
+                }
+                if (kind === 'stab') {
+                    // Draw back, lunge forward with a twist, hold, recover
+                    this._keys([
+                        [0, 0, 0, 0, 0, 0, 0],
+                        [0.24, 0.03, 0.04, 0.12, 0.18, 0, -0.2],
+                        [0.42, -0.14, 0.09, -0.44, -0.3, 0.18, 0.6],
+                        [0.58, -0.13, 0.08, -0.4, -0.27, 0.16, 0.55],
+                        [1, 0, 0, 0, 0, 0, 0]
+                    ], p, o, hand, 1);
+                    return;
+                }
                 if (kind === 'draw') {
                     const e = _ease.back(p);
                     o.py += -0.25 * (1 - e);
@@ -13459,6 +13496,183 @@
                 const s = (key === 'sniper' ? 1.5 : key === 'pistol' ? 0.85 : 1) * (0.8 + Math.random() * 0.4);
                 g.scale.setScalar(s);
                 setTimeout(() => { if (this.mat) this.mat.opacity = 0; }, 45);
+            }
+        };
+
+        // =============================================
+        // V1.7 Ability cast gestures: the off-hand comes up into view, gathers the
+        // agent's energy and throws it; ultimates gather longer with orbiting wisps
+        // and a burst; second-stage activations are a quick flick. Runs on its own
+        // timeline layered on the gun pose (so a cast mid-reload does not break the
+        // reload). Reuses the gun hands' material and the muzzle-star card shader,
+        // so it adds no shader programs.
+        // =============================================
+        const castFX = {
+            group: null, hand: null, sleeve: null,
+            halo: null, core: null, wisps: [],
+            haloMat: null, coreMat: null,
+            active: null,
+            CLIPS: { cast: 620, ult: 1150, tap: 360 },
+            REST: { x: -0.22, y: -0.66, z: -0.36 },
+
+            init: function () {
+                if (this.group) return;
+                const handsMesh = game.weapons.rifle && game.weapons.rifle.model.children.find(c => c.userData.isHands);
+                const skin = handsMesh ? handsMesh.material : new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.3 });
+                const sleeveMat = new THREE.MeshStandardMaterial({ color: 0x1b2230, roughness: 0.7 });
+                // One open left hand, palm forward, fingers up (thumb toward the middle)
+                const palm = roundedBoxGeometry(0.07, 0.075, 0.026, 0.01, 2);
+                const finger = roundedBoxGeometry(0.016, 0.055, 0.017, 0.007, 2);
+                const thumb = roundedBoxGeometry(0.018, 0.045, 0.019, 0.008, 2);
+                const parts = [{ geometry: palm, matrix: partMatrix(0, 0, 0, 0, 0, 0) }];
+                for (let i = 0; i < 4; i++) {
+                    const len = i === 0 || i === 3 ? 0.92 : 1;
+                    const m = partMatrix((i - 1.5) * 0.0175, 0.06 * len, -0.004, -0.18, 0, (i - 1.5) * -0.07);
+                    m.multiply(new THREE.Matrix4().makeScale(1, len, 1));
+                    parts.push({ geometry: finger, matrix: m });
+                }
+                parts.push({ geometry: thumb, matrix: partMatrix(0.044, 0.004, -0.008, -0.2, 0, -0.75) });
+                this.hand = new THREE.Mesh(mergeGeometryParts(parts), skin);
+                for (const g of [palm, finger, thumb]) g.dispose();
+                const sleeveGeo = roundedBoxGeometry(0.066, 0.24, 0.062, 0.018, 2);
+                sleeveGeo.translate(0, -0.155, 0);
+                this.sleeve = new THREE.Mesh(sleeveGeo, sleeveMat);
+                this.group = new THREE.Group();
+                this.group.add(this.hand, this.sleeve);
+                this.group.visible = false;
+                weaponGroup.add(this.group);
+
+                // Energy: a soft halo in the agent colour, a hot core and orbiting wisps
+                const c = document.createElement('canvas');
+                c.width = c.height = 128;
+                const g = c.getContext('2d');
+                const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+                grd.addColorStop(0, 'rgba(255,255,255,1)');
+                grd.addColorStop(0.3, 'rgba(255,255,255,0.55)');
+                grd.addColorStop(0.65, 'rgba(255,255,255,0.14)');
+                grd.addColorStop(1, 'rgba(255,255,255,0)');
+                g.fillStyle = grd;
+                g.fillRect(0, 0, 128, 128);
+                const tex = new THREE.CanvasTexture(c);
+                tex.encoding = THREE.sRGBEncoding;
+                // Drawn over the hand (depth test off is not a shader change), so the palm glows
+                const mk = () => new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false });
+                this.haloMat = mk();
+                this.coreMat = mk();
+                const card = new THREE.PlaneGeometry(1, 1);
+                this.halo = new THREE.Mesh(card, this.haloMat);
+                this.core = new THREE.Mesh(card, this.coreMat);
+                this.halo.renderOrder = this.core.renderOrder = 5;
+                weaponGroup.add(this.halo, this.core);
+                for (let i = 0; i < 5; i++) {
+                    const w = new THREE.Mesh(card, this.haloMat);
+                    w.renderOrder = 5;
+                    weaponGroup.add(w);
+                    this.wisps.push(w);
+                }
+                this.hide();
+            },
+
+            hide: function () {
+                if (!this.group) return;
+                this.group.visible = this.halo.visible = this.core.visible = false;
+                for (const w of this.wisps) w.visible = false;
+            },
+
+            // kind: 'cast' | 'ult' | 'tap'
+            start: function (kind, colorHex) {
+                if (!this.group || !this.CLIPS[kind]) return;
+                // An ultimate in progress is not cut short by a flick
+                if (this.active && this.active.kind === 'ult' && kind !== 'ult' && performance.now() - this.active.start < this.active.dur * 0.75) return;
+                const col = new THREE.Color(colorHex === undefined ? 0x38f6ff : colorHex);
+                this.haloMat.color.copy(col);
+                this.coreMat.color.copy(col).lerp(new THREE.Color(0xffffff), 0.65);
+                this.active = { kind: kind, start: performance.now(), dur: this.CLIPS[kind], burst: false, hex: col.getHex() };
+                if (vmAnim.clip && vmAnim.clip.kind === 'inspect') vmAnim.finishClip(game.weapons[game.activeWeapon]);
+            },
+
+            // Hand pose and energy for clip progress p; returns how far the gun is moved aside (0-1)
+            _pose: function (kind, p, now) {
+                const R = this.REST;
+                let up, push, charge, flare, tremble = 0;
+                if (kind === 'tap') {
+                    up = _seg(p, 0, 0.3, _ease.out) * (1 - _seg(p, 0.6, 1));
+                    push = _bump(p, 0.42, 0.18);
+                    charge = 0.35 * up;
+                    flare = _bump(p, 0.45, 0.16);
+                } else if (kind === 'ult') {
+                    up = _seg(p, 0, 0.2, _ease.out) * (1 - _seg(p, 0.82, 1));
+                    charge = _seg(p, 0.12, 0.62);
+                    tremble = charge * (1 - _seg(p, 0.64, 0.68));
+                    push = _bump(p, 0.7, 0.08);
+                    flare = _bump(p, 0.7, 0.12) * 1.8;
+                } else {
+                    up = _seg(p, 0, 0.28, _ease.out) * (1 - _seg(p, 0.7, 1));
+                    charge = _seg(p, 0.15, 0.48);
+                    push = _bump(p, 0.56, 0.1);
+                    flare = _bump(p, 0.58, 0.12) * 1.2;
+                }
+                const hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                const tx = Math.sin(now * 0.09) * 0.0035 * tremble, ty = Math.cos(now * 0.11) * 0.0035 * tremble;
+                const x = (R.x + (-0.15 - R.x) * up + 0.03 * push) * hand + tx;
+                const y = R.y + (-0.215 - R.y) * up + 0.03 * push + ty;
+                const z = R.z + (-0.39 - R.z) * up - 0.17 * push;
+                const g = this.group;
+                g.visible = up > 0.01;
+                g.position.set(x, y, z);
+                g.scale.set(1.3 * hand, 1.3, 1.3);
+                // Palm cupped while rising, opening flat on the throw
+                g.rotation.set(-0.55 * (1 - up) + 0.25 * push, 0.25 * hand * (1 - push), 0.15 * hand * (1 - up));
+                // Energy in front of the palm
+                const fade = 1 - _seg(p, kind === 'ult' ? 0.78 : 0.68, kind === 'ult' ? 0.92 : 0.82);
+                const e = Math.min(1, charge + flare) * fade * (up > 0.01 ? 1 : 0);
+                const ox = x + 0.012 * hand, oy = y + 0.07, oz = z - 0.05 - 0.03 * push;
+                const pulse = 1 + 0.08 * Math.sin(now * 0.025);
+                const haloS = (0.08 + 0.17 * charge + 0.2 * flare) * pulse * (kind === 'ult' ? 1.45 : 1);
+                this.halo.visible = this.core.visible = e > 0.01;
+                this.halo.position.set(ox, oy, oz);
+                this.halo.scale.setScalar(haloS);
+                this.halo.rotation.z = now * 0.002;
+                this.core.position.set(ox, oy, oz - 0.002);
+                this.core.scale.setScalar(haloS * 0.4);
+                this.haloMat.opacity = Math.min(1, 1.1 * e);
+                this.coreMat.opacity = Math.min(1, 1.1 * e);
+                // Wisps spiral in while an ultimate gathers
+                const wispOn = kind === 'ult' ? charge * (1 - _seg(p, 0.66, 0.72)) : 0;
+                for (let i = 0; i < this.wisps.length; i++) {
+                    const w = this.wisps[i];
+                    w.visible = wispOn > 0.02;
+                    if (!w.visible) continue;
+                    const a = now * 0.006 + i * Math.PI * 2 / this.wisps.length;
+                    const r = 0.16 * (1 - 0.55 * wispOn);
+                    w.position.set(ox + Math.cos(a) * r, oy + Math.sin(a * 1.3) * r * 0.6, oz + Math.sin(a) * r * 0.4);
+                    w.scale.setScalar(0.05 + 0.04 * wispOn);
+                }
+                return up;
+            },
+
+            // Called from vmAnim.end every frame: poses the hand and moves the gun aside
+            apply: function (now, o, hand) {
+                const a = this.active;
+                if (!a) return;
+                const p = (now - a.start) / a.dur;
+                if (p >= 1 || p < 0) {
+                    this.active = null;
+                    this.hide();
+                    return;
+                }
+                const up = this._pose(a.kind, p, now);
+                // The ultimate's release shakes the view a little (Camera Shake setting applies)
+                if (a.kind === 'ult' && !a.burst && p >= 0.68) {
+                    a.burst = true;
+                    if (typeof fxKit !== 'undefined' && fxKit.enabled()) fxKit.shakeAt(camera.position.x, camera.position.y, camera.position.z, 0.35);
+                }
+                const ads = 1 - (game.adsProgress || 0) * 0.6;
+                const aside = up * (a.kind === 'ult' ? 1.5 : a.kind === 'tap' ? 0.55 : 1);
+                o.py += -0.09 * aside * ads;
+                o.px += 0.035 * aside * hand;
+                o.rz += -0.32 * aside * hand;
+                o.rx += -0.12 * aside;
             }
         };
 
@@ -20667,6 +20881,7 @@
                     game.ultChargesLeft--;
                     this.castOmenShroudedStep(now, true);
                     this.syncHud(now, true);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
@@ -20685,18 +20900,21 @@
                 // Yoru Gatecrash 2nd-Stage Activation: if a Rift Tether is active in the world, pressing [E] teleports Yoru to it immediately!
                 if (agentId === 'yoru' && slotKey === 'e' && this.yoruTether && this.yoruTether.active && now < this.yoruTether.expireAt) {
                     this.triggerYoruGatecrashTeleport(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Chamber Rendezvous 2nd-Stage Activation: if a Golden Anchor is active in the world, pressing [E] snaps Chamber back to it!
                 if (agentId === 'chamber' && slotKey === 'e' && this.chamberAnchor && this.chamberAnchor.active && now < this.chamberAnchor.expireAt) {
                     this.triggerChamberRendezvousTeleport(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Skye Guiding Light 2nd-Stage Activation: if an Emerald Hawk is in flight, pressing [E] detonates its Flash immediately!
                 if (agentId === 'skye' && slotKey === 'e' && this.hasActiveSkyeHawk(now)) {
                     this.triggerSkyeHawkFlash(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
@@ -20706,6 +20924,7 @@
                     _abilityRay.origin.copy(camera.position);
                     _abilityRay.direction.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                     if (this.checkShootIsoOrb(_abilityRay, now, 1.45)) {
+                        castFX.start('tap', def.themeColor);
                         return;
                     }
                 }
@@ -20713,36 +20932,42 @@
                 // Gekko Thrash Early Lunge-Detonate: pressing [X] while Thrash is steering triggers immediate 7.5m Detain burst!
                 if (slotKey === 'x' && this.gekkoThrash && this.gekkoThrash.active) {
                     this.detonateGekkoThrash(now, Date.now());
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Harbor Cascade 2nd-Stage Anchor: pressing [C] while a Cascade tidal wave is advancing stops it in place!
                 if (agentId === 'harbor' && slotKey === 'c' && this.hasMovingHarborCascade(now)) {
                     this.stopHarborCascade(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Vyse Arc Rose 2nd-Stage Detonate: pressing [Q] while an Arc Rose is planted triggers its 22m metallic flash!
                 if (agentId === 'vyse' && slotKey === 'q' && this.hasActiveVyseArcRose(now)) {
                     this.detonateVyseArcRose(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Tejo Stealth Drone 2nd-Stage EMP Pulse: pressing [C] while Stealth Drone is flying triggers its 11m EMP Suppress & Scan!
                 if (agentId === 'tejo' && slotKey === 'c' && this.hasActiveTejoDrone(now)) {
                     this.detonateTejoDronePulse(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Waylay Refract 2nd-Stage Return: pressing [E] while a Crystal Beacon is active zips Waylay back in invulnerable light!
                 if (agentId === 'waylay' && slotKey === 'e' && this.hasActiveWaylayRefract(now)) {
                     this.triggerWaylayRefractReturn(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Veto Crosscut 2nd-Stage Teleport: pressing [C] while a Vortex Anchor is active teleports Veto to it!
                 if (agentId === 'veto' && slotKey === 'c' && this.hasActiveVetoCrosscut(now)) {
                     this.triggerVetoCrosscutTeleport(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
@@ -20760,6 +20985,8 @@
                 }
 
                 if (!this.consumeCharge(slotKey, now)) return;
+                // V1.7: off-hand cast gesture in the agent's colour
+                castFX.start('cast', def.themeColor);
 
                 if (agentId === 'jett') {
                     if (slotKey === 'e') this.castJettTailwind(now);
@@ -24494,6 +24721,7 @@
             // --- X: Ultimates (Jett Blade Storm, Phoenix Run It Back, Sova Hunter's Fury, Sage Resurrection, Reyna Empress, Omen From the Shadows, Raze Showstopper, Killjoy Lockdown, Cypher Neural Theft, Brimstone Orbital Strike) ---
             activateUltimate: function(agentId, now) {
                 const def = AGENT_DEFS[agentId];
+                castFX.start('ult', def.themeColor);
                 game.ultPoints = 0;
                 game.ultAgent = agentId;
                 game.ultActiveUntil = now + def.abilities.x.durationMs;
@@ -33646,35 +33874,11 @@
 
                 soundFX.knifeSlash(isHeavy);
 
-                // Animate 3D Knife Viewmodel (Fast Diagonal Slash vs Heavy Forward Lunge Stab)
-                const knifeModel = weapon.model;
-                const hip = weapon.hipPos || { x: 0.26, y: -0.26, z: -0.46 };
-                if (knifeModel) {
-                    if (isHeavy) {
-                        knifeModel.position.set(hip.x - 0.14, hip.y + 0.05, hip.z - 0.42);
-                        knifeModel.rotation.set(-0.38, 0.18, 0.55);
-                        setTimeout(() => {
-                            if (game.activeWeapon === 'knife') {
-                                knifeModel.position.set(hip.x, hip.y, hip.z);
-                                knifeModel.rotation.set(0, 0, 0);
-                            }
-                        }, 260);
-                    } else {
-                        knifeModel.position.set(hip.x - 0.28, hip.y + 0.06, hip.z - 0.24);
-                        knifeModel.rotation.set(-0.18, 0.35, 0.78);
-                        setTimeout(() => {
-                            if (game.activeWeapon === 'knife') {
-                                knifeModel.position.set(hip.x + 0.08, hip.y - 0.04, hip.z);
-                                knifeModel.rotation.set(0.1, -0.15, -0.35);
-                                setTimeout(() => {
-                                    if (game.activeWeapon === 'knife') {
-                                        knifeModel.position.set(hip.x, hip.y, hip.z);
-                                        knifeModel.rotation.set(0, 0, 0);
-                                    }
-                                }, 120);
-                            }
-                        }, 110);
-                    }
+                // V1.7: knife slash (alternating sides) and lunge stab on the viewmodel animator
+                if (isHeavy) vmAnim.play('stab', 460);
+                else {
+                    vmAnim.slashSide = -(vmAnim.slashSide || -1);
+                    vmAnim.play('slash', 340);
                 }
 
                 // Melee reach & cone check
@@ -34515,23 +34719,9 @@
                 game.reloading = true;
                 soundFX.knifeSlash(false);
                 showNotification("Tactical Knife Inspect Flourish", 1000);
-                const knifeModel = weapon.model;
-                const t0 = performance.now();
-                const spinInterval = setInterval(() => {
-                    const p = Math.min(1, (performance.now() - t0) / 480);
-                    if (knifeModel) {
-                        knifeModel.rotation.x = p * Math.PI * 2;
-                        knifeModel.rotation.z = Math.sin(p * Math.PI) * 0.45;
-                    }
-                    if (p >= 1) {
-                        clearInterval(spinInterval);
-                        if (knifeModel) {
-                            knifeModel.rotation.x = 0;
-                            knifeModel.rotation.z = 0;
-                        }
-                        game.reloading = false;
-                    }
-                }, 16);
+                // V1.7: the knuckle flip runs on the viewmodel animator
+                vmAnim.play('inspect', 560);
+                setTimeout(() => { game.reloading = false; }, 560);
                 return;
             }
             
@@ -35635,11 +35825,15 @@
             // so drivers that finish compiling on first draw do it here.
             viewmodelScene.environment = scene.environment;
             syncViewmodelCamera();
+            // V1.7 cast hand and its energy cards: drawn with the viewmodel warm-up
+            const castParts = castFX.group ? [castFX.group, castFX.halo, castFX.core].concat(castFX.wisps) : [];
+            for (const o of castParts) o.visible = true;
             renderer.compile(viewmodelScene, viewmodelCamera);
             const muzzleHalos = ['rifle', 'sniper', 'pistol'].map(k => game.weapons[k] && game.weapons[k].muzzleHalo).filter(Boolean);
             for (const h of muzzleHalos) h.visible = true;
             renderer.render(viewmodelScene, viewmodelCamera);
             for (const h of muzzleHalos) h.visible = false;
+            castFX.hide();
 
             game.weapons.rifle.model.visible = rifleWas;
             game.weapons.sniper.model.visible = sniperWas;
@@ -39232,6 +39426,7 @@
             muzzleStar.init();
             shellFX.init();
             fxKit.init();
+            castFX.init();
             weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material) && o.material !== muzzleStar.mat) o.material.toneMapped = false; });
             
             // Initialize object pools
