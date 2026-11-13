@@ -21,6 +21,7 @@ The `tests/` folder holds headless browser tests. They need no GPU, because Chro
 - **Game modes:** Wave, Retake and the 30-bot Range play through planting, defusing, detonation, round changes and the range scorecard.
 - **HUD and settings:** the HUD has no overlapping panels at common window sizes, and settings survive a reload (and the opt-out sticks).
 - **Audio and hit feedback:** 3D enemy audio and hit feedback work.
+- **Accessibility and bot skill:** Reduce Flashes softens washes and flashbangs and stops the low-health pulse; the cyan colour-blind option recolours bots; bot tactics scale with Bot Skill (Iron never flanks, Radiant peeks pre-aimed).
 - **Bot tactics:** every map has cover spots; hurt bots take cover out of sight, peek to shoot and never fire while running; pairs flank, and a bot whose partner dies takes cover.
 - **Bot colours and animation:** bots spawn in their archetype colours, they walk, flinch, recoil and topple over when killed, and their hitboxes stay fixed.
 - **High detail characters and guns:** the setting is off by default; when on, bots, wingmen, guns and hands are drawn with rounded, detailed shapes while hitboxes, weapon skins and shaders stay unchanged.
