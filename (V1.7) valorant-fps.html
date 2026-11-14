@@ -3583,13 +3583,30 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
-                                    <strong>Arena Lighting &amp; Contrast Atmosphere</strong>
-                                    <small>Switch between Standard Daylight, Competitive Zero-Fog Clarity, or Night Cyber Glow</small>
+                                    <strong>Arena Lighting &amp; Time of Day</strong>
+                                    <small>Standard Daylight, Competitive Zero-Fog Clarity, Night Cyber Glow, or a low golden sun at Sunset or Dawn</small>
                                 </div>
                                 <div class="settings-pill-group" id="setting-atmosphere-pills">
                                     <button class="settings-pill-opt active" data-atmos="daylight">☀ STANDARD DAYLIGHT</button>
                                     <button class="settings-pill-opt" data-atmos="competitive">⚡ COMPETITIVE ZERO-FOG</button>
                                     <button class="settings-pill-opt" data-atmos="night">🌙 NIGHT CYBER GLOW</button>
+                                    <button class="settings-pill-opt" data-atmos="sunset">🌇 SUNSET</button>
+                                    <button class="settings-pill-opt" data-atmos="dawn">🌅 DAWN</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Weather</strong>
+                                    <small>Map: each map's own weather (rain on Bind, storms on Split, snow on Icebox, sandstorms on Haven, leaves on Ascent and Lotus). Or pick one weather for every map. Off on Low quality</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-weather-pills">
+                                    <button class="settings-pill-opt active" data-weather="off">OFF</button>
+                                    <button class="settings-pill-opt" data-weather="map">MAP</button>
+                                    <button class="settings-pill-opt" data-weather="rain">🌧 RAIN</button>
+                                    <button class="settings-pill-opt" data-weather="storm">⛈ STORM</button>
+                                    <button class="settings-pill-opt" data-weather="snow">❄ SNOW</button>
+                                    <button class="settings-pill-opt" data-weather="sand">🌪 SAND</button>
                                 </div>
                             </div>
                         </div>
@@ -5214,7 +5231,7 @@
             userSettings: {
                 qualityMode: 'auto',
                 enemyHighlightColor: 'red', // 'red' | 'yellow' | 'purple'
-                atmosphereMode: 'daylight', // 'daylight' | 'competitive' | 'night'
+                atmosphereMode: 'daylight', // 'daylight' | 'competitive' | 'night' | 'sunset' | 'dawn'
                 fov: 75,
                 resolutionScale: 100,
                 shadowResolution: 2048,
@@ -5237,6 +5254,7 @@
                 brightness: 100,       // V1.7: % of the atmosphere mode's exposure (70-140)
                 reduceFlashes: false,  // V1.7 accessibility: soften full-screen flashes and the low-health pulse
                 cameraShake: true,     // V1.7: subtle shake on nearby blasts (off with Reduce Flashes too)
+                weather: 'off',        // V1.7: 'off' (default) | 'map' | 'rain' | 'storm' | 'snow' | 'sand' | 'leaves'
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -5824,6 +5842,11 @@
             map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
             return { map: map };
         }
+        // V1.7 Weather: shared surface uniforms (floor + map pieces) and lighting
+        // multipliers. weatherFX (further down) drives them; everything is a uniform,
+        // so weather never changes a shader program.
+        const weatherSurf = { uWet: { value: 0 }, uSnow: { value: 0 }, uSand: { value: 0 }, uRain: { value: 0 }, uWTime: { value: 0 } };
+        const weatherState = { sunScale: 1, ambScale: 1, baseAmbient: 0.1, onQuality: null };
         const floorTextures = createFloorTextures();
         const floorGeometry = new THREE.PlaneGeometry(200, 200, 20, 20);
         const floorMaterial = new THREE.MeshStandardMaterial({ 
@@ -5856,6 +5879,7 @@
             s.uniforms.uFloorHD = floorHDUniform;
             s.uniforms.tFloorAO = { value: floorAOTexture };
             s.uniforms.tFloorN = { value: surfaceTextureFactory.textures.floor };
+            Object.assign(s.uniforms, weatherSurf);
             s.vertexShader = s.vertexShader
                 .replace('#include <common>', '#include <common>\nvarying vec2 vFloorW;')
                 .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
@@ -5863,6 +5887,7 @@
             s.fragmentShader = s.fragmentShader
                 .replace('#include <common>', `#include <common>
                     varying vec2 vFloorW; uniform float uFloorHD;
+                    uniform float uWet; uniform float uSnow; uniform float uSand; uniform float uRain; uniform float uWTime;
                     uniform sampler2D tFloorAO; uniform sampler2D tFloorN;
                     float fh21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
                     float fnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -5879,11 +5904,37 @@
                         // Tile uv: u runs along world +x, v along world -z
                         vec2 fxy = fn.xy * 2.0 - 1.0;
                         fhdN = normalize(vec3(fxy.x, sqrt(max(0.0, 1.0 - dot(fxy, fxy))), -fxy.y));
+                    }
+                    // Weather: wet darkening, glassy puddles with rain ripples, snow cover, sand drifts
+                    float wPud = 0.0, wSnowC = 0.0;
+                    vec2 wRip = vec2(0.0);
+                    if (uWet + uSnow + uSand > 0.0) {
+                        float pn = fnoise(vFloorW * 0.12 + 5.0) * 0.65 + fnoise(vFloorW * 0.43 + 2.0) * 0.35;
+                        wPud = smoothstep(0.58, 0.64, pn) * uWet;
+                        diffuseColor.rgb *= mix(1.0, 0.62, uWet) * mix(1.0, 0.5, wPud);
+                        if (uRain > 0.0 && wPud > 0.0) {
+                            vec2 rq = vFloorW * 1.7;
+                            vec2 cell = floor(rq);
+                            vec2 dv = fract(rq) - 0.5 - (vec2(fh21(cell + 1.7), fh21(cell + 4.3)) - 0.5) * 0.5;
+                            float t = fract(uWTime * 0.8 + fh21(cell));
+                            float d = length(dv), R = t * 0.45;
+                            float band = 1.0 - smoothstep(0.0, 0.07, abs(d - R));
+                            wRip = dv / max(d, 1e-3) * sin((d - R) * 60.0) * band * (1.0 - t) * 0.45 * wPud * uRain;
+                        }
+                        float sn = fnoise(vFloorW * 0.23 + 11.0) * 0.7 + fnoise(vFloorW * 1.4) * 0.3;
+                        wSnowC = uSnow * mix(0.35, 0.9, smoothstep(0.3, 0.7, sn));
+                        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.36, 0.39, 0.45), wSnowC);
+                        float sd = fnoise(vec2(vFloorW.x * 0.09 + vFloorW.y * 0.04, vFloorW.y * 0.3));
+                        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.21, 0.11), uSand * mix(0.25, 0.75, smoothstep(0.35, 0.75, sd)));
                     }`)
                 .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-                    roughnessFactor = clamp(roughnessFactor * fhdRough, 0.04, 1.0);`)
+                    roughnessFactor = clamp(roughnessFactor * fhdRough, 0.04, 1.0);
+                    roughnessFactor = mix(roughnessFactor, 0.3, uWet * 0.8);
+                    roughnessFactor = mix(roughnessFactor, 0.03, wPud);
+                    roughnessFactor = mix(roughnessFactor, 0.75, wSnowC);`)
                 .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-                    if (uFloorHD > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(fhdN, 0.0)).xyz, uFloorHD));`);
+                    if (uFloorHD > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(fhdN, 0.0)).xyz, uFloorHD * (1.0 - wPud)));
+                    if (wPud > 0.0) normal = normalize(normal + (viewMatrix * vec4(wRip.x, 0.0, wRip.y, 0.0)).xyz);`);
         };
         floorMaterial.customProgramCacheKey = () => 'floorDetail';
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -5914,20 +5965,32 @@
             return mesh;
         })();
         scene.add(skyDome);
-        let skyDomeHex = -1;
-        function recolorSkyDome(skyHex) {
-            if (skyHex === skyDomeHex) return;
-            skyDomeHex = skyHex;
+        let skyDomeHex = '';
+        const _skyTmp = new THREE.Color();
+        function recolorSkyDome(skyHex, horizonHex, sunDir) {
+            const key = skyHex + ':' + horizonHex + ':' + (sunDir ? sunDir.join(',') : '');
+            if (key === skyDomeHex) return;
+            skyDomeHex = key;
             const base = new THREE.Color(skyHex);
-            const horizon = base.clone().lerp(new THREE.Color(0xc8d6e5), 0.16).convertSRGBToLinear();
+            const horizon = (horizonHex !== undefined ? new THREE.Color(horizonHex) : base.clone().lerp(new THREE.Color(0xc8d6e5), 0.16)).convertSRGBToLinear();
+            // Time of day: the horizon glow is strongest toward the sun
+            const sun = sunDir ? new THREE.Vector3(sunDir[0], 0, sunDir[2]).normalize() : null;
+            const sunGlow = sunDir ? new THREE.Color(horizonHex).convertSRGBToLinear() : null;
             const zenith = base.clone().multiplyScalar(0.5).convertSRGBToLinear();
             const fogC = base.clone().convertSRGBToLinear();
             const geo = skyDome.geometry;
             const pos = geo.attributes.position, cols = geo.attributes.color.array, c = new THREE.Color();
             for (let i = 0; i < pos.count; i++) {
                 const h = pos.getY(i) / 400; // -1..1
-                if (h <= 0.02) c.copy(fogC).lerp(horizon, Math.max(0, h) / 0.02);
-                else c.copy(horizon).lerp(zenith, Math.pow(Math.min(1, (h - 0.02) / 0.75), 0.7));
+                let hz = horizon;
+                if (sun) {
+                    const len = Math.hypot(pos.getX(i), pos.getZ(i)) || 1;
+                    const facing = Math.max(0, (pos.getX(i) * sun.x + pos.getZ(i) * sun.z) / len);
+                    hz = _skyTmp.copy(zenith).lerp(sunGlow, 0.25 + 0.75 * Math.pow(facing, 2.5));
+                }
+                const span = sun ? 0.5 : 0.75;
+                if (h <= 0.02) c.copy(fogC).lerp(hz, Math.max(0, h) / 0.02);
+                else c.copy(hz).lerp(zenith, Math.pow(Math.min(1, (h - 0.02) / span), 0.7));
                 cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
             }
             geo.attributes.color.needsUpdate = true;
@@ -5942,8 +6005,52 @@
         const ATMOSPHERE_LIGHTING = {
             competitive: { ambient: 0.16, sun: 1.1, env: 2.4, exposure: 1.65, viewmodel: 1.05 },
             daylight:    { ambient: 0.10, sun: 1.0, env: 2.0, exposure: 1.5,  viewmodel: 1.0 },
-            night:       { ambient: 0.06, sun: 0.6, env: 1.0, exposure: 1.15, viewmodel: 0.6 }
+            night:       { ambient: 0.06, sun: 0.6, env: 1.0, exposure: 1.15, viewmodel: 0.6 },
+            // V1.7 time of day: a low warm sun (~35 deg, so the 20 m perimeter walls do not
+            // shade the whole arena) from the west (sunset) or east (dawn), long shadows, a gradient sky that glows toward the sun
+            sunset:      { ambient: 0.15, sun: 1.7, env: 2.2, exposure: 1.7, viewmodel: 0.9,
+                           sunColor: 0xff8c48, sunDir: [-0.72, 0.6, 0.38], sky: 0x2a1f3d, horizon: 0xff8048 },
+            dawn:        { ambient: 0.15, sun: 1.5, env: 2.3, exposure: 1.7, viewmodel: 0.92,
+                           sunColor: 0xffc49c, sunDir: [0.7, 0.56, -0.46], sky: 0x3f4f78, horizon: 0xffb088 }
         };
+        // Sun direction and a shadow camera fitted to the arena for it. The default
+        // keeps the hand-fitted values; other directions fit the +/-50.5 m x 0..20 m
+        // box in light space.
+        const SUN_DEFAULT = { pos: [30, 60, 45], near: 17, far: 131, left: -71, right: 71, top: 67, bottom: -53 };
+        let sunDirKey = 'default';
+        function setSunDirection(dir) {
+            const key = dir ? dir.join(',') : 'default';
+            if (key === sunDirKey) return;
+            sunDirKey = key;
+            const cam = directionalLight.shadow.camera;
+            if (!dir) {
+                directionalLight.position.set(SUN_DEFAULT.pos[0], SUN_DEFAULT.pos[1], SUN_DEFAULT.pos[2]);
+                Object.assign(cam, { near: SUN_DEFAULT.near, far: SUN_DEFAULT.far, left: SUN_DEFAULT.left, right: SUN_DEFAULT.right, top: SUN_DEFAULT.top, bottom: SUN_DEFAULT.bottom });
+            } else {
+                const v = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize();
+                directionalLight.position.copy(v).multiplyScalar(90);
+                const m = new THREE.Matrix4().lookAt(directionalLight.position, new THREE.Vector3(), new THREE.Vector3(0, 1, 0));
+                m.setPosition(directionalLight.position);
+                const inv = m.clone().invert();
+                const b = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
+                const q = new THREE.Vector3();
+                for (const x of [-50.5, 50.5]) for (const y of [0, 20]) for (const z of [-50.5, 50.5]) {
+                    q.set(x, y, z).applyMatrix4(inv);
+                    b[0] = Math.min(b[0], q.x); b[1] = Math.max(b[1], q.x);
+                    b[2] = Math.min(b[2], q.y); b[3] = Math.max(b[3], q.y);
+                    b[4] = Math.min(b[4], -q.z); b[5] = Math.max(b[5], -q.z);
+                }
+                Object.assign(cam, { left: b[0] - 1, right: b[1] + 1, bottom: b[2] - 1, top: b[3] + 1, near: Math.max(0.5, b[4] - 1), far: b[5] + 1 });
+            }
+            cam.updateProjectionMatrix();
+            directionalLight.updateMatrix();
+            directionalLight.updateMatrixWorld();
+            if (typeof shadowManager !== 'undefined' && shadowManager.frustum) {
+                const sus = shadowManager.suspended;
+                shadowManager.init();
+                if (sus) directionalLight.shadow.matrix.makeScale(0, 0, 0).setPosition(2, 2, 2);
+            }
+        }
         // Applies sun, ambient, exposure, environment map and sky dome for the
         // active map preset + atmosphere mode. Reads scene.background, which the
         // map preset / atmosphere code sets just before calling this.
@@ -5952,11 +6059,13 @@
             const look = ATMOSPHERE_LIGHTING[mode] || ATMOSPHERE_LIGHTING.daylight;
             const presets = (typeof MAP_PRESETS !== 'undefined') ? MAP_PRESETS : null;
             const preset = presets ? (presets[(typeof game !== 'undefined' && game.mapPreset) || 'ascent'] || presets.ascent) : null;
-            const sunHex = preset && preset.sunColor !== undefined ? preset.sunColor : 0xffffff;
+            const sunHex = look.sunColor !== undefined ? look.sunColor : (preset && preset.sunColor !== undefined ? preset.sunColor : 0xffffff);
+            setSunDirection(look.sunDir || null);
             const sunIntensity = preset && preset.sunIntensity !== undefined ? preset.sunIntensity : 1.5;
             directionalLight.color.setHex(sunHex).convertSRGBToLinear();
-            directionalLight.intensity = sunIntensity * look.sun;
-            ambientLight.intensity = look.ambient;
+            directionalLight.intensity = sunIntensity * look.sun * weatherState.sunScale;
+            weatherState.baseAmbient = look.ambient * weatherState.ambScale;
+            ambientLight.intensity = weatherState.baseAmbient;
             const brightnessPct = (typeof game !== 'undefined' && game.userSettings && game.userSettings.brightness) || 100;
             const brightness = Math.max(0.7, Math.min(1.4, brightnessPct / 100));
             renderer.toneMappingExposure = look.exposure * brightness;
@@ -5966,7 +6075,7 @@
             viewmodelSun.intensity = 0.9 * look.viewmodel * brightness;
             viewmodelSun.color.setHex(sunHex).convertSRGBToLinear();
             const skyHex = scene.background.getHex();
-            recolorSkyDome(skyHex);
+            recolorSkyDome(skyHex, look.horizon, look.sunDir);
             const groundHex = preset ? preset.floorColor : 0x1f2833;
             const accentA = preset && preset.accentA !== undefined ? preset.accentA : 0xff4655;
             const accentB = preset && preset.accentB !== undefined ? preset.accentB : 0x4672ff;
@@ -6926,6 +7035,8 @@
             const charDetail = (cfg.charDetail === 'on' || cinematic) && adaptiveSettings.currentQuality !== 'low';
             adaptiveSettings.charHiDetail = charDetail;
             characterDetail.set(charDetail);
+            // V1.7 weather density follows the quality (off on Low)
+            if (weatherState.onQuality) weatherState.onQuality();
         }
         
         // Applies visual budgets only. Population, AI radius and enemy shot rules
@@ -8084,6 +8195,7 @@
             s.uniforms.tSurf1 = { value: tx.stone };
             s.uniforms.tSurf2 = { value: tx.metal };
             s.uniforms.tSurf3 = { value: tx.wood };
+            Object.assign(s.uniforms, weatherSurf);
             s.vertexShader = s.vertexShader
                 .replace('#include <common>', `#include <common>
                     varying vec3 vWPos;
@@ -8102,6 +8214,7 @@
             s.fragmentShader = s.fragmentShader
                 .replace('#include <common>', `#include <common>
                     varying vec3 vWPos; uniform float uDetail; uniform float uHiDetail;
+                    uniform float uWet; uniform float uSnow; uniform float uSand;
                     varying vec4 vSurf; varying vec3 vLocal; varying vec3 vScale;
                     uniform sampler2D tSurf0; uniform sampler2D tSurf1; uniform sampler2D tSurf2; uniform sampler2D tSurf3;
                     float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -8185,10 +8298,29 @@
                         diffuseColor.rgb *= mix(1.0, alb * ao, uHiDetail);
                         hdRough = mix(1.0, rgh, uHiDetail);
                         hdN = normalize(wN * tn.z + tU * tn.x + tV * tn.y + tilt * 0.9);
+                    }
+                    // Weather: wet walls with darker rain streaks, snow on top faces and
+                    // drifted against wall bases, sand on tops and the lower walls
+                    float wxRough = 1.0, wxAmt = 0.0;
+                    if (uWet + uSnow + uSand > 0.0) {
+                        vec3 gN = normalize((vec4(normalize(vNormal), 0.0) * viewMatrix).xyz);
+                        float top = smoothstep(0.55, 0.85, gN.y);
+                        float streak = smoothstep(0.45, 0.85, vnoise(vec2((vWPos.x + vWPos.z) * 2.3, vWPos.y * 0.18 + 3.0)));
+                        diffuseColor.rgb *= mix(1.0, 0.7 - 0.14 * streak * (1.0 - top), uWet);
+                        float sn = vnoise(vWPos.xz * 1.7 + 4.0);
+                        float snowT = uSnow * top * mix(0.75, 1.0, sn);
+                        float snowB = uSnow * (1.0 - smoothstep(0.0, 0.35 + 0.3 * sn, vWPos.y)) * (1.0 - top) * 0.85;
+                        float snowC = max(snowT, snowB);
+                        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.45, 0.52), snowC);
+                        float sandA = uSand * max(top * 0.65, (1.0 - smoothstep(0.0, 0.9, vWPos.y)) * 0.7);
+                        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.4, 0.29, 0.16), sandA);
+                        wxRough = mix(0.34 - 0.16 * streak, 0.8, snowC);
+                        wxAmt = max(uWet, snowC);
                     }`)
                 .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
                     if (uDetail > 0.0) roughnessFactor = clamp(roughnessFactor * mix(1.0, 0.75 + 0.5 * grime, uDetail), 0.04, 1.0);
-                    roughnessFactor = clamp(roughnessFactor * hdRough, 0.04, 1.0);`)
+                    roughnessFactor = clamp(roughnessFactor * hdRough, 0.04, 1.0);
+                    roughnessFactor = mix(roughnessFactor, wxRough, wxAmt);`)
                 .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
                     if (hdOn > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(hdN, 0.0)).xyz, hdOn));`);
         };
@@ -13137,6 +13269,392 @@
                 L.rx = nz(2.2) * 0.022 * s; L.ry = nz(5.5) * 0.022 * s;
                 camera.position.x += L.x; camera.position.y += L.y; camera.position.z += L.z;
                 camera.rotation.x += L.rx; camera.rotation.y += L.ry;
+            }
+        };
+
+        // =============================================
+        // V1.7 Weather: rain, storms with lightning, snow, sandstorms and wind-blown
+        // leaves. Particles live in a box that wraps around the camera and move
+        // entirely on the GPU (no per-frame CPU work). Surfaces (wet floors, puddles,
+        // snow, sand) are uniforms on the floor and map shaders. Setting: Off (default),
+        // Map (each map's own weather) or one weather everywhere. Off on Low.
+        // =============================================
+        const WEATHER_KINDS = {
+            rain:   { id: 0, box: 26, speed: 17, wind: [1.2, 0, 0.6], size: [0.02, 0.6], color: [0.7, 0.76, 0.84], opacity: 0.42, count: 3600, splash: 1,
+                      sky: 0x3c4652, skyMix: 0.55, fog: 1.8, sun: 0.55, amb: 1.15, wet: 1 },
+            storm:  { id: 1, box: 26, speed: 22, wind: [3.5, 0, 1.5], size: [0.022, 0.78], color: [0.72, 0.78, 0.86], opacity: 0.48, count: 4800, splash: 1.4,
+                      sky: 0x272f3a, skyMix: 0.7, fog: 2.4, sun: 0.4, amb: 1.1, wet: 1, lightning: true },
+            snow:   { id: 2, box: 24, speed: 1.3, wind: [0.6, 0, 0.25], size: [0.085, 0.085], color: [0.95, 0.97, 1.0], opacity: 0.9, count: 3200,
+                      sky: 0x98a4b2, skyMix: 0.55, fog: 2.2, sun: 0.75, amb: 1.25, snow: 1 },
+            sand:   { id: 3, box: 26, speed: 0.6, wind: [9, 0, 3], size: [0.04, 0.32], color: [0.85, 0.68, 0.46], opacity: 0.5, count: 4200,
+                      sky: 0xa07c50, skyMix: 0.62, fog: 3.6, sun: 0.55, amb: 1.2, sand: 1 },
+            leaves: { id: 4, box: 24, speed: 1.0, wind: [2.2, 0, 0.9], size: [0.13, 0.09], color: [1, 1, 1], opacity: 0.95, count: 900 }
+        };
+        const MAP_WEATHER = { ascent: 'leaves', bind: 'rain', haven: 'sand', split: 'storm', icebox: 'snow', lotus: 'leaves' };
+        const WEATHER_DENSITY = { low: 0, medium: 0.45, high: 0.7, ultra: 1, cinematic: 1 };
+
+        const weatherFX = {
+            CAP: 6000, SPLASH_CAP: 420,
+            mesh: null, splash: null,
+            kind: 'clear', time: 0,
+            lightning: 0, strikes: [], nextStrikeAt: 0, strikeCount: 0,
+            surf: { wet: 0, snow: 0, sand: 0 },
+            audio: null,
+            _mapSeen: null,
+
+            _shader: function () {
+                return {
+                    transparent: true, depthWrite: false, toneMapped: false, fog: false,
+                    uniforms: {
+                        uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uBox: { value: 26 },
+                        uWind: { value: new THREE.Vector3() }, uSpeed: { value: 10 }, uSize: { value: new THREE.Vector2(0.01, 0.5) },
+                        uKind: { value: 0 }, uColor: { value: new THREE.Vector3(1, 1, 1) }, uOpacity: { value: 0.3 },
+                        uFogColor: { value: new THREE.Vector3() }, uFogDensity: { value: 0.01 }, uFlash: { value: 0 }
+                    },
+                    vertexShader: `
+                        uniform float uTime; uniform vec3 uCam; uniform float uBox; uniform vec3 uWind; uniform float uSpeed;
+                        uniform vec2 uSize; uniform float uKind; uniform float uFogDensity;
+                        attribute vec4 aSeed;
+                        varying vec2 vUv; varying float vFade; varying float vSeed; varying float vFog;
+                        void main() {
+                            vUv = position.xy + 0.5; vSeed = aSeed.w;
+                            float spd = uSpeed * (0.75 + 0.5 * aSeed.w);
+                            vec3 vel = vec3(uWind.x, -spd, uWind.z);
+                            vec3 org = uCam - vec3(0.5 * uBox, 0.3 * uBox, 0.5 * uBox);
+                            vec3 p;
+                            vec3 w;
+                            vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+                            vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+                            vFade = 1.0;
+                            if (uKind > 4.5) {
+                                // Rain splash: a ring on the floor that grows and fades, then moves on
+                                float cyc = uTime * (1.6 + aSeed.w) + aSeed.w * 7.0;
+                                float t = fract(cyc), n = floor(cyc);
+                                p = vec3(aSeed.x, 0.0, aSeed.z) * uBox + vec3(fract(n * 0.618), 0.0, fract(n * 0.382)) * uBox;
+                                p = org + mod(p - org, uBox);
+                                p.y = 0.03;
+                                w = p + vec3(position.x, 0.0, position.y) * (0.04 + 0.24 * t);
+                                vFade = 1.0 - t;
+                            } else {
+                                p = aSeed.xyz * uBox + vel * uTime;
+                                if ((uKind > 1.5 && uKind < 2.5) || uKind > 3.5) {
+                                    float ph = aSeed.w * 40.0;
+                                    p.x += sin(uTime * 1.1 + ph) * 0.5;
+                                    p.z += cos(uTime * 0.9 + ph * 1.3) * 0.5;
+                                }
+                                p = org + mod(p - org, uBox);
+                                if (uKind < 1.5 || (uKind > 2.5 && uKind < 3.5)) {
+                                    // Rain and sand: thin streaks along the motion, turned to the camera
+                                    vec3 d = normalize(vel);
+                                    vec3 s = normalize(cross(d, normalize(uCam - p)) + 1e-5);
+                                    w = p + s * position.x * uSize.x + d * position.y * uSize.y;
+                                } else if (uKind < 2.5) {
+                                    w = p + (right * position.x + up * position.y) * uSize.x * (0.6 + 0.8 * aSeed.w);
+                                } else {
+                                    // Leaves tumble as they drift
+                                    float a = uTime * (2.0 + 3.0 * aSeed.w) + aSeed.w * 20.0;
+                                    vec2 q = vec2(position.x * uSize.x, position.y * uSize.y * (0.25 + 0.75 * abs(cos(a))));
+                                    float c = cos(a * 0.7), sn = sin(a * 0.7);
+                                    q = vec2(c * q.x - sn * q.y, sn * q.x + c * q.y);
+                                    w = p + right * q.x + up * q.y;
+                                }
+                            }
+                            gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+                            float dist = length(p - uCam);
+                            vFade *= 1.0 - smoothstep(uBox * 0.3, uBox * 0.5, length(p.xz - uCam.xz));
+                            vFade *= smoothstep(0.35, 1.1, dist);
+                            vFog = 1.0 - exp(-uFogDensity * uFogDensity * dist * dist);
+                        }`,
+                    fragmentShader: `
+                        uniform vec3 uColor; uniform float uOpacity; uniform float uKind; uniform vec3 uFogColor; uniform float uFlash;
+                        varying vec2 vUv; varying float vFade; varying float vSeed; varying float vFog;
+                        void main() {
+                            vec2 p = vUv * 2.0 - 1.0;
+                            float a;
+                            vec3 col = uColor;
+                            if (uKind < 1.5) a = (1.0 - abs(p.x)) * (1.0 - smoothstep(0.2, 1.0, abs(p.y)));
+                            else if (uKind < 2.5) a = 1.0 - smoothstep(0.25, 1.0, length(p));
+                            else if (uKind < 3.5) a = (1.0 - abs(p.x)) * (1.0 - smoothstep(0.0, 1.0, abs(p.y)));
+                            else if (uKind < 4.5) {
+                                float e = length(vec2(p.x, p.y * 1.6));
+                                a = 1.0 - smoothstep(0.75, 0.95, e);
+                                col = mix(vec3(0.5, 0.26, 0.07), vec3(0.72, 0.56, 0.12), fract(vSeed * 7.0));
+                                col = mix(col, vec3(0.28, 0.4, 0.11), step(0.7, fract(vSeed * 13.0)));
+                                col *= 0.7 + 0.3 * (p.y * 0.5 + 0.5) - 0.25 * smoothstep(0.0, 0.08, 0.04 - abs(p.x));
+                            } else {
+                                float r = length(p);
+                                a = (1.0 - smoothstep(0.0, 0.2, abs(r - 0.78))) * 0.8;
+                            }
+                            col += uFlash * 0.7;
+                            col = mix(col, uFogColor, vFog);
+                            gl_FragColor = vec4(col, a * uOpacity * vFade * (1.0 - vFog * 0.6));
+                        }`
+                };
+            },
+
+            _geometry: function (n) {
+                const pos = new Float32Array(n * 4 * 3), seed = new Float32Array(n * 4 * 4), idx = new Uint32Array(n * 6);
+                const C = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]];
+                for (let i = 0; i < n; i++) {
+                    const sx = Math.random(), sy = Math.random(), sz = Math.random(), sw = Math.random();
+                    for (let k = 0; k < 4; k++) {
+                        const v = i * 4 + k;
+                        pos[v * 3] = C[k][0]; pos[v * 3 + 1] = C[k][1];
+                        seed[v * 4] = sx; seed[v * 4 + 1] = sy; seed[v * 4 + 2] = sz; seed[v * 4 + 3] = sw;
+                    }
+                    idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6);
+                }
+                const g = new THREE.BufferGeometry();
+                g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+                g.setIndex(new THREE.BufferAttribute(idx, 1));
+                g.setDrawRange(0, 0);
+                return g;
+            },
+
+            init: function () {
+                if (this.mesh) return;
+                const mat = new THREE.ShaderMaterial(this._shader());
+                mat.side = THREE.DoubleSide;
+                this.mesh = new THREE.Mesh(this._geometry(this.CAP), mat);
+                // The splash rings use the same shader source, so the same program
+                const smat = new THREE.ShaderMaterial(this._shader());
+                smat.side = THREE.DoubleSide;
+                smat.uniforms.uKind.value = 5;
+                this.splash = new THREE.Mesh(this._geometry(this.SPLASH_CAP), smat);
+                for (const m of [this.mesh, this.splash]) {
+                    m.frustumCulled = false;
+                    m.renderOrder = 13;
+                    m.visible = false;
+                    scene.add(m);
+                }
+                weatherState.onQuality = () => this.refresh();
+            },
+
+            // Which weather is showing now
+            resolve: function () {
+                const cfg = game.userSettings || {};
+                const q = (typeof adaptiveSettings !== 'undefined' && adaptiveSettings.currentQuality) || 'medium';
+                if (q === 'low') return 'clear';
+                const w = cfg.weather || 'off';
+                if (w === 'off') return 'clear';
+                if (w === 'map') return MAP_WEATHER[game.mapPreset] || 'clear';
+                return WEATHER_KINDS[w] ? w : 'clear';
+            },
+
+            // Re-resolve after a setting, quality or map change
+            refresh: function (force) {
+                if (!this.mesh) return;
+                const kind = this.resolve();
+                this._mapSeen = game.mapPreset;
+                const changed = kind !== this.kind;
+                this.kind = kind;
+                const W = WEATHER_KINDS[kind];
+                const q = (typeof adaptiveSettings !== 'undefined' && adaptiveSettings.currentQuality) || 'medium';
+                const dens = WEATHER_DENSITY[q] !== undefined ? WEATHER_DENSITY[q] : 0.7;
+                if (W) {
+                    const u = this.mesh.material.uniforms;
+                    u.uKind.value = W.id; u.uBox.value = W.box; u.uSpeed.value = W.speed;
+                    u.uWind.value.set(W.wind[0], W.wind[1], W.wind[2]);
+                    u.uSize.value.set(W.size[0], W.size[1]);
+                    u.uColor.value.set(W.color[0], W.color[1], W.color[2]);
+                    u.uOpacity.value = W.opacity;
+                    const n = Math.min(this.CAP, Math.round(W.count * dens));
+                    this.mesh.geometry.setDrawRange(0, n * 6);
+                    const su = this.splash.material.uniforms;
+                    su.uBox.value = 18;
+                    su.uColor.value.set(0.75, 0.8, 0.88);
+                    su.uOpacity.value = 0.5;
+                    this.splash.geometry.setDrawRange(0, Math.min(this.SPLASH_CAP, Math.round(300 * (W.splash || 0) * dens)) * 6);
+                }
+                this.mesh.visible = !!W;
+                this.splash.visible = !!(W && W.splash);
+                if (changed || force) {
+                    this.strikes.length = 0;
+                    this.lightning = 0;
+                    this.nextStrikeAt = performance.now() + 4000 + Math.random() * 6000;
+                    // Surfaces jump straight to the new state on a change (fade only on the first wetting)
+                    if (force) {
+                        this.surf.wet = W && W.wet ? 1 : 0;
+                        this.surf.snow = W && W.snow ? 1 : 0;
+                        this.surf.sand = W && W.sand ? 1 : 0;
+                    }
+                    this._apply();
+                    refreshSceneLighting();
+                }
+                this._applySurf();
+            },
+
+            _applySurf: function () {
+                const W = WEATHER_KINDS[this.kind];
+                weatherSurf.uWet.value = this.surf.wet;
+                weatherSurf.uSnow.value = this.surf.snow;
+                weatherSurf.uSand.value = this.surf.sand;
+                weatherSurf.uRain.value = W && W.wet ? 1 : 0;
+                floorMaterial.envMapIntensity = 0.5 + 0.9 * this.surf.wet;
+            },
+
+            // Weather sits on top of the sky/fog the atmosphere theme and quality
+            // profile set: it keeps their values as a base and re-applies its tint and
+            // fog multiplier, picking up a new base whenever something else changes them.
+            _base: null, _last: null, _mode: 'daylight',
+            _capture: function () {
+                this._base = { bg: scene.background.clone(), fog: scene.fog.color.clone(), dens: scene.fog.density };
+            },
+            // Called from applyAtmosphereTheme right after it sets a fresh sky and fog
+            adjustAtmosphere: function (mode) {
+                this._mode = mode || 'daylight';
+                this._capture();
+                this._apply();
+            },
+            _apply: function () {
+                if (!this._base) this._capture();
+                const B = this._base, W = WEATHER_KINDS[this.kind];
+                scene.background.copy(B.bg);
+                scene.fog.color.copy(B.fog);
+                let dens = B.dens;
+                if (W && W.sky !== undefined) {
+                    const c = new THREE.Color(W.sky);
+                    if (this._mode === 'night') c.multiplyScalar(0.22);
+                    else if (this._mode === 'sunset' || this._mode === 'dawn') c.lerp(B.bg, 0.45);
+                    scene.background.lerp(c, W.skyMix);
+                    scene.fog.color.lerp(c, W.skyMix);
+                    dens *= W.fog;
+                    weatherState.sunScale = W.sun;
+                    weatherState.ambScale = W.amb;
+                } else {
+                    weatherState.sunScale = 1;
+                    weatherState.ambScale = 1;
+                }
+                scene.fog.density = dens;
+                this._last = { bg: scene.background.getHex(), fog: scene.fog.color.getHex(), dens: dens };
+            },
+            // Per frame: notice when a quality profile or map change reset the fog/sky
+            _watch: function () {
+                const L = this._last;
+                if (!L) return;
+                if (scene.fog.density !== L.dens || scene.background.getHex() !== L.bg || scene.fog.color.getHex() !== L.fog) {
+                    const B = this._base;
+                    if (scene.fog.density !== L.dens) B.dens = scene.fog.density;
+                    if (scene.background.getHex() !== L.bg) B.bg.copy(scene.background);
+                    if (scene.fog.color.getHex() !== L.fog) B.fog.copy(scene.fog.color);
+                    this._apply();
+                    refreshSceneLighting();
+                }
+            },
+
+            // Lightning: two or three quick pulses, thunder a moment later
+            strike: function (now) {
+                this.strikes.push(now, now + 80 + Math.random() * 60);
+                if (Math.random() < 0.5) this.strikes.push(now + 240 + Math.random() * 120);
+                this.strikeCount++;
+                const delay = 0.5 + Math.random() * 1.8;
+                if (typeof soundFX !== 'undefined' && game.soundEnabled !== false) {
+                    soundFX.playNoise(0.95, 0.22, delay, 320);
+                    soundFX.playNoise(0.95, 0.18, delay + 0.4, 160);
+                }
+            },
+
+            update: function (dt, now) {
+                if (!this.mesh) return;
+                if (game.mapPreset !== this._mapSeen) this.refresh(true);
+                const W = WEATHER_KINDS[this.kind];
+                // Surfaces fade in and out over a few seconds
+                const k = Math.min(1, dt * 0.4);
+                const tw = W && W.wet ? 1 : 0, ts = W && W.snow ? 1 : 0, tsa = W && W.sand ? 1 : 0;
+                const sf = this.surf;
+                if (sf.wet !== tw || sf.snow !== ts || sf.sand !== tsa) {
+                    sf.wet += (tw - sf.wet) * k; sf.snow += (ts - sf.snow) * k; sf.sand += (tsa - sf.sand) * k;
+                    if (Math.abs(sf.wet - tw) < 0.002) sf.wet = tw;
+                    if (Math.abs(sf.snow - ts) < 0.002) sf.snow = ts;
+                    if (Math.abs(sf.sand - tsa) < 0.002) sf.sand = tsa;
+                    this._applySurf();
+                }
+                this._watch();
+                this._audio(W);
+                if (!W) {
+                    if (this.lightning !== 0) this._light(0);
+                    return;
+                }
+                this.time = (this.time + dt) % 600;
+                weatherSurf.uWTime.value = this.time;
+                for (const m of [this.mesh, this.splash]) {
+                    const u = m.material.uniforms;
+                    u.uTime.value = this.time;
+                    u.uCam.value.copy(camera.position);
+                    u.uFogColor.value.set(scene.fog.color.r, scene.fog.color.g, scene.fog.color.b);
+                    u.uFogDensity.value = scene.fog.density;
+                }
+                if (W.lightning) {
+                    if (now >= this.nextStrikeAt) {
+                        this.strike(now);
+                        this.nextStrikeAt = now + 7000 + Math.random() * 9000;
+                    }
+                    let L = 0;
+                    for (let i = this.strikes.length - 1; i >= 0; i--) {
+                        const age = now - this.strikes[i];
+                        if (age < 0) continue;
+                        if (age > 900) { this.strikes.splice(i, 1); continue; }
+                        L += Math.exp(-age / 70);
+                    }
+                    L = Math.min(1.4, L) * ((game.userSettings && game.userSettings.reduceFlashes) ? 0.2 : 1);
+                    this._light(L);
+                } else if (this.lightning !== 0) this._light(0);
+            },
+
+            _light: function (L) {
+                if (L === this.lightning) return;
+                this.lightning = L;
+                ambientLight.intensity = weatherState.baseAmbient + L * 1.8;
+                skyDome.material.color.setScalar(1 + L * 2.2);
+                this.mesh.material.uniforms.uFlash.value = L;
+                this.splash.material.uniforms.uFlash.value = L;
+            },
+
+            // Rain hiss / wind, built lazily; follows Master volume and the sound toggle
+            _audio: function (W) {
+                const want = W ? (W.id === 0 ? 0.05 : W.id === 1 ? 0.08 : 0) : 0;
+                const wind = W ? (W.id === 1 ? 0.03 : W.id === 2 ? 0.035 : W.id === 3 ? 0.07 : W.id === 4 ? 0.02 : 0) : 0;
+                if (!this.audio) {
+                    if (want <= 0 && wind <= 0) return;
+                    if (typeof soundFX === 'undefined' || !soundFX.ctx) return;
+                    const ctx = soundFX.ctx;
+                    const mk = (brown) => {
+                        const len = ctx.sampleRate * 3, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+                        let last = 0;
+                        for (let i = 0; i < len; i++) {
+                            const r = Math.random() * 2 - 1;
+                            last = brown ? (last + 0.02 * r) / 1.02 : r;
+                            d[i] = brown ? last * 3.2 : r;
+                        }
+                        for (let i = 0; i < 2000; i++) d[len - 1 - i] *= i / 2000;
+                        const src = ctx.createBufferSource();
+                        src.buffer = buf; src.loop = true;
+                        return src;
+                    };
+                    const rain = mk(false), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), rg = ctx.createGain();
+                    hp.type = 'highpass'; hp.frequency.value = 900; lp.type = 'lowpass'; lp.frequency.value = 6500;
+                    rg.gain.value = 0;
+                    rain.connect(hp); hp.connect(lp); lp.connect(rg); rg.connect(ctx.destination);
+                    const wsrc = mk(true), wf = ctx.createBiquadFilter(), wg = ctx.createGain();
+                    wf.type = 'lowpass'; wf.frequency.value = 520; wg.gain.value = 0;
+                    wsrc.connect(wf); wf.connect(wg); wg.connect(ctx.destination);
+                    rain.start(); wsrc.start();
+                    this.audio = { ctx, rg, wg, wf };
+                }
+                const A = this.audio, t = A.ctx.currentTime;
+                const cfg = game.userSettings || {};
+                const master = (game.soundEnabled === false) ? 0 : (typeof cfg.masterVolume === 'number' ? cfg.masterVolume : 100) / 100;
+                A.rg.gain.setTargetAtTime(want * master, t, 0.8);
+                // Gusting wind
+                const gust = 0.7 + 0.3 * Math.sin(t * 0.37) * Math.sin(t * 0.11 + 1.3);
+                A.wg.gain.setTargetAtTime(wind * master * gust, t, 0.8);
+                A.wf.frequency.setTargetAtTime(380 + 300 * gust, t, 0.8);
+            },
+
+            // After the shader warm-up hides every effect: show what the setting wants
+            afterWarm: function () {
+                this.refresh(true);
             }
         };
 
@@ -35664,7 +36182,11 @@
             _grade: function () {
                 const m = (game.userSettings && game.userSettings.atmosphereMode) || 'daylight';
                 const u = this.mats.composite.uniforms;
-                if (m === 'night') {
+                if (m === 'sunset' || m === 'dawn') {
+                    // Golden highlights, violet shadows
+                    u.uContrast.value = 1.08; u.uSaturation.value = 1.12;
+                    u.uShadowTint.value.set(0.97, 0.94, 1.08); u.uHighTint.value.set(1.07, 1.0, 0.9);
+                } else if (m === 'night') {
                     u.uContrast.value = 1.1; u.uSaturation.value = 0.95;
                     u.uShadowTint.value.set(0.92, 0.98, 1.1); u.uHighTint.value.set(1.0, 1.0, 1.02);
                 } else if (m === 'competitive') {
@@ -35859,7 +36381,10 @@
                 b.count = 1;
                 b.instanceMatrix.needsUpdate = true;
             }
-            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke];
+            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke, weatherFX.mesh, weatherFX.splash];
+            const weatherRanges = [weatherFX.mesh.geometry.drawRange.count, weatherFX.splash.geometry.drawRange.count];
+            weatherFX.mesh.geometry.setDrawRange(0, 6);
+            weatherFX.splash.geometry.setDrawRange(0, 6);
             for (let i = 0; i < agentSystem.warmupMeshes.length; i++) {
                 const wm = agentSystem.warmupMeshes[i];
                 wm.position.copy(p);
@@ -35875,6 +36400,9 @@
                 renderer.render(scene, camera);
             }
             for (const object of warmEffects) object.visible = false;
+            weatherFX.mesh.geometry.setDrawRange(0, weatherRanges[0]);
+            weatherFX.splash.geometry.setDrawRange(0, weatherRanges[1]);
+            weatherFX.afterWarm();
             particleBatch.mesh.geometry.setDrawRange(0, 0);
             trailBatch.mesh.geometry.setDrawRange(0, 0);
             decalBatch.mesh.count = 0;
@@ -36026,6 +36554,7 @@
             brightness: 100,
             reduceFlashes: false,
             cameraShake: true,
+            weather: 'off',
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -36796,6 +37325,12 @@
                     this.saveToStorage();
                 });
 
+                this.bindPillGroup('setting-weather-pills', 'data-weather', (val) => {
+                    game.userSettings.weather = val || 'off';
+                    weatherFX.refresh(true);
+                    this.saveToStorage();
+                });
+
                 const fovSlider = document.getElementById('setting-fov');
                 if (fovSlider) {
                     fovSlider.addEventListener('input', (e) => {
@@ -37494,11 +38029,18 @@
                     scene.background.setHex(0x060b14);
                     scene.fog.color.setHex(0x060b14);
                     scene.fog.density = Math.max(0.0035, 0.013 - (d - 60) * 0.0001);
+                } else if (mode === 'sunset' || mode === 'dawn') {
+                    const L = ATMOSPHERE_LIGHTING[mode];
+                    scene.background.setHex(L.sky);
+                    scene.fog.color.setHex(L.sky).lerp(new THREE.Color(L.horizon), 0.3);
+                    scene.fog.density = Math.max(0.0028, 0.0125 - (d - 60) * 0.0001);
                 } else {
                     scene.background.setHex(baseSky);
                     scene.fog.color.setHex(baseSky);
                     scene.fog.density = Math.max(0.0025, 0.012 - (d - 60) * 0.0001);
                 }
+                // V1.7 weather: greyer/sandier sky, thicker fog, dimmer sun
+                weatherFX.adjustAtmosphere(mode);
                 // V1.7: ambient/sun/exposure per mode (ATMOSPHERE_LIGHTING, scaled by
                 // the map's sunIntensity), env map and sky dome follow the new sky.
                 refreshSceneLighting();
@@ -37910,6 +38452,7 @@
                 setActivePill('setting-map-detail-pills', 'data-mapdetail', cfg.mapDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-reduce-flash-pills', 'data-reduceflash', cfg.reduceFlashes ? 'on' : 'off');
                 setActivePill('setting-camera-shake-pills', 'data-camshake', cfg.cameraShake === false ? 'off' : 'on');
+                setActivePill('setting-weather-pills', 'data-weather', cfg.weather || 'off');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
@@ -39427,6 +39970,7 @@
             shellFX.init();
             fxKit.init();
             castFX.init();
+            weatherFX.init();
             weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material) && o.material !== muzzleStar.mat) o.material.toneMapped = false; });
             
             // Initialize object pools
@@ -39623,6 +40167,7 @@
             applyWeaponBobbing(time, game.keys.w || game.keys.a || game.keys.s || game.keys.d);
             shellFX.update(Math.min(0.05, delta));
             fxKit.update(Math.min(0.05, delta), now);
+            weatherFX.update(Math.min(0.05, delta), now);
             // V1.7: 3D audio listener follows the camera; enemy footsteps; low-health cue
             soundFX.updateListener();
             enemyAudio.update();
