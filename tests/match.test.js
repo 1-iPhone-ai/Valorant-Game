@@ -5,7 +5,8 @@ const { boot, closeBrowser, programState } = require('./harness');
 
 after(closeBrowser);
 
-const skipPhase = (evaluate) => evaluate(() => { matchMode.phaseEndsAt = performance.now(); });
+// Skipping a phase also skips any round-highlight replay (the post-round pause waits for it)
+const skipPhase = (evaluate) => evaluate(() => { matchMode.phaseEndsAt = performance.now(); replayDirector.stop(); });
 const killAll = (evaluate) => evaluate(() => {
     for (const e of enemyObjects) if (e.isActive && !e.hit) damageEnemyActor(e, 9999, performance.now(), Date.now(), 'Test', 'torso');
 });

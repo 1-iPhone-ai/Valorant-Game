@@ -85,14 +85,28 @@ test('PlayStation pad: detection, analog movement, look, fire, ADS, menus', { ti
     for (const b of [14, 4, 5, 12]) await press(b);
     assert.deepEqual(await evaluate(() => __casts), ['c', 'q', 'e', 'x']);
 
-    // Menus: Options opens settings, R1 changes tab, Circle closes. Hold Triangle opens buy menu.
+    // Menus: Options opens the pause menu; D-pad to SETTINGS and Cross opens it; R1 changes tab;
+    // Circle closes settings, Circle again resumes. Hold Triangle opens buy menu.
     await press(9);
+    assert.deepEqual(await evaluate(() => [mainMenu.open, mainMenu.kind]), [true, 'pause']);
+    const focusAct = () => evaluate(() => gamepadController.navFocus && gamepadController.navFocus.dataset.act);
+    // Steer to SETTINGS from either side (a held D-pad auto-repeats, so a slow frame can move twice)
+    const order = ['play', 'agent', 'modes', 'settings', 'controls'];
+    for (let i = 0; i < 10; i++) {
+        const at = order.indexOf(await focusAct());
+        if (at === 3) break;
+        await press(at > 3 ? 12 : 13);
+    }
+    assert.equal(await focusAct(), 'settings', 'D-pad reaches SETTINGS');
+    await press(0);
     assert.equal(await evaluate(() => game.settingsOpen), true);
     const tab0 = await evaluate(() => document.querySelector('.settings-tab-btn.active').dataset.tab);
     await press(5);
     assert.notEqual(await evaluate(() => document.querySelector('.settings-tab-btn.active').dataset.tab), tab0);
     await press(1);
-    assert.equal(await evaluate(() => game.settingsOpen), false);
+    assert.deepEqual(await evaluate(() => [game.settingsOpen, mainMenu.open]), [false, true]);
+    await press(1);
+    assert.equal(await evaluate(() => mainMenu.open), false, 'Circle resumes the game');
     await press(3, 700);
     assert.equal(await evaluate(() => game.buyMenuOpen), true);
     await press(13);
