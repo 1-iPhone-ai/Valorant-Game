@@ -39,6 +39,7 @@ async function closeBrowser() {
  * Opens the game and waits until initGame() (including shader warm-up) has run.
  * options.initScript: function run in the page before any game script.
  * options.quality: graphics profile to force (default 'medium'); pass null to keep Auto.
+ * options.menu: true to keep the start screen (it is skipped by default).
  * Returns { page, errors, frames, evaluate }.
  */
 // Only one game runs at a time: a page left open keeps its render loop going
@@ -53,6 +54,8 @@ async function boot(options = {}) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+    // The start screen pauses the game: tests start in play unless they ask for the menu
+    if (!options.menu) await page.addInitScript(() => { window.__skipMainMenu = true; });
     if (options.initScript) await page.addInitScript(options.initScript, options.initArg);
     await page.route('https://cdnjs.cloudflare.com/**', (r) => r.fulfill({ body: THREE_JS, contentType: 'application/javascript' }));
     await page.route((url) => !url.href.startsWith('file:') && !url.href.startsWith('https://cdnjs.cloudflare.com'), (r) => r.abort());
