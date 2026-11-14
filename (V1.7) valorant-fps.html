@@ -3819,6 +3819,17 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>Show Body</strong>
+                                    <small>See your legs and body in your agent's colour when you look down, and your shadow on the ground</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-showbody-pills">
+                                    <button class="settings-pill-opt active" data-showbody="on">ON</button>
+                                    <button class="settings-pill-opt" data-showbody="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Breakable Props</strong>
                                     <small>Glass panes that shatter and explosive barrels that blow up when shot (they come back next round, or after 30 s)</small>
                                 </div>
@@ -5354,6 +5365,7 @@
                 killCam: true,         // V1.7: kill cam after a death and Match round highlights
                 skipMenu: false,       // V1.7: start straight in the game (no start screen)
                 breakables: true,      // glass panes and explosive barrels on the maps
+                showBody: true,        // your legs and body when you look down, and your shadow
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -36849,7 +36861,7 @@
                 b.count = 1;
                 b.instanceMatrix.needsUpdate = true;
             }
-            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke, weatherFX.mesh, weatherFX.splash, replayDirector.ghost, breakables.group];
+            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke, weatherFX.mesh, weatherFX.splash, replayDirector.ghost, breakables.group, playerBody.group];
             const propsShown = breakables.glass.concat(breakables.barrels).map((p) => p.mesh.visible);
             for (const p of breakables.glass.concat(breakables.barrels)) p.mesh.visible = true;
             const weatherRanges = [weatherFX.mesh.geometry.drawRange.count, weatherFX.splash.geometry.drawRange.count];
@@ -37033,6 +37045,7 @@
             killCam: true,
             skipMenu: false,
             breakables: true,
+            showBody: true,
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -38298,6 +38311,95 @@
         };
 
         // =============================================
+        // Your own body: legs and torso in your agent's colour under the camera, so
+        // you see them when you look down, with a walk that follows how far you
+        // move, a crouch, and a shadow on the ground. Hidden in menus, replays and
+        // while down. Settings > Show Body (on by default). Plain standard materials
+        // (the wingmen's), so no new shader programs.
+        // =============================================
+        const playerBody = {
+            group: null, legs: [], bodyMat: null, accentMat: null,
+            phase: 0, amp: 0, lastX: 0, lastZ: 0, color: '', shown: false,
+            _fwd: new THREE.Vector3(),
+
+            enabled: function () { return !(game.userSettings && game.userSettings.showBody === false); },
+
+            init: function () {
+                if (this.group) return;
+                this.bodyMat = new THREE.MeshStandardMaterial({ color: 0x1b2230, roughness: 0.55, metalness: 0.15 });
+                this.accentMat = new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.35, roughness: 0.4 });
+                const rb = (w, h, d, x, y, z) => ({ geometry: roundedBoxGeometry(w, h, d, Math.min(w, h, d) * 0.3, 2), matrix: partMatrix(x, y, z, 0, 0, 0) });
+                const mk = (parts, mat) => { const m = new THREE.Mesh(mergeGeometryParts(parts), mat); for (const p of parts) p.geometry.dispose(); m.castShadow = true; m.receiveShadow = true; return m; };
+                const g = new THREE.Group();
+                // Torso and hips: shadow only. Right under the camera they would fill the
+                // view when you look down; the shadow pass draws them with its own depth
+                // material, so writing neither colour nor depth hides them from the view only.
+                this.shadowOnlyMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+                g.add(mk([rb(0.44, 0.24, 0.27, 0, 0.98, 0), rb(0.5, 0.52, 0.29, 0, 1.34, 0.02), rb(0.24, 0.27, 0.26, 0, 1.76, 0)], this.shadowOnlyMat));
+                // Legs swing from the hip
+                for (const side of [-1, 1]) {
+                    const leg = new THREE.Group();
+                    leg.position.set(side * 0.12, 0.92, 0);
+                    leg.add(mk([rb(0.17, 0.86, 0.19, 0, -0.44, 0), rb(0.16, 0.09, 0.28, 0, -0.875, -0.05)], this.bodyMat));
+                    leg.add(mk([rb(0.12, 0.11, 0.04, 0, -0.46, -0.1)], this.accentMat));
+                    g.add(leg);
+                    this.legs.push(leg);
+                }
+                g.visible = false;
+                scene.add(g);
+                this.group = g;
+            },
+
+            update: function (dt) {
+                if (!this.group) return;
+                const show = this.enabled() && !mainMenu.open && !replayDirector.clip && game.health > 0;
+                if (!show) {
+                    if (this.group.visible) { this.group.visible = false; shadowManager.markEvent(); }
+                    return;
+                }
+                if (!this.group.visible) { this.group.visible = true; shadowManager.markEvent(); }
+                // Agent colour
+                const def = AGENT_DEFS[game.activeAgent];
+                const col = (def && def.themeColor) || '#38f6ff';
+                if (col !== this.color) {
+                    this.color = col;
+                    this.accentMat.color.set(col).convertSRGBToLinear();
+                    this.accentMat.emissive.copy(this.accentMat.color);
+                }
+                // Stand under the eye, a little behind it, facing where you look
+                const cc = characterController;
+                const eye = camera.position;
+                const feetY = eye.y - (cc.height || 1.7);
+                const yaw = camera.rotation.y;
+                this._fwd.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+                const g = this.group;
+                const ox = g.position.x, oy = g.position.y, oz = g.position.z;
+                g.position.set(eye.x - this._fwd.x * 0.3, feetY, eye.z - this._fwd.z * 0.3);
+                g.rotation.y = yaw;
+                const s = Math.max(0.6, (cc.height || 1.7) / 1.7);
+                g.scale.set(1, s, 1);
+                // Walk: one leg cycle per 1.6 m moved; legs tuck in the air
+                const moved = Math.hypot(eye.x - this.lastX, eye.z - this.lastZ);
+                this.lastX = eye.x; this.lastZ = eye.z;
+                const step = moved < 2 ? moved : 0;
+                const speed = dt > 0 ? step / dt : 0;
+                // In the air the stride stops and both legs tuck up
+                const air = cc.grounded === false;
+                const target = air ? 0 : Math.min(1, speed / 4.5);
+                this.amp += (target - this.amp) * Math.min(1, dt * 10);
+                this.tuck = (this.tuck || 0) + ((air ? 0.4 : 0) - (this.tuck || 0)) * Math.min(1, dt * 8);
+                if (!air) this.phase = (this.phase + step / 1.6 * Math.PI * 2) % (Math.PI * 2);
+                const swing = Math.sin(this.phase) * 0.55 * this.amp;
+                this.legs[0].rotation.x = swing - this.tuck;
+                this.legs[1].rotation.x = -swing - this.tuck * 0.6;
+                // Moving bodies refresh the shadow map
+                if (Math.abs(g.position.x - ox) + Math.abs(g.position.y - oy) + Math.abs(g.position.z - oz) > 0.002 || this.amp > 0.02 || this.tuck > 0.02) {
+                    shadowManager.markMotion(g.position.x, g.position.y + 0.9, g.position.z, 1.0, ox, oy + 0.9, oz);
+                }
+            }
+        };
+
+        // =============================================
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
@@ -38749,6 +38851,11 @@
                     game.userSettings.maxDecals = p.maxDecals;
                     this.applyAtmosphereTheme();
                     this.syncAllUI();
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-showbody-pills', 'data-showbody', (val) => {
+                    game.userSettings.showBody = val !== 'off';
                     this.saveToStorage();
                 });
 
@@ -39925,6 +40032,7 @@
                 setActivePill('setting-killcam-pills', 'data-killcam', cfg.killCam === false ? 'off' : 'on');
                 setActivePill('setting-skipmenu-pills', 'data-skipmenu', cfg.skipMenu ? 'on' : 'off');
                 setActivePill('setting-breakables-pills', 'data-breakables', cfg.breakables === false ? 'off' : 'on');
+                setActivePill('setting-showbody-pills', 'data-showbody', cfg.showBody === false ? 'off' : 'on');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
@@ -41446,6 +41554,7 @@
             reflectFX.init();
             replayDirector.init();
             mainMenu.init();
+            playerBody.init();
             weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material) && o.material !== muzzleStar.mat) o.material.toneMapped = false; });
             
             // Initialize object pools
@@ -41641,6 +41750,7 @@
             presentPlayerCamera(simAccumulator / SIM_DT);
             const now = performance.now();
             mainMenu.update(delta, now);
+            playerBody.update(delta);
             updateGunplayAndCrosshair(delta, time, now);
             updateWeaponPosition();
             applyWeaponBobbing(time, game.keys.w || game.keys.a || game.keys.s || game.keys.d);
