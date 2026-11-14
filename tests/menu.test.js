@@ -85,11 +85,17 @@ test('controller drives the menu (Start pauses, D-pad and A select, B backs out)
     const { page, errors, frames, evaluate } = await boot({ quality: 'low', menu: true, initScript: fakePad });
     const press = async (i) => { await evaluate((i) => __press(i, true), i); await frames(2); await evaluate((i) => __press(i, false), i); await frames(2); };
     assert.equal(await evaluate(() => mainMenu.open), true);
-    // D-pad down twice from the top, A: MODES (PLAY, MODES; AGENT SELECT is hidden on the start screen)
+    // D-pad to MODES, then A (start screen: PLAY, MODES, SETTINGS, CONTROLS; AGENT SELECT is hidden).
+    // Steer from either side: a held D-pad auto-repeats, so a slow frame can move twice.
+    const focusAct = () => evaluate(() => gamepadController.navFocus && gamepadController.navFocus.dataset.act);
+    const order = ['play', 'modes', 'settings', 'controls'];
     await press(13);
-    await press(13);
-    const focused = await evaluate(() => gamepadController.navFocus && gamepadController.navFocus.dataset.act);
-    assert.equal(focused, 'modes');
+    for (let i = 0; i < 10; i++) {
+        const at = order.indexOf(await focusAct());
+        if (at === 1) break;
+        await press(at > 1 ? 12 : 13);
+    }
+    assert.equal(await focusAct(), 'modes', 'D-pad moves the focus');
     await press(0);
     assert.equal(await evaluate(() => mainMenu.view), 'modes');
     await press(1);

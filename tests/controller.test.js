@@ -90,7 +90,13 @@ test('PlayStation pad: detection, analog movement, look, fire, ADS, menus', { ti
     await press(9);
     assert.deepEqual(await evaluate(() => [mainMenu.open, mainMenu.kind]), [true, 'pause']);
     const focusAct = () => evaluate(() => gamepadController.navFocus && gamepadController.navFocus.dataset.act);
-    for (let i = 0; i < 6 && (await focusAct()) !== 'settings'; i++) await press(13);
+    // Steer to SETTINGS from either side (a held D-pad auto-repeats, so a slow frame can move twice)
+    const order = ['play', 'agent', 'modes', 'settings', 'controls'];
+    for (let i = 0; i < 10; i++) {
+        const at = order.indexOf(await focusAct());
+        if (at === 3) break;
+        await press(at > 3 ? 12 : 13);
+    }
     assert.equal(await focusAct(), 'settings', 'D-pad reaches SETTINGS');
     await press(0);
     assert.equal(await evaluate(() => game.settingsOpen), true);
