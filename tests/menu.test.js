@@ -62,9 +62,11 @@ test('start screen: game paused under an orbiting camera; keyboard menus; agent 
     assert.match(descs.text, /Healing orb/);
     await page.click('#agent-picker-lock-btn');
     await frames(3);
+    const menuShown = () => evaluate(() => getComputedStyle(document.getElementById('main-menu')).display !== 'none');
     const play = await evaluate(() => ({ open: mainMenu.open, started: mainMenu.started, agent: game.activeAgent, mode: game.gameMode, match: matchMode.active,
         hud: getComputedStyle(document.getElementById('crosshair')).visibility, showcase: mainMenu.showcase.visible, gun: weaponGroup.visible }));
     assert.deepEqual(play, { open: false, started: true, agent: 'sage', mode: 'match', match: true, hud: 'visible', showcase: false, gun: true });
+    assert.equal(await menuShown(), false, 'the menu panel is gone from the screen once the game starts');
 
     // Esc in play: the pause menu, which also pauses the round timer
     await page.keyboard.press('Escape');
@@ -73,8 +75,10 @@ test('start screen: game paused under an orbiting camera; keyboard menus; agent 
     await page.waitForTimeout(2500);
     const left2 = await evaluate(() => matchMode.phaseEndsAt - performance.now());
     assert.ok(Math.abs(left2 - pause.left) < 600, `buy timer paused (${Math.round(pause.left)} -> ${Math.round(left2)} ms)`);
+    assert.equal(await menuShown(), true, 'pause menu on screen');
     await page.keyboard.press('Escape');
     assert.equal(await evaluate(() => mainMenu.open), false, 'Esc again resumes');
+    assert.equal(await menuShown(), false, 'and the menu panel is gone again');
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(programs, watermark, 'the menu and the agent preview add no shader programs');
     assert.equal(stalls, 0);
@@ -108,6 +112,7 @@ test('controller drives the menu (Start pauses, D-pad and A select, B backs out)
     assert.deepEqual(await evaluate(() => [mainMenu.open, mainMenu.kind]), [true, 'pause']);
     await press(9);
     assert.equal(await evaluate(() => mainMenu.open), false);
+    assert.equal(await evaluate(() => getComputedStyle(document.getElementById('main-menu')).display), 'none', 'menu panel hidden after resuming');
 
     // Skip Menu On Start: saved, and the next load goes straight into the game
     await evaluate(() => document.querySelector('#setting-skipmenu-pills [data-skipmenu="on"]').click());

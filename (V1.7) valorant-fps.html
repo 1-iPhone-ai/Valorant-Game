@@ -38041,6 +38041,8 @@
                 this.open = false;
                 this.selecting = false;
                 document.body.classList.remove('menu-open', 'agent-select');
+                // Hide the menu panel itself (it stayed on screen over the game)
+                this.render();
                 if (this.savedLook) {
                     camera.rotation.set(this.savedLook.x, this.savedLook.y, 0, 'YXZ');
                     camera.fov = this.savedLook.fov;
