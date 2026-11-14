@@ -163,6 +163,39 @@
         .match-rounds .w { background: rgba(0, 229, 163, 0.25); border: 1px solid #00e5a3; }
         .match-rounds .l { background: rgba(255, 70, 85, 0.22); border: 1px solid #ff4655; }
         .match-rounds .mvp { box-shadow: 0 0 0 2px #ffd166 inset; }
+
+        /* V1.7 main menu and agent select */
+        .main-menu { position: absolute; inset: 0; z-index: 40; display: none; pointer-events: auto;
+            background: linear-gradient(90deg, rgba(6, 10, 18, 0.9) 0%, rgba(6, 10, 18, 0.55) 34%, rgba(6, 10, 18, 0) 60%); }
+        .main-menu.visible { display: block; }
+        body.agent-select .main-menu .mm-side { visibility: hidden; }
+        .mm-side { position: absolute; left: 6vw; top: 50%; transform: translateY(-50%); width: min(380px, 80vw); }
+        .mm-logo { font-size: 30px; font-weight: 900; letter-spacing: 3px; white-space: nowrap; color: #ff4655; line-height: 1; }
+        .mm-sub { font-size: 12px; letter-spacing: 5px; color: #cbd5e1; margin: 6px 0 26px; }
+        .mm-view { display: none; flex-direction: column; gap: 8px; }
+        .mm-view.active { display: flex; }
+        .mm-btn { text-align: left; background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(148, 163, 184, 0.25); border-left: 3px solid transparent;
+            color: #f1f5f9; font-size: 18px; font-weight: 800; letter-spacing: 3px; padding: 11px 16px; cursor: pointer; border-radius: 3px;
+            display: flex; flex-direction: column; transition: background 0.12s, border-color 0.12s, padding 0.12s; }
+        .mm-btn small { font-size: 11px; font-weight: 500; letter-spacing: 0.5px; color: #94a3b8; margin-top: 3px; }
+        .mm-btn .mm-val { font-size: 11px; color: #ffd166; letter-spacing: 2px; margin-top: 2px; }
+        .mm-btn:hover, .mm-btn:focus, .mm-btn.gp-focus { outline: none; background: rgba(255, 70, 85, 0.18); border-left-color: #ff4655; padding-left: 22px; }
+        .mm-btn.selected { border-left-color: #ffd166; }
+        .mm-back { font-size: 13px; color: #94a3b8; }
+        .main-menu:not(.pause) .mm-pause-only { display: none; }
+        .mm-controls { font-size: 12px; color: #cbd5e1; line-height: 1.7; background: rgba(15, 23, 42, 0.6); padding: 10px 14px; border-radius: 4px; }
+        .mm-controls b { color: #fff; }
+        .mm-controls-pad { margin-top: 6px; color: #94a3b8; }
+        .mm-foot { margin-top: 22px; font-size: 11px; color: #64748b; letter-spacing: 1px; }
+        .mm-agent-tag { position: absolute; right: 8vw; bottom: 12vh; text-align: right; color: #fff; font-weight: 900; letter-spacing: 4px; font-size: 26px; }
+        .mm-agent-tag small { display: block; font-size: 11px; color: #94a3b8; letter-spacing: 4px; }
+        body.agent-select .mm-agent-tag { display: none; }
+        body.menu-open #ui-root > *:not(#main-menu):not(#agent-picker-overlay):not(#settings-panel) { visibility: hidden; }
+        body.menu-open.agent-select .agent-picker-overlay { background: linear-gradient(270deg, rgba(6, 11, 19, 0.92) 0%, rgba(6, 11, 19, 0.6) 55%, rgba(6, 11, 19, 0) 70%);
+            backdrop-filter: none; justify-content: flex-end; }
+        body.menu-open.agent-select .agent-picker-panel { width: min(760px, 60vw); margin-right: 3vw; max-height: 94vh; }
+        body.menu-open.agent-select .agent-picker-body { min-height: 0; overflow: auto; }
+        .inspector-ability-desc { font-size: 11px; color: #cbd5e1; margin-top: 2px; line-height: 1.35; }
         /* V1.7 death recap (bottom centre, above the agent bar) */
         .death-recap {
             position: absolute;
@@ -3786,6 +3819,17 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>Skip Menu On Start</strong>
+                                    <small>Go straight into the game when it loads instead of the start screen (Esc still opens the menu)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-skipmenu-pills">
+                                    <button class="settings-pill-opt active" data-skipmenu="off">OFF</button>
+                                    <button class="settings-pill-opt" data-skipmenu="on">ON</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Draw Distance &amp; Atmospheric Fog</strong>
                                     <small>Maximum render distance for arena geometry and targets (60m – 140m)</small>
                                 </div>
@@ -5297,6 +5341,7 @@
                 cameraShake: true,     // V1.7: subtle shake on nearby blasts (off with Reduce Flashes too)
                 weather: 'off',        // V1.7: 'off' (default) | 'map' | 'rain' | 'storm' | 'snow' | 'sand' | 'leaves'
                 killCam: true,         // V1.7: kill cam after a death and Match round highlights
+                skipMenu: false,       // V1.7: start straight in the game (no start screen)
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -12163,6 +12208,7 @@
         // Pointer lock handling
         document.addEventListener('pointerlockchange', () => {
             isPointerLocked = document.pointerLockElement === document.body;
+            mainMenu.onPointerLockChange();
         });
         
         // Initial pointer lock attempt when clicking on game
@@ -12181,6 +12227,11 @@
                 event.preventDefault();
                 event.stopPropagation();
                 settingsManager.handleKeybindCapture(event.code);
+                return;
+            }
+            // V1.7: the main menu takes the keyboard while it is the top layer
+            if (mainMenu.open && !game.settingsOpen && !game.agentPickerOpen) {
+                mainMenu.onKey(event);
                 return;
             }
             if (event.code === 'KeyP') {
@@ -12207,6 +12258,12 @@
                     }
                     tacticalDirector.toggleBuyMenu();
                 }
+                return;
+            }
+            if (event.code === 'Escape' && !event.repeat && !game.buyMenuOpen && !game.agentPickerOpen && !game.settingsOpen && !mainMenu.open
+                && !(typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) && matchMode.phase !== 'over') {
+                event.preventDefault();
+                mainMenu.show('pause');
                 return;
             }
             if (event.code === 'Escape' && (game.buyMenuOpen || game.agentPickerOpen || game.settingsOpen)) {
@@ -12715,7 +12772,7 @@
             },
             
             menuOpen: function() {
-                return game.settingsOpen || game.buyMenuOpen || game.agentPickerOpen ||
+                return game.settingsOpen || game.buyMenuOpen || game.agentPickerOpen || (typeof mainMenu !== 'undefined' && mainMenu.open) ||
                     (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen);
             },
             
@@ -12873,7 +12930,8 @@
                 if (pressed(GP.R3)) inspectWeapon();
                 
                 // --- Menus. View/Touchpad: tap = scoreboard, hold = agent picker
-                if (pressed(GP.MENU) && typeof settingsManager !== 'undefined') settingsManager.toggleSettings(true);
+                // V1.7: Start opens the pause menu (Settings is in it)
+                if (pressed(GP.MENU)) mainMenu.show('pause');
                 const viewBtn = cur[GP.PAD] ? GP.PAD : GP.VIEW;
                 if (cur[viewBtn] && !this.holdFired[viewBtn] && heldFor(viewBtn) >= GP_HOLD_MS) {
                     this.holdFired[viewBtn] = true;
@@ -12943,6 +13001,7 @@
                 if (game.agentPickerOpen) return document.getElementById('agent-picker-overlay');
                 if (game.buyMenuOpen) return document.getElementById('buy-menu-overlay');
                 if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) return document.getElementById('career-modal-overlay');
+                if (mainMenu.open) return mainMenu.el;
                 return null;
             },
             
@@ -13002,7 +13061,8 @@
                 if (game.settingsOpen && typeof settingsManager !== 'undefined') { settingsManager.toggleSettings(false); return; }
                 if (game.agentPickerOpen && tacticalDirector.toggleAgentPicker) { tacticalDirector.toggleAgentPicker(false); return; }
                 if (game.buyMenuOpen) { tacticalDirector.toggleBuyMenu(false); return; }
-                if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) tacticalEnhancements.toggleCareerModal(false);
+                if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) { tacticalEnhancements.toggleCareerModal(false); return; }
+                if (mainMenu.open) mainMenu.back();
             },
             
             navigate: function(pad, cur, pressed, left, now) {
@@ -13040,6 +13100,7 @@
                     this.clearNavFocus();
                 }
                 if (pressed(GP.MENU) && game.settingsOpen) { settingsManager.toggleSettings(false); this.clearNavFocus(); }
+                else if (pressed(GP.MENU) && mainMenu.open && !game.agentPickerOpen && mainMenu.kind === 'pause') { mainMenu.resume(); this.clearNavFocus(); }
                 // Settings tabs with the bumpers
                 if (game.settingsOpen && (pressed(GP.LB) || pressed(GP.RB))) {
                     const tabs = Array.from(root.querySelectorAll('.settings-tab-btn'));
@@ -16307,6 +16368,38 @@
         // Valorant Agent Abilities System (C, Q, E, X + 29-Agent Switcher: Jett, Phoenix, Sova, Sage, Reyna, Omen, Raze, Killjoy, Cypher, Brimstone, Viper, Yoru, Neon, Chamber, KAY/O, Skye, Fade, Breach, Iso, Clove, Gekko, Deadlock, Harbor, Astra, Vyse, Tejo, Waylay, Veto, Miks)
         // =============================================
         const AGENT_ORDER = ['jett', 'phoenix', 'sova', 'sage', 'reyna', 'omen', 'raze', 'killjoy', 'cypher', 'brimstone', 'viper', 'yoru', 'neon', 'chamber', 'kayo', 'skye', 'fade', 'breach', 'iso', 'clove', 'gekko', 'deadlock', 'harbor', 'astra', 'vyse', 'tejo', 'waylay', 'veto', 'miks'];
+        // V1.7 agent select: what each ability does in this game (C, Q, E, X)
+        const ABILITY_DESC = {
+            jett:      ['Throws a smoke screen that blocks sight.', 'Launches you straight up; hold Space to drift-glide down.', 'Dashes you a short distance in the direction you are moving.', 'Zero spread and rapid fire, wallhack on every enemy, and each kill heals you.'],
+            phoenix:   ['Throws a fire zone: burns enemies and heals you while you stand in it.', 'Curving flash that blinds enemies who see it pop.', 'A fiery dash forward.', 'Places a solar anchor: fatal damage rewinds you there at full health.'],
+            sova:      ['Throws a smoke screen that blocks sight.', 'Explosive bolt that damages everything in its blast.', 'Recon bolt that scans and reveals enemies around where it lands.', 'Three wall-piercing railgun blasts (left-click or X to fire).'],
+            sage:      ['Raises an ice wall; aim down to boost yourself up onto it.', 'Frost orb that leaves a 65% slow field.', 'Healing orb: +60 health over a few seconds.', 'Full health, +50 armor and a self-revive on a fatal hit for 16 s.'],
+            reyna:     ['Ethereal eye that nearsights every enemy who looks at it.', 'Consumes a soul orb from a kill: heals you and adds overshield.', 'Consumes a soul orb from a kill: intangible and faster for a moment.', 'Empress: +35% fire rate, and every kill resets Devour and Dismiss.'],
+            omen:      ['Teleports you to where you aim.', 'A shadow wave that nearsights everything it passes through.', 'A long-lasting purple smoke.', 'Blinds and reveals every enemy and gives two bonus long-range blinks (X).'],
+            raze:      ['A bot that stalks nearby enemies and makes them take double damage.', 'Satchel jump; hold Space to glide.', 'Cluster grenade that splits into extra blasts.', 'Two Showstopper rockets (left-click or X to fire).'],
+            killjoy:   ['Nanoswarm grenade: a 45 DPS zone that also reveals enemies.', 'An alarm bot that hunts nearby enemies and makes them vulnerable.', 'A turret that fires at enemies in its line of sight within 28 m.', 'Lockdown: a 26 m dome that detains, slows and reveals every enemy inside.'],
+            cypher:    ['A tripwire that tethers, reveals and concusses anyone who crosses it.', 'A cage that blocks vision and slows and pings enemies inside.', 'A spycam that scans 32 m and tags enemies with darts (+20% damage).', 'Neural theft: reveals every enemy, then pulses again.'],
+            brimstone: ['A beacon: +25% fire rate, extra speed and an instant ammo refill.', 'Incendiary: a heavy fire zone (60 DPS).', 'An orbital smoke screen that lasts 14 s.', 'Orbital strike: a laser that scorches the target zone (130 DPS).'],
+            viper:     ['An acid pool (50 DPS) that makes enemies take +20% damage.', 'A poison cloud that blocks sight and decays enemies (30 DPS).', 'A 22 m toxic wall that blocks vision and decays enemies.', "Viper's Pit: a 14 m toxic cloud (40 DPS) with nearsight; you see through it."],
+            yoru:      ['A decoy that strides forward and flashes enemies it touches.', 'A rift flash that bounces and then detonates.', 'Sends a tether; press E again within 16 s to teleport to it.', 'Dimensional drift: invulnerable, see everyone through walls, +45% speed.'],
+            neon:      ['Twin 20 m electric walls that block sight and shock enemies (35 DPS).', 'A bolt that bounces twice and concusses enemies in its blasts.', '+45% sprint speed and +25% fire rate for 6.5 s.', 'Overdrive: left-click fires a 400 DPS lightning beam.'],
+            chamber:   ['A trap that scans 11 m and sets off a 6.5 m slow and vulnerable field.', 'A precision shot straight along your crosshair.', 'Places an anchor; press E again within 28 s to snap back to it.', 'Tour de Force: five one-shot golden sniper rounds (left-click or X).'],
+            kayo:      ['A grenade that pulses plasma across the floor four times.', 'A flash that blinds and tags enemies; throw it backwards or crouched for a quick pop-flash.', 'A wall-piercing knife that suppresses and reveals enemies within 18 m.', 'NULL/cmd: combat stim, 24 m suppression pulses and a self-revive.'],
+            skye:      ['Heals you +97 and adds +25 overshield.', 'A beast that runs ahead, hunts and concusses enemies.', 'A hawk you steer with the crosshair; press E again to flash.', 'Three seekers that hunt down the nearest enemies.'],
+            fade:      ['A prowler you steer with the crosshair; it nearsights on a bite.', 'An orb that drops into a 6.5 m tether and decay vortex.', 'A watcher that reveals enemies it can see and marks their trail.', 'Nightfall: a wall-piercing wave that decays, deafens and marks enemies.'],
+            breach:    ['A charge through the wall that blasts three times (65 each).', 'A fast blinding burst through cover.', 'A 28 m wall-piercing quake that goes off after 0.6 s.', 'Rolling Thunder: a huge cascading quake that concusses everything ahead.'],
+            iso:       ['An energy wall that advances and blocks enemy fire.', 'A wall-piercing bolt that makes enemies take +50% damage.', 'A shield that absorbs the next hit; shoot the orb overhead to refresh it.', 'Kill Contract: pulls one enemy into a 1v1 arena with you, shielded.'],
+            clove:     ['+50 overheal, +50 overshield and +35% speed for 8 s.', 'A burst that decays every enemy around where it lands.', 'A twilight cloud that blocks vision and slows (10.5 s).', 'Not Dead Yet: an immortal phase with +35% speed and a self-revive.'],
+            gekko:     ['A creature that spreads into a 6.4 m acid pool, then erupts for 130.', 'Wingman hunts enemies, concusses them and leaves a globule to pick up.', 'Dizzy flies out, blinds enemies it sees and leaves a globule.', 'Thrash: steer with the crosshair, press X to lunge and detain.'],
+            deadlock:  ['A grenade that drops a 6.5 m gravity net.', 'A sensor that watches an 11.5 m area for footsteps and gunfire.', 'A barrier that repels and shocks enemies while bullets pass through.', 'Annihilation: a nanowire cocoon that reels its target in.'],
+            harbor:    ['A wave that surges forward; press C again to stop it in place.', 'A 5 m water dome that blocks bullets.', 'A 22 m water wall that blocks vision, slows enemies and heals you +12.', 'Reckoning: a geyser pool that advances and concusses with strikes (20 m).'],
+            astra:     ['A gravity well that pulls enemies in, then implodes to make them vulnerable.', 'A nova that concusses everything within 6.6 m after 0.65 s.', 'A 4.9 m cosmic smoke that blinds and slows enemies inside.', 'Cosmic Divide: an endless wall that blocks bullets and vision, and refreshes your stars.'],
+            vyse:      ['A trap that raises a 9 m metal wall behind enemies who cross it.', 'A flower that flashes everything within 22 m; press Q again or let it trigger itself.', 'A 6.5 m field of metal thorns.', 'Steel Garden: a 24 m thorn field that jams enemy weapons, plus 50 armor.'],
+            tejo:      ['A drone; press C again for an 11 m EMP that suppresses and reveals.', 'A sticky grenade that concusses within 7.2 m.', 'Two target zones that each take three missile strikes.', 'Armageddon: a 28 m corridor of rolling airstrikes.'],
+            waylay:    ['A light cluster that bursts into a 6.5 m slowing field.', 'A double dash of light with a little lift (+12 health).', 'Places a beacon for 14 s; press E again to zip back, invulnerable.', 'Convergent Paths: a 26 m shockwave, extra speed and 50 armor.'],
+            veto:      ['Places an anchor for 22 s; press C again to teleport there with a shockwave.', 'A glob that spawns a 6.4 m snare and decay zone.', 'A drone that zaps enemies within 12.5 m and clears blinds for 12 s.', 'Evolution: full health, 50 armor, immunity to debuffs and a 9 m aura.'],
+            miks:      ['A sound emitter that heals you and concusses nearby enemies.', '+35% speed and +25% fire rate for 7.5 s, refreshed by every kill.', 'A sound dome that deafens and reveals the enemies inside.', 'Bassquake: 30 m of seismic sound waves, the stim and 50 armor.']
+        };
         const AGENT_DEFS = {
             jett: {
                 id: 'jett',
@@ -34075,7 +34168,9 @@
                         try { document.exitPointerLock(); } catch (err) {}
                     }
                 } else {
-                    if (!deviceInfo.touchEnabled && !game.buyMenuOpen && document.pointerLockElement !== renderer.domElement) {
+                    // V1.7: closed from the main menu without locking in: back to the menu
+                    mainMenu.onPickerClosed();
+                    if (!mainMenu.open && !deviceInfo.touchEnabled && !game.buyMenuOpen && document.pointerLockElement !== renderer.domElement) {
                         try { renderer.domElement.requestPointerLock(); } catch (err) {}
                     }
                 }
@@ -34165,11 +34260,12 @@
                         const cdSec = ab.cooldownSec || (ab.cooldownMs ? Math.round(ab.cooldownMs / 1000) : 0);
                         return cdSec ? `${cdSec}s CD • ${ab.maxCharges || 1} Charge${(ab.maxCharges || 1) > 1 ? 's' : ''}` : defaultRole;
                     };
+                    const dsc = ABILITY_DESC[agentId] || [];
                     const slots = [
-                        { key: 'C', data: def.abilities.c, meta: fmtMeta(def.abilities.c, 'Tactical Utility') },
-                        { key: 'Q', data: def.abilities.q, meta: fmtMeta(def.abilities.q, 'Strike Utility') },
-                        { key: 'E', data: def.abilities.e, meta: fmtMeta(def.abilities.e, 'Signature Ability') },
-                        { key: 'X', data: def.abilities.x, meta: `${def.abilities.x.ultCost || 6} Ult Points • Ultimate` }
+                        { key: 'C', data: def.abilities.c, meta: fmtMeta(def.abilities.c, 'Tactical Utility'), desc: dsc[0] },
+                        { key: 'Q', data: def.abilities.q, meta: fmtMeta(def.abilities.q, 'Strike Utility'), desc: dsc[1] },
+                        { key: 'E', data: def.abilities.e, meta: fmtMeta(def.abilities.e, 'Signature Ability'), desc: dsc[2] },
+                        { key: 'X', data: def.abilities.x, meta: `${def.abilities.x.ultCost || 6} Ult Points • Ultimate`, desc: dsc[3] }
                     ];
                     abilitiesEl.innerHTML = slots.map(s => `
                         <div class="inspector-ability-row" style="border-left-color:${accentCol}">
@@ -34177,6 +34273,7 @@
                             <div class="inspector-ability-info">
                                 <div class="inspector-ability-title">[${s.key}] ${s.data.name}</div>
                                 <div class="inspector-ability-meta">${s.meta}</div>
+                                ${s.desc ? `<div class="inspector-ability-desc">${s.desc}</div>` : ''}
                             </div>
                         </div>
                     `).join('');
@@ -34200,6 +34297,8 @@
                         agentSystem.cycleAgent();
                     }
                 }
+                // V1.7: locking in from the main menu starts the game
+                mainMenu.onAgentLocked();
                 this.toggleAgentPicker(false);
             },
 
@@ -36652,7 +36751,7 @@
             viewmodelScene.environment = scene.environment;
             syncViewmodelCamera();
             // V1.7 cast hand and its energy cards: drawn with the viewmodel warm-up
-            const castParts = castFX.group ? [castFX.group, castFX.halo, castFX.core].concat(castFX.wisps) : [];
+            const castParts = (castFX.group ? [castFX.group, castFX.halo, castFX.core].concat(castFX.wisps) : []).concat(mainMenu.showcase ? [mainMenu.showcase] : []);
             for (const o of castParts) o.visible = true;
             renderer.compile(viewmodelScene, viewmodelCamera);
             const muzzleHalos = ['rifle', 'sniper', 'pistol'].map(k => game.weapons[k] && game.weapons[k].muzzleHalo).filter(Boolean);
@@ -36863,6 +36962,7 @@
             cameraShake: true,
             weather: 'off',
             killCam: true,
+            skipMenu: false,
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -37804,6 +37904,276 @@
             }
         };
 
+        // =============================================
+        // V1.7 Main menu and agent select. Start screen over a slow camera orbit of
+        // the map (the game is paused): PLAY goes to agent select (all 29 agents,
+        // abilities with descriptions, a rotating preview in the agent's colour) and
+        // LOCK IN starts the chosen mode. Esc, the Start button or losing the mouse
+        // lock opens it again as a pause menu. Keyboard, mouse and controller work
+        // everywhere. Settings > Skip Menu On Start goes straight into the game.
+        // =============================================
+        const MENU_MODES = [
+            ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
+            ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
+            ['retake', 'RETAKE', 'Retake a planted site before the spike goes off'],
+            ['range', 'RANGE', '30 bots against the clock, with a scorecard']
+        ];
+        const mainMenu = {
+            open: false, kind: 'start', view: 'main', started: false, selecting: false,
+            mode: 'wave', el: null, showcase: null, figure: null, accentMat: null, ringMat: null,
+            t: 0, savedLook: null, lockWas: false, _lastNow: 0,
+            _off: new THREE.Vector3(), _q: new THREE.Quaternion(), _turn: new THREE.Quaternion(), _y: new THREE.Vector3(0, 1, 0),
+
+            paused: function () { return this.open; },
+
+            init: function () {
+                if (this.el) return;
+                const el = document.createElement('div');
+                el.id = 'main-menu';
+                el.className = 'main-menu';
+                el.innerHTML = `
+                    <div class="mm-side">
+                        <div class="mm-logo">VALORANT 3D FPS</div>
+                        <div class="mm-sub">V1.7 RADIANT EDITION</div>
+                        <div class="mm-view" data-view="main">
+                            <button class="mm-btn" data-act="play">PLAY</button>
+                            <button class="mm-btn mm-pause-only" data-act="agent">AGENT SELECT</button>
+                            <button class="mm-btn" data-act="modes">MODES <span class="mm-val" id="mm-mode-val">WAVE</span></button>
+                            <button class="mm-btn" data-act="settings">SETTINGS</button>
+                            <button class="mm-btn" data-act="controls">CONTROLS</button>
+                        </div>
+                        <div class="mm-view" data-view="modes">
+                            ${MENU_MODES.map((m) => `<button class="mm-btn mm-mode" data-mode="${m[0]}">${m[1]}<small>${m[2]}</small></button>`).join('')}
+                            <button class="mm-btn mm-back" data-act="back">BACK</button>
+                        </div>
+                        <div class="mm-view" data-view="controls">
+                            <div class="mm-controls">
+                                <div><b>WASD</b> Move</div><div><b>Mouse</b> Aim • <b>Left / Right click</b> Shoot / Aim down sights</div>
+                                <div><b>Space</b> Jump (hold: glide) • <b>Ctrl / Z</b> Crouch</div><div><b>R</b> Reload • <b>Y</b> Inspect • <b>1–4</b> Weapons • <b>V</b> Variants</div>
+                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings</div>
+                                <div><b>F1 / F2 / F3</b> Wave / Range / Retake • <b>F4</b> Maps • <b>T</b> Ping</div><div><b>Esc</b> This menu</div>
+                                <div class="mm-controls-pad"><b>Controller:</b> sticks move and aim • RT shoot • LT aim • A jump • B crouch • X reload • LB / RB / D-pad abilities • Start this menu • hold View: agents</div>
+                            </div>
+                            <button class="mm-btn mm-back" data-act="back">BACK</button>
+                        </div>
+                        <div class="mm-foot">Enter / Ⓐ select • Esc / Ⓑ back</div>
+                    </div>
+                    <div class="mm-agent-tag"><span id="mm-agent-name">JETT</span><small id="mm-agent-role">DUELIST</small></div>`;
+                document.getElementById('ui-root').appendChild(el);
+                this.el = el;
+                el.addEventListener('mousedown', (e) => e.stopPropagation());
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const b = e.target.closest('button');
+                    if (!b) return;
+                    if (b.dataset.mode) { this.mode = b.dataset.mode; this.setView('main'); return; }
+                    this.act(b.dataset.act);
+                });
+                this.buildShowcase();
+            },
+
+            // A figure in the agent's colour on a glowing ring, drawn with the
+            // viewmodel (never clipped by walls); gun-material programs, so no compiles
+            buildShowcase: function () {
+                const body = new THREE.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.5, metalness: 0.2, toneMapped: false });
+                this.accentMat = new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.6, roughness: 0.35, toneMapped: false });
+                this.ringMat = new THREE.MeshBasicMaterial({ color: 0x38f6ff, transparent: true, opacity: 0.85, toneMapped: false });
+                const rb = (w, h, d, x, y, z, rx, rz) => ({ geometry: roundedBoxGeometry(w, h, d, Math.min(w, h, d) * 0.3, 2), matrix: partMatrix(x, y, z, rx || 0, 0, rz || 0) });
+                const bodyParts = [
+                    rb(0.17, 0.82, 0.2, -0.12, 0.41, 0), rb(0.17, 0.82, 0.2, 0.12, 0.41, 0.02, -0.06),   // legs
+                    rb(0.46, 0.26, 0.28, 0, 0.92, 0),                                                    // hips
+                    rb(0.5, 0.56, 0.3, 0, 1.3, 0),                                                       // torso
+                    rb(0.14, 0.62, 0.15, -0.34, 1.26, 0.02, 0, 0.12), rb(0.14, 0.62, 0.15, 0.34, 1.26, -0.04, -0.4, -0.1), // arms
+                    rb(0.24, 0.27, 0.26, 0, 1.76, 0)                                                     // head
+                ];
+                const accentParts = [
+                    rb(0.21, 0.07, 0.04, 0, 1.78, -0.14),                                                // visor
+                    rb(0.18, 0.12, 0.3, -0.31, 1.55, 0), rb(0.18, 0.12, 0.3, 0.31, 1.55, 0),            // shoulders
+                    rb(0.5, 0.05, 0.31, 0, 1.06, 0),                                                     // belt
+                    rb(0.08, 0.3, 0.05, 0, 1.36, -0.16)                                                  // chest stripe
+                ];
+                const fig = new THREE.Group();
+                fig.add(new THREE.Mesh(mergeGeometryParts(bodyParts), body));
+                fig.add(new THREE.Mesh(mergeGeometryParts(accentParts), this.accentMat));
+                for (const p of bodyParts.concat(accentParts)) p.geometry.dispose();
+                const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40), this.ringMat);
+                ring.rotation.x = -Math.PI / 2;
+                const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.79, 40), this.ringMat);
+                ring2.rotation.x = -Math.PI / 2;
+                ring.position.y = ring2.position.y = 0.01;
+                const g = new THREE.Group();
+                g.add(fig, ring, ring2);
+                g.visible = false;
+                viewmodelScene.add(g);
+                this.figure = fig;
+                this.showcase = g;
+            },
+
+            // After loading: the start screen, unless skipped
+            boot: function () {
+                this.init();
+                const skip = window.__skipMainMenu || (game.userSettings && game.userSettings.skipMenu);
+                if (skip) { this.started = true; return; }
+                this.show('start');
+            },
+
+            show: function (kind) {
+                this.init();
+                if (this.open) { this.kind = kind || this.kind; this.render(); return; }
+                this.kind = kind || (this.started ? 'pause' : 'start');
+                this.open = true;
+                this.view = 'main';
+                this.mode = game.gameMode || 'wave';
+                this.savedLook = { x: camera.rotation.x, y: camera.rotation.y, fov: camera.fov };
+                // Let go of everything held
+                if (game.keys) for (const k in game.keys) game.keys[k] = false;
+                game.mouseDown = false;
+                if (typeof setAdsState === 'function') setAdsState(false);
+                if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) {} }
+                document.body.classList.add('menu-open');
+                this.render();
+                const first = this.el.querySelector('.mm-view.active .mm-btn');
+                if (first) first.focus({ preventScroll: true });
+            },
+
+            hide: function () {
+                if (!this.open) return;
+                this.open = false;
+                this.selecting = false;
+                document.body.classList.remove('menu-open', 'agent-select');
+                if (this.savedLook) {
+                    camera.rotation.set(this.savedLook.x, this.savedLook.y, 0, 'YXZ');
+                    camera.fov = this.savedLook.fov;
+                    camera.updateProjectionMatrix();
+                }
+                this.showcase.visible = false;
+                weaponGroup.visible = true;
+                if (typeof timingResetPending !== 'undefined') timingResetPending = true;
+            },
+
+            setView: function (v) { this.view = v; this.render(); const b = this.el.querySelector('.mm-view.active .mm-btn'); if (b) b.focus({ preventScroll: true }); },
+
+            render: function () {
+                if (!this.el) return;
+                this.el.classList.toggle('visible', this.open);
+                this.el.classList.toggle('pause', this.kind === 'pause');
+                this.el.querySelectorAll('.mm-view').forEach((v) => v.classList.toggle('active', v.dataset.view === this.view));
+                this.el.querySelector('[data-act="play"]').textContent = this.kind === 'pause' ? 'RESUME' : 'PLAY';
+                const m = MENU_MODES.find((x) => x[0] === this.mode) || MENU_MODES[0];
+                document.getElementById('mm-mode-val').textContent = m[1];
+                this.el.querySelectorAll('.mm-mode').forEach((b) => b.classList.toggle('selected', b.dataset.mode === this.mode));
+            },
+
+            act: function (a) {
+                if (a === 'play') {
+                    if (this.kind === 'start') this.openAgentSelect();
+                    else this.resume();
+                } else if (a === 'agent') this.openAgentSelect();
+                else if (a === 'modes') this.setView('modes');
+                else if (a === 'controls') this.setView('controls');
+                else if (a === 'back') this.back();
+                else if (a === 'settings' && typeof settingsManager !== 'undefined') settingsManager.toggleSettings(true);
+            },
+
+            back: function () {
+                if (this.view !== 'main') { this.setView('main'); return; }
+                if (this.kind === 'pause') this.resume();
+            },
+
+            openAgentSelect: function () {
+                this.selecting = true;
+                document.body.classList.add('agent-select');
+                tacticalDirector.toggleAgentPicker(true);
+            },
+
+            // From lockInPickerAgent: the agent is chosen, start (or resume) the game
+            onAgentLocked: function () {
+                if (!this.selecting) return;
+                this.selecting = false;
+                document.body.classList.remove('agent-select');
+                this.resume();
+            },
+            // The picker was closed without locking in: back to the menu
+            onPickerClosed: function () {
+                if (!this.selecting) return;
+                this.selecting = false;
+                document.body.classList.remove('agent-select');
+                const b = this.el.querySelector('.mm-view.active .mm-btn');
+                if (b) b.focus({ preventScroll: true });
+            },
+
+            resume: function () {
+                const changeMode = this.mode !== game.gameMode;
+                this.started = true;
+                this.hide();
+                if (changeMode) tacticalDirector.setGameMode(this.mode);
+                if (!deviceInfo.touchEnabled && !document.pointerLockElement) { try { document.body.requestPointerLock(); } catch (e) {} }
+            },
+
+            // Keyboard while the menu is the top layer
+            onKey: function (e) {
+                const keys = ['Escape', 'Enter', 'ArrowUp', 'ArrowDown', 'Space'];
+                if (keys.indexOf(e.code) === -1) return;
+                e.preventDefault();
+                if (e.repeat && e.code === 'Escape') return;
+                if (e.code === 'Escape') { this.back(); return; }
+                const btns = Array.from(this.el.querySelectorAll('.mm-view.active .mm-btn')).filter((b) => b.offsetParent !== null);
+                let i = btns.indexOf(document.activeElement);
+                if (e.code === 'ArrowDown' || e.code === 'ArrowUp') {
+                    i = i < 0 ? 0 : (i + (e.code === 'ArrowDown' ? 1 : btns.length - 1)) % btns.length;
+                    if (btns[i]) btns[i].focus({ preventScroll: true });
+                } else if (btns[i]) btns[i].click();
+                else if (btns[0]) btns[0].click();
+            },
+
+            // Losing the mouse lock mid-game (Esc in the browser) opens the pause menu
+            onPointerLockChange: function () {
+                const locked = !!document.pointerLockElement;
+                const was = this.lockWas;
+                this.lockWas = locked;
+                if (!was || locked || !this.started || this.open) return;
+                if (game.buyMenuOpen || game.agentPickerOpen || game.settingsOpen) return;
+                if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) return;
+                if (matchMode.phase === 'over' || replayDirector.clip) return;
+                this.show('pause');
+            },
+
+            // Every frame while open: paused timers, the orbiting camera and the preview
+            update: function (dt, now) {
+                if (!this.open) { this._lastNow = 0; return; }
+                // Round and spike timers stand still (real elapsed time: the frame delta is capped)
+                const realMs = this._lastNow ? Math.max(0, now - this._lastNow) : 0;
+                this._lastNow = now;
+                if (matchMode.active && matchMode.phaseEndsAt) matchMode.phaseEndsAt += realMs;
+                if (tacticalDirector.spikeState === 'planted' && tacticalDirector.spikeDetonateAt) tacticalDirector.spikeDetonateAt += realMs;
+                this.t += dt;
+                const a = 0.7 + this.t * 0.05, r = 34;
+                camera.position.set(Math.cos(a) * r, 12, Math.sin(a) * r);
+                camera.lookAt(0, 2, 0);
+                camera.fov = 70;
+                camera.updateProjectionMatrix();
+                weaponGroup.visible = false;
+                // Preview: right of the menu, or left of the agent list in agent select
+                const id = (this.selecting && tacticalDirector.agentPickerSelectedId) || game.activeAgent || 'jett';
+                const def = AGENT_DEFS[id];
+                const col = (def && def.themeColor) || '#38f6ff';
+                this.accentMat.color.set(col).convertSRGBToLinear();
+                this.accentMat.emissive.copy(this.accentMat.color);
+                this.ringMat.color.set(col).convertSRGBToLinear();
+                this.ringMat.opacity = 0.6 + 0.3 * Math.sin(this.t * 3);
+                const sc = this.showcase;
+                sc.visible = true;
+                this._off.set(this.selecting ? -1.75 : 1.55, -1.05, -3.0).applyQuaternion(camera.quaternion);
+                sc.position.copy(camera.position).add(this._off);
+                // Stand upright, facing the camera, turning slowly
+                const yaw = Math.atan2(camera.position.x - sc.position.x, camera.position.z - sc.position.z);
+                sc.rotation.set(0, yaw, 0);
+                this.figure.rotation.y = Math.PI + Math.sin(this.t * 0.6) * 0.9;
+                document.getElementById('mm-agent-name').textContent = def ? def.name : '';
+                document.getElementById('mm-agent-role').textContent = def ? def.role : '';
+            }
+        };
+
         const settingsManager = {
             LS_CONSENT_KEY: 'valorant_v16_ls_consent',
             LS_DATA_KEY: 'valorant_v16_user_settings',
@@ -37991,6 +38361,11 @@
                     game.userSettings.maxDecals = p.maxDecals;
                     this.applyAtmosphereTheme();
                     this.syncAllUI();
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-skipmenu-pills', 'data-skipmenu', (val) => {
+                    game.userSettings.skipMenu = val === 'on';
                     this.saveToStorage();
                 });
 
@@ -39154,6 +39529,7 @@
                 setActivePill('setting-camera-shake-pills', 'data-camshake', cfg.cameraShake === false ? 'off' : 'on');
                 setActivePill('setting-weather-pills', 'data-weather', cfg.weather || 'off');
                 setActivePill('setting-killcam-pills', 'data-killcam', cfg.killCam === false ? 'off' : 'on');
+                setActivePill('setting-skipmenu-pills', 'data-skipmenu', cfg.skipMenu ? 'on' : 'off');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
@@ -40674,6 +41050,7 @@
             weatherFX.init();
             reflectFX.init();
             replayDirector.init();
+            mainMenu.init();
             weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material) && o.material !== muzzleStar.mat) o.material.toneMapped = false; });
             
             // Initialize object pools
@@ -40849,7 +41226,8 @@
             if (game.keys.space && !spaceWasDown) jumpQueued = true;
             spaceWasDown = !!game.keys.space;
             
-            simAccumulator += delta;
+            // V1.7: the main / pause menu pauses the simulation
+            simAccumulator += mainMenu.paused() ? 0 : delta;
             const simBudget = SIM_DT * SIM_MAX_STEPS;
             if (simAccumulator > simBudget) {
                 perfTelemetry.droppedSimMs += (simAccumulator - simBudget) * 1000;
@@ -40865,6 +41243,7 @@
             }
             presentPlayerCamera(simAccumulator / SIM_DT);
             const now = performance.now();
+            mainMenu.update(delta, now);
             updateGunplayAndCrosshair(delta, time, now);
             updateWeaponPosition();
             applyWeaponBobbing(time, game.keys.w || game.keys.a || game.keys.s || game.keys.d);
@@ -40968,6 +41347,8 @@
             progressFill.style.width = '100%';
             progressText.textContent = 'Loading: 100%';
             animate(performance.now());
+            // V1.7: start screen (unless Settings > Skip Menu On Start)
+            mainMenu.boot();
             loadingScreen.style.opacity = '0';
             setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
         }, 1000);
