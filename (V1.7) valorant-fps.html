@@ -3819,6 +3819,17 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>Breakable Props</strong>
+                                    <small>Glass panes that shatter and explosive barrels that blow up when shot (they come back next round, or after 30 s)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-breakables-pills">
+                                    <button class="settings-pill-opt active" data-breakables="on">ON</button>
+                                    <button class="settings-pill-opt" data-breakables="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Skip Menu On Start</strong>
                                     <small>Go straight into the game when it loads instead of the start screen (Esc still opens the menu)</small>
                                 </div>
@@ -5342,6 +5353,7 @@
                 weather: 'off',        // V1.7: 'off' (default) | 'map' | 'rain' | 'storm' | 'snow' | 'sand' | 'leaves'
                 killCam: true,         // V1.7: kill cam after a death and Match round highlights
                 skipMenu: false,       // V1.7: start straight in the game (no start screen)
+                breakables: true,      // glass panes and explosive barrels on the maps
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -8751,6 +8763,7 @@
                     collisionIndex.insert(c);
                 }
             }
+            breakables.build();
 
             // Ensure player & enemies are not embedded in newly spawned map geometry
             characterController.position.set(0, characterController.height || 1.7, 15);
@@ -8824,7 +8837,7 @@
             mapPieces.push(piece);
             environmentShootables.push(piece);
             envShotIndex.insert(piece);
-            shootableOwners.set(proxy, { kind: 'env', actor: null });
+            shootableOwners.set(proxy, { kind: 'env', actor: null, piece: piece });
             mapVisibilityDirty = true;
             return piece;
         }
@@ -35110,9 +35123,17 @@
                     let firstEnvHit = null;
                     let firstEnvOwner = null;
                     let lastEnvDistSameCover = 0;
+                    let lastEnvHit = null;
+                    // Penetration depends on the cover's material (wood easy, metal hard)
+                    let penThickness = maxWallbangThickness, penDamage = 0.62;
+                    let exitPoint = null, exitNormal = null;
+                    // An explosive barrel stops the bullet
+                    const barrelHit = breakables.firstBarrel(raycaster.ray, WEAPON_RANGE);
+                    const barrelDist = barrelHit ? barrelHit.dist : Infinity;
 
                     for (let i = 0; i < intersects.length; i++) {
                         const intersection = intersects[i];
+                        if (intersection.distance > barrelDist) break;
                         const object = intersection.object;
                         const owner = shootableOwners.get(object);
                         if (!owner) continue;
@@ -35122,8 +35143,33 @@
                                 firstEnvHit = intersection;
                                 firstEnvOwner = owner;
                                 lastEnvDistSameCover = intersection.distance;
-                            } else if (intersection.distance - firstEnvHit.distance <= maxWallbangThickness) {
-                                lastEnvDistSameCover = intersection.distance;
+                                lastEnvHit = intersection;
+                                const m = BREAK_MAT[surfOfOwner(owner)] || BREAK_MAT[1];
+                                penThickness = maxWallbangThickness * m.pen;
+                                penDamage = m.dmg;
+                                // Real thickness: where the bullet leaves this piece
+                                if (owner.piece) {
+                                    const tExit = rayBoxExit(raycaster.ray, owner.piece.bounds);
+                                    if (tExit > intersection.distance && tExit < Infinity) {
+                                        lastEnvDistSameCover = tExit;
+                                        exitPoint = raycaster.ray.at(tExit, new THREE.Vector3());
+                                        exitNormal = _exitN.clone();
+                                    }
+                                }
+                            } else if (intersection.distance <= lastEnvDistSameCover + 0.05) {
+                                // Touching pieces of the same cover: carry on to where it ends
+                                if (owner.piece) {
+                                    const tExit = rayBoxExit(raycaster.ray, owner.piece.bounds);
+                                    if (tExit > lastEnvDistSameCover) {
+                                        lastEnvDistSameCover = tExit;
+                                        exitPoint = raycaster.ray.at(tExit, new THREE.Vector3());
+                                        exitNormal = _exitN.clone();
+                                    }
+                                }
+                                lastEnvHit = intersection;
+                            } else {
+                                // A second wall behind the first: nothing further is hit
+                                break;
                             }
                             continue;
                         }
@@ -35138,7 +35184,7 @@
                             const estCoverThickness = Math.max(0.2, lastEnvDistSameCover - firstEnvHit.distance);
                             const distPastEntry = intersection.distance - firstEnvHit.distance;
                             // Allow wallbanging through cover corners / boxes when thickness is within weapon penetration limit
-                            if (estCoverThickness <= maxWallbangThickness && distPastEntry <= 18.0) {
+                            if (estCoverThickness <= penThickness && distPastEntry <= 18.0) {
                                 isWallbangHit = true;
                             } else {
                                 break;
@@ -35185,6 +35231,22 @@
                     if (firstEnvHit && firstEnvOwner && firstEnvOwner.iceWall && typeof agentSystem !== 'undefined') {
                         agentSystem.damageIceWall(firstEnvOwner.iceWall, baseDamage);
                     }
+                    // Glass breaks wherever the bullet crosses it before stopping; a barrel takes the hit
+                    const envStop = firstEnvHit ? firstEnvHit.distance : WEAPON_RANGE;
+                    breakables.shatterAlong(raycaster.ray.origin, raycaster.ray.direction, Math.min(envStop, barrelDist));
+                    if (barrelHit && barrelDist < envStop) {
+                        createHitEffect(barrelHit.point, true);
+                        materialImpact(barrelHit.point, null, MAP_SURF.metal);
+                        breakables.damageBarrel(barrelHit.prop, baseDamage);
+                    }
+                    // Exit hole and debris on the far side of cover the bullet went through
+                    const firstSurf = firstEnvHit ? surfOfOwner(firstEnvOwner) : MAP_SURF.concrete;
+                    if (firstEnvHit && exitPoint && !firstEnvOwner.iceWall &&
+                        lastEnvDistSameCover - firstEnvHit.distance <= penThickness &&
+                        Math.abs(firstEnvHit.point.x) < 48.2 && Math.abs(firstEnvHit.point.z) < 48.2 && exitPoint.y > 0.02) {
+                        createBulletImpact(exitPoint, exitNormal);
+                        materialImpact(exitPoint, exitNormal, firstSurf);
+                    }
 
                     if (_actorHitCandidates.size > 0) {
                         // Also spawn entry wall impact decal if this shot penetrated cover!
@@ -35194,6 +35256,7 @@
                             _shotWorldNormal.copy(firstEnvHit.face.normal).applyMatrix3(_shotNormalMatrix).normalize();
                             createHitEffect(firstEnvHit.point, true);
                             createBulletImpact(firstEnvHit.point, _shotWorldNormal);
+                            materialImpact(firstEnvHit.point, _shotWorldNormal, firstSurf);
                         }
 
                         const hsOnly = !!(game.userSettings && game.userSettings.headshotOnly);
@@ -35205,7 +35268,7 @@
                                 }
                                 hitActorThisShot = true;
                                 createHitEffect(entry.point, false);
-                                const wbMult = entry.isWallbang ? 0.62 : 1.0;
+                                const wbMult = entry.isWallbang ? penDamage : 1.0;
                                 const finalPelletDmg = Math.max(6, Math.round(baseDamage * wbMult));
                                 if (entry.isWallbang && !playedWallbangSound) {
                                     playedWallbangSound = true;
@@ -35221,7 +35284,7 @@
                                 }
                                 hitActorThisShot = true;
                                 createHitEffect(entry.point, false);
-                                const wbMult = entry.isWallbang ? 0.62 : 1.0;
+                                const wbMult = entry.isWallbang ? penDamage : 1.0;
                                 const finalPelletDmg = Math.max(6, Math.round(baseDamage * wbMult));
                                 if (entry.isWallbang && !playedWallbangSound) {
                                     playedWallbangSound = true;
@@ -35242,12 +35305,13 @@
                                 );
                             }
                         }
-                    } else if (firstEnvHit) {
+                    } else if (firstEnvHit && !(barrelHit && barrelDist < envStop)) {
                         const object = firstEnvHit.object;
                         _shotNormalMatrix.getNormalMatrix(object.matrixWorld);
                         _shotWorldNormal.copy(firstEnvHit.face.normal).applyMatrix3(_shotNormalMatrix).normalize();
                         createHitEffect(firstEnvHit.point, true);
                         createBulletImpact(firstEnvHit.point, _shotWorldNormal);
+                        materialImpact(firstEnvHit.point, _shotWorldNormal, firstSurf);
                     }
                 }
 
@@ -36133,6 +36197,7 @@
             // Create bullet trail from enemy (using pool)
             _enemyShotDirection.set(dirX, dirY, dirZ).normalize();
             createBulletTrail(_enemyShotOrigin, _enemyShotDirection);
+            breakables.shatterAlong(_enemyShotOrigin, _enemyShotDirection, muzzleToPlayerDist);
 
             // 2. Raycast the fired bullet trajectory against envShotIndex to ensure cover blocks off-axis shots
             const savedFar = raycaster.far;
@@ -36784,7 +36849,9 @@
                 b.count = 1;
                 b.instanceMatrix.needsUpdate = true;
             }
-            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke, weatherFX.mesh, weatherFX.splash, replayDirector.ghost];
+            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke, weatherFX.mesh, weatherFX.splash, replayDirector.ghost, breakables.group];
+            const propsShown = breakables.glass.concat(breakables.barrels).map((p) => p.mesh.visible);
+            for (const p of breakables.glass.concat(breakables.barrels)) p.mesh.visible = true;
             const weatherRanges = [weatherFX.mesh.geometry.drawRange.count, weatherFX.splash.geometry.drawRange.count];
             weatherFX.mesh.geometry.setDrawRange(0, 6);
             weatherFX.splash.geometry.setDrawRange(0, 6);
@@ -36806,6 +36873,8 @@
             weatherFX.mesh.geometry.setDrawRange(0, weatherRanges[0]);
             weatherFX.splash.geometry.setDrawRange(0, weatherRanges[1]);
             weatherFX.afterWarm();
+            breakables.glass.concat(breakables.barrels).forEach((p, i) => { p.mesh.visible = propsShown[i]; });
+            if (breakables.group) breakables.group.visible = true;
             // V1.7: one reflection pass (same programs, drawn into the sRGB reflection target)
             reflectFX.render(true);
             reflectU.uReflect.value = 0;
@@ -36963,6 +37032,7 @@
             weather: 'off',
             killCam: true,
             skipMenu: false,
+            breakables: true,
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -37190,6 +37260,7 @@
                 const td = tacticalDirector;
                 // V1.7: a new round ends any replay and starts fresh round stats
                 replayDirector.stop();
+                breakables.reset();
                 this.rs = { kills: [], dmg: 0, killer: null };
                 this.round++;
                 const prevSide = this.side;
@@ -37912,6 +37983,321 @@
         // lock opens it again as a pause menu. Keyboard, mouse and controller work
         // everywhere. Settings > Skip Menu On Start goes straight into the game.
         // =============================================
+        // Breakable world: material penetration, impact effects by material, glass
+        // panes that shatter and explosive barrels that chain-react. Props are placed
+        // per map with a fixed pattern on open floor (away from spawns and spike
+        // sites), collide while intact and come back next round (or after 30 s).
+        // Settings > Breakable Props (on by default).
+        // =============================================
+        // Penetration by surface (MAP_SURF ids): how much thicker cover the gun can
+        // shoot through, and how much damage gets through it
+        // Where a ray leaves a box (slab method). Hit proxies are single-sided, so the
+        // back face is never reported: cover thickness comes from the box instead.
+        const _exitN = new THREE.Vector3();
+        function rayBoxExit(ray, box) {
+            let tFar = Infinity, axis = 0, sign = 1;
+            const o = ray.origin, d = ray.direction;
+            for (let k = 0; k < 3; k++) {
+                const oc = k === 0 ? o.x : k === 1 ? o.y : o.z, dc = k === 0 ? d.x : k === 1 ? d.y : d.z;
+                const mn = k === 0 ? box.min.x : k === 1 ? box.min.y : box.min.z, mx = k === 0 ? box.max.x : k === 1 ? box.max.y : box.max.z;
+                if (Math.abs(dc) < 1e-9) continue;
+                const t = dc > 0 ? (mx - oc) / dc : (mn - oc) / dc;
+                if (t < tFar) { tFar = t; axis = k; sign = dc > 0 ? 1 : -1; }
+            }
+            _exitN.set(axis === 0 ? sign : 0, axis === 1 ? sign : 0, axis === 2 ? sign : 0);
+            return tFar;
+        }
+        const BREAK_MAT = { 1: { pen: 1.0, dmg: 0.62 }, 2: { pen: 0.85, dmg: 0.56 }, 3: { pen: 0.45, dmg: 0.42 }, 4: { pen: 1.8, dmg: 0.82 } };
+        const surfOfOwner = (owner) => (owner && owner.piece ? (owner.piece.surf % 10) : MAP_SURF.concrete);
+
+        // Impact particles for a bullet hitting a surface (Low: none)
+        function materialImpact(point, normal, surf) {
+            if (!fxKit.enabled()) return;
+            const nx = normal ? normal.x : 0, ny = normal ? normal.y : 1, nz = normal ? normal.z : 0;
+            const out = (s) => [(nx + (Math.random() - 0.5) * 1.2) * s, (ny + Math.random() * 0.8) * s, (nz + (Math.random() - 0.5) * 1.2) * s];
+            if (surf === MAP_SURF.metal) {
+                for (let i = 0; i < 9; i++) {
+                    const v = out(4 + Math.random() * 4);
+                    fxKit._emit(fxKit.parts, FX_KIND.spark, point.x, point.y, point.z, v[0], v[1], v[2], Math.random() < 0.5 ? 0xfff2b0 : 0xffb347, 0.18 + Math.random() * 0.2, 0.09, 0.03, 1, 1.5, 9.8);
+                }
+                abilityLights.flash(point.x + nx * 0.2, point.y + ny * 0.2, point.z + nz * 0.2, 0xffc46b, 2.6, 1.1, 70);
+            } else if (surf === MAP_SURF.wood) {
+                for (let i = 0; i < 7; i++) {
+                    const v = out(2.5 + Math.random() * 2.5);
+                    fxKit._emit(fxKit.parts, FX_KIND.ember, point.x, point.y, point.z, v[0], v[1], v[2], i % 2 ? 0x8a5a2b : 0xc8955a, 0.45 + Math.random() * 0.3, 0.09, 0.07, 1, 1.2, 9.8);
+                }
+                fxKit._emit(fxKit.smokes, FX_KIND.dust, point.x, point.y, point.z, nx * 0.8, 0.3, nz * 0.8, 0xb08a60, 0.7, 0.15, 0.55, 0.5, 2, 0);
+            } else {
+                for (let i = 0; i < 5; i++) {
+                    const v = out(2 + Math.random() * 2.5);
+                    fxKit._emit(fxKit.parts, FX_KIND.ember, point.x, point.y, point.z, v[0], v[1], v[2], 0x9a9a9a, 0.4 + Math.random() * 0.3, 0.08, 0.06, 1, 1, 9.8);
+                }
+                for (let i = 0; i < 2; i++) {
+                    fxKit._emit(fxKit.smokes, FX_KIND.dust, point.x, point.y, point.z, nx * (0.6 + i * 0.4), 0.25, nz * (0.6 + i * 0.4), 0xb8b2a6, 0.9, 0.18, 0.75, 0.55, 2, 0);
+                }
+            }
+        }
+
+        const breakables = {
+            glass: [], barrels: [], group: null, mats: null, chain: [],
+            _hit: new THREE.Vector3(), _ray: new THREE.Ray(), _scratch: [],
+            RESPAWN_MS: 30000,
+            explosions: 0, shattered: 0,
+
+            enabled: function () { return !(game.userSettings && game.userSettings.breakables === false); },
+
+            _initMats: function () {
+                if (this.mats) return;
+                this.mats = {
+                    glass: new THREE.MeshStandardMaterial({ color: 0xa8dcff, roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.24, depthWrite: false, envMapIntensity: 1.6 }),
+                    frame: new THREE.MeshStandardMaterial({ color: 0x2a3038, roughness: 0.45, metalness: 0.6 }),
+                    barrel: new THREE.MeshStandardMaterial({ color: 0xb3262e, roughness: 0.5, metalness: 0.35 }),
+                    band: new THREE.MeshStandardMaterial({ color: 0xf5c518, emissive: 0xf5c518, emissiveIntensity: 0.2, roughness: 0.5 })
+                };
+                this.geo = {
+                    post: new THREE.BoxGeometry(0.12, 2.6, 0.12),
+                    barrel: new THREE.CylinderGeometry(0.42, 0.42, 1.15, 18),
+                    ring: new THREE.CylinderGeometry(0.44, 0.44, 0.07, 18),
+                    band: new THREE.CylinderGeometry(0.43, 0.43, 0.16, 18)
+                };
+            },
+
+            _rng: function (seed) {
+                let a = seed >>> 0;
+                return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+            },
+
+            // Open floor: no collider (or other prop) within the margin
+            _clear: function (minX, minZ, maxX, maxZ, margin) {
+                const near = collisionIndex.query(minX - margin, minZ - margin, maxX + margin, maxZ + margin, this._scratch);
+                for (const r of near) {
+                    if (r.maxY < 0.15) continue;
+                    if (r.maxX > minX - margin && r.minX < maxX + margin && r.maxZ > minZ - margin && r.minZ < maxZ + margin) return false;
+                }
+                for (const p of this.glass.concat(this.barrels)) {
+                    const b = p.box;
+                    if (b.max.x > minX - margin && b.min.x < maxX + margin && b.max.z > minZ - margin && b.min.z < maxZ + margin) return false;
+                }
+                // Keep the bots' cover spots free
+                const covers = (typeof enemyTactics !== 'undefined' && enemyTactics.covers) || [];
+                for (const c of covers) {
+                    if (c.x > minX - 1.4 && c.x < maxX + 1.4 && c.z > minZ - 1.4 && c.z < maxZ + 1.4) return false;
+                }
+                return true;
+            },
+            _awayFromKeySpots: function (x, z) {
+                if (Math.hypot(x - 42, z) < 11 || Math.hypot(x + 42, z) < 11 || Math.hypot(x, z - 15) < 6) return false;
+                const sites = (typeof tacticalDirector !== 'undefined' && tacticalDirector.spikeSites) || {};
+                for (const k in sites) { const p = sites[k] && sites[k].pos; if (p && Math.hypot(x - p.x, z - p.z) < 6) return false; }
+                return true;
+            },
+
+            _collider: function (box) {
+                const rec = createColliderRecord('static', null);
+                setColliderFromBox3(rec, box, (box.min.x + box.max.x) / 2, (box.min.z + box.max.z) / 2);
+                return rec;
+            },
+            _setSolid: function (p, on) {
+                if (on && !p.rec.indexed) collisionIndex.insert(p.rec);
+                else if (!on && p.rec.indexed) collisionIndex.remove(p.rec);
+                if (typeof navGrid !== 'undefined') navGrid.builtFor = null;
+            },
+
+            // After the map's colliders are indexed: place this map's props
+            build: function () {
+                this._initMats();
+                if (!this.group) { this.group = new THREE.Group(); scene.add(this.group); }
+                for (const p of this.glass.concat(this.barrels)) { this.group.remove(p.mesh); if (p.rec.indexed) collisionIndex.remove(p.rec); }
+                this.glass.length = 0;
+                this.barrels.length = 0;
+                this.chain.length = 0;
+                let seed = 0;
+                for (const ch of String(game.mapPreset || 'ascent')) seed = seed * 31 + ch.charCodeAt(0);
+                const rnd = this._rng(seed);
+                for (let tries = 0; tries < 400 && this.glass.length < 4; tries++) {
+                    const alongX = rnd() < 0.5;
+                    const x = (rnd() * 2 - 1) * 38, z = (rnd() * 2 - 1) * 38;
+                    const hw = 1.6, ht = 0.08;
+                    const minX = x - (alongX ? hw : ht), maxX = x + (alongX ? hw : ht), minZ = z - (alongX ? ht : hw), maxZ = z + (alongX ? ht : hw);
+                    if (!this._awayFromKeySpots(x, z) || !this._clear(minX, minZ, maxX, maxZ, 1.3)) continue;
+                    this._makeGlass(x, z, alongX);
+                }
+                for (let tries = 0; tries < 400 && this.barrels.length < 6; tries++) {
+                    const x = (rnd() * 2 - 1) * 40, z = (rnd() * 2 - 1) * 40;
+                    if (!this._awayFromKeySpots(x, z) || !this._clear(x - 0.45, z - 0.45, x + 0.45, z + 0.45, 0.5)) continue;
+                    // Next to cover, like a real map
+                    if (this._clear(x - 0.45, z - 0.45, x + 0.45, z + 0.45, 2.6)) continue;
+                    this._makeBarrel(x, z);
+                }
+                this.applyEnabled();
+            },
+
+            _makeGlass: function (x, z, alongX) {
+                const M = this.mats, G = this.geo;
+                const g = new THREE.Group();
+                const pane = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.4, 0.06), M.glass);
+                pane.position.y = 1.3;
+                pane.renderOrder = 2;
+                const p1 = new THREE.Mesh(G.post, M.frame), p2 = new THREE.Mesh(G.post, M.frame);
+                p1.position.set(-1.66, 1.3, 0); p2.position.set(1.66, 1.3, 0);
+                const rail = new THREE.Mesh(new THREE.BoxGeometry(3.44, 0.1, 0.12), M.frame);
+                rail.position.y = 0.05;
+                for (const m of [p1, p2, rail]) { m.castShadow = true; m.receiveShadow = true; }
+                g.add(pane, p1, p2, rail);
+                g.position.set(x, 0, z);
+                if (!alongX) g.rotation.y = Math.PI / 2;
+                g.updateMatrixWorld(true);
+                this.group.add(g);
+                const box = new THREE.Box3().setFromObject(pane);
+                const rec = this._collider(new THREE.Box3().setFromObject(g));
+                this.glass.push({ kind: 'glass', mesh: g, pane: pane, box: box, rec: rec, broken: false, brokenAt: 0, x: x, z: z, alongX: alongX });
+            },
+
+            _makeBarrel: function (x, z) {
+                const M = this.mats, G = this.geo;
+                const g = new THREE.Group();
+                const body = new THREE.Mesh(G.barrel, M.barrel);
+                body.position.y = 0.575;
+                const r1 = new THREE.Mesh(G.ring, M.frame), r2 = new THREE.Mesh(G.ring, M.frame);
+                r1.position.y = 0.3; r2.position.y = 0.85;
+                const band = new THREE.Mesh(G.band, M.band);
+                band.position.y = 0.575;
+                for (const m of [body, r1, r2, band]) { m.castShadow = true; m.receiveShadow = true; }
+                g.add(body, r1, r2, band);
+                g.position.set(x, 0, z);
+                g.updateMatrixWorld(true);
+                this.group.add(g);
+                const box = new THREE.Box3(new THREE.Vector3(x - 0.43, 0, z - 0.43), new THREE.Vector3(x + 0.43, 1.15, z + 0.43));
+                this.barrels.push({ kind: 'barrel', mesh: g, box: box, rec: this._collider(box), hp: 40, broken: false, brokenAt: 0, x: x, z: z });
+            },
+
+            // Setting on/off: props shown and solid, or hidden and gone
+            applyEnabled: function () {
+                const on = this.enabled();
+                if (this.group) this.group.visible = true;
+                for (const p of this.glass.concat(this.barrels)) {
+                    const show = on && !p.broken;
+                    p.mesh.visible = show;
+                    this._setSolid(p, show);
+                }
+                if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
+            },
+
+            // Nearest intact prop of a kind along a ray (distance, or Infinity)
+            _first: function (list, ray, range) {
+                let best = null, bestD = range;
+                for (const p of list) {
+                    if (p.broken || !p.mesh.visible) continue;
+                    if (ray.intersectBox(p.box, this._hit)) {
+                        const d = this._hit.distanceTo(ray.origin);
+                        if (d < bestD) { bestD = d; best = { prop: p, dist: d, point: this._hit.clone() }; }
+                    }
+                }
+                return best;
+            },
+            firstBarrel: function (ray, range) { return this._first(this.barrels, ray, range); },
+
+            // Bullets break every pane they cross before they stop
+            shatterAlong: function (origin, dir, dist) {
+                if (!this.glass.length) return 0;
+                const ray = this._ray.set(origin, dir);
+                let n = 0;
+                for (const g of this.glass) {
+                    if (g.broken || !g.mesh.visible) continue;
+                    if (ray.intersectBox(g.box, this._hit) && this._hit.distanceTo(origin) < dist) { this.shatter(g, dir); n++; }
+                }
+                return n;
+            },
+
+            shatter: function (g, dir) {
+                if (g.broken) return;
+                g.broken = true;
+                g.brokenAt = performance.now();
+                g.mesh.visible = false;
+                this._setSolid(g, false);
+                this.shattered++;
+                shadowManager.markEvent();
+                const c = g.box.getCenter(new THREE.Vector3());
+                if (fxKit.enabled()) {
+                    const dx = dir ? dir.x : 0, dz = dir ? dir.z : 0;
+                    for (let i = 0; i < 40; i++) {
+                        const along = (Math.random() - 0.5) * 3.0;
+                        const px = c.x + (g.alongX ? along : 0), pz = c.z + (g.alongX ? 0 : along), py = 0.2 + Math.random() * 2.3;
+                        fxKit._emit(fxKit.parts, FX_KIND.spark, px, py, pz, dx * 2.5 + (Math.random() - 0.5) * 2, Math.random() * 1.5, dz * 2.5 + (Math.random() - 0.5) * 2,
+                            Math.random() < 0.6 ? 0xd8f3ff : 0xffffff, 0.6 + Math.random() * 0.5, 0.11 + Math.random() * 0.08, 0.05, 0.85, 0.6, 9.8);
+                    }
+                }
+                soundFX.at(c.x, c.y, c.z, () => {
+                    soundFX.playNoise(0.45, 0.2, 0, 7000);
+                    for (let i = 0; i < 5; i++) soundFX.playTone(2400 + Math.random() * 2600, 1800 + Math.random() * 1500, 0.08, 'sine', 0.035, 0.04 + i * 0.05 + Math.random() * 0.04);
+                });
+            },
+
+            damageBarrel: function (b, dmg) {
+                if (b.broken) return;
+                b.hp -= dmg;
+                if (b.hp <= 0) this.explode(b);
+            },
+
+            explode: function (b) {
+                if (b.broken) return;
+                b.broken = true;
+                b.brokenAt = performance.now();
+                b.mesh.visible = false;
+                this._setSolid(b, false);
+                this.explosions++;
+                shadowManager.markEvent();
+                const x = b.x, y = 0.6, z = b.z, R = 6;
+                fxKit.burst(x, y, z, 0xff6a1a, 5, { sparks: 1.6 });
+                abilityLights.flash(x, y + 0.4, z, 0xff7a2a, 12, 4, 600);
+                soundFX.at(x, y, z, () => {
+                    soundFX.playNoise(0.95, 0.38, 0, 900);
+                    soundFX.playTone(110, 32, 0.6, 'sine', 0.3, 0);
+                });
+                const now = performance.now();
+                // Bots in range
+                for (const e of enemyObjects) {
+                    if (!e.isActive || e.hit) continue;
+                    const d = Math.hypot(e.mesh.position.x - x, e.mesh.position.z - z);
+                    if (d < R) damageEnemyActor(e, Math.round(150 * (1 - d / R)), now, Date.now(), 'Explosive Barrel', 'torso');
+                }
+                // The player
+                const p = characterController.position;
+                const dp = Math.hypot(p.x - x, p.z - z);
+                if (dp < R && game.health > 0) takeDamage(Math.round(110 * (1 - dp / R)), new THREE.Vector3(x, y, z), { label: 'Explosive Barrel' });
+                // Glass nearby shatters, other barrels go up a moment later
+                for (const g of this.glass) if (!g.broken && Math.hypot(g.x - x, g.z - z) < R) this.shatter(g, null);
+                for (const o of this.barrels) if (!o.broken && o !== b && Math.hypot(o.x - x, o.z - z) < 4.5) this.chain.push({ b: o, at: now + 160 });
+            },
+
+            // Chain reactions and respawns
+            update: function (now) {
+                for (let i = this.chain.length - 1; i >= 0; i--) {
+                    if (now >= this.chain[i].at) { const c = this.chain[i]; this.chain.splice(i, 1); this.explode(c.b); }
+                }
+                if (game.gameMode === 'match' || game.gameMode === 'spikerush' || !this.enabled()) return;
+                for (const p of this.glass.concat(this.barrels)) {
+                    if (p.broken && now - p.brokenAt > this.RESPAWN_MS) this._restore(p);
+                }
+            },
+            _restore: function (p) {
+                const c = characterController.position;
+                if (c.x > p.box.min.x - 0.8 && c.x < p.box.max.x + 0.8 && c.z > p.box.min.z - 0.8 && c.z < p.box.max.z + 0.8) return;
+                p.broken = false;
+                if (p.kind === 'barrel') p.hp = 40;
+                p.mesh.visible = this.enabled();
+                this._setSolid(p, this.enabled());
+                shadowManager.markEvent();
+            },
+            // New round: everything back
+            reset: function () {
+                this.chain.length = 0;
+                for (const p of this.glass.concat(this.barrels)) { p.broken = false; if (p.kind === 'barrel') p.hp = 40; }
+                this.applyEnabled();
+            }
+        };
+
+        // =============================================
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
@@ -38363,6 +38749,12 @@
                     game.userSettings.maxDecals = p.maxDecals;
                     this.applyAtmosphereTheme();
                     this.syncAllUI();
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-breakables-pills', 'data-breakables', (val) => {
+                    game.userSettings.breakables = val !== 'off';
+                    breakables.applyEnabled();
                     this.saveToStorage();
                 });
 
@@ -39532,6 +39924,7 @@
                 setActivePill('setting-weather-pills', 'data-weather', cfg.weather || 'off');
                 setActivePill('setting-killcam-pills', 'data-killcam', cfg.killCam === false ? 'off' : 'on');
                 setActivePill('setting-skipmenu-pills', 'data-skipmenu', cfg.skipMenu ? 'on' : 'off');
+                setActivePill('setting-breakables-pills', 'data-breakables', cfg.breakables === false ? 'off' : 'on');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
@@ -41067,6 +41460,8 @@
             for (const collider of staticColliders) {
                 collisionIndex.insert(collider);
             }
+            // Glass panes and explosive barrels for this map
+            breakables.build();
 
             spawnEnemies();
             
@@ -41252,6 +41647,7 @@
             shellFX.update(Math.min(0.05, delta));
             fxKit.update(Math.min(0.05, delta), now);
             weatherFX.update(Math.min(0.05, delta), now);
+            breakables.update(now);
             // V1.7: 3D audio listener follows the camera; enemy footsteps; low-health cue
             soundFX.updateListener();
             enemyAudio.update();
