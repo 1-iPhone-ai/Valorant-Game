@@ -5847,6 +5847,32 @@
         // so weather never changes a shader program.
         const weatherSurf = { uWet: { value: 0 }, uSnow: { value: 0 }, uSand: { value: 0 }, uRain: { value: 0 }, uWTime: { value: 0 } };
         const weatherState = { sunScale: 1, ambScale: 1, baseAmbient: 0.1, onQuality: null };
+        // V1.7 planar floor reflection (reflectFX) and ability lights (abilityLights):
+        // fixed-size uniforms on the floor and map shaders, so lights coming and going
+        // never change a light count or a shader program.
+        const AL_MAX = 6;
+        const reflectU = { tReflect: { value: null }, uReflect: { value: 0 }, uReflMatrix: { value: new THREE.Matrix4() }, uReflTexel: { value: new THREE.Vector2(1, 1) }, uReflGain: { value: 1 } };
+        const abilityLightU = {
+            uALPos: { value: Array.from({ length: AL_MAX }, () => new THREE.Vector4(0, -100, 0, 0)) },
+            uALCol: { value: Array.from({ length: AL_MAX }, () => new THREE.Vector4()) },
+            uALOn: { value: 0 }
+        };
+        const AL_GLSL = `
+                    uniform vec4 uALPos[${AL_MAX}]; uniform vec4 uALCol[${AL_MAX}]; uniform float uALOn;
+                    vec3 abilityLight(vec3 wp, vec3 wn) {
+                        vec3 sum = vec3(0.0);
+                        for (int i = 0; i < ${AL_MAX}; i++) {
+                            vec4 P = uALPos[i];
+                            if (P.w <= 0.0) continue;
+                            vec3 L = P.xyz - wp;
+                            float d = length(L);
+                            float att = 1.0 - clamp(d / P.w, 0.0, 1.0);
+                            att *= att;
+                            float nl = max(dot(wn, L / max(d, 1e-3)), 0.0);
+                            sum += uALCol[i].rgb * uALCol[i].w * att * (0.2 + 0.8 * nl);
+                        }
+                        return sum;
+                    }`;
         const floorTextures = createFloorTextures();
         const floorGeometry = new THREE.PlaneGeometry(200, 200, 20, 20);
         const floorMaterial = new THREE.MeshStandardMaterial({ 
@@ -5879,15 +5905,18 @@
             s.uniforms.uFloorHD = floorHDUniform;
             s.uniforms.tFloorAO = { value: floorAOTexture };
             s.uniforms.tFloorN = { value: surfaceTextureFactory.textures.floor };
-            Object.assign(s.uniforms, weatherSurf);
+            Object.assign(s.uniforms, weatherSurf, reflectU, abilityLightU);
             s.vertexShader = s.vertexShader
-                .replace('#include <common>', '#include <common>\nvarying vec2 vFloorW;')
+                .replace('#include <common>', '#include <common>\nvarying vec2 vFloorW; varying vec4 vReflCoord; uniform mat4 uReflMatrix;')
                 .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
-                    vFloorW = (modelMatrix * vec4(transformed, 1.0)).xz;`);
+                    vFloorW = (modelMatrix * vec4(transformed, 1.0)).xz;
+                    vReflCoord = uReflMatrix * modelMatrix * vec4(transformed, 1.0);`);
             s.fragmentShader = s.fragmentShader
                 .replace('#include <common>', `#include <common>
                     varying vec2 vFloorW; uniform float uFloorHD;
                     uniform float uWet; uniform float uSnow; uniform float uSand; uniform float uRain; uniform float uWTime;
+                    varying vec4 vReflCoord; uniform sampler2D tReflect; uniform float uReflect; uniform vec2 uReflTexel; uniform float uReflGain;
+                    ${AL_GLSL}
                     uniform sampler2D tFloorAO; uniform sampler2D tFloorN;
                     float fh21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
                     float fnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -5934,7 +5963,25 @@
                     roughnessFactor = mix(roughnessFactor, 0.75, wSnowC);`)
                 .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
                     if (uFloorHD > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(fhdN, 0.0)).xyz, uFloorHD * (1.0 - wPud)));
-                    if (wPud > 0.0) normal = normalize(normal + (viewMatrix * vec4(wRip.x, 0.0, wRip.y, 0.0)).xyz);`);
+                    if (wPud > 0.0) normal = normalize(normal + (viewMatrix * vec4(wRip.x, 0.0, wRip.y, 0.0)).xyz);`)
+                .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+                    if (uALOn > 0.5) { vec3 al = abilityLight(vec3(vFloorW.x, 0.0, vFloorW.y), vec3(0.0, 1.0, 0.0)); reflectedLight.directDiffuse += (diffuseColor.rgb * 2.2 + 0.03) * al; }`)
+                .replace('#include <tonemapping_fragment>', `
+                    // Planar reflection: sharp in puddles, blurred by roughness, strongest at grazing angles
+                    if (uReflect > 0.0) {
+                        vec3 vw = normalize(cameraPosition - vec3(vFloorW.x, 0.0, vFloorW.y));
+                        float fres = 0.04 + 0.96 * pow(1.0 - clamp(vw.y, 0.0, 1.0), 5.0);
+                        float rgh = clamp(roughnessFactor, 0.0, 1.0);
+                        float gloss = pow(1.0 - rgh, 1.6);
+                        vec2 ruv = vReflCoord.xy / vReflCoord.w + wRip * 0.05;
+                        vec2 bl = uReflTexel * (1.0 + rgh * 7.0);
+                        vec3 rc = texture2D(tReflect, ruv).rgb * 0.4
+                            + (texture2D(tReflect, ruv + vec2(bl.x, 0.0)).rgb + texture2D(tReflect, ruv - vec2(bl.x, 0.0)).rgb
+                            + texture2D(tReflect, ruv + vec2(0.0, bl.y)).rgb + texture2D(tReflect, ruv - vec2(0.0, bl.y)).rgb) * 0.15;
+                        rc = pow(rc, vec3(2.2)) * uReflGain;
+                        gl_FragColor.rgb = mix(gl_FragColor.rgb, rc, clamp(fres * gloss * uReflect * (0.35 + 0.65 * max(uWet, wPud)), 0.0, 1.0));
+                    }
+                    #include <tonemapping_fragment>`);
         };
         floorMaterial.customProgramCacheKey = () => 'floorDetail';
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -8195,7 +8242,7 @@
             s.uniforms.tSurf1 = { value: tx.stone };
             s.uniforms.tSurf2 = { value: tx.metal };
             s.uniforms.tSurf3 = { value: tx.wood };
-            Object.assign(s.uniforms, weatherSurf);
+            Object.assign(s.uniforms, weatherSurf, abilityLightU);
             s.vertexShader = s.vertexShader
                 .replace('#include <common>', `#include <common>
                     varying vec3 vWPos;
@@ -8215,6 +8262,7 @@
                 .replace('#include <common>', `#include <common>
                     varying vec3 vWPos; uniform float uDetail; uniform float uHiDetail;
                     uniform float uWet; uniform float uSnow; uniform float uSand;
+                    ${AL_GLSL}
                     varying vec4 vSurf; varying vec3 vLocal; varying vec3 vScale;
                     uniform sampler2D tSurf0; uniform sampler2D tSurf1; uniform sampler2D tSurf2; uniform sampler2D tSurf3;
                     float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -8322,7 +8370,9 @@
                     roughnessFactor = clamp(roughnessFactor * hdRough, 0.04, 1.0);
                     roughnessFactor = mix(roughnessFactor, wxRough, wxAmt);`)
                 .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-                    if (hdOn > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(hdN, 0.0)).xyz, hdOn));`);
+                    if (hdOn > 0.0) normal = normalize(mix(normal, (viewMatrix * vec4(hdN, 0.0)).xyz, hdOn));`)
+                .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+                    if (uALOn > 0.5) { vec3 al = abilityLight(vWPos, normalize((vec4(normal, 0.0) * viewMatrix).xyz)); reflectedLight.directDiffuse += (diffuseColor.rgb * 2.2 + 0.03) * al; }`);
         };
         mapMaterial.customProgramCacheKey = () => 'mapDetail';
         let unitBoxGeometry = null;
@@ -13119,6 +13169,8 @@
                         Math.random() < 0.3 ? 0xfff2c4 : bright, 0.35 + Math.random() * 0.4, 0.16 + Math.random() * 0.08, 0.07, 1, 1.8, 9.8);
                 }
                 this._emit(this.parts, FX_KIND.glow, x, y, z, 0, 0, 0, bright, 0.22 + R * 0.02, R * 0.35, R * 1.25, 0.9, 0, 0);
+                // The blast lights the floor and walls around it
+                abilityLights.flash(x, y, z, bright, 3 + R * 2.2, 3.4, 260 + R * 60);
                 if (opts.smoke !== false && R >= 2.5) {
                     const puffs = Math.min(8, Math.round(R));
                     for (let i = 0; i < puffs; i++) {
@@ -13134,6 +13186,7 @@
             // Ground shockwave rings (dashes, stomps, pulses): dust kicked out along the ring
             ring: function (x, y, z, colorHex, scale) {
                 if (!this.enabled()) return;
+                abilityLights.flash(x, y + 0.4, z, this._bright(colorHex), 3 + scale * 1.5, 1.4, 350);
                 const n = Math.min(14, 5 + Math.round(scale * 2));
                 for (let i = 0; i < n; i++) {
                     const a = i / n * Math.PI * 2 + Math.random() * 0.4;
@@ -13179,6 +13232,9 @@
             // Fire / acid zones: called every frame per active zone
             embers: function (x, y, z, colorHex, radius, dt) {
                 if (!this.enabled()) return;
+                // Flickering firelight over the zone
+                const fl = 0.75 + 0.25 * Math.sin(performance.now() * 0.023 + x) * Math.sin(performance.now() * 0.037 + z);
+                abilityLights.add(x, y + 1.2, z, this._bright(colorHex), radius * 1.6 + 3, 3.2 * fl);
                 let n = dt * (6 + radius * 3);
                 while (n > 0) {
                     if (n < 1 && Math.random() > n) break;
@@ -13655,6 +13711,164 @@
             // After the shader warm-up hides every effect: show what the setting wants
             afterWarm: function () {
                 this.refresh(true);
+            }
+        };
+
+        // =============================================
+        // V1.7 Planar floor reflection. The scene is drawn once more from a camera
+        // mirrored under the floor (y = 0) into an sRGB target, which reuses every
+        // existing shader program. Clipping below the floor uses an oblique near
+        // plane in the projection matrix (as three's Reflector), not clipping planes,
+        // so no program changes. Ultra/Cinematic: every frame at half resolution;
+        // High: a third of the resolution every other frame, and only while the floor
+        // is wet; Medium/Low: off.
+        // =============================================
+        const reflectFX = {
+            rt: null, cam: new THREE.PerspectiveCamera(),
+            scale: 0, every: 1, wetOnly: false, frame: 0, renders: 0,
+            _m: {
+                pos: new THREE.Vector3(), look: new THREE.Vector3(), target: new THREE.Vector3(), rot: new THREE.Matrix4(),
+                n: new THREE.Vector3(0, 1, 0), plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(),
+                bias: new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1)
+            },
+
+            init: function () {
+                if (this.rt) return;
+                this.rt = new THREE.WebGLRenderTarget(16, 16, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
+                this.rt.texture.encoding = THREE.sRGBEncoding;
+                reflectU.tReflect.value = this.rt.texture;
+                const prev = weatherState.onQuality;
+                weatherState.onQuality = () => { if (prev) prev(); this.setQuality(); };
+                this.setQuality();
+            },
+
+            setQuality: function () {
+                const q = (typeof adaptiveSettings !== 'undefined' && adaptiveSettings.currentQuality) || 'medium';
+                if (q === 'ultra' || q === 'cinematic') { this.scale = 0.5; this.every = 1; this.wetOnly = false; }
+                else if (q === 'high') { this.scale = 0.34; this.every = 2; this.wetOnly = true; }
+                else { this.scale = 0; }
+                if (!this.scale) reflectU.uReflect.value = 0;
+            },
+
+            active: function () {
+                if (!this.rt || !this.scale) return false;
+                if (this.wetOnly && weatherSurf.uWet.value <= 0) return false;
+                return true;
+            },
+
+            _size: function () {
+                const pr = renderer.getPixelRatio();
+                const w = Math.max(16, Math.round(window.innerWidth * pr * this.scale));
+                const h = Math.max(16, Math.round(window.innerHeight * pr * this.scale));
+                if (this.rt.width !== w || this.rt.height !== h) this.rt.setSize(w, h);
+                reflectU.uReflTexel.value.set(1 / w, 1 / h);
+            },
+
+            // Before the main world render
+            render: function (force) {
+                if (!force && !this.active()) {
+                    reflectU.uReflect.value = 0;
+                    return;
+                }
+                this.frame++;
+                if (!force && this.renders > 0 && this.frame % this.every !== 0) return;
+                const M = this._m, cam = this.cam, n = M.n;
+                camera.updateMatrixWorld();
+                // Mirror the camera position and its look target through y = 0
+                M.pos.setFromMatrixPosition(camera.matrixWorld);
+                if (M.pos.y <= 0.01) { reflectU.uReflect.value = 0; return; }
+                M.rot.extractRotation(camera.matrixWorld);
+                M.look.set(0, 0, -1).applyMatrix4(M.rot).add(M.pos);
+                cam.position.set(M.pos.x, -M.pos.y, M.pos.z);
+                M.target.set(M.look.x, -M.look.y, M.look.z);
+                cam.up.set(0, 1, 0).applyMatrix4(M.rot).reflect(n);
+                cam.lookAt(M.target);
+                cam.far = camera.far;
+                cam.updateMatrixWorld();
+                cam.projectionMatrix.copy(camera.projectionMatrix);
+                // Texture matrix for the floor shader
+                reflectU.uReflMatrix.value.copy(M.bias).multiply(cam.projectionMatrix).multiply(cam.matrixWorldInverse);
+                // Oblique near plane = the floor (clips everything below it)
+                M.plane.setFromNormalAndCoplanarPoint(n, new THREE.Vector3(0, 0, 0)).applyMatrix4(cam.matrixWorldInverse);
+                M.clip.set(M.plane.normal.x, M.plane.normal.y, M.plane.normal.z, M.plane.constant);
+                const e = cam.projectionMatrix.elements;
+                M.q.set((Math.sign(M.clip.x) + e[8]) / e[0], (Math.sign(M.clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
+                M.clip.multiplyScalar(2 / M.clip.dot(M.q));
+                e[2] = M.clip.x; e[6] = M.clip.y; e[10] = M.clip.z + 1 - 0.003; e[14] = M.clip.w;
+                cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+                this._size();
+                // Draw (floor hidden; sky dome stays centred on the real camera)
+                const was = floor.visible;
+                floor.visible = false;
+                renderer.setRenderTarget(this.rt);
+                renderer.setClearColor(scene.background, 1);
+                renderer.clear();
+                renderer.render(scene, cam);
+                renderer.setRenderTarget(null);
+                floor.visible = was;
+                this.renders++;
+                // The target holds tone-mapped colour: undo the exposure so it sits with the lit floor
+                reflectU.uReflGain.value = 1 / Math.max(0.5, renderer.toneMappingExposure);
+                reflectU.uReflect.value = 1;
+            }
+        };
+
+        // =============================================
+        // V1.7 Ability lights: blasts, fire zones, muzzle flashes and ultimates light
+        // the floor and walls around them in their colour. Up to 6 at once (nearest
+        // and brightest win), as uniforms on the floor and map shaders. Off on Low.
+        // =============================================
+        const _muzzleLightPos = new THREE.Vector3();
+        const abilityLights = {
+            flashes: [],
+            frameAdds: [],
+            shown: 0,
+            _c: new THREE.Color(),
+            _v: new THREE.Vector3(),
+            enabled: function () { return (typeof adaptiveSettings === 'undefined' || adaptiveSettings.currentQuality !== 'low'); },
+            // A light that fades out over lifeMs
+            flash: function (x, y, z, colorHex, radius, intensity, lifeMs) {
+                if (!this.enabled()) return;
+                if (this.flashes.length > 24) this.flashes.shift();
+                this._c.setHex(colorHex).convertSRGBToLinear();
+                this.flashes.push({ x, y, z, r: this._c.r, g: this._c.g, b: this._c.b, radius, intensity, born: performance.now(), life: lifeMs || 400 });
+            },
+            // A light for this frame only (called every frame by persistent effects)
+            add: function (x, y, z, colorHex, radius, intensity) {
+                if (!this.enabled() || this.frameAdds.length > 24) return;
+                this._c.setHex(colorHex).convertSRGBToLinear();
+                this.frameAdds.push({ x, y, z, r: this._c.r, g: this._c.g, b: this._c.b, radius, intensity });
+            },
+            update: function (now) {
+                const list = [];
+                for (let i = this.flashes.length - 1; i >= 0; i--) {
+                    const f = this.flashes[i];
+                    const p = (now - f.born) / f.life;
+                    if (p >= 1) { this.flashes.splice(i, 1); continue; }
+                    if (p < 0) continue;
+                    const k = (1 - p) * (1 - p);
+                    list.push({ x: f.x, y: f.y, z: f.z, r: f.r, g: f.g, b: f.b, radius: f.radius, intensity: f.intensity * k });
+                }
+                for (const a of this.frameAdds) list.push(a);
+                this.frameAdds.length = 0;
+                const cp = camera.position;
+                for (const l of list) l.score = l.intensity * l.radius / (8 + Math.hypot(l.x - cp.x, l.y - cp.y, l.z - cp.z));
+                list.sort((a, b) => b.score - a.score);
+                const P = abilityLightU.uALPos.value, C = abilityLightU.uALCol.value;
+                const n = this.enabled() ? Math.min(AL_MAX, list.length) : 0;
+                for (let i = 0; i < AL_MAX; i++) {
+                    if (i < n) {
+                        const l = list[i];
+                        P[i].set(l.x, l.y, l.z, l.radius);
+                        C[i].set(l.r, l.g, l.b, l.intensity);
+                    } else {
+                        P[i].w = 0;
+                        C[i].w = 0;
+                    }
+                }
+                this.shown = n;
+                this.top = n > 0 ? list[0] : null;
+                abilityLightU.uALOn.value = n > 0 ? 1 : 0;
             }
         };
 
@@ -14184,6 +14398,8 @@
                 if (a.kind === 'ult' && !a.burst && p >= 0.68) {
                     a.burst = true;
                     if (typeof fxKit !== 'undefined' && fxKit.enabled()) fxKit.shakeAt(camera.position.x, camera.position.y, camera.position.z, 0.35);
+                    // The release lights up the area around you in the agent's colour
+                    if (typeof abilityLights !== 'undefined') abilityLights.flash(camera.position.x, camera.position.y - 0.5, camera.position.z, a.hex, 9, 2.2, 700);
                 }
                 const ads = 1 - (game.adsProgress || 0) * 0.6;
                 const aside = up * (a.kind === 'ult' ? 1.5 : a.kind === 'tap' ? 0.55 : 1);
@@ -34642,6 +34858,10 @@
                         if (weapon.muzzleHalo) weapon.muzzleHalo.visible = false;
                     }, 50);
                     muzzleStar.flash(game.activeWeapon, !!weapon.stealthTracers);
+                    // V1.7: each shot briefly lights the walls and floor around you
+                    _muzzleLightPos.set(0, -0.15, -1.1).applyQuaternion(camera.quaternion).add(camera.position);
+                    abilityLights.flash(_muzzleLightPos.x, _muzzleLightPos.y, _muzzleLightPos.z, 0xffb45a,
+                        game.activeWeapon === 'sniper' ? 9 : 6.5, weapon.stealthTracers ? 0.5 : 1.3, 70);
                 }
 
                 // V1.7: brass out of the ejection port (the Operator ejects when the bolt cycles).
@@ -36080,22 +36300,42 @@
                 // 4. Sun shafts
                 this.mats.rays = sm(`
                     varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 uSun; uniform float uStrength; uniform float uAspect;
+                    uniform vec3 uSunTint; uniform vec4 uLight; uniform vec3 uLightCol; uniform float uLightDepth;
                     void main() {
                         vec2 dir = (uSun - vUv) / 24.0;
                         vec2 uv = vUv;
                         float decay = 1.0, sum = 0.0;
-                        for (int i = 0; i < 24; i++) {
-                            // Light source: open sky, strongest round the sun itself
-                            float sky = step(0.9999, texture2D(tDepth, uv).x);
-                            vec2 ds = (uv - uSun) * vec2(uAspect, 1.0);
-                            float glow = exp(-dot(ds, ds) * 9.0);
-                            float lum = dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.55, 0.15));
-                            sum += sky * (glow * 1.6 + lum * 0.25) * decay;
-                            decay *= 0.94;
-                            uv += dir;
+                        if (uStrength > 0.0) {
+                            for (int i = 0; i < 24; i++) {
+                                // Light source: open sky, strongest round the sun itself
+                                float sky = step(0.9999, texture2D(tDepth, uv).x);
+                                vec2 ds = (uv - uSun) * vec2(uAspect, 1.0);
+                                float glow = exp(-dot(ds, ds) * 9.0);
+                                float lum = dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.55, 0.15));
+                                sum += sky * (glow * 1.6 + lum * 0.25) * decay;
+                                decay *= 0.94;
+                                uv += dir;
+                            }
                         }
-                        gl_FragColor = vec4(vec3(sum / 24.0 * uStrength), 1.0);
-                    }`, { tColor: { value: null }, tDepth: { value: null }, uSun: { value: new THREE.Vector2(0.5, 0.5) }, uStrength: { value: 0 }, uAspect: { value: 1 } });
+                        // V1.7: shafts from the brightest ability light in view, through the fog,
+                        // blocked where geometry stands in front of it
+                        float lsum = 0.0;
+                        if (uLight.w > 0.0) {
+                            vec2 ldir = (uLight.xy - vUv) / 20.0;
+                            vec2 luv = vUv;
+                            float ld = 1.0;
+                            for (int i = 0; i < 20; i++) {
+                                vec2 dl = (luv - uLight.xy) * vec2(uAspect, 1.0);
+                                float src = exp(-dot(dl, dl) / max(uLight.z * uLight.z, 1e-4));
+                                float open = step(uLightDepth - 0.0004, texture2D(tDepth, luv).x);
+                                lsum += src * open * ld;
+                                ld *= 0.93;
+                                luv += ldir;
+                            }
+                        }
+                        gl_FragColor = vec4(uSunTint * (sum / 24.0 * uStrength) + uLightCol * (lsum / 20.0 * uLight.w), 1.0);
+                    }`, { tColor: { value: null }, tDepth: { value: null }, uSun: { value: new THREE.Vector2(0.5, 0.5) }, uStrength: { value: 0 }, uAspect: { value: 1 },
+                          uSunTint: { value: new THREE.Color(1, 0.92, 0.75) }, uLight: { value: new THREE.Vector4() }, uLightCol: { value: new THREE.Color() }, uLightDepth: { value: 1 } });
                 // 5. Composite
                 this.mats.composite = sm(`
                     varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tB0; uniform sampler2D tB1; uniform sampler2D tB2; uniform sampler2D tB3;
@@ -36146,7 +36386,7 @@
                         gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
                     }`, {
                     tColor: { value: null }, tB0: { value: null }, tB1: { value: null }, tB2: { value: null }, tB3: { value: null },
-                    tRays: { value: null }, uTexel: { value: new THREE.Vector2() }, uBloom: { value: 0.75 }, uRayTint: { value: new THREE.Color(1, 0.92, 0.75) },
+                    tRays: { value: null }, uTexel: { value: new THREE.Vector2() }, uBloom: { value: 0.75 }, uRayTint: { value: new THREE.Color(1, 1, 1) },
                     uTime: { value: 0 }, uContrast: { value: 1.06 }, uSaturation: { value: 1.08 },
                     uShadowTint: { value: new THREE.Vector3(0.97, 0.99, 1.04) }, uHighTint: { value: new THREE.Vector3(1.03, 1.0, 0.96) },
                     uVignette: { value: 0.22 }, uGrain: { value: 0.025 }, uCA: { value: 1.0 }
@@ -36260,6 +36500,20 @@
                 ru.uSun.value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5);
                 ru.uStrength.value = facing ? (night ? 0.22 : 0.75) * (1 - Math.min(1, Math.hypot(sp.x, sp.y) / 1.6)) : 0;
                 ru.uAspect.value = camera.aspect;
+                // Sun shafts take the sun's colour (warm at sunset and dawn)
+                ru.uSunTint.value.copy(directionalLight.color).lerp(new THREE.Color(1, 0.92, 0.75), 0.5);
+                // Shafts from the brightest ability light on screen
+                const top = abilityLights.top;
+                ru.uLight.value.w = 0;
+                if (top && top.intensity > 0.3) {
+                    const lp = this._sun.set(top.x, top.y, top.z).project(camera);
+                    if (lp.z < 1 && lp.z > -1 && Math.abs(lp.x) < 1.2 && Math.abs(lp.y) < 1.2) {
+                        const dist = camera.position.distanceTo(_muzzleLightPos.set(top.x, top.y, top.z));
+                        ru.uLight.value.set(lp.x * 0.5 + 0.5, lp.y * 0.5 + 0.5, Math.min(0.25, top.radius / Math.max(1, dist) * 0.35), Math.min(1.2, top.intensity * 0.45));
+                        ru.uLightCol.value.setRGB(top.r, top.g, top.b);
+                        ru.uLightDepth.value = lp.z * 0.5 + 0.5;
+                    }
+                }
                 ru.tColor.value = R.world.texture;
                 ru.tDepth.value = R.world.depthTexture;
                 this._pass(M.rays, R.rays);
@@ -36403,6 +36657,9 @@
             weatherFX.mesh.geometry.setDrawRange(0, weatherRanges[0]);
             weatherFX.splash.geometry.setDrawRange(0, weatherRanges[1]);
             weatherFX.afterWarm();
+            // V1.7: one reflection pass (same programs, drawn into the sRGB reflection target)
+            reflectFX.render(true);
+            reflectU.uReflect.value = 0;
             particleBatch.mesh.geometry.setDrawRange(0, 0);
             trailBatch.mesh.geometry.setDrawRange(0, 0);
             decalBatch.mesh.count = 0;
@@ -39971,6 +40228,7 @@
             fxKit.init();
             castFX.init();
             weatherFX.init();
+            reflectFX.init();
             weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material) && o.material !== muzzleStar.mat) o.material.toneMapped = false; });
             
             // Initialize object pools
@@ -40206,6 +40464,9 @@
             fxKit.applyShake(now, Math.min(0.05, delta));
             skyDome.position.copy(camera.position);
             skyDome.updateMatrix();
+            // V1.7: ability lights for this frame, then the floor reflection pass
+            abilityLights.update(now);
+            reflectFX.render();
             // With autoClear off, r128's background pass only sets the clear colour,
             // so set it before the single manual clear (the sky dome covers it anyway)
             if (postFX.enabled) {
