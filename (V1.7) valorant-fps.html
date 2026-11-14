@@ -3564,6 +3564,7 @@
                                     <button class="settings-pill-opt" data-quality="medium">MEDIUM</button>
                                     <button class="settings-pill-opt" data-quality="high">HIGH</button>
                                     <button class="settings-pill-opt" data-quality="ultra">ULTRA 4K</button>
+                                    <button class="settings-pill-opt" data-quality="cinematic" title="Ambient occlusion, bloom, sun shafts, colour grading and FXAA, plus High Detail maps and characters">CINEMATIC (POST FX)</button>
                                 </div>
                             </div>
 
@@ -3711,6 +3712,17 @@
                                 <div class="settings-pill-group" id="setting-reduce-flash-pills">
                                     <button class="settings-pill-opt active" data-reduceflash="off">OFF</button>
                                     <button class="settings-pill-opt" data-reduceflash="on">ON</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Camera Shake</strong>
+                                    <small>A small shake from nearby explosions and blasts (always off with Reduce Flashes)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-camera-shake-pills">
+                                    <button class="settings-pill-opt active" data-camshake="on">ON</button>
+                                    <button class="settings-pill-opt" data-camshake="off">OFF</button>
                                 </div>
                             </div>
 
@@ -4837,7 +4849,10 @@
             low:    { drawDistance: 60,  maxParticles: 5,  maxDecals: 10, shadows: false, shadowResolution: 1024, fogDensity: 0.01,   maxPixelRatio: 1,        surfaceDetail: 0, haloBudget: 4 },
             medium: { drawDistance: 80,  maxParticles: 10, maxDecals: 20, shadows: true,  shadowResolution: 2048, fogDensity: 0.008,  maxPixelRatio: 1.5,      surfaceDetail: 1, haloBudget: 8 },
             high:   { drawDistance: 100, maxParticles: 15, maxDecals: 30, shadows: true,  shadowResolution: 4096, fogDensity: 0.005,  maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 12 },
-            ultra:  { drawDistance: 135, maxParticles: 20, maxDecals: 40, shadows: true,  shadowResolution: 4096, fogDensity: 0.0035, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16 }
+            ultra:  { drawDistance: 135, maxParticles: 20, maxDecals: 40, shadows: true,  shadowResolution: 4096, fogDensity: 0.0035, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16 },
+            // V1.7: above Ultra, manual only (Auto never picks it). Adds the postFX
+            // pipeline and turns on High Detail Maps and Characters & Guns.
+            cinematic: { drawDistance: 150, maxParticles: 20, maxDecals: 40, shadows: true, shadowResolution: 4096, fogDensity: 0.003, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16, post: true }
         };
         const QUALITY_ORDER = ['low', 'medium', 'high'];
         
@@ -5221,6 +5236,7 @@
                 glowHalos: 'auto',     // V1.7: 'auto' (profile budget) | 'off' | 'max'
                 brightness: 100,       // V1.7: % of the atmosphere mode's exposure (70-140)
                 reduceFlashes: false,  // V1.7 accessibility: soften full-screen flashes and the low-health pulse
+                cameraShake: true,     // V1.7: subtle shake on nearby blasts (off with Reduce Flashes too)
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -6903,10 +6919,11 @@
             mapDetailUniform.value = detail;
             haloSystem.setBudget(halos);
             // High Detail Maps: player opt-in, and never on the Low profile
-            const hiDetail = cfg.mapDetail === 'on' && adaptiveSettings.currentQuality !== 'low';
+            const cinematic = adaptiveSettings.currentQuality === 'cinematic';
+            const hiDetail = (cfg.mapDetail === 'on' || cinematic) && adaptiveSettings.currentQuality !== 'low';
             adaptiveSettings.mapHiDetail = hiDetail;
             mapHiDetail.set(hiDetail);
-            const charDetail = cfg.charDetail === 'on' && adaptiveSettings.currentQuality !== 'low';
+            const charDetail = (cfg.charDetail === 'on' || cinematic) && adaptiveSettings.currentQuality !== 'low';
             adaptiveSettings.charHiDetail = charDetail;
             characterDetail.set(charDetail);
         }
@@ -6920,6 +6937,8 @@
             adaptiveSettings.maxParticles = profile.maxParticles;
             adaptiveSettings.maxDecals = profile.maxDecals;
             adaptiveSettings.shadowResolution = profile.shadowResolution;
+            postFX.enabled = !!profile.post;
+            if (postFX.enabled) postFX.init();
             applyVisualOverrides(profile);
             scene.fog.density = profile.fogDensity;
             
@@ -7279,7 +7298,8 @@
                 this.pixelStep = 0;
                 this.upgradeHoldUntil = 0;
                 this.upgradeBackoffMs = 20000;
-                const baseQuality = adaptiveSettings.currentQuality === 'ultra' ? 'high' : adaptiveSettings.currentQuality;
+                const cq = adaptiveSettings.currentQuality;
+                const baseQuality = (cq === 'ultra' || cq === 'cinematic') ? 'high' : cq;
                 applyGraphicsProfile(baseQuality, 'auto-mode');
                 showNotification('Quality set to AUTO-ADAPTIVE');
             }
@@ -7303,6 +7323,9 @@
                     qualityController.setManual('ultra');
                     break;
                 case 'ultra':
+                    qualityController.setManual('cinematic');
+                    break;
+                case 'cinematic':
                 default:
                     qualityController.setAuto();
                     break;
@@ -12834,6 +12857,825 @@
             }
         }
         
+        // =============================================
+        // V1.7 Ability effects kit: sparks, glow, smoke, embers, dust, camera shake
+        // =============================================
+        // Shared by every agent through the helpers almost all abilities already
+        // call (spawnFlashBurst, spawnWindRing, projectile detonations, smokes,
+        // fire zones), so all 29 kits gain the same finish without per-ability
+        // rewrites. Two instanced camera-facing particle batches, one additive
+        // (sparks stretched along their velocity, glow, embers) and one alpha-blended
+        // (procedural billowing smoke and dust): two draw calls in total, both
+        // compiled in the warm-up. The simulation is plain JS on pooled records.
+        const FX_KIND = { spark: 0, glow: 1, smoke: 2, ember: 3, dust: 4 };
+        const fxKit = {
+            ADD_CAP: 420,
+            SMOKE_CAP: 160,
+            add: null,
+            smoke: null,
+            parts: [],
+            smokes: [],
+            nextAdd: 0,
+            nextSmoke: 0,
+            trauma: 0,
+            shakeLast: { x: 0, y: 0, z: 0, rx: 0, ry: 0 },
+            _c: new THREE.Color(),
+            _m: new THREE.Matrix4(),
+
+            makeBatch: function (cap, additive) {
+                const geo = new THREE.PlaneGeometry(1, 1);
+                const color = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
+                const params = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); // size, alpha, stretch, kind
+                const vel = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4);    // velocity xyz, seed
+                for (const a of [color, params, vel]) a.setUsage(THREE.DynamicDrawUsage);
+                geo.setAttribute('aColor', color);
+                geo.setAttribute('aParams', params);
+                geo.setAttribute('aVel', vel);
+                const mat = new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+                    toneMapped: false,
+                    uniforms: { uTime: { value: 0 } },
+                    vertexShader: `
+                        attribute vec3 aColor; attribute vec4 aParams; attribute vec4 aVel;
+                        varying vec3 vColor; varying vec2 vUv; varying float vAlpha; varying float vKind; varying float vSeed;
+                        void main() {
+                            vColor = aColor; vUv = uv; vAlpha = aParams.y; vKind = aParams.w; vSeed = aVel.w;
+                            vec4 c = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+                            vec2 q = position.xy * aParams.x;
+                            // Sparks and embers stretch along their screen-space velocity
+                            if (aParams.z > 0.0) {
+                                vec3 v = (modelViewMatrix * vec4(aVel.xyz, 0.0)).xyz;
+                                vec2 d = length(v.xy) > 1e-4 ? normalize(v.xy) : vec2(0.0, 1.0);
+                                vec2 n = vec2(d.y, -d.x);   // (a rotation, not a mirror: keeps the quad front-facing)
+                                q = d * position.y * aParams.x * (1.0 + aParams.z) + n * position.x * aParams.x * 0.6;
+                            }
+                            c.xy += q;
+                            gl_Position = projectionMatrix * c;
+                        }`,
+                    fragmentShader: `
+                        uniform float uTime;
+                        varying vec3 vColor; varying vec2 vUv; varying float vAlpha; varying float vKind; varying float vSeed;
+                        float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+                        float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+                            return mix(mix(h21(i), h21(i+vec2(1.0,0.0)), f.x), mix(h21(i+vec2(0.0,1.0)), h21(i+vec2(1.0,1.0)), f.x), f.y); }
+                        void main() {
+                            vec2 p = vUv * 2.0 - 1.0;
+                            float r = length(p);
+                            float a;
+                            vec3 col = vColor;
+                            if (vKind < 0.5 || vKind > 2.5 && vKind < 3.5) {
+                                // spark / ember: hot white core, coloured falloff
+                                // (smoothstep with edge0 > edge1 is undefined in GLSL: use 1 - smoothstep)
+                                a = 1.0 - smoothstep(0.0, 1.0, r);
+                                col = mix(vColor, vec3(1.0), (1.0 - smoothstep(0.0, 0.45, r)) * 0.8);
+                            } else if (vKind < 1.5) {
+                                a = pow(1.0 - smoothstep(0.0, 1.0, r), 2.2);        // glow
+                            } else {
+                                // smoke / dust: billowing noise, soft edge
+                                float n = vn(p * 2.3 + vSeed * 17.0 + uTime * 0.15) * 0.6 + vn(p * 4.7 - vSeed * 9.0) * 0.4;
+                                a = 1.0 - smoothstep(0.25, 1.0, r + (n - 0.5) * 0.6);
+                                col *= 0.75 + 0.5 * n;
+                            }
+                            gl_FragColor = vec4(col, a * vAlpha);
+                        }`
+                });
+                const mesh = new THREE.InstancedMesh(geo, mat, cap);
+                mesh.count = 0;
+                mesh.frustumCulled = false;
+                mesh.renderOrder = additive ? 12 : 11;
+                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                scene.add(mesh);
+                return mesh;
+            },
+
+            init: function () {
+                if (this.add) return;
+                this.add = this.makeBatch(this.ADD_CAP, true);
+                this.smoke = this.makeBatch(this.SMOKE_CAP, false);
+                for (let i = 0; i < this.ADD_CAP; i++) this.parts.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), c: new THREE.Color(), t: 0, life: 1, s0: 0, s1: 0, a0: 1, kind: 0, drag: 0, grav: 0, seed: 0 });
+                for (let i = 0; i < this.SMOKE_CAP; i++) this.smokes.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), c: new THREE.Color(), t: 0, life: 1, s0: 0, s1: 0, a0: 1, kind: 2, drag: 0, grav: 0, seed: 0 });
+            },
+
+            _emit: function (pool, kind, x, y, z, vx, vy, vz, colorHex, life, s0, s1, a0, drag, grav) {
+                const isAdd = pool === this.parts;
+                const idx = isAdd ? this.nextAdd : this.nextSmoke;
+                const r = pool[idx];
+                if (isAdd) this.nextAdd = (idx + 1) % this.ADD_CAP; else this.nextSmoke = (idx + 1) % this.SMOKE_CAP;
+                r.alive = true; r.kind = kind;
+                r.p.set(x, y, z); r.v.set(vx, vy, vz);
+                r.c.setHex(colorHex);
+                r.t = 0; r.life = life; r.s0 = s0; r.s1 = s1; r.a0 = a0; r.drag = drag; r.grav = grav;
+                r.seed = Math.random();
+                return r;
+            },
+
+            enabled: function () { return !!this.add && adaptiveSettings.currentQuality !== 'low'; },
+
+            // Explosion / flash / impact: sparks, a glow flash, smoke for big ones, shake
+            burst: function (x, y, z, colorHex, radius, opts) {
+                if (!this.enabled()) return;
+                opts = opts || {};
+                const R = Math.max(0.5, radius || 2);
+                const bright = this._bright(colorHex);
+                const n = Math.min(60, Math.round((opts.sparks !== undefined ? opts.sparks : 1) * (10 + R * 5)));
+                for (let i = 0; i < n; i++) {
+                    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const sp = (2.5 + Math.random() * 5.5) * Math.min(1.6, 0.5 + R * 0.18);
+                    this._emit(this.parts, FX_KIND.spark, x, y, z, rr * Math.cos(th) * sp, Math.abs(u) * sp * 0.9 + 1.2, rr * Math.sin(th) * sp,
+                        Math.random() < 0.3 ? 0xfff2c4 : bright, 0.35 + Math.random() * 0.4, 0.16 + Math.random() * 0.08, 0.07, 1, 1.8, 9.8);
+                }
+                this._emit(this.parts, FX_KIND.glow, x, y, z, 0, 0, 0, bright, 0.22 + R * 0.02, R * 0.35, R * 1.25, 0.9, 0, 0);
+                if (opts.smoke !== false && R >= 2.5) {
+                    const puffs = Math.min(8, Math.round(R));
+                    for (let i = 0; i < puffs; i++) {
+                        const a = Math.random() * Math.PI * 2, d = Math.random() * R * 0.35;
+                        this._emit(this.smokes, FX_KIND.smoke, x + Math.cos(a) * d, y + Math.random() * 0.6, z + Math.sin(a) * d,
+                            Math.cos(a) * 0.8, 0.5 + Math.random() * 0.5, Math.sin(a) * 0.8,
+                            this._mix(colorHex, 0x3a3f47, 0.75), 1.6 + Math.random() * 1.2, R * 0.35, R * 0.9, 0.42, 1.2, -0.25);
+                    }
+                }
+                if (opts.shake !== false) this.shakeAt(x, y, z, Math.min(1, R / 6) * (opts.shakeScale || 1));
+            },
+
+            // Ground shockwave rings (dashes, stomps, pulses): dust kicked out along the ring
+            ring: function (x, y, z, colorHex, scale) {
+                if (!this.enabled()) return;
+                const n = Math.min(14, 5 + Math.round(scale * 2));
+                for (let i = 0; i < n; i++) {
+                    const a = i / n * Math.PI * 2 + Math.random() * 0.4;
+                    const sp = 2 + scale * 0.8;
+                    this._emit(this.smokes, FX_KIND.dust, x + Math.cos(a) * 0.4, Math.max(0.15, y - 0.2), z + Math.sin(a) * 0.4,
+                        Math.cos(a) * sp, 0.3, Math.sin(a) * sp, this._mix(colorHex, 0x8b8070, 0.6), 0.8, 0.5, 1.6 + scale * 0.2, 0.55, 2.6, 0);
+                }
+                for (let i = 0; i < 6; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    this._emit(this.parts, FX_KIND.spark, x, y, z, Math.cos(a) * 4, 1.5 + Math.random() * 2, Math.sin(a) * 4,
+                        this._bright(colorHex), 0.3, 0.08, 0.04, 0.8, 2.2, 9.8);
+                }
+            },
+
+            // Smoke grenades: rolling puffs that fill the sphere as it forms
+            smokeCloud: function (x, y, z, colorHex, radius) {
+                if (!this.enabled()) return;
+                for (let i = 0; i < 16; i++) {
+                    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const d = radius * (0.4 + Math.random() * 0.5);
+                    this._emit(this.smokes, FX_KIND.smoke, x, y, z, rr * Math.cos(th) * d * 1.4, u * d * 0.9, rr * Math.sin(th) * d * 1.4,
+                        this._mix(colorHex, 0xd7dde5, 0.55), 1.4 + Math.random() * 0.8, radius * 0.3, radius * 0.85, 0.7, 2.2, 0);
+                }
+                this.burst(x, y, z, colorHex, 1.2, { sparks: 0.4, smoke: false, shake: false });
+            },
+
+            // Active smoke spheres: puffs rolling over the surface (called every frame)
+            smokeShell: function (x, y, z, linearColor, radius, dt, fade) {
+                if (!this.enabled()) return;
+                let n = dt * 14 * fade;
+                while (n > 0) {
+                    if (n < 1 && Math.random() > n) break;
+                    n -= 1;
+                    const u = Math.random() * 1.6 - 0.6, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const px = x + rr * Math.cos(th) * radius * 0.92, py = y + u * radius * 0.92, pz = z + rr * Math.sin(th) * radius * 0.92;
+                    this._c.copy(linearColor).convertLinearToSRGB();
+                    const hex = this._mix(this._c.getHex(), 0xe2e8f0, 0.45);
+                    this._emit(this.smokes, FX_KIND.smoke, px, py, pz, -Math.sin(th) * 0.35, 0.08, Math.cos(th) * 0.35,
+                        hex, 2.4 + Math.random() * 1.0, radius * 0.45, radius * 0.8, 0.6, 0.3, 0);
+                }
+            },
+
+            // Fire / acid zones: called every frame per active zone
+            embers: function (x, y, z, colorHex, radius, dt) {
+                if (!this.enabled()) return;
+                let n = dt * (6 + radius * 3);
+                while (n > 0) {
+                    if (n < 1 && Math.random() > n) break;
+                    n -= 1;
+                    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * radius * 0.9;
+                    this._emit(this.parts, FX_KIND.ember, x + Math.cos(a) * d, y + 0.1, z + Math.sin(a) * d,
+                        (Math.random() - 0.5) * 0.6, 1.2 + Math.random() * 1.6, (Math.random() - 0.5) * 0.6,
+                        this._bright(colorHex), 0.8 + Math.random() * 0.8, 0.12, 0.05, 1, 0.6, -0.4);
+                    if (Math.random() < 0.18) {
+                        this._emit(this.smokes, FX_KIND.smoke, x + Math.cos(a) * d, y + 0.4, z + Math.sin(a) * d, 0, 0.9, 0,
+                            0x2e2a27, 1.6, 0.4, 1.4, 0.22, 0.6, -0.2);
+                    }
+                }
+            },
+
+            // Camera shake ("trauma" model): fades with distance; Settings can turn it off
+            shakeAt: function (x, y, z, amount) {
+                const cfg = game.userSettings || {};
+                if (cfg.cameraShake === false || cfg.reduceFlashes) return;
+                const d = Math.hypot(x - camera.position.x, y - camera.position.y, z - camera.position.z);
+                this.trauma = Math.min(1, this.trauma + amount * Math.max(0, 1 - d / 28));
+            },
+
+            _bright: function (hex) {
+                this._c.setHex(hex);
+                const m = Math.max(this._c.r, this._c.g, this._c.b) || 1;
+                this._c.multiplyScalar(1 / m);
+                return this._c.getHex();
+            },
+            _mix: function (a, b, t) {
+                const ca = new THREE.Color(a), cb = new THREE.Color(b);
+                return ca.lerp(cb, t).getHex();
+            },
+
+            update: function (dt, now) {
+                if (!this.add) return;
+                this.add.material.uniforms.uTime.value = now * 0.001;
+                this.smoke.material.uniforms.uTime.value = now * 0.001;
+                this._write(this.parts, this.add, dt);
+                this._write(this.smokes, this.smoke, dt);
+            },
+
+            _write: function (pool, mesh, dt) {
+                const g = mesh.geometry, col = g.attributes.aColor, par = g.attributes.aParams, vel = g.attributes.aVel;
+                const m = this._m.elements;
+                let n = 0;
+                for (let i = 0; i < pool.length; i++) {
+                    const r = pool[i];
+                    if (!r.alive) continue;
+                    r.t += dt;
+                    if (r.t >= r.life) { r.alive = false; continue; }
+                    const k = Math.exp(-r.drag * dt);
+                    r.v.multiplyScalar(k);
+                    r.v.y -= r.grav * dt;
+                    r.p.addScaledVector(r.v, dt);
+                    if (r.kind === FX_KIND.spark && r.p.y < 0.02) { r.p.y = 0.02; r.v.y *= -0.35; r.v.x *= 0.6; r.v.z *= 0.6; }
+                    const f = r.t / r.life;
+                    const size = r.s0 + (r.s1 - r.s0) * Math.sqrt(f);
+                    let alpha = r.a0 * (1 - f);
+                    if (r.kind === FX_KIND.smoke || r.kind === FX_KIND.dust) alpha = r.a0 * Math.min(1, f * 6) * (1 - f) * (1 - f);
+                    const stretch = (r.kind === FX_KIND.spark || r.kind === FX_KIND.ember) ? Math.min(7, r.v.length() * 0.9) : 0;
+                    m[12] = r.p.x; m[13] = r.p.y; m[14] = r.p.z;
+                    mesh.setMatrixAt(n, this._m);
+                    col.setXYZ(n, r.c.r, r.c.g, r.c.b);
+                    par.setXYZW(n, size, alpha, stretch, r.kind);
+                    vel.setXYZW(n, r.v.x, r.v.y, r.v.z, r.seed);
+                    n++;
+                }
+                mesh.count = n;
+                if (n) {
+                    mesh.instanceMatrix.needsUpdate = true;
+                    col.needsUpdate = true; par.needsUpdate = true; vel.needsUpdate = true;
+                }
+            },
+
+            // Applied just before rendering. Position is re-set from the player every
+            // frame, so only the look rotation (changed incrementally by mouse, pad
+            // and recoil) has last frame's shake removed before the new one is added.
+            applyShake: function (now, dt) {
+                const L = this.shakeLast;
+                camera.rotation.x -= L.rx; camera.rotation.y -= L.ry;
+                this.trauma = Math.max(0, this.trauma - dt * 1.6);
+                const s = this.trauma * this.trauma;
+                if (s <= 0) { L.x = L.y = L.z = L.rx = L.ry = 0; return; }
+                const t = now * 0.001;
+                const nz = (o) => Math.sin(t * 37.1 + o) * 0.6 + Math.sin(t * 61.7 + o * 1.7) * 0.4;
+                L.x = nz(1.3) * 0.05 * s; L.y = nz(4.1) * 0.05 * s; L.z = nz(7.9) * 0.03 * s;
+                L.rx = nz(2.2) * 0.022 * s; L.ry = nz(5.5) * 0.022 * s;
+                camera.position.x += L.x; camera.position.y += L.y; camera.position.z += L.z;
+                camera.rotation.x += L.rx; camera.rotation.y += L.ry;
+            }
+        };
+
+        // =============================================
+        // V1.7 Viewmodel animator: draw, reload, inspect, recoil spring, sprint, landing
+        // =============================================
+        // Adds a pose offset on top of the existing bob/ADS/sway placement. Each
+        // frame begin() removes last frame's offset, the base placement runs as
+        // before, and end() adds the new one, so the two never fight. Animations
+        // are timelines on the frame clock (smooth at any frame rate), replacing
+        // the old snap-to-pose timeouts. Recoil is a damped spring per channel.
+        const _ease = {
+            out: (t) => 1 - Math.pow(1 - t, 3),
+            inOut: (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+            back: (t) => { const c = 1.6; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); }
+        };
+        // 0 -> 1 over [a, b], eased
+        const _seg = (p, a, b, f) => (f || _ease.inOut)(Math.min(1, Math.max(0, (p - a) / (b - a))));
+        // Smooth bump peaking at c with half-width w
+        const _bump = (p, c, w) => { const x = (p - c) / w; return Math.abs(x) >= 1 ? 0 : 0.5 + 0.5 * Math.cos(x * Math.PI); };
+
+        const vmAnim = {
+            model: null,
+            last: { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 },
+            sp: { z: 0, vz: 0, p: 0, vp: 0, r: 0, vr: 0, y: 0, vy: 0 },
+            clip: null,
+            sprint: 0,
+            lastT: 0,
+            wasGrounded: true,
+            slideKickAt: -1e9,
+
+            slashSide: 1,
+            play: function (kind, durMs) {
+                this.clip = { kind: kind, start: performance.now(), dur: Math.max(50, durMs), weapon: game.activeWeapon, side: this.slashSide };
+            },
+
+            // Called on every shot: the spring takes it from here
+            fire: function (amount) {
+                const s = this.sp;
+                // Peaks about 50 ms after the shot: ~1x recoil of muzzle rise (as the old
+                // fixed kick), ~0.5x of push-back, ~0.6x of drop
+                s.vp += amount * 80;
+                s.vz += amount * 34;
+                s.vy -= amount * 40;
+                s.vr += (Math.random() - 0.5) * amount * 24;
+                if (game.activeWeapon === 'pistol') this.slideKickAt = performance.now();
+            },
+
+            switched: function () {
+                this.model = null;
+                this.last = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 };
+                this.play('draw', game.activeWeapon === 'knife' ? 280 : 380);
+            },
+
+            begin: function (model) {
+                if (model !== this.model) {
+                    this.model = model;
+                    this.last = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 };
+                    return;
+                }
+                const L = this.last;
+                model.position.x -= L.px; model.position.y -= L.py; model.position.z -= L.pz;
+                model.rotation.x -= L.rx; model.rotation.y -= L.ry; model.rotation.z -= L.rz;
+            },
+
+            end: function (model, now) {
+                const w = game.weapons[game.activeWeapon];
+                const dt = Math.min(0.05, Math.max(0, (now - (this.lastT || now)) / 1000));
+                this.lastT = now;
+                const hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                const o = { px: 0, py: 0, pz: 0, rx: 0, ry: 0, rz: 0 };
+                // Recoil / landing springs
+                const s = this.sp, K = 320, C = 24;
+                s.vz += (-K * s.z - C * s.vz) * dt; s.z += s.vz * dt;
+                s.vp += (-K * s.p - C * s.vp) * dt; s.p += s.vp * dt;
+                s.vr += (-K * s.r - C * s.vr) * dt; s.r += s.vr * dt;
+                s.vy += (-K * s.y - C * s.vy) * dt; s.y += s.vy * dt;
+                o.pz += s.z; o.rx += s.p; o.rz += s.r; o.py += s.y;
+                // Landing dip
+                const grounded = characterController.grounded !== false;
+                if (grounded && !this.wasGrounded) s.vy -= 0.7;
+                this.wasGrounded = grounded;
+                // Sprint: gun lowered and turned in
+                const moving = game.keys.w || game.keys.a || game.keys.s || game.keys.d;
+                const sprintTarget = (characterController.sprinting && moving && !game.adsActive && !game.reloading && !this.clip) ? 1 : 0;
+                this.sprint += (sprintTarget - this.sprint) * Math.min(1, dt * 8);
+                const sb = this.sprint;
+                o.rx += 0.16 * sb; o.ry += 0.38 * sb * hand; o.px += -0.035 * sb * hand; o.py += -0.05 * sb;
+                // Pistol slide kick on each shot
+                if (w && w.slide) {
+                    if (w.slideRestZ === undefined) w.slideRestZ = w.slide.position.z;
+                    const k = Math.max(0, 1 - (now - this.slideKickAt) / 90);
+                    w.slide.position.z = w.slideRestZ + 0.05 * k * (2 - k);
+                }
+                // Timeline clips
+                const c = this.clip;
+                if (c && c.kind === 'inspect' && game.adsActive) this.finishClip(w);
+                if (this.clip) {
+                    const p = (now - c.start) / c.dur;
+                    if (p >= 1 || c.weapon !== game.activeWeapon) {
+                        this.finishClip(w);
+                    } else {
+                        this.pose(c.kind, p, w, o, hand);
+                    }
+                }
+                // Ability cast gesture (off-hand) layered on top
+                castFX.apply(now, o, hand);
+                model.position.x += o.px; model.position.y += o.py; model.position.z += o.pz;
+                model.rotation.x += o.rx; model.rotation.y += o.ry; model.rotation.z += o.rz;
+                this.last = o;
+            },
+
+            finishClip: function (w) {
+                if (w && w.magazine && w.magRestY !== undefined) {
+                    w.magazine.position.y = w.magRestY;
+                    w.magazine.visible = true;
+                }
+                if (w && w.slide && w.slideRestZ !== undefined) w.slide.position.z = w.slideRestZ;
+                this.clip = null;
+            },
+
+            // Keyframed offsets: keys = [[t, px, py, pz, rx, ry, rz], ...], eased between keys
+            _keys: function (keys, p, o, hand, side) {
+                let i = 0;
+                while (i < keys.length - 2 && p > keys[i + 1][0]) i++;
+                const a = keys[i], b = keys[i + 1];
+                const t = _ease.inOut(Math.min(1, Math.max(0, (p - a[0]) / (b[0] - a[0]))));
+                const v = (j) => a[j] + (b[j] - a[j]) * t;
+                const sx = hand * side;
+                o.px += v(1) * sx; o.py += v(2); o.pz += v(3);
+                o.rx += v(4); o.ry += v(5) * sx; o.rz += v(6) * sx;
+            },
+
+            pose: function (kind, p, w, o, hand) {
+                if (kind === 'slash') {
+                    // Wind up high on one side, cut down across, recover
+                    this._keys([
+                        [0, 0, 0, 0, 0, 0, 0],
+                        [0.18, 0.06, 0.13, 0.03, 0.35, -0.25, -0.55],
+                        [0.46, -0.27, 0.02, -0.22, -0.2, 0.38, 0.85],
+                        [0.6, -0.25, 0.0, -0.18, -0.15, 0.32, 0.7],
+                        [1, 0, 0, 0, 0, 0, 0]
+                    ], p, o, hand, (this.clip && this.clip.side) || 1);
+                    return;
+                }
+                if (kind === 'stab') {
+                    // Draw back, lunge forward with a twist, hold, recover
+                    this._keys([
+                        [0, 0, 0, 0, 0, 0, 0],
+                        [0.24, 0.03, 0.04, 0.12, 0.18, 0, -0.2],
+                        [0.42, -0.14, 0.09, -0.44, -0.3, 0.18, 0.6],
+                        [0.58, -0.13, 0.08, -0.4, -0.27, 0.16, 0.55],
+                        [1, 0, 0, 0, 0, 0, 0]
+                    ], p, o, hand, 1);
+                    return;
+                }
+                if (kind === 'draw') {
+                    const e = _ease.back(p);
+                    o.py += -0.25 * (1 - e);
+                    o.rx += 0.6 * (1 - e);
+                    o.rz += 0.3 * (1 - e) * hand;
+                    return;
+                }
+                if (kind === 'inspect') {
+                    if (w && w.isMelee) {
+                        // Knife: a flip over the knuckles and back
+                        o.rx += _seg(p, 0.1, 0.6) * Math.PI * 2;
+                        o.rz += Math.sin(p * Math.PI) * 0.5 * hand;
+                        o.py += Math.sin(p * Math.PI) * 0.06;
+                        return;
+                    }
+                    // Show the left side, swing over to the right side, return
+                    const a = _seg(p, 0.0, 0.25), b = _seg(p, 0.38, 0.62), r = _seg(p, 0.78, 1.0);
+                    const yaw = (0.9 * a - 1.6 * b) * (1 - r);
+                    o.ry += yaw * hand;
+                    o.rz += (0.45 * a - 0.2 * b) * (1 - r) * hand;
+                    o.rx += -0.12 * Math.sin(p * Math.PI);
+                    o.px += -0.07 * (a - 0.2 * b) * (1 - r) * hand;
+                    o.py += 0.05 * Math.sin(p * Math.PI);
+                    o.pz += 0.06 * Math.sin(p * Math.PI);
+                    return;
+                }
+                if (kind === 'reload' && w) {
+                    // Tilt in, work the gun, tilt out
+                    const tilt = _seg(p, 0, 0.14) * (1 - _seg(p, 0.86, 1));
+                    o.rz += 0.5 * tilt * hand;
+                    o.rx += -0.14 * tilt;
+                    o.py += 0.04 * tilt;
+                    o.px += -0.03 * tilt * hand;
+                    if (w.magazine) {
+                        if (w.magRestY === undefined) w.magRestY = w.magazine.position.y;
+                        let drop;
+                        if (p < 0.18) drop = 0;
+                        else if (p < 0.34) drop = _seg(p, 0.18, 0.34, _ease.inOut);
+                        else if (p < 0.5) drop = 1;                       // hand fetching a new one
+                        else drop = 1 - _seg(p, 0.5, 0.66, _ease.out);    // seat it
+                        w.magazine.position.y = w.magRestY - 0.36 * drop;
+                        w.magazine.visible = !(p > 0.36 && p < 0.48);
+                        // Seating jolt
+                        o.py += 0.022 * _bump(p, 0.67, 0.04);
+                        o.rx += 0.05 * _bump(p, 0.67, 0.04);
+                    }
+                    if (game.activeWeapon === 'pistol' && w.slide) {
+                        if (w.slideRestZ === undefined) w.slideRestZ = w.slide.position.z;
+                        w.slide.position.z = w.slideRestZ + 0.06 * _bump(p, 0.79, 0.06);
+                        o.pz += 0.02 * _bump(p, 0.79, 0.06);
+                    } else if (game.activeWeapon === 'sniper') {
+                        // Bolt cycle: roll out, pull, push
+                        o.rz += 0.25 * _bump(p, 0.78, 0.1) * hand;
+                        o.pz += 0.05 * _bump(p, 0.76, 0.05) - 0.02 * _bump(p, 0.84, 0.04);
+                    } else {
+                        // Charging handle
+                        o.pz += 0.035 * _bump(p, 0.78, 0.05);
+                        o.rx += -0.06 * _bump(p, 0.78, 0.05);
+                    }
+                }
+            }
+        };
+
+        // =============================================
+        // V1.7 Shell casings: pooled brass ejected from the gun, bouncing on the floor
+        // =============================================
+        const shellFX = {
+            CAP: 40,
+            mesh: null,
+            shells: [],
+            next: 0,
+            _m: new THREE.Matrix4(),
+            _q: new THREE.Quaternion(),
+            _e: new THREE.Euler(),
+            _v: new THREE.Vector3(),
+            _right: new THREE.Vector3(),
+            _up: new THREE.Vector3(),
+            _fwd: new THREE.Vector3(),
+
+            init: function () {
+                if (this.mesh) return;
+                const geo = new THREE.CylinderGeometry(0.0065, 0.0065, 0.026, 8);
+                geo.rotateZ(Math.PI / 2);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.9, roughness: 0.32 });
+                this.mesh = new THREE.InstancedMesh(geo, mat, this.CAP);
+                this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                this.mesh.count = 0;
+                this.mesh.frustumCulled = false;
+                this.mesh.castShadow = false;
+                this.mesh.receiveShadow = true;
+                for (let i = 0; i < this.CAP; i++) this.shells.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), t: 0, floor: 0 });
+                scene.add(this.mesh);
+            },
+
+            eject: function () {
+                if (!this.mesh) return;
+                const key = game.activeWeapon;
+                if (key === 'knife') return;
+                const s = this.shells[this.next];
+                this.next = (this.next + 1) % this.CAP;
+                camera.updateMatrixWorld();
+                const m = camera.matrixWorld.elements;
+                this._right.set(m[0], m[1], m[2]);
+                this._up.set(m[4], m[5], m[6]);
+                this._fwd.set(-m[8], -m[9], -m[10]);
+                const hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                const ads = game.adsProgress || 0;
+                s.p.copy(camera.position)
+                    .addScaledVector(this._right, (0.22 - 0.18 * ads) * hand)
+                    .addScaledVector(this._up, -0.16 + 0.06 * ads)
+                    .addScaledVector(this._fwd, 0.45);
+                s.v.set(0, 0, 0)
+                    .addScaledVector(this._right, (1.5 + Math.random() * 0.8) * hand)
+                    .addScaledVector(this._up, 1.6 + Math.random() * 0.7)
+                    .addScaledVector(this._fwd, -0.4 + Math.random() * 0.3);
+                if (characterController.velocity) s.v.add(characterController.velocity);
+                s.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+                s.w.set((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+                s.t = 0;
+                s.floor = Math.max(0, characterController.position.y - (characterController.height || 1.7)) + 0.007;
+                s.alive = true;
+            },
+
+            update: function (dt) {
+                if (!this.mesh) return;
+                let n = 0;
+                for (let i = 0; i < this.CAP; i++) {
+                    const s = this.shells[i];
+                    if (!s.alive) continue;
+                    s.t += dt;
+                    if (s.t > 3) { s.alive = false; continue; }
+                    if (s.p.y > s.floor || s.v.lengthSq() > 0.01) {
+                        s.v.y -= 9.8 * dt;
+                        s.p.addScaledVector(s.v, dt);
+                        s.r.addScaledVector(s.w, dt);
+                        if (s.p.y < s.floor) {
+                            s.p.y = s.floor;
+                            s.v.y *= -0.32;
+                            s.v.x *= 0.55; s.v.z *= 0.55;
+                            s.w.multiplyScalar(0.5);
+                            if (Math.abs(s.v.y) < 0.25) { s.v.set(0, 0, 0); s.w.set(0, 0, 0); s.r.x = 0; s.r.z = 0; }
+                        }
+                    }
+                    const fade = s.t > 2.5 ? 1 - (s.t - 2.5) / 0.5 : 1;
+                    this._q.setFromEuler(this._e.set(s.r.x, s.r.y, s.r.z));
+                    this._v.set(fade, fade, fade);
+                    this._m.compose(s.p, this._q, this._v);
+                    this.mesh.setMatrixAt(n++, this._m);
+                }
+                this.mesh.count = n;
+                if (n) this.mesh.instanceMatrix.needsUpdate = true;
+            }
+        };
+
+        // =============================================
+        // V1.7 Muzzle flash star: crossed additive cards with a procedural star,
+        // randomly rotated and sized each shot (on top of the existing flash and halo)
+        // =============================================
+        const muzzleStar = {
+            mat: null,
+            cards: {},
+            init: function () {
+                if (this.mat) return;
+                const c = document.createElement('canvas');
+                c.width = c.height = 128;
+                const g = c.getContext('2d');
+                const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+                grd.addColorStop(0, 'rgba(255,255,240,1)');
+                grd.addColorStop(0.25, 'rgba(255,214,120,0.9)');
+                grd.addColorStop(1, 'rgba(255,140,40,0)');
+                g.fillStyle = grd;
+                g.beginPath();
+                for (let i = 0; i < 12; i++) {
+                    const a = i / 12 * Math.PI * 2, r = i % 2 ? 22 : 62;
+                    g.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r);
+                }
+                g.closePath();
+                g.fill();
+                const tex = new THREE.CanvasTexture(c);
+                tex.encoding = THREE.sRGBEncoding;
+                this.mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+                for (const key of ['rifle', 'sniper', 'pistol']) {
+                    const w = game.weapons[key];
+                    if (!w || !w.muzzleFlash) continue;
+                    const grp = new THREE.Group();
+                    const front = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), this.mat);
+                    const side = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.12), this.mat);
+                    side.rotation.y = Math.PI / 2;
+                    side.position.z = -0.08;
+                    grp.add(front, side);
+                    grp.position.copy(w.muzzleFlash.position);
+                    w.model.add(grp);
+                    this.cards[key] = grp;
+                }
+            },
+            flash: function (key, dim) {
+                const g = this.cards[key];
+                if (!g || !this.mat) return;
+                this.mat.opacity = dim ? 0.35 : 0.95;
+                g.rotation.z = Math.random() * Math.PI;
+                const s = (key === 'sniper' ? 1.5 : key === 'pistol' ? 0.85 : 1) * (0.8 + Math.random() * 0.4);
+                g.scale.setScalar(s);
+                setTimeout(() => { if (this.mat) this.mat.opacity = 0; }, 45);
+            }
+        };
+
+        // =============================================
+        // V1.7 Ability cast gestures: the off-hand comes up into view, gathers the
+        // agent's energy and throws it; ultimates gather longer with orbiting wisps
+        // and a burst; second-stage activations are a quick flick. Runs on its own
+        // timeline layered on the gun pose (so a cast mid-reload does not break the
+        // reload). Reuses the gun hands' material and the muzzle-star card shader,
+        // so it adds no shader programs.
+        // =============================================
+        const castFX = {
+            group: null, hand: null, sleeve: null,
+            halo: null, core: null, wisps: [],
+            haloMat: null, coreMat: null,
+            active: null,
+            CLIPS: { cast: 620, ult: 1150, tap: 360 },
+            REST: { x: -0.22, y: -0.66, z: -0.36 },
+
+            init: function () {
+                if (this.group) return;
+                const handsMesh = game.weapons.rifle && game.weapons.rifle.model.children.find(c => c.userData.isHands);
+                const skin = handsMesh ? handsMesh.material : new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.3 });
+                const sleeveMat = new THREE.MeshStandardMaterial({ color: 0x1b2230, roughness: 0.7 });
+                // One open left hand, palm forward, fingers up (thumb toward the middle)
+                const palm = roundedBoxGeometry(0.07, 0.075, 0.026, 0.01, 2);
+                const finger = roundedBoxGeometry(0.016, 0.055, 0.017, 0.007, 2);
+                const thumb = roundedBoxGeometry(0.018, 0.045, 0.019, 0.008, 2);
+                const parts = [{ geometry: palm, matrix: partMatrix(0, 0, 0, 0, 0, 0) }];
+                for (let i = 0; i < 4; i++) {
+                    const len = i === 0 || i === 3 ? 0.92 : 1;
+                    const m = partMatrix((i - 1.5) * 0.0175, 0.06 * len, -0.004, -0.18, 0, (i - 1.5) * -0.07);
+                    m.multiply(new THREE.Matrix4().makeScale(1, len, 1));
+                    parts.push({ geometry: finger, matrix: m });
+                }
+                parts.push({ geometry: thumb, matrix: partMatrix(0.044, 0.004, -0.008, -0.2, 0, -0.75) });
+                this.hand = new THREE.Mesh(mergeGeometryParts(parts), skin);
+                for (const g of [palm, finger, thumb]) g.dispose();
+                const sleeveGeo = roundedBoxGeometry(0.066, 0.24, 0.062, 0.018, 2);
+                sleeveGeo.translate(0, -0.155, 0);
+                this.sleeve = new THREE.Mesh(sleeveGeo, sleeveMat);
+                this.group = new THREE.Group();
+                this.group.add(this.hand, this.sleeve);
+                this.group.visible = false;
+                weaponGroup.add(this.group);
+
+                // Energy: a soft halo in the agent colour, a hot core and orbiting wisps
+                const c = document.createElement('canvas');
+                c.width = c.height = 128;
+                const g = c.getContext('2d');
+                const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+                grd.addColorStop(0, 'rgba(255,255,255,1)');
+                grd.addColorStop(0.3, 'rgba(255,255,255,0.55)');
+                grd.addColorStop(0.65, 'rgba(255,255,255,0.14)');
+                grd.addColorStop(1, 'rgba(255,255,255,0)');
+                g.fillStyle = grd;
+                g.fillRect(0, 0, 128, 128);
+                const tex = new THREE.CanvasTexture(c);
+                tex.encoding = THREE.sRGBEncoding;
+                // Drawn over the hand (depth test off is not a shader change), so the palm glows
+                const mk = () => new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false });
+                this.haloMat = mk();
+                this.coreMat = mk();
+                const card = new THREE.PlaneGeometry(1, 1);
+                this.halo = new THREE.Mesh(card, this.haloMat);
+                this.core = new THREE.Mesh(card, this.coreMat);
+                this.halo.renderOrder = this.core.renderOrder = 5;
+                weaponGroup.add(this.halo, this.core);
+                for (let i = 0; i < 5; i++) {
+                    const w = new THREE.Mesh(card, this.haloMat);
+                    w.renderOrder = 5;
+                    weaponGroup.add(w);
+                    this.wisps.push(w);
+                }
+                this.hide();
+            },
+
+            hide: function () {
+                if (!this.group) return;
+                this.group.visible = this.halo.visible = this.core.visible = false;
+                for (const w of this.wisps) w.visible = false;
+            },
+
+            // kind: 'cast' | 'ult' | 'tap'
+            start: function (kind, colorHex) {
+                if (!this.group || !this.CLIPS[kind]) return;
+                // An ultimate in progress is not cut short by a flick
+                if (this.active && this.active.kind === 'ult' && kind !== 'ult' && performance.now() - this.active.start < this.active.dur * 0.75) return;
+                const col = new THREE.Color(colorHex === undefined ? 0x38f6ff : colorHex);
+                this.haloMat.color.copy(col);
+                this.coreMat.color.copy(col).lerp(new THREE.Color(0xffffff), 0.65);
+                this.active = { kind: kind, start: performance.now(), dur: this.CLIPS[kind], burst: false, hex: col.getHex() };
+                if (vmAnim.clip && vmAnim.clip.kind === 'inspect') vmAnim.finishClip(game.weapons[game.activeWeapon]);
+            },
+
+            // Hand pose and energy for clip progress p; returns how far the gun is moved aside (0-1)
+            _pose: function (kind, p, now) {
+                const R = this.REST;
+                let up, push, charge, flare, tremble = 0;
+                if (kind === 'tap') {
+                    up = _seg(p, 0, 0.3, _ease.out) * (1 - _seg(p, 0.6, 1));
+                    push = _bump(p, 0.42, 0.18);
+                    charge = 0.35 * up;
+                    flare = _bump(p, 0.45, 0.16);
+                } else if (kind === 'ult') {
+                    up = _seg(p, 0, 0.2, _ease.out) * (1 - _seg(p, 0.82, 1));
+                    charge = _seg(p, 0.12, 0.62);
+                    tremble = charge * (1 - _seg(p, 0.64, 0.68));
+                    push = _bump(p, 0.7, 0.08);
+                    flare = _bump(p, 0.7, 0.12) * 1.8;
+                } else {
+                    up = _seg(p, 0, 0.28, _ease.out) * (1 - _seg(p, 0.7, 1));
+                    charge = _seg(p, 0.15, 0.48);
+                    push = _bump(p, 0.56, 0.1);
+                    flare = _bump(p, 0.58, 0.12) * 1.2;
+                }
+                const hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                const tx = Math.sin(now * 0.09) * 0.0035 * tremble, ty = Math.cos(now * 0.11) * 0.0035 * tremble;
+                const x = (R.x + (-0.15 - R.x) * up + 0.03 * push) * hand + tx;
+                const y = R.y + (-0.215 - R.y) * up + 0.03 * push + ty;
+                const z = R.z + (-0.39 - R.z) * up - 0.17 * push;
+                const g = this.group;
+                g.visible = up > 0.01;
+                g.position.set(x, y, z);
+                g.scale.set(1.3 * hand, 1.3, 1.3);
+                // Palm cupped while rising, opening flat on the throw
+                g.rotation.set(-0.55 * (1 - up) + 0.25 * push, 0.25 * hand * (1 - push), 0.15 * hand * (1 - up));
+                // Energy in front of the palm
+                const fade = 1 - _seg(p, kind === 'ult' ? 0.78 : 0.68, kind === 'ult' ? 0.92 : 0.82);
+                const e = Math.min(1, charge + flare) * fade * (up > 0.01 ? 1 : 0);
+                const ox = x + 0.012 * hand, oy = y + 0.07, oz = z - 0.05 - 0.03 * push;
+                const pulse = 1 + 0.08 * Math.sin(now * 0.025);
+                const haloS = (0.08 + 0.17 * charge + 0.2 * flare) * pulse * (kind === 'ult' ? 1.45 : 1);
+                this.halo.visible = this.core.visible = e > 0.01;
+                this.halo.position.set(ox, oy, oz);
+                this.halo.scale.setScalar(haloS);
+                this.halo.rotation.z = now * 0.002;
+                this.core.position.set(ox, oy, oz - 0.002);
+                this.core.scale.setScalar(haloS * 0.4);
+                this.haloMat.opacity = Math.min(1, 1.1 * e);
+                this.coreMat.opacity = Math.min(1, 1.1 * e);
+                // Wisps spiral in while an ultimate gathers
+                const wispOn = kind === 'ult' ? charge * (1 - _seg(p, 0.66, 0.72)) : 0;
+                for (let i = 0; i < this.wisps.length; i++) {
+                    const w = this.wisps[i];
+                    w.visible = wispOn > 0.02;
+                    if (!w.visible) continue;
+                    const a = now * 0.006 + i * Math.PI * 2 / this.wisps.length;
+                    const r = 0.16 * (1 - 0.55 * wispOn);
+                    w.position.set(ox + Math.cos(a) * r, oy + Math.sin(a * 1.3) * r * 0.6, oz + Math.sin(a) * r * 0.4);
+                    w.scale.setScalar(0.05 + 0.04 * wispOn);
+                }
+                return up;
+            },
+
+            // Called from vmAnim.end every frame: poses the hand and moves the gun aside
+            apply: function (now, o, hand) {
+                const a = this.active;
+                if (!a) return;
+                const p = (now - a.start) / a.dur;
+                if (p >= 1 || p < 0) {
+                    this.active = null;
+                    this.hide();
+                    return;
+                }
+                const up = this._pose(a.kind, p, now);
+                // The ultimate's release shakes the view a little (Camera Shake setting applies)
+                if (a.kind === 'ult' && !a.burst && p >= 0.68) {
+                    a.burst = true;
+                    if (typeof fxKit !== 'undefined' && fxKit.enabled()) fxKit.shakeAt(camera.position.x, camera.position.y, camera.position.z, 0.35);
+                }
+                const ads = 1 - (game.adsProgress || 0) * 0.6;
+                const aside = up * (a.kind === 'ult' ? 1.5 : a.kind === 'tap' ? 0.55 : 1);
+                o.py += -0.09 * aside * ads;
+                o.px += 0.035 * aside * hand;
+                o.rz += -0.32 * aside * hand;
+                o.rx += -0.12 * aside;
+            }
+        };
+
         // Apply weapon sway based on mouse movement (scaled by viewmodelBob setting)
         function applyWeaponSway(moveX, moveY) {
             const weapon = game.weapons[game.activeWeapon];
@@ -12859,11 +13701,21 @@
             }
         }
         
-        // Weapon bobbing, Left/Right-Handed viewmodel placement, ADS interpolation & [Y] Weapon Inspect Flourish
+        // V1.7: base placement, then the viewmodel animator's offset on top
         function applyWeaponBobbing(time, isMoving) {
             const weapon = game.weapons[game.activeWeapon];
+            const model = weapon ? weapon.model : null;
+            if (!model) return;
+            vmAnim.begin(model);
+            applyWeaponBobbingBase(time, isMoving);
+            vmAnim.end(model, time);
+        }
+
+        // Weapon bobbing, Left/Right-Handed viewmodel placement and ADS interpolation
+        function applyWeaponBobbingBase(time, isMoving) {
+            const weapon = game.weapons[game.activeWeapon];
             const activeWeapon = weapon ? weapon.model : null;
-            if (!activeWeapon || game.reloading) return;
+            if (!activeWeapon) return;
 
             const adsP = game.adsProgress || 0;
             const hip = weapon.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
@@ -12873,24 +13725,7 @@
             const baseY = hip.y + (ads.y - hip.y) * adsP;
             const baseZ = hip.z + (ads.z - hip.z) * adsP;
 
-            // 3D Weapon Flourish / Inspect Animation ([Y] Key)
-            if (game.inspectUntil > time && !game.adsActive) {
-                const dur = Math.max(100, game.inspectUntil - game.inspectStartAt);
-                const p = Math.min(1, Math.max(0, (time - game.inspectStartAt) / dur));
-                const wave = Math.sin(p * Math.PI);
-                activeWeapon.position.x = THREE.MathUtils.lerp(activeWeapon.position.x, baseX - 0.11 * wave * handSign, 0.25);
-                activeWeapon.position.y = THREE.MathUtils.lerp(activeWeapon.position.y, baseY + 0.09 * wave, 0.25);
-                activeWeapon.position.z = THREE.MathUtils.lerp(activeWeapon.position.z, baseZ + 0.06 * wave, 0.25);
-                if (weapon.isMelee) {
-                    activeWeapon.rotation.x = p * Math.PI * 2;
-                    activeWeapon.rotation.z = Math.sin(p * Math.PI * 2) * 0.55;
-                } else {
-                    activeWeapon.rotation.x = 0.24 * Math.sin(p * Math.PI * 2); // muzzle tips up
-                    activeWeapon.rotation.z = 0.65 * Math.sin(p * Math.PI);
-                }
-                return;
-            }
-            
+            // ([Y] inspect is a vmAnim timeline now)
             // Bob intensity: reduced when aiming down sights, crouched, or lowered via Viewmodel Bob slider
             const bobUserScale = (game.userSettings && typeof game.userSettings.viewmodelBob === 'number')
                 ? (game.userSettings.viewmodelBob / 100)
@@ -13124,16 +13959,10 @@
             const weaponModel = selected.model;
             const hip = selected.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
             const handSign = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
-            weaponModel.position.set(hip.x * handSign, hip.y - 0.2, hip.z);
-            weaponModel.rotation.set(0.3, 0, selected.isMelee ? -0.35 : 0); // V1.7 fix: no PI base (see applyWeaponBobbing)
-            
-            setTimeout(() => {
-                if (game.activeWeapon === weaponName && !game.reloading) {
-                    weaponModel.position.y = hip.y;
-                    weaponModel.rotation.x = 0;
-                    weaponModel.rotation.z = 0;
-                }
-            }, 180);
+            weaponModel.position.set(hip.x * handSign, hip.y, hip.z);
+            weaponModel.rotation.set(0, 0, 0); // V1.7 fix: no PI base (see applyWeaponBobbing)
+            // V1.7: animated draw (raise, roll in, settle) on the viewmodel animator
+            vmAnim.switched();
             
             // Show notification
             const extraNote = selected.isMelee ? ' (+25% Move Speed)' : ((weaponName === 'sniper' && game.sniperVariant === 'marshal') ? ' (+12% Scout Speed)' : '');
@@ -13420,7 +14249,8 @@
             if (game.reloading || game.adsActive) return;
             const now = performance.now();
             game.inspectStartAt = now;
-            game.inspectUntil = now + 1150;
+            game.inspectUntil = now + 2400;
+            vmAnim.play('inspect', 2400);
             if (typeof soundFX !== 'undefined') {
                 soundFX.playTone(660, 990, 0.09, 'triangle', 0.06, 0);
                 soundFX.playTone(990, 1320, 0.12, 'sine', 0.05, 0.06);
@@ -20051,6 +20881,7 @@
                     game.ultChargesLeft--;
                     this.castOmenShroudedStep(now, true);
                     this.syncHud(now, true);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
@@ -20069,18 +20900,21 @@
                 // Yoru Gatecrash 2nd-Stage Activation: if a Rift Tether is active in the world, pressing [E] teleports Yoru to it immediately!
                 if (agentId === 'yoru' && slotKey === 'e' && this.yoruTether && this.yoruTether.active && now < this.yoruTether.expireAt) {
                     this.triggerYoruGatecrashTeleport(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Chamber Rendezvous 2nd-Stage Activation: if a Golden Anchor is active in the world, pressing [E] snaps Chamber back to it!
                 if (agentId === 'chamber' && slotKey === 'e' && this.chamberAnchor && this.chamberAnchor.active && now < this.chamberAnchor.expireAt) {
                     this.triggerChamberRendezvousTeleport(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Skye Guiding Light 2nd-Stage Activation: if an Emerald Hawk is in flight, pressing [E] detonates its Flash immediately!
                 if (agentId === 'skye' && slotKey === 'e' && this.hasActiveSkyeHawk(now)) {
                     this.triggerSkyeHawkFlash(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
@@ -20090,6 +20924,7 @@
                     _abilityRay.origin.copy(camera.position);
                     _abilityRay.direction.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                     if (this.checkShootIsoOrb(_abilityRay, now, 1.45)) {
+                        castFX.start('tap', def.themeColor);
                         return;
                     }
                 }
@@ -20097,36 +20932,42 @@
                 // Gekko Thrash Early Lunge-Detonate: pressing [X] while Thrash is steering triggers immediate 7.5m Detain burst!
                 if (slotKey === 'x' && this.gekkoThrash && this.gekkoThrash.active) {
                     this.detonateGekkoThrash(now, Date.now());
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Harbor Cascade 2nd-Stage Anchor: pressing [C] while a Cascade tidal wave is advancing stops it in place!
                 if (agentId === 'harbor' && slotKey === 'c' && this.hasMovingHarborCascade(now)) {
                     this.stopHarborCascade(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Vyse Arc Rose 2nd-Stage Detonate: pressing [Q] while an Arc Rose is planted triggers its 22m metallic flash!
                 if (agentId === 'vyse' && slotKey === 'q' && this.hasActiveVyseArcRose(now)) {
                     this.detonateVyseArcRose(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Tejo Stealth Drone 2nd-Stage EMP Pulse: pressing [C] while Stealth Drone is flying triggers its 11m EMP Suppress & Scan!
                 if (agentId === 'tejo' && slotKey === 'c' && this.hasActiveTejoDrone(now)) {
                     this.detonateTejoDronePulse(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Waylay Refract 2nd-Stage Return: pressing [E] while a Crystal Beacon is active zips Waylay back in invulnerable light!
                 if (agentId === 'waylay' && slotKey === 'e' && this.hasActiveWaylayRefract(now)) {
                     this.triggerWaylayRefractReturn(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
                 // Veto Crosscut 2nd-Stage Teleport: pressing [C] while a Vortex Anchor is active teleports Veto to it!
                 if (agentId === 'veto' && slotKey === 'c' && this.hasActiveVetoCrosscut(now)) {
                     this.triggerVetoCrosscutTeleport(now);
+                    castFX.start('tap', def.themeColor);
                     return;
                 }
 
@@ -20144,6 +20985,8 @@
                 }
 
                 if (!this.consumeCharge(slotKey, now)) return;
+                // V1.7: off-hand cast gesture in the agent's colour
+                castFX.start('cast', def.themeColor);
 
                 if (agentId === 'jett') {
                     if (slotKey === 'e') this.castJettTailwind(now);
@@ -23878,6 +24721,7 @@
             // --- X: Ultimates (Jett Blade Storm, Phoenix Run It Back, Sova Hunter's Fury, Sage Resurrection, Reyna Empress, Omen From the Shadows, Raze Showstopper, Killjoy Lockdown, Cypher Neural Theft, Brimstone Orbital Strike) ---
             activateUltimate: function(agentId, now) {
                 const def = AGENT_DEFS[agentId];
+                castFX.start('ult', def.themeColor);
                 game.ultPoints = 0;
                 game.ultAgent = agentId;
                 game.ultActiveUntil = now + def.abilities.x.durationMs;
@@ -24812,6 +25656,7 @@
                 item.mesh.position.set(x, y, z);
                 item.mesh.scale.set(0.4, 0.4, 0.4);
                 item.mesh.visible = true;
+                fxKit.ring(x, y, z, colorHex, Math.min(6, maxScale || 1));   // V1.7 dust + sparks
             },
 
             spawnSmokeSphere: function(x, y, z, colorHex, radius, durationMs, now) {
@@ -24821,6 +25666,7 @@
                 }
                 item.inUse = true;
                 item.position.set(x, Math.max(radius * 0.65, y), z);
+                fxKit.smokeCloud(x, item.position.y, z, colorHex, radius);   // V1.7 rolling puffs
                 item.radius = radius;
                 item.startAt = now;
                 item.expireAt = now + durationMs;
@@ -24860,8 +25706,9 @@
                     item.outerMat.emissive.setHex(0x7c2d12).convertSRGBToLinear();
                     item.innerMat.color.setHex(0xfde68a).convertSRGBToLinear();
                 } else {
-                    item.outerMat.color.setHex(colorHex === 0x57a8ff ? 0x6ea8e6 : 0x7fd4e6).convertSRGBToLinear();
-                    item.outerMat.emissive.setHex(0x164e63).convertSRGBToLinear();
+                    // V1.7: a greyer, dimmer cyan so the smoke reads as smoke, not a lamp
+                    item.outerMat.color.setHex(colorHex === 0x57a8ff ? 0x5d8fc4 : 0x63a8b8).convertSRGBToLinear();
+                    item.outerMat.emissive.setHex(0x0c3542).convertSRGBToLinear();
                     item.innerMat.color.setHex(0xcffafe).convertSRGBToLinear();
                 }
                 item.ringMat.color.setHex(colorHex).convertSRGBToLinear();
@@ -24925,6 +25772,7 @@
                 item.mesh.position.copy(item.position);
                 item.mesh.scale.set(0.3, 0.3, 0.3);
                 item.mesh.visible = true;
+                fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
             },
 
             spawnReconBeacon: function(x, y, z, now) {
@@ -28088,8 +28936,11 @@
                     s.outerMesh.rotation.y = time * 0.0008;
                     s.innerMesh.rotation.y = -time * 0.0014;
                     s.outerMat.opacity = 0.56 * fade;
-                    s.innerMat.opacity = 0.26 * fade;
+                    // V1.7: dimmer additive core (it read as a glowing ball, worse with bloom);
+                    // rolling puffs over the surface give the sphere a smoky edge
+                    s.innerMat.opacity = 0.12 * fade;
                     s.ringMat.opacity = 0.72 * fade;
+                    if (grow >= 1) fxKit.smokeShell(s.position.x, s.position.y, s.position.z, s.outerMat.color, s.radius, Math.min(0.05, delta || 0.016), fade);
 
                     if (characterController.position.distanceToSquared(s.position) <= (s.radius * 0.95) * (s.radius * 0.95)) {
                         playerInSmoke = true;
@@ -28122,6 +28973,9 @@
                     m.crownMat.opacity = 0.36 * pulse * fade;
                     m.crownMesh.scale.y = 0.75 + 0.35 * Math.sin(time * 0.018);
                     m.ringMesh.rotation.z = time * 0.002;
+                    // V1.7 embers and drifting smoke over fire / acid zones
+                    fxKit.embers(m.position.x, m.position.y, m.position.z,
+                        m.isSnakeBite ? 0x22c55e : (m.isNanoswarm ? 0xfacc15 : (m.isIncendiary ? 0xef4444 : 0xff7b00)), m.radius * fade, Math.min(0.05, delta || 0.016));
                 }
                 for (let i = 0; i < this.slowZones.length; i++) {
                     const sz = this.slowZones[i];
@@ -28145,7 +28999,9 @@
                     const p = (now - f.startAt) / (f.expireAt - f.startAt);
                     const s = 0.3 + (f.maxRadius - 0.3) * Math.sin(p * Math.PI * 0.5);
                     f.mesh.scale.set(s, s, s);
-                    f.mat.opacity = 0.9 * (1 - p);
+                    // V1.7: with the effects kit's fireball and sparks this becomes a
+                    // thin, quickly fading shock shell instead of a full-screen dome
+                    f.mat.opacity = fxKit.enabled() ? 0.32 * (1 - p) * (1 - p) : 0.9 * (1 - p);
                 }
 
                 // 6. Animate Sova Recon Sonar Spheres
@@ -33018,35 +33874,11 @@
 
                 soundFX.knifeSlash(isHeavy);
 
-                // Animate 3D Knife Viewmodel (Fast Diagonal Slash vs Heavy Forward Lunge Stab)
-                const knifeModel = weapon.model;
-                const hip = weapon.hipPos || { x: 0.26, y: -0.26, z: -0.46 };
-                if (knifeModel) {
-                    if (isHeavy) {
-                        knifeModel.position.set(hip.x - 0.14, hip.y + 0.05, hip.z - 0.42);
-                        knifeModel.rotation.set(-0.38, 0.18, 0.55);
-                        setTimeout(() => {
-                            if (game.activeWeapon === 'knife') {
-                                knifeModel.position.set(hip.x, hip.y, hip.z);
-                                knifeModel.rotation.set(0, 0, 0);
-                            }
-                        }, 260);
-                    } else {
-                        knifeModel.position.set(hip.x - 0.28, hip.y + 0.06, hip.z - 0.24);
-                        knifeModel.rotation.set(-0.18, 0.35, 0.78);
-                        setTimeout(() => {
-                            if (game.activeWeapon === 'knife') {
-                                knifeModel.position.set(hip.x + 0.08, hip.y - 0.04, hip.z);
-                                knifeModel.rotation.set(0.1, -0.15, -0.35);
-                                setTimeout(() => {
-                                    if (game.activeWeapon === 'knife') {
-                                        knifeModel.position.set(hip.x, hip.y, hip.z);
-                                        knifeModel.rotation.set(0, 0, 0);
-                                    }
-                                }, 120);
-                            }
-                        }, 110);
-                    }
+                // V1.7: knife slash (alternating sides) and lunge stab on the viewmodel animator
+                if (isHeavy) vmAnim.play('stab', 460);
+                else {
+                    vmAnim.slashSide = -(vmAnim.slashSide || -1);
+                    vmAnim.play('slash', 340);
                 }
 
                 // Melee reach & cone check
@@ -33291,15 +34123,13 @@
                         if (weapon.muzzleFlash) weapon.muzzleFlash.material.opacity = 0;
                         if (weapon.muzzleHalo) weapon.muzzleHalo.visible = false;
                     }, 50);
+                    muzzleStar.flash(game.activeWeapon, !!weapon.stealthTracers);
                 }
 
-                // Animate Sheriff Pistol reciprocating top slide on shot
-                if (game.activeWeapon === 'pistol' && weapon.slide) {
-                    weapon.slide.position.z = 0.05;
-                    setTimeout(() => {
-                        if (weapon.slide) weapon.slide.position.z = -0.08;
-                    }, 85);
-                }
+                // V1.7: brass out of the ejection port (the Operator ejects when the bolt cycles).
+                // The pistol slide kick is driven by vmAnim (it used to end 9 cm forward of rest).
+                if (game.activeWeapon === 'sniper') setTimeout(() => shellFX.eject(), 380);
+                else shellFX.eject();
 
                 // Apply viewmodel recoil & progressive camera spray kick (Crouching reduces recoil by 25%)
                 const adsProgress = game.adsProgress || 0;
@@ -33310,17 +34140,8 @@
                 const recoilScale = adsRecoilMult * crouchRecoilMult * ultRecoilScale * (isPistolBurst ? 1.35 : (isBulldogBurst ? 1.15 : 1.0));
 
                 const recoilAmount = weapon.recoil * recoilScale * (Math.random() * 0.4 + 0.8);
-                const hip = weapon.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
-                const ads = weapon.adsPos || hip;
-                const restY = hip.y + (ads.y - hip.y) * adsProgress;
-                weapon.model.rotation.x = recoilAmount; // muzzle kicks up (barrel is -Z)
-                weapon.model.position.y = restY - recoilAmount * 3.5;
-
-                setTimeout(() => {
-                    if (!game.reloading && game.weapons[game.activeWeapon] === weapon) {
-                        weapon.model.rotation.x = 0;
-                    }
-                }, 160);
+                // V1.7: the gun kicks back, rises and rolls on a damped spring (vmAnim)
+                vmAnim.fire(recoilAmount);
 
                 // Progressive vertical climb + horizontal sway spray pattern on camera look
                 const sprayIdx = game.sprayShotCount;
@@ -33898,23 +34719,9 @@
                 game.reloading = true;
                 soundFX.knifeSlash(false);
                 showNotification("Tactical Knife Inspect Flourish", 1000);
-                const knifeModel = weapon.model;
-                const t0 = performance.now();
-                const spinInterval = setInterval(() => {
-                    const p = Math.min(1, (performance.now() - t0) / 480);
-                    if (knifeModel) {
-                        knifeModel.rotation.x = p * Math.PI * 2;
-                        knifeModel.rotation.z = Math.sin(p * Math.PI) * 0.45;
-                    }
-                    if (p >= 1) {
-                        clearInterval(spinInterval);
-                        if (knifeModel) {
-                            knifeModel.rotation.x = 0;
-                            knifeModel.rotation.z = 0;
-                        }
-                        game.reloading = false;
-                    }
-                }, 16);
+                // V1.7: the knuckle flip runs on the viewmodel animator
+                vmAnim.play('inspect', 560);
+                setTimeout(() => { game.reloading = false; }, 560);
                 return;
             }
             
@@ -33942,70 +34749,10 @@
             // Show notification
             showNotification(`Reloading ${weapon.name}...`);
             
-            // Reload animation
-            const weaponModel = weapon.model;
-            const hip = weapon.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
-            
-            // Different reload animations depending on weapon
-            if (game.activeWeapon === 'rifle') {
-                weaponModel.position.y = -0.1;
-                weaponModel.rotation.x = -0.3;
-                weaponModel.rotation.z = 0.5;
-                
-                setTimeout(() => {
-                    const magazine = weaponModel.children.find(c => c.position.y === -0.12 && c.position.z === 0.1);
-                    if (magazine) {
-                        magazine.position.y = -0.4;
-                    }
-                    
-                    setTimeout(() => {
-                        if (magazine) {
-                            magazine.position.y = -0.12;
-                        }
-                        
-                        setTimeout(() => {
-                            weaponModel.position.set(hip.x, hip.y, hip.z);
-                            weaponModel.rotation.x = 0;
-                            weaponModel.rotation.z = 0;
-                        }, weapon.reloadTime * 1000 * 0.3);
-                    }, weapon.reloadTime * 1000 * 0.4);
-                }, weapon.reloadTime * 1000 * 0.2);
-            } else if (game.activeWeapon === 'sniper') {
-                weaponModel.position.y = -0.1;
-                
-                setTimeout(() => {
-                    weaponModel.rotation.z = 0.2;
-                    
-                    setTimeout(() => {
-                        weaponModel.rotation.z = -0.2;
-                        
-                        setTimeout(() => {
-                            weaponModel.position.set(hip.x, hip.y, hip.z);
-                            weaponModel.rotation.z = 0;
-                        }, weapon.reloadTime * 1000 * 0.3);
-                    }, weapon.reloadTime * 1000 * 0.4);
-                }, weapon.reloadTime * 1000 * 0.2);
-            } else if (game.activeWeapon === 'pistol') {
-                // Sheriff Sidearm reload animation: drop magazine, insert fresh mag, rack top slide
-                weaponModel.position.y = -0.14;
-                weaponModel.rotation.x = -0.24;
-                weaponModel.rotation.z = 0.38;
-                if (weapon.slide) weapon.slide.position.z = 0.04;
-
-                setTimeout(() => {
-                    if (weapon.magazine) weapon.magazine.position.y = -0.32;
-                    setTimeout(() => {
-                        if (weapon.magazine) weapon.magazine.position.y = -0.10;
-                        if (weapon.slide) weapon.slide.position.z = -0.08;
-                        soundFX.ads(true, false);
-                        setTimeout(() => {
-                            weaponModel.position.set(hip.x, hip.y, hip.z);
-                            weaponModel.rotation.x = 0;
-                            weaponModel.rotation.z = 0;
-                        }, weapon.reloadTime * 1000 * 0.28);
-                    }, weapon.reloadTime * 1000 * 0.42);
-                }, weapon.reloadTime * 1000 * 0.2);
-            }
+            // V1.7: reload choreography (tilt, magazine out and in, slide/bolt/charging
+            // handle) is a smooth timeline on the viewmodel animator
+            vmAnim.play('reload', weapon.reloadTime * 1000);
+            if (game.activeWeapon === 'sniper') setTimeout(() => { if (game.activeWeapon === 'sniper') shellFX.eject(); }, weapon.reloadTime * 780);
             
             // Complete reload after specified time
             setTimeout(() => {
@@ -34662,6 +35409,361 @@
         // a ~80 ms stall the first time a decal appeared. The effects are drawn
         // in front of the camera inside one task, so the warm-up frames are never
         // presented.
+        // =============================================
+        // V1.7 Cinematic post-processing (quality level above Ultra)
+        // =============================================
+        // When on, the world renders into rtWorld (colour + depth texture) instead
+        // of the screen. rtWorld's texture is tagged sRGB, which is the renderer's
+        // own output encoding, so every material keeps its existing program: no
+        // shader variant is added for rendering off-screen. Then, all in
+        // display-referred space:
+        //   1. Ambient occlusion (half res): hemisphere samples against the depth
+        //      buffer, blurred, multiplied into the world.
+        //   2. The viewmodel is drawn on top (its own cleared depth), so the gun
+        //      gets bloom and grading but no world AO.
+        //   3. Bloom: bright pass, then a 4-level blurred mip chain.
+        //   4. Sun shafts: radial blur toward the sun's screen position from the
+        //      sky pixels (quarter res).
+        //   5. Composite to the screen: FXAA, bloom, shafts, colour grade per
+        //      atmosphere, light vignette, edge chromatic aberration, film grain.
+        // All pass shaders are compiled in the warm-up (postFX.warm), so switching
+        // to Cinematic never stalls on a compile.
+        const postFX = {
+            enabled: false,
+            ready: false,
+            w: 0, h: 0,
+            rt: {},
+            mats: {},
+            quad: null,
+            scene: null,
+            cam: null,
+            _size: new THREE.Vector2(),
+            _sun: new THREE.Vector3(),
+            _sunDir: new THREE.Vector3(),
+            frame: 0,
+
+            init: function () {
+                if (this.ready) return;
+                this.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+                this.scene = new THREE.Scene();
+                this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
+                this.quad.frustumCulled = false;
+                this.scene.add(this.quad);
+                const mk = (opts) => {
+                    const t = new THREE.WebGLRenderTarget(4, 4, Object.assign({
+                        minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+                        format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false
+                    }, opts || {}));
+                    t.texture.generateMipmaps = false;
+                    return t;
+                };
+                this.rt.world = mk({ depthBuffer: true });
+                this.rt.world.texture.encoding = THREE.sRGBEncoding; // same programs as the screen
+                this.rt.world.depthTexture = new THREE.DepthTexture(4, 4);
+                this.rt.world.depthTexture.type = THREE.UnsignedIntType;
+                this.rt.view = mk({ depthBuffer: true });
+                this.rt.view.texture.encoding = THREE.sRGBEncoding;
+                this.rt.ao = mk();
+                this.rt.aoBlur = mk();
+                this.rt.bloom = [mk(), mk(), mk(), mk()];
+                this.rt.bloomTmp = [mk(), mk(), mk(), mk()];
+                this.rt.rays = mk();
+
+                const vs = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+                const sm = (fs, uniforms) => new THREE.ShaderMaterial({
+                    vertexShader: vs, fragmentShader: fs, uniforms: uniforms,
+                    depthTest: false, depthWrite: false, toneMapped: false
+                });
+                const depthFns = `
+                    uniform float uNear; uniform float uFar; uniform vec2 uTanHalf;
+                    float viewZ(float d) { return (uNear * uFar) / ((uFar - uNear) * d - uFar); }
+                    vec3 viewPos(vec2 uv, float d) { float z = viewZ(d); return vec3((uv * 2.0 - 1.0) * uTanHalf * -z, z); }`;
+                // 1. Ambient occlusion
+                const kernel = [];
+                for (let i = 0; i < 12; i++) {
+                    const a = i * 2.39996, r = Math.sqrt((i + 0.5) / 12);
+                    kernel.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0.25 + 0.75 * ((i * 7) % 12) / 12));
+                }
+                this.mats.ao = sm(`
+                    varying vec2 vUv; uniform sampler2D tDepth; uniform vec2 uTexel; uniform float uRadius; uniform float uStrength;
+                    uniform vec3 uKernel[12]; uniform mat4 uProj;
+                    ${depthFns}
+                    float h12(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+                    void main() {
+                        float d = texture2D(tDepth, vUv).x;
+                        if (d >= 0.9999) { gl_FragColor = vec4(1.0); return; }
+                        vec3 P = viewPos(vUv, d);
+                        vec3 Px = viewPos(vUv + vec2(uTexel.x, 0.0), texture2D(tDepth, vUv + vec2(uTexel.x, 0.0)).x);
+                        vec3 Py = viewPos(vUv + vec2(0.0, uTexel.y), texture2D(tDepth, vUv + vec2(0.0, uTexel.y)).x);
+                        vec3 N = normalize(cross(Px - P, Py - P));
+                        // Face the camera. (Not N.z: a level floor seen head-on has N.z ~ 0.)
+                        if (dot(N, P) > 0.0) N = -N;
+                        float ang = h12(gl_FragCoord.xy) * 6.2832;
+                        vec3 T = normalize(vec3(cos(ang), sin(ang), 0.0) - N * dot(vec3(cos(ang), sin(ang), 0.0), N));
+                        vec3 B = cross(N, T);
+                        float occ = 0.0;
+                        for (int i = 0; i < 12; i++) {
+                            vec3 k = uKernel[i];
+                            vec3 S = P + (T * k.x + B * k.y + N * k.z) * uRadius;
+                            vec4 c = uProj * vec4(S, 1.0);
+                            vec2 suv = c.xy / c.w * 0.5 + 0.5;
+                            if (suv.x < 0.0 || suv.y < 0.0 || suv.x > 1.0 || suv.y > 1.0) continue;
+                            float sz = viewZ(texture2D(tDepth, suv).x);
+                            float range = smoothstep(0.0, 1.0, uRadius / max(0.001, abs(P.z - sz)));
+                            occ += (sz >= S.z + 0.03 ? 1.0 : 0.0) * range;
+                        }
+                        float ao = 1.0 - occ / 12.0 * uStrength;
+                        // Fade AO out with distance so far walls stay clean
+                        ao = mix(ao, 1.0, smoothstep(30.0, 70.0, -P.z));
+                        gl_FragColor = vec4(vec3(clamp(ao, 0.0, 1.0)), 1.0);
+                    }`, {
+                    tDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uRadius: { value: 0.7 }, uStrength: { value: 1.25 },
+                    uKernel: { value: kernel }, uProj: { value: new THREE.Matrix4() },
+                    uNear: { value: 0.1 }, uFar: { value: 1000 }, uTanHalf: { value: new THREE.Vector2(1, 1) }
+                });
+                this.mats.blur4 = sm(`
+                    varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uTexel;
+                    void main() {
+                        vec4 s = vec4(0.0);
+                        for (int y = -1; y <= 2; y++) for (int x = -1; x <= 2; x++) s += texture2D(tSrc, vUv + (vec2(float(x), float(y)) - 0.5) * uTexel);
+                        gl_FragColor = s / 16.0;
+                    }`, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } });
+                // 2. World x AO into the view target
+                this.mats.applyAO = sm(`
+                    varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tAO; uniform float uAO;
+                    void main() {
+                        vec4 c = texture2D(tColor, vUv);
+                        float ao = mix(1.0, texture2D(tAO, vUv).r, uAO);
+                        gl_FragColor = vec4(c.rgb * ao, 1.0);
+                    }`, { tColor: { value: null }, tAO: { value: null }, uAO: { value: 1 } });
+                // 3. Bloom
+                this.mats.bright = sm(`
+                    varying vec2 vUv; uniform sampler2D tSrc; uniform float uThreshold; uniform vec2 uTexel;
+                    void main() {
+                        vec3 c = vec3(0.0);
+                        c += texture2D(tSrc, vUv + vec2(-0.5, -0.5) * uTexel).rgb;
+                        c += texture2D(tSrc, vUv + vec2( 0.5, -0.5) * uTexel).rgb;
+                        c += texture2D(tSrc, vUv + vec2(-0.5,  0.5) * uTexel).rgb;
+                        c += texture2D(tSrc, vUv + vec2( 0.5,  0.5) * uTexel).rgb;
+                        c *= 0.25;
+                        // Luminance, so saturated but mid-bright colours (a pink gun skin) do not glow
+                        float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+                        float k = smoothstep(uThreshold, uThreshold + 0.2, l);
+                        gl_FragColor = vec4(c * k, 1.0);
+                    }`, { tSrc: { value: null }, uThreshold: { value: 0.74 }, uTexel: { value: new THREE.Vector2() } });
+                this.mats.blurDir = sm(`
+                    varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uDir;
+                    void main() {
+                        vec3 c = texture2D(tSrc, vUv).rgb * 0.227;
+                        c += (texture2D(tSrc, vUv + uDir * 1.385).rgb + texture2D(tSrc, vUv - uDir * 1.385).rgb) * 0.316;
+                        c += (texture2D(tSrc, vUv + uDir * 3.231).rgb + texture2D(tSrc, vUv - uDir * 3.231).rgb) * 0.070;
+                        gl_FragColor = vec4(c, 1.0);
+                    }`, { tSrc: { value: null }, uDir: { value: new THREE.Vector2() } });
+                // 4. Sun shafts
+                this.mats.rays = sm(`
+                    varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 uSun; uniform float uStrength; uniform float uAspect;
+                    void main() {
+                        vec2 dir = (uSun - vUv) / 24.0;
+                        vec2 uv = vUv;
+                        float decay = 1.0, sum = 0.0;
+                        for (int i = 0; i < 24; i++) {
+                            // Light source: open sky, strongest round the sun itself
+                            float sky = step(0.9999, texture2D(tDepth, uv).x);
+                            vec2 ds = (uv - uSun) * vec2(uAspect, 1.0);
+                            float glow = exp(-dot(ds, ds) * 9.0);
+                            float lum = dot(texture2D(tColor, uv).rgb, vec3(0.3, 0.55, 0.15));
+                            sum += sky * (glow * 1.6 + lum * 0.25) * decay;
+                            decay *= 0.94;
+                            uv += dir;
+                        }
+                        gl_FragColor = vec4(vec3(sum / 24.0 * uStrength), 1.0);
+                    }`, { tColor: { value: null }, tDepth: { value: null }, uSun: { value: new THREE.Vector2(0.5, 0.5) }, uStrength: { value: 0 }, uAspect: { value: 1 } });
+                // 5. Composite
+                this.mats.composite = sm(`
+                    varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tB0; uniform sampler2D tB1; uniform sampler2D tB2; uniform sampler2D tB3;
+                    uniform sampler2D tRays; uniform vec2 uTexel; uniform float uBloom; uniform vec3 uRayTint; uniform float uTime;
+                    uniform float uContrast; uniform float uSaturation; uniform vec3 uShadowTint; uniform vec3 uHighTint;
+                    uniform float uVignette; uniform float uGrain; uniform float uCA;
+                    vec3 fxaa(vec2 uv) {
+                        vec3 rgbM = texture2D(tColor, uv).rgb;
+                        vec3 rgbNW = texture2D(tColor, uv + vec2(-1.0, -1.0) * uTexel).rgb;
+                        vec3 rgbNE = texture2D(tColor, uv + vec2( 1.0, -1.0) * uTexel).rgb;
+                        vec3 rgbSW = texture2D(tColor, uv + vec2(-1.0,  1.0) * uTexel).rgb;
+                        vec3 rgbSE = texture2D(tColor, uv + vec2( 1.0,  1.0) * uTexel).rgb;
+                        vec3 L = vec3(0.299, 0.587, 0.114);
+                        float lNW = dot(rgbNW, L), lNE = dot(rgbNE, L), lSW = dot(rgbSW, L), lSE = dot(rgbSE, L), lM = dot(rgbM, L);
+                        float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));
+                        float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
+                        if (lMax - lMin < max(0.0312, lMax * 0.125)) return rgbM;
+                        vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), ((lNW + lSW) - (lNE + lSE)));
+                        float red = max((lNW + lNE + lSW + lSE) * 0.03125, 0.0078125);
+                        float rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + red);
+                        dir = clamp(dir * rcp, -8.0, 8.0) * uTexel;
+                        vec3 a = 0.5 * (texture2D(tColor, uv + dir * (1.0 / 3.0 - 0.5)).rgb + texture2D(tColor, uv + dir * (2.0 / 3.0 - 0.5)).rgb);
+                        vec3 b = a * 0.5 + 0.25 * (texture2D(tColor, uv - dir * 0.5).rgb + texture2D(tColor, uv + dir * 0.5).rgb);
+                        float lB = dot(b, L);
+                        return (lB < lMin || lB > lMax) ? a : b;
+                    }
+                    float h12(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+                    void main() {
+                        vec2 c = vUv - 0.5;
+                        float r2 = dot(c, c);
+                        vec3 col = fxaa(vUv);
+                        // Slight colour fringing toward the corners only
+                        if (uCA > 0.0) {
+                            vec2 off = c * r2 * uCA * 0.02;
+                            col.r = mix(col.r, texture2D(tColor, vUv - off).r, 0.7);
+                            col.b = mix(col.b, texture2D(tColor, vUv + off).b, 0.7);
+                        }
+                        vec3 bloom = texture2D(tB0, vUv).rgb * 0.42 + texture2D(tB1, vUv).rgb * 0.3 + texture2D(tB2, vUv).rgb * 0.2 + texture2D(tB3, vUv).rgb * 0.18;
+                        col += bloom * uBloom;
+                        col += texture2D(tRays, vUv).rgb * uRayTint;
+                        // Grade: contrast around mid-grey, saturation, split tone
+                        float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+                        col = mix(vec3(l), col, uSaturation);
+                        col = (col - 0.5) * uContrast + 0.5;
+                        col *= mix(uShadowTint, uHighTint, smoothstep(0.1, 0.8, l));
+                        col *= 1.0 - uVignette * smoothstep(0.18, 0.75, r2 * 1.6);
+                        col += (h12(vUv * 913.0 + uTime) - 0.5) * uGrain;
+                        gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+                    }`, {
+                    tColor: { value: null }, tB0: { value: null }, tB1: { value: null }, tB2: { value: null }, tB3: { value: null },
+                    tRays: { value: null }, uTexel: { value: new THREE.Vector2() }, uBloom: { value: 0.75 }, uRayTint: { value: new THREE.Color(1, 0.92, 0.75) },
+                    uTime: { value: 0 }, uContrast: { value: 1.06 }, uSaturation: { value: 1.08 },
+                    uShadowTint: { value: new THREE.Vector3(0.97, 0.99, 1.04) }, uHighTint: { value: new THREE.Vector3(1.03, 1.0, 0.96) },
+                    uVignette: { value: 0.22 }, uGrain: { value: 0.025 }, uCA: { value: 1.0 }
+                });
+                this.ready = true;
+            },
+
+            resize: function () {
+                renderer.getDrawingBufferSize(this._size);
+                const w = Math.max(4, this._size.x | 0), h = Math.max(4, this._size.y | 0);
+                if (w === this.w && h === this.h) return;
+                this.w = w; this.h = h;
+                this.rt.world.setSize(w, h);
+                this.rt.view.setSize(w, h);
+                const hw = Math.max(2, w >> 1), hh = Math.max(2, h >> 1);
+                this.rt.ao.setSize(hw, hh);
+                this.rt.aoBlur.setSize(hw, hh);
+                for (let i = 0; i < 4; i++) {
+                    const s = 1 << (i + 1);
+                    this.rt.bloom[i].setSize(Math.max(2, (w / s) | 0), Math.max(2, (h / s) | 0));
+                    this.rt.bloomTmp[i].setSize(Math.max(2, (w / s) | 0), Math.max(2, (h / s) | 0));
+                }
+                this.rt.rays.setSize(Math.max(2, w >> 2), Math.max(2, h >> 2));
+            },
+
+            _pass: function (mat, target) {
+                this.quad.material = mat;
+                renderer.setRenderTarget(target);
+                renderer.render(this.scene, this.cam);
+            },
+
+            // Per-atmosphere grade: daylight warm and punchy, competitive clean, night cool
+            _grade: function () {
+                const m = (game.userSettings && game.userSettings.atmosphereMode) || 'daylight';
+                const u = this.mats.composite.uniforms;
+                if (m === 'night') {
+                    u.uContrast.value = 1.1; u.uSaturation.value = 0.95;
+                    u.uShadowTint.value.set(0.92, 0.98, 1.1); u.uHighTint.value.set(1.0, 1.0, 1.02);
+                } else if (m === 'competitive') {
+                    u.uContrast.value = 1.04; u.uSaturation.value = 1.04;
+                    u.uShadowTint.value.set(0.99, 1.0, 1.02); u.uHighTint.value.set(1.01, 1.0, 0.99);
+                } else {
+                    u.uContrast.value = 1.07; u.uSaturation.value = 1.1;
+                    u.uShadowTint.value.set(0.96, 0.99, 1.05); u.uHighTint.value.set(1.04, 1.0, 0.95);
+                }
+                u.uCA.value = (game.userSettings && game.userSettings.reduceFlashes) ? 0 : 1;
+            },
+
+            // Replaces the plain "world, clear depth, viewmodel" draw when enabled
+            render: function (now) {
+                this.resize();
+                const R = this.rt, M = this.mats;
+                // World
+                renderer.setRenderTarget(R.world);
+                renderer.setClearColor(scene.background, 1);
+                renderer.clear();
+                renderer.render(scene, camera);
+                // AO (half res) from the world's depth
+                const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5);
+                const ao = M.ao.uniforms;
+                ao.tDepth.value = R.world.depthTexture;
+                ao.uTexel.value.set(1 / R.ao.width, 1 / R.ao.height);
+                ao.uProj.value.copy(camera.projectionMatrix);
+                ao.uNear.value = camera.near; ao.uFar.value = camera.far;
+                ao.uTanHalf.value.set(tanY * camera.aspect, tanY);
+                this._pass(M.ao, R.ao);
+                M.blur4.uniforms.tSrc.value = R.ao.texture;
+                M.blur4.uniforms.uTexel.value.set(1 / R.ao.width, 1 / R.ao.height);
+                this._pass(M.blur4, R.aoBlur);
+                // World x AO, then the viewmodel on top
+                M.applyAO.uniforms.tColor.value = R.world.texture;
+                M.applyAO.uniforms.tAO.value = R.aoBlur.texture;
+                renderer.setRenderTarget(R.view);
+                renderer.clear();
+                this._pass(M.applyAO, R.view);
+                renderer.clearDepth();
+                viewmodelScene.environment = scene.environment;
+                syncViewmodelCamera();
+                renderer.render(viewmodelScene, viewmodelCamera);
+                // Bloom chain
+                let src = R.view.texture, sw = this.w, sh = this.h;
+                for (let i = 0; i < 4; i++) {
+                    const dst = R.bloom[i], tmp = R.bloomTmp[i];
+                    if (i === 0) {
+                        M.bright.uniforms.tSrc.value = src;
+                        M.bright.uniforms.uTexel.value.set(1 / sw, 1 / sh);
+                        this._pass(M.bright, dst);
+                    } else {
+                        M.blur4.uniforms.tSrc.value = src;
+                        M.blur4.uniforms.uTexel.value.set(1 / sw, 1 / sh);
+                        this._pass(M.blur4, dst);
+                    }
+                    M.blurDir.uniforms.tSrc.value = dst.texture;
+                    M.blurDir.uniforms.uDir.value.set(1 / dst.width, 0);
+                    this._pass(M.blurDir, tmp);
+                    M.blurDir.uniforms.tSrc.value = tmp.texture;
+                    M.blurDir.uniforms.uDir.value.set(0, 1 / dst.height);
+                    this._pass(M.blurDir, dst);
+                    src = dst.texture; sw = dst.width; sh = dst.height;
+                }
+                // Sun shafts: sun direction to screen
+                const ru = M.rays.uniforms;
+                const sunDir = this._sunDir.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
+                const sp = this._sun.copy(camera.position).addScaledVector(sunDir, 500).project(camera);
+                const facing = sp.z < 1 && Math.abs(sp.x) < 1.6 && Math.abs(sp.y) < 1.6;
+                const night = game.userSettings && game.userSettings.atmosphereMode === 'night';
+                ru.uSun.value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5);
+                ru.uStrength.value = facing ? (night ? 0.22 : 0.75) * (1 - Math.min(1, Math.hypot(sp.x, sp.y) / 1.6)) : 0;
+                ru.uAspect.value = camera.aspect;
+                ru.tColor.value = R.world.texture;
+                ru.tDepth.value = R.world.depthTexture;
+                this._pass(M.rays, R.rays);
+                // Composite to the screen
+                this._grade();
+                const cu = M.composite.uniforms;
+                cu.tColor.value = R.view.texture;
+                cu.tB0.value = R.bloom[0].texture; cu.tB1.value = R.bloom[1].texture;
+                cu.tB2.value = R.bloom[2].texture; cu.tB3.value = R.bloom[3].texture;
+                cu.tRays.value = R.rays.texture;
+                cu.uTexel.value.set(1 / this.w, 1 / this.h);
+                cu.uTime.value = (now * 0.001) % 100;
+                this._pass(M.composite, null);
+                this.frame++;
+            },
+
+            // Compile every pass up front (called from the shader warm-up)
+            warm: function () {
+                this.init();
+                const was = this.enabled;
+                this.render(performance.now());
+                renderer.setRenderTarget(null);
+                this.enabled = was;
+            }
+        };
+
         function warmShaderVariants() {
             const start = performance.now();
             scene.updateMatrixWorld();
@@ -34723,11 +35825,15 @@
             // so drivers that finish compiling on first draw do it here.
             viewmodelScene.environment = scene.environment;
             syncViewmodelCamera();
+            // V1.7 cast hand and its energy cards: drawn with the viewmodel warm-up
+            const castParts = castFX.group ? [castFX.group, castFX.halo, castFX.core].concat(castFX.wisps) : [];
+            for (const o of castParts) o.visible = true;
             renderer.compile(viewmodelScene, viewmodelCamera);
             const muzzleHalos = ['rifle', 'sniper', 'pistol'].map(k => game.weapons[k] && game.weapons[k].muzzleHalo).filter(Boolean);
             for (const h of muzzleHalos) h.visible = true;
             renderer.render(viewmodelScene, viewmodelCamera);
             for (const h of muzzleHalos) h.visible = false;
+            castFX.hide();
 
             game.weapons.rifle.model.visible = rifleWas;
             game.weapons.sniper.model.visible = sniperWas;
@@ -34742,7 +35848,18 @@
             haloSystem.mesh.instanceColor.needsUpdate = true;
             haloSystem.mesh.visible = true;
             
-            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh];
+            // Shell casings: one instance in front of the camera for the warm draws
+            shellFX.mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z));
+            shellFX.mesh.count = 1;
+            shellFX.mesh.instanceMatrix.needsUpdate = true;
+            for (const b of [fxKit.add, fxKit.smoke]) {
+                b.setMatrixAt(0, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z));
+                b.geometry.attributes.aParams.setXYZW(0, 0.5, 0.5, 0, 1);
+                b.geometry.attributes.aParams.needsUpdate = true;
+                b.count = 1;
+                b.instanceMatrix.needsUpdate = true;
+            }
+            const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke];
             for (let i = 0; i < agentSystem.warmupMeshes.length; i++) {
                 const wm = agentSystem.warmupMeshes[i];
                 wm.position.copy(p);
@@ -34762,12 +35879,18 @@
             trailBatch.mesh.geometry.setDrawRange(0, 0);
             decalBatch.mesh.count = 0;
             haloSystem.mesh.count = 0;
+            shellFX.mesh.count = 0;
+            shellFX.mesh.visible = true;
+            fxKit.add.count = 0; fxKit.add.visible = true;
+            fxKit.smoke.count = 0; fxKit.smoke.visible = true;
             for (let i = 0; i < enemyFlashLights.length; i++) {
                 enemyFlashLights[i].object.visible = false;
             }
             packEnemyBatches();
             packTargetBatches();
             shadowManager.markEvent();
+            // V1.7: compile the Cinematic post-processing passes now as well
+            postFX.warm();
             perfTelemetry.shaderWarmupMs = performance.now() - start;
             perfTelemetry.programWatermark = renderer.info.programs ? renderer.info.programs.length : 0;
         }
@@ -34902,6 +36025,7 @@
             glowHalos: 'auto',
             brightness: 100,
             reduceFlashes: false,
+            cameraShake: true,
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -35644,6 +36768,12 @@
                     game.userSettings.maxDecals = p.maxDecals;
                     this.applyAtmosphereTheme();
                     this.syncAllUI();
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-camera-shake-pills', 'data-camshake', (val) => {
+                    game.userSettings.cameraShake = val !== 'off';
+                    if (!game.userSettings.cameraShake) fxKit.trauma = 0;
                     this.saveToStorage();
                 });
 
@@ -36779,6 +37909,7 @@
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
                 setActivePill('setting-map-detail-pills', 'data-mapdetail', cfg.mapDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-reduce-flash-pills', 'data-reduceflash', cfg.reduceFlashes ? 'on' : 'off');
+                setActivePill('setting-camera-shake-pills', 'data-camshake', cfg.cameraShake === false ? 'off' : 'on');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
@@ -38291,7 +39422,12 @@
             createWeapons();
             // Viewmodel keeps its authored saturation: no ACES on gun materials
             // (set before the warm-up compile, so it never triggers a recompile)
-            weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material)) o.material.toneMapped = false; });
+            // V1.7: muzzle star cards and pooled shell casings (before the warm-up compile)
+            muzzleStar.init();
+            shellFX.init();
+            fxKit.init();
+            castFX.init();
+            weaponGroup.traverse(o => { if (o.material && !Array.isArray(o.material) && o.material !== muzzleStar.mat) o.material.toneMapped = false; });
             
             // Initialize object pools
             initObjectPools();
@@ -38485,6 +39621,8 @@
             updateGunplayAndCrosshair(delta, time, now);
             updateWeaponPosition();
             applyWeaponBobbing(time, game.keys.w || game.keys.a || game.keys.s || game.keys.d);
+            shellFX.update(Math.min(0.05, delta));
+            fxKit.update(Math.min(0.05, delta), now);
             // V1.7: 3D audio listener follows the camera; enemy footsteps; low-health cue
             soundFX.updateListener();
             enemyAudio.update();
@@ -38520,17 +39658,22 @@
             // Render scene: world, then the viewmodel over a cleared depth buffer
             // (autoClear is off; info.autoReset is off and reset here)
             renderer.info.reset();
+            fxKit.applyShake(now, Math.min(0.05, delta));
             skyDome.position.copy(camera.position);
             skyDome.updateMatrix();
             // With autoClear off, r128's background pass only sets the clear colour,
             // so set it before the single manual clear (the sky dome covers it anyway)
-            renderer.setClearColor(scene.background, 1);
-            renderer.clear();
-            renderer.render(scene, camera);
-            renderer.clearDepth();
-            viewmodelScene.environment = scene.environment;
-            syncViewmodelCamera();
-            renderer.render(viewmodelScene, viewmodelCamera);
+            if (postFX.enabled) {
+                postFX.render(now);
+            } else {
+                renderer.setClearColor(scene.background, 1);
+                renderer.clear();
+                renderer.render(scene, camera);
+                renderer.clearDepth();
+                viewmodelScene.environment = scene.environment;
+                syncViewmodelCamera();
+                renderer.render(viewmodelScene, viewmodelCamera);
+            }
             perfTelemetry.summary.drawCalls = renderer.info.render.calls;
             perfTelemetry.summary.triangles = renderer.info.render.triangles;
             const programCount = renderer.info.programs ? renderer.info.programs.length : 0;
