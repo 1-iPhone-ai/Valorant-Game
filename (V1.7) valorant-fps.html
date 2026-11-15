@@ -229,6 +229,21 @@
         .level-toast.big b { font-size: 26px; color: #ffd166; }
         .level-toast span { display: block; font-size: 11px; letter-spacing: 2px; color: #cbd5e1; margin-top: 2px; }
         .skin-card-btn.locked { opacity: 0.5; }
+        .mm-workshop { display: flex; flex-direction: column; gap: 8px; }
+        .ws-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .mm-btn.ws-slot { font-size: 12px; padding: 7px 10px; }
+        .ws-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+        .ws-label { width: 62px; font-size: 11px; font-weight: 900; letter-spacing: 2px; color: #cbd5e1; }
+        .mm-btn.ws-sw { width: 26px; height: 26px; padding: 0; border-radius: 4px; border: 2px solid rgba(148, 163, 184, 0.35); }
+        .mm-btn.ws-sw:hover, .mm-btn.ws-sw:focus { padding: 0; border-color: #fff; }
+        .mm-btn.ws-sw.selected { border-color: #ffd166; box-shadow: 0 0 0 2px #ffd166; }
+        .ws-pick { width: 34px; height: 28px; border: none; background: none; padding: 0; cursor: pointer; }
+        .ws-name { flex: 1; min-width: 120px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.35); color: #fff; padding: 6px 8px; font-weight: 800; letter-spacing: 2px; border-radius: 3px; }
+        .mm-btn.ws-fin { font-size: 11px; padding: 6px 10px; }
+        #ws-glow { flex: 1; min-width: 120px; }
+        .ws-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+        .ws-actions .mm-btn { font-size: 12px; padding: 8px 12px; }
+        .mm-btn.ws-save { border-left-color: #2bf0a5; }
         .skin-lock { font-size: 10px; color: #ffd166; letter-spacing: 1px; margin-top: 4px; }
         body.menu-open #ui-root > *:not(#main-menu):not(#agent-picker-overlay):not(#settings-panel) { visibility: hidden; }
         body.menu-open.agent-select .agent-picker-overlay { background: linear-gradient(270deg, rgba(6, 11, 19, 0.92) 0%, rgba(6, 11, 19, 0.6) 55%, rgba(6, 11, 19, 0) 70%);
@@ -4602,6 +4617,9 @@
                                         <span style="background:#2bf0a5;"></span>
                                     </div>
                                 </button>
+                                <button class="skin-card-btn ws-card" data-skin="custom1" style="display:none"><div class="ws-card-name" style="font-weight:800; font-size:13px;">CUSTOM 1</div><div class="ws-card-sub" style="font-size:11px; color:#94a3b8;"></div><div class="skin-swatch-strip"><span></span><span></span><span></span><span></span></div></button>
+                                <button class="skin-card-btn ws-card" data-skin="custom2" style="display:none"><div class="ws-card-name" style="font-weight:800; font-size:13px;">CUSTOM 2</div><div class="ws-card-sub" style="font-size:11px; color:#94a3b8;"></div><div class="skin-swatch-strip"><span></span><span></span><span></span><span></span></div></button>
+                                <button class="skin-card-btn ws-card" data-skin="custom3" style="display:none"><div class="ws-card-name" style="font-weight:800; font-size:13px;">CUSTOM 3</div><div class="ws-card-sub" style="font-size:11px; color:#94a3b8;"></div><div class="skin-swatch-strip"><span></span><span></span><span></span><span></span></div></button>
                                 <button class="skin-card-btn" data-skin="ember">
                                     <div style="font-weight:800; font-size:13px; color:#fb923c;">EMBER // FORGE</div>
                                     <div style="font-size:11px; color:#94a3b8;">Charred Steel &amp; Molten Orange</div>
@@ -5481,6 +5499,7 @@
                 skipMenu: false,       // V1.7: start straight in the game (no start screen)
                 breakables: true,      // glass panes and explosive barrels on the maps
                 showBody: true,        // your legs and body when you look down, and your shadow
+                customSkins: [],       // V1.7 skin workshop: up to three of your own designs
                 slide: true,           // crouch while sprinting to slide
                 mantle: true,          // jump into a ledge up to chest height to climb onto it
                 fpsCap: 0,
@@ -5513,7 +5532,7 @@
                 showHints: true,
                 showDamageNumbers: true,
                 hudScale: 100,         // V1.7: HUD Size % (80-130)
-                weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx' | level rewards: 'ember' | 'glacier' | 'neontide' | 'onyx'
+                weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx' | level rewards: 'ember' | 'glacier' | 'neontide' | 'onyx' | workshop: 'custom1'..'custom3'
                 botDifficulty: 'gold', // 'iron' | 'gold' | 'immortal' | 'radiant'
                 infiniteAbilities: false,
                 infiniteUlt: false,
@@ -37644,6 +37663,7 @@
             showBody: true,
             slide: true,
             mantle: true,
+            customSkins: [],
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -39831,6 +39851,188 @@
             }
         };
 
+        // =============================================
+        // V1.7 Weapon skin workshop: design your own skins (body, trim, glow and
+        // tracer colours, a finish and glow strength) in three named slots, with a
+        // live rotating preview of your gun. Saved with your settings; equipped like
+        // any other skin (Settings, Career). The preview is a clone of the real gun
+        // sharing its materials, so it adds no shader programs.
+        // =============================================
+        const WORKSHOP_FINISHES = {
+            matte:  { label: 'MATTE',  metalness: 0.2,  roughness: 0.75 },
+            satin:  { label: 'SATIN',  metalness: 0.5,  roughness: 0.45 },
+            metal:  { label: 'METAL',  metalness: 0.85, roughness: 0.25 },
+            chrome: { label: 'CHROME', metalness: 1.0,  roughness: 0.08 }
+        };
+        const WORKSHOP_CHANNELS = [
+            ['body', 'BODY'], ['secondary', 'TRIM'], ['accent', 'GLOW'], ['tracer', 'TRACER']
+        ];
+        const WORKSHOP_SWATCHES = ['#0a0a0a', '#334155', '#e2e8f0', '#ff4655', '#f97316', '#facc15', '#2bf0a5', '#22e6ff', '#6366f1', '#ff2bd6'];
+        const hexStr = (n) => '#' + n.toString(16).padStart(6, '0');
+
+        const skinWorkshop = {
+            slot: 0, draft: null, weapon: 'rifle', preview: null, previewKey: '',
+
+            blank: function (i) {
+                return { name: `CUSTOM ${i + 1}`, body: 0x1e293b, secondary: 0x334155, accent: 0x22e6ff, tracer: 0x22e6ff, finish: 'satin', glow: 1 };
+            },
+            slots: function () { return (game.userSettings && Array.isArray(game.userSettings.customSkins)) ? game.userSettings.customSkins : []; },
+            themeOf: function (d) {
+                const f = WORKSHOP_FINISHES[d.finish] || WORKSHOP_FINISHES.satin;
+                return { label: `${(d.name || 'CUSTOM').toUpperCase()} // WORKSHOP`, body: d.body, secondary: d.secondary, accent: d.accent,
+                    tracer: d.tracer, metalness: f.metalness, roughness: f.roughness, glow: d.glow, custom: true };
+            },
+            // Saved slots become skins 'custom1'..'custom3'
+            sync: function () {
+                const list = this.slots();
+                for (let i = 0; i < 3; i++) {
+                    const id = 'custom' + (i + 1);
+                    if (list[i]) WEAPON_SKIN_THEMES[id] = this.themeOf(list[i]);
+                    else delete WEAPON_SKIN_THEMES[id];
+                }
+                this.syncCards();
+            },
+            // The three Settings skin cards for the slots: shown once saved
+            syncCards: function () {
+                const list = this.slots();
+                for (let i = 0; i < 3; i++) {
+                    const c = document.querySelector(`#setting-skin-cards [data-skin="custom${i + 1}"]`);
+                    if (!c) continue;
+                    const d = list[i];
+                    c.style.display = d ? '' : 'none';
+                    if (!d) continue;
+                    c.querySelector('.ws-card-name').textContent = `${d.name.toUpperCase()} // WORKSHOP`;
+                    c.querySelector('.ws-card-name').style.color = hexStr(d.accent);
+                    c.querySelector('.ws-card-sub').textContent = `Your design • ${(WORKSHOP_FINISHES[d.finish] || WORKSHOP_FINISHES.satin).label} finish`;
+                    const sw = c.querySelectorAll('.skin-swatch-strip span');
+                    [d.body, d.secondary, d.accent, d.tracer].forEach((v, k) => { if (sw[k]) sw[k].style.background = hexStr(v); });
+                }
+            },
+
+            open: function () {
+                this.slot = 0;
+                const eq = /^custom([1-3])$/.exec(game.userSettings.weaponSkin || '');
+                if (eq) this.slot = +eq[1] - 1;
+                this.loadSlot(this.slot);
+            },
+            loadSlot: function (i) {
+                this.slot = i;
+                const saved = this.slots()[i];
+                this.draft = Object.assign(this.blank(i), saved || {});
+                this.render();
+                this.apply();
+            },
+            set: function (key, value) {
+                if (key === 'name') this.draft.name = String(value).slice(0, 16) || `CUSTOM ${this.slot + 1}`;
+                else if (key === 'finish') { if (WORKSHOP_FINISHES[value]) this.draft.finish = value; }
+                else if (key === 'glow') this.draft.glow = Math.max(0, Math.min(2, +value));
+                else this.draft[key] = typeof value === 'string' ? parseInt(value.replace('#', ''), 16) : value;
+                this.apply();
+                if (key !== 'name' && key !== 'glow') this.render();
+            },
+            // Live preview on the real guns (shared materials)
+            apply: function () { settingsManager.applyWeaponSkin('_workshop', this.themeOf(this.draft)); },
+            save: function () {
+                const list = this.slots().slice();
+                while (list.length <= this.slot) list.push(null);
+                list[this.slot] = Object.assign({}, this.draft);
+                game.userSettings.customSkins = list.slice(0, 3);
+                game.userSettings.weaponSkin = 'custom' + (this.slot + 1);
+                this.sync();
+                settingsManager.applyWeaponSkin(game.userSettings.weaponSkin);
+                settingsManager.saveToStorage();
+                settingsManager.syncAllUI();
+                if (soundFX.buySuccess) soundFX.buySuccess();
+                this.render();
+                if (typeof mainMenu !== 'undefined' && mainMenu.open) mainMenu.render();
+                return game.userSettings.weaponSkin;
+            },
+            // Leaving: back to whatever is equipped
+            close: function () {
+                settingsManager.applyWeaponSkin(game.userSettings.weaponSkin || 'standard');
+                this.removePreview();
+            },
+            cycleWeapon: function () {
+                const order = ['rifle', 'sniper', 'pistol', 'knife'];
+                this.weapon = order[(order.indexOf(this.weapon) + 1) % order.length];
+                this.render();
+            },
+
+            // A clone of the chosen gun, sized to the showcase spot
+            ensurePreview: function (parent) {
+                if (this.previewKey === this.weapon && this.preview) return this.preview;
+                this.removePreview();
+                const src = game.weapons[this.weapon] && game.weapons[this.weapon].model;
+                if (!src) return null;
+                const g = new THREE.Group();
+                const clone = src.clone();
+                clone.position.set(0, 0, 0);
+                clone.rotation.set(0, 0, 0);
+                clone.scale.set(1, 1, 1);
+                clone.traverse((o) => {
+                    if (o.userData.isHands) o.visible = false;
+                    if (o === src.userData.muzzleFlash || (o.material && o.material.blending === THREE.AdditiveBlending)) o.visible = false;
+                });
+                clone.updateMatrixWorld(true);
+                const box = new THREE.Box3().setFromObject(clone);
+                const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+                const s = 2.1 / Math.max(0.001, size.x, size.y, size.z);
+                clone.position.copy(center).multiplyScalar(-s);
+                clone.scale.setScalar(s);
+                g.add(clone);
+                parent.add(g);
+                this.preview = g;
+                this.previewKey = this.weapon;
+                return g;
+            },
+            removePreview: function () {
+                if (this.preview && this.preview.parent) this.preview.parent.remove(this.preview);
+                this.preview = null;
+                this.previewKey = '';
+            },
+
+            render: function () {
+                const el = document.getElementById('mm-workshop');
+                if (!el || !this.draft) return;
+                const d = this.draft, list = this.slots();
+                const slots = [0, 1, 2].map((i) => `<button class="mm-btn ws-slot${i === this.slot ? ' selected' : ''}" data-ws="slot:${i}">SLOT ${i + 1}<small>${list[i] ? list[i].name : 'EMPTY'}</small></button>`).join('');
+                const rows = WORKSHOP_CHANNELS.map(([key, label]) => {
+                    const sw = WORKSHOP_SWATCHES.map((h) => `<button class="mm-btn ws-sw${parseInt(h.slice(1), 16) === d[key] ? ' selected' : ''}" data-ws="${key}:${h}" style="background:${h}" aria-label="${label} ${h}"></button>`).join('');
+                    return `<div class="ws-row"><span class="ws-label">${label}</span>${sw}<input type="color" class="ws-pick" data-wspick="${key}" value="${hexStr(d[key])}"></div>`;
+                }).join('');
+                const fin = Object.keys(WORKSHOP_FINISHES).map((k) => `<button class="mm-btn ws-fin${d.finish === k ? ' selected' : ''}" data-ws="finish:${k}">${WORKSHOP_FINISHES[k].label}</button>`).join('');
+                const equipped = game.userSettings.weaponSkin === 'custom' + (this.slot + 1);
+                el.innerHTML = `
+                    <div class="ws-slots">${slots}</div>
+                    <div class="ws-row"><span class="ws-label">NAME</span><input class="ws-name" id="ws-name" maxlength="16" value="${d.name.replace(/"/g, '&quot;')}"></div>
+                    ${rows}
+                    <div class="ws-row"><span class="ws-label">FINISH</span>${fin}</div>
+                    <div class="ws-row"><span class="ws-label">GLOW</span><input type="range" id="ws-glow" min="0" max="200" step="5" value="${Math.round(d.glow * 100)}"><b id="ws-glow-val">${Math.round(d.glow * 100)}%</b></div>
+                    <div class="ws-actions">
+                        <button class="mm-btn" data-ws="weapon">PREVIEW: ${this.weapon.toUpperCase()}</button>
+                        <button class="mm-btn" data-ws="revert">RESET</button>
+                        <button class="mm-btn ws-save" data-ws="save">${equipped ? 'SAVE (EQUIPPED)' : 'SAVE &amp; EQUIP'}</button>
+                    </div>`;
+            },
+
+            // Clicks and inputs inside the workshop panel (from the main menu)
+            onClick: function (b) {
+                const [k, v] = b.dataset.ws.split(':');
+                if (k === 'slot') this.loadSlot(+v);
+                else if (k === 'weapon') this.cycleWeapon();
+                else if (k === 'revert') this.loadSlot(this.slot);
+                else if (k === 'save') this.save();
+                else this.set(k, v);
+                const again = document.querySelector(`#mm-workshop [data-ws="${b.dataset.ws}"]`);
+                if (again) again.focus({ preventScroll: true });
+            },
+            onInput: function (t) {
+                if (t.id === 'ws-name') this.set('name', t.value);
+                else if (t.id === 'ws-glow') { this.set('glow', t.value / 100); const v = document.getElementById('ws-glow-val'); if (v) v.textContent = t.value + '%'; }
+                else if (t.dataset.wspick) this.set(t.dataset.wspick, t.value);
+            }
+        };
+
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
@@ -39874,8 +40076,13 @@
                             <button class="mm-btn" data-act="modes">MODES <span class="mm-val" id="mm-mode-val">WAVE</span></button>
                             <button class="mm-btn" data-act="map">MAP <span class="mm-val" id="mm-map-val">ASCENT</span></button>
                             <button class="mm-btn" data-act="career">CAREER <span class="mm-val" id="mm-level-val">LEVEL 1</span></button>
+                            <button class="mm-btn" data-act="workshop">WORKSHOP <span class="mm-val" id="mm-skin-val">STANDARD</span></button>
                             <button class="mm-btn" data-act="settings">SETTINGS</button>
                             <button class="mm-btn" data-act="controls">CONTROLS</button>
+                        </div>
+                        <div class="mm-view" data-view="workshop">
+                            <div class="mm-career mm-workshop" id="mm-workshop"></div>
+                            <button class="mm-btn mm-back" data-act="back">BACK</button>
                         </div>
                         <div class="mm-view" data-view="career">
                             <div class="mm-career" id="mm-career"></div>
@@ -39901,11 +40108,14 @@
                 document.getElementById('ui-root').appendChild(el);
                 this.el = el;
                 el.addEventListener('mousedown', (e) => e.stopPropagation());
+                el.addEventListener('input', (e) => { if (e.target.closest('#mm-workshop')) skinWorkshop.onInput(e.target); });
+                el.addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT') e.stopPropagation(); });
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const b = e.target.closest('button');
                     if (!b) return;
                     if (b.dataset.mode) { this.mode = b.dataset.mode; this.setView('main'); return; }
+                    if (b.dataset.ws) { skinWorkshop.onClick(b); return; }
                     if (b.dataset.equip) {
                         const [type, id] = b.dataset.equip.split(':');
                         if (!progression.equip(type, id) && soundFX.buyDeny) soundFX.buyDeny();
@@ -39982,8 +40192,11 @@
                     camera.fov = this.savedLook.fov;
                     camera.updateProjectionMatrix();
                 }
+                if (this.view === 'workshop') skinWorkshop.close();
+                this.figure.visible = true;
                 this.showcase.visible = false;
                 weaponGroup.visible = true;
+                slideCamera.roll = slideCamera.applied = 0;
                 if (typeof timingResetPending !== 'undefined') timingResetPending = true;
             },
 
@@ -39999,7 +40212,9 @@
                 document.getElementById('mm-mode-val').textContent = m[1];
                 const mp = (typeof MAP_PRESETS !== 'undefined' && MAP_PRESETS[game.mapPreset]) || null;
                 document.getElementById('mm-map-val').textContent = mp ? mp.name : 'ASCENT';
-                this.el.classList.toggle('career', this.view === 'career');
+                this.el.classList.toggle('career', this.view === 'career' || this.view === 'workshop');
+                const skinTheme = WEAPON_SKIN_THEMES[game.userSettings.weaponSkin] || WEAPON_SKIN_THEMES.standard;
+                document.getElementById('mm-skin-val').textContent = skinTheme.label.split(' // ')[0];
                 document.getElementById('mm-level-val').textContent = `LEVEL ${progression.level}`;
                 document.getElementById('mm-card').innerHTML = progression.cardHtml(progression.card, true) + `<small>LEVEL ${progression.level}</small>`;
                 this.el.querySelectorAll('.mm-mode').forEach((b) => b.classList.toggle('selected', b.dataset.mode === this.mode));
@@ -40012,6 +40227,7 @@
                 } else if (a === 'agent') this.openAgentSelect();
                 else if (a === 'modes') this.setView('modes');
                 else if (a === 'career') { progression.renderCareer(); this.setView('career'); }
+                else if (a === 'workshop') { skinWorkshop.open(); this.setView('workshop'); }
                 else if (a === 'map') { tacticalDirector.cycleMapPreset(); this.render(); }
                 else if (a === 'controls') this.setView('controls');
                 else if (a === 'back') this.back();
@@ -40019,6 +40235,7 @@
             },
 
             back: function () {
+                if (this.view === 'workshop') skinWorkshop.close();
                 if (this.view !== 'main') { this.setView('main'); return; }
                 if (this.kind === 'pause') this.resume();
             },
@@ -40108,6 +40325,13 @@
                 const yaw = Math.atan2(camera.position.x - sc.position.x, camera.position.z - sc.position.z);
                 sc.rotation.set(0, yaw, 0);
                 this.figure.rotation.y = Math.PI + Math.sin(this.t * 0.6) * 0.9;
+                // Workshop: the gun you are designing turns in place of the figure
+                const ws = this.view === 'workshop';
+                this.figure.visible = !ws;
+                if (ws) {
+                    const p = skinWorkshop.ensurePreview(sc);
+                    if (p) { p.position.set(-0.2, 1.15, 0.4); p.rotation.set(0.25, this.t * 0.8, 0); }
+                } else if (skinWorkshop.preview) skinWorkshop.removePreview();
                 document.getElementById('mm-agent-name').textContent = def ? def.name : '';
                 document.getElementById('mm-agent-role').textContent = def ? def.role : '';
             }
@@ -41091,8 +41315,10 @@
                 refreshSceneLighting();
             },
 
-            applyWeaponSkin: function(skinId) {
-                const theme = WEAPON_SKIN_THEMES[skinId] || WEAPON_SKIN_THEMES.standard;
+            applyWeaponSkin: function(skinId, themeOverride) {
+                if (!themeOverride && typeof skinWorkshop !== 'undefined') skinWorkshop.sync();
+                const theme = themeOverride || WEAPON_SKIN_THEMES[skinId] || WEAPON_SKIN_THEMES.standard;
+                const glow = typeof theme.glow === 'number' ? theme.glow : 1;
                 const badge = document.getElementById('active-skin-badge');
                 if (badge) badge.textContent = theme.label;
 
@@ -41110,9 +41336,17 @@
                         if (!mesh || !mesh.material || mesh === wObj.muzzleFlash) continue;
                         // Skip the skin-tone hands mesh (V1.7: no longer always the last child)
                         if (mesh.userData.isHands) continue;
-                        if (mesh.material.emissive && mesh.material.emissiveIntensity > 0.2) {
+                        // Glowing parts are found once, by an actual glow colour (parts made without
+                        // one still report the default intensity of 1, so intensity alone is not
+                        // enough), and keep their original intensity as the base
+                        if (mesh.userData.skinGlowBase === undefined && mesh.material.emissive) {
+                            const e = mesh.material.emissive;
+                            mesh.userData.skinGlowBase = (e.r + e.g + e.b > 0.01 && mesh.material.emissiveIntensity > 0.2) ? mesh.material.emissiveIntensity : 0;
+                        }
+                        if (mesh.material.emissive && mesh.userData.skinGlowBase > 0) {
                             mesh.material.color.setHex(theme.accent).convertSRGBToLinear();
                             mesh.material.emissive.setHex(theme.accent).convertSRGBToLinear();
+                            mesh.material.emissiveIntensity = mesh.userData.skinGlowBase * glow;
                         } else if (i === 0) {
                             mesh.material.color.setHex(theme.body).convertSRGBToLinear();
                             if (mesh.material.isMeshStandardMaterial) {
@@ -41430,6 +41664,7 @@
                 hudScale.apply();
                 this.applyAtmosphereTheme();
                 if (typeof progression !== 'undefined' && cfg.weaponSkin && !progression.has('skin', cfg.weaponSkin)) cfg.weaponSkin = 'standard';
+                if (typeof skinWorkshop !== 'undefined') { skinWorkshop.sync(); if (/^custom/.test(cfg.weaponSkin || '') && !WEAPON_SKIN_THEMES[cfg.weaponSkin]) cfg.weaponSkin = 'standard'; }
                 this.applyWeaponSkin(cfg.weaponSkin || 'standard');
                 this.applyCrosshairStyle();
                 this.applyHudVisibility();
