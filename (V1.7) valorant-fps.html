@@ -5428,7 +5428,7 @@
                 localStorageEnabled: false
             },
             gameMode: 'wave', // 'wave' (Wave & Spike Assault) | 'range' (30-Bot Range) | 'retake' (Site Retake & Defuse)
-            mapPreset: 'ascent', // 'ascent' | 'bind' | 'haven' | 'icebox'
+            mapPreset: 'ascent', // 'ascent' | 'bind' | 'haven' | 'icebox' | 'lotus' | 'split' | 'skyline'
             botAbilityAI: true,
             roundNumber: 1,
             primaryVariant: 'vandal', // 'vandal' | 'phantom' | 'bulldog' | 'judge'
@@ -8722,6 +8722,78 @@
                     createBox(-9, 1.2, 25, 3, 2.4, 3, 0xec4899);
                     createBox(9, 1.2, -25, 3, 2.4, 3, 0xeab308);
                 }
+            },
+            skyline: {
+                id: 'skyline',
+                name: 'SKYLINE',
+                subtitle: 'Neon Rooftop City at Night, Skybridges & Billboards',
+                skyColor: 0x0b0a1f,
+                // Night city: cool moonlight, magenta/cyan neon accents
+                sunColor: 0xa9b8ff,
+                sunIntensity: 1.15,
+                accentA: 0xff2bd6,
+                accentB: 0x22e6ff,
+                floorColor: 0x1b1e2b,
+                wallColor: 0x121624,
+                build: function() {
+                    // Stairs: solid 1 m steps rising towards (dx, dz) from the start point
+                    const stairs = (x, z, dx, dz, count, width, hex) => {
+                        for (let i = 0; i < count; i++) {
+                            const h = i + 1;
+                            const cx = x + dx * i * 1.2, cz = z + dz * i * 1.2;
+                            createBox(cx, h / 2, cz, dx ? 1.2 : width, h, dz ? 1.2 : width, hex);
+                        }
+                    };
+                    // Central helipad block with steps up its east side
+                    createBox(0, 1.5, 0, 10, 3, 8, 0x262a3d);
+                    stairs(6.8, 0, -1, 0, 2, 3.2, 0x2e3448);
+                    // West water tower: base, overhead deck (legs and tank are decor)
+                    createBox(-18, 0.6, -6, 3, 1.2, 3, 0x334155);
+                    createBox(-18, 5, -6, 6.4, 0.4, 6.4, 0x1e2433);
+                    createCylinder(-18, 8.4, -6, 2.7, 6, 0x3b3f58);
+                    // East vent farm: AC units and exhaust stacks
+                    createBox(17, 1, 5, 3, 2, 2.2, 0x475569);
+                    createBox(20.5, 1, 8, 2.2, 2, 3, 0x475569);
+                    createBox(16.5, 0.6, 10, 2.4, 1.2, 2, 0x3f4a5c);
+                    createCylinder(20, 3, 3.5, 0.6, 6, 0x64748b);
+                    createCylinder(14.5, 2.5, 7.5, 0.5, 5, 0x64748b);
+                    // Raised side decks with steps, and the billboards standing on them
+                    createBox(-35, 1.1, 0, 10, 2.2, 18, 0x23283a);
+                    createBox(35, 1.1, 0, 10, 2.2, 18, 0x23283a);
+                    for (const sx of [-1, 1]) {
+                        createBox(28.5 * sx, 0.375, 0, 1, 0.75, 4, 0x2e3448);
+                        createBox(29.5 * sx, 0.75, 0, 1, 1.5, 4, 0x2e3448);
+                    }
+                    createBox(-38.5, 7, 0, 0.5, 5, 12, 0x101522);
+                    createBox(38.5, 7, 0, 0.5, 5, 12, 0x101522);
+                    createCylinder(-38.5, 3.5, -4.5, 0.25, 4, 0x1e2433);
+                    createCylinder(-38.5, 3.5, 4.5, 0.25, 4, 0x1e2433);
+                    createCylinder(38.5, 3.5, -4.5, 0.25, 4, 0x1e2433);
+                    createCylinder(38.5, 3.5, 4.5, 0.25, 4, 0x1e2433);
+                    // North and south skybridges between stair towers (walk under or across)
+                    for (const zs of [-1, 1]) {
+                        const z = 38 * zs;
+                        createBox(-14, 2, z, 6, 4, 6, 0x1f2437);
+                        createBox(14, 2, z, 6, 4, 6, 0x1f2437);
+                        createBox(0, 3.8, z, 22, 0.4, 3, 0x2a3049);
+                        createBox(0, 4.55, z - 1.4, 22, 1.1, 0.2, 0x1a1f30);    // railings
+                        createBox(0, 4.55, z + 1.4, 22, 1.1, 0.2, 0x1a1f30);
+                        stairs(-14, z - zs * 6, 0, zs, 3, 3, 0x2e3448);
+                        stairs(14, z - zs * 6, 0, zs, 3, 3, 0x2e3448);
+                    }
+                    // Cover around A (north) and B (south)
+                    createBox(-6, 0.6, -25, 2.4, 1.2, 1.2, 0x3f4a5c);
+                    createBox(6.5, 1, -18.5, 2, 2, 2, 0x4c5672);
+                    createBox(-4, 0.6, -29, 4, 1.2, 0.8, 0x2e3448);
+                    createBox(6, 0.6, 25, 2.4, 1.2, 1.2, 0x3f4a5c);
+                    createBox(-6.5, 1, 18.5, 2, 2, 2, 0x4c5672);
+                    createBox(4.5, 0.6, 29.5, 4, 1.2, 0.8, 0x2e3448);
+                    // Rooftop access huts in the corners of the flanks
+                    createBox(-26, 1.75, -22, 5, 3.5, 4, 0x262a3d);
+                    createBox(26, 1.75, 22, 5, 3.5, 4, 0x262a3d);
+                    createBox(26, 1, -24, 3, 2, 3, 0x334155);
+                    createBox(-26, 1, 24, 3, 2, 3, 0x334155);
+                }
             }
         };
 
@@ -8996,7 +9068,7 @@
         // Which procedural texture a map piece uses (+10 marks a cylinder)
         function classifyMapSurface(shape, sx, sy, sz, color) {
             const preset = (typeof game !== 'undefined' && game.mapPreset) || 'ascent';
-            const metalMap = preset === 'icebox' || preset === 'split';
+            const metalMap = preset === 'icebox' || preset === 'split' || preset === 'skyline';
             const cyl = shape === 'cylinder';
             let id;
             if (cyl) id = metalMap ? MAP_SURF.metal : MAP_SURF.stone;
@@ -9004,7 +9076,7 @@
             else if (Math.max(sx, sz) <= 3.2 && sy <= 3.2) id = metalMap ? MAP_SURF.metal : MAP_SURF.wood;
             else if (sy <= 1.2) id = MAP_SURF.metal;
             else if (preset === 'icebox') id = (color === 0x475569 || color === 0x1e293b) ? MAP_SURF.concrete : MAP_SURF.metal;
-            else if (preset === 'split') id = MAP_SURF.concrete;
+            else if (preset === 'split' || preset === 'skyline') id = MAP_SURF.concrete;
             else id = MAP_SURF.stone;
             return id + (cyl ? 10 : 0);
         }
@@ -13585,7 +13657,7 @@
                       sky: 0xa07c50, skyMix: 0.62, fog: 3.6, sun: 0.55, amb: 1.2, sand: 1 },
             leaves: { id: 4, box: 24, speed: 1.0, wind: [2.2, 0, 0.9], size: [0.13, 0.09], color: [1, 1, 1], opacity: 0.95, count: 900 }
         };
-        const MAP_WEATHER = { ascent: 'leaves', bind: 'rain', haven: 'sand', split: 'storm', icebox: 'snow', lotus: 'leaves' };
+        const MAP_WEATHER = { ascent: 'leaves', bind: 'rain', haven: 'sand', split: 'storm', icebox: 'snow', lotus: 'leaves', skyline: 'rain' };
         const WEATHER_DENSITY = { low: 0, medium: 0.45, high: 0.7, ultra: 1, cinematic: 1 };
 
         const weatherFX = {
@@ -17662,7 +17734,9 @@
             lotus:  { root: 55, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 5, 4, 0], tempo: 62, wave: 'triangle', cutoff: 1100,
                       bed: { type: 'lowpass', freq: 420, q: 0.4, gain: 0.4 }, hum: 0, events: ['drip', 'bell', 'bird'] },
             split:  { root: 53, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 6, 5, 6], tempo: 76, wave: 'sawtooth', cutoff: 1800,
-                      bed: { type: 'lowpass', freq: 220, q: 0.6, gain: 0.55 }, hum: 120, events: ['neon', 'creak'] }
+                      bed: { type: 'lowpass', freq: 220, q: 0.6, gain: 0.55 }, hum: 120, events: ['neon', 'creak'] },
+            skyline: { root: 51, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 3, 4], tempo: 84, wave: 'sawtooth', cutoff: 1500,
+                      bed: { type: 'lowpass', freq: 300, q: 0.5, gain: 0.6 }, hum: 90, events: ['neon', 'drip', 'creak'] }
         };
         const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -34634,7 +34708,7 @@
             },
 
             cycleMapPreset: function(targetPreset) {
-                const order = ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split'];
+                const order = ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split', 'skyline'];
                 const currIdx = order.indexOf(game.mapPreset || 'ascent');
                 const nextId = (targetPreset && MAP_PRESETS && MAP_PRESETS[targetPreset])
                     ? targetPreset
@@ -39122,6 +39196,7 @@
                             <button class="mm-btn" data-act="play">PLAY</button>
                             <button class="mm-btn mm-pause-only" data-act="agent">AGENT SELECT</button>
                             <button class="mm-btn" data-act="modes">MODES <span class="mm-val" id="mm-mode-val">WAVE</span></button>
+                            <button class="mm-btn" data-act="map">MAP <span class="mm-val" id="mm-map-val">ASCENT</span></button>
                             <button class="mm-btn" data-act="settings">SETTINGS</button>
                             <button class="mm-btn" data-act="controls">CONTROLS</button>
                         </div>
@@ -39161,21 +39236,6 @@
                 const body = new THREE.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.5, metalness: 0.2, toneMapped: false });
                 this.accentMat = new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.6, roughness: 0.35, toneMapped: false });
                 this.ringMat = new THREE.MeshBasicMaterial({ color: 0x38f6ff, transparent: true, opacity: 0.85, toneMapped: false });
-                const rb = (w, h, d, x, y, z, rx, rz) => ({ geometry: roundedBoxGeometry(w, h, d, Math.min(w, h, d) * 0.3, 2), matrix: partMatrix(x, y, z, rx || 0, 0, rz || 0) });
-                const bodyParts = [
-                    rb(0.17, 0.82, 0.2, -0.12, 0.41, 0), rb(0.17, 0.82, 0.2, 0.12, 0.41, 0.02, -0.06),   // legs
-                    rb(0.46, 0.26, 0.28, 0, 0.92, 0),                                                    // hips
-                    rb(0.5, 0.56, 0.3, 0, 1.3, 0),                                                       // torso
-                    rb(0.14, 0.62, 0.15, -0.34, 1.26, 0.02, 0, 0.12), rb(0.14, 0.62, 0.15, 0.34, 1.26, -0.04, -0.4, -0.1), // arms
-                    rb(0.24, 0.27, 0.26, 0, 1.76, 0)                                                     // head
-                ];
-                const accentParts = [
-                    rb(0.21, 0.07, 0.04, 0, 1.78, -0.14),                                                // visor
-                    rb(0.18, 0.12, 0.3, -0.31, 1.55, 0), rb(0.18, 0.12, 0.3, 0.31, 1.55, 0),            // shoulders
-                    rb(0.5, 0.05, 0.31, 0, 1.06, 0),                                                     // belt
-                    rb(0.08, 0.3, 0.05, 0, 1.36, -0.16)                                                  // chest stripe
-                ];
-                for (const p of bodyParts.concat(accentParts)) p.geometry.dispose();
                 // The same soldier figure as the bots, in the agent's colour
                 const fig = humanoidFigure({ torso: this.accentMat, head: body, legs: body, gear: body });
                 fig.scale.setScalar(0.85);
@@ -39249,6 +39309,8 @@
                 this.el.querySelector('[data-act="play"]').textContent = this.kind === 'pause' ? 'RESUME' : 'PLAY';
                 const m = MENU_MODES.find((x) => x[0] === this.mode) || MENU_MODES[0];
                 document.getElementById('mm-mode-val').textContent = m[1];
+                const mp = (typeof MAP_PRESETS !== 'undefined' && MAP_PRESETS[game.mapPreset]) || null;
+                document.getElementById('mm-map-val').textContent = mp ? mp.name : 'ASCENT';
                 this.el.querySelectorAll('.mm-mode').forEach((b) => b.classList.toggle('selected', b.dataset.mode === this.mode));
             },
 
@@ -39258,6 +39320,7 @@
                     else this.resume();
                 } else if (a === 'agent') this.openAgentSelect();
                 else if (a === 'modes') this.setView('modes');
+                else if (a === 'map') { tacticalDirector.cycleMapPreset(); this.render(); }
                 else if (a === 'controls') this.setView('controls');
                 else if (a === 'back') this.back();
                 else if (a === 'settings' && typeof settingsManager !== 'undefined') settingsManager.toggleSettings(true);
@@ -41049,6 +41112,7 @@
                 this.loadCareerIfEnabled();
                 this.buildLotusDoors3D();
                 this.buildSplitZiplines3D();
+                this.buildSkylineCity3D();
                 this.buildWingmanBots3D();
                 this.pingGroup = new THREE.Group();
                 scene.add(this.pingGroup);
@@ -41671,12 +41735,114 @@
                 scene.add(this.splitGroup);
             },
 
+            // SKYLINE: the city around the rooftop arena. Distant towers with lit
+            // windows, neon billboard faces, wall neon, a helipad ring and blinking
+            // antenna lights. All plain coloured materials (no new shader programs),
+            // merged into a few meshes; nothing here collides.
+            buildSkylineCity3D: function() {
+                const g = new THREE.Group();
+                g.name = 'skylineCity';
+                let seed = 4242;
+                const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+                const unit = new THREE.BoxGeometry(1, 1, 1);
+                const part = (sx, sy, sz, x, y, z, ry) => {
+                    const m = partMatrix(x, y, z, 0, ry || 0, 0);
+                    m.multiply(new THREE.Matrix4().makeScale(sx, sy, sz));
+                    return { geometry: unit, matrix: m };
+                };
+                const towers = [], lit = [[], [], []];
+                const y0 = (h) => h / 2 - 2;          // towers rise from below the rooftop
+                for (let i = 0; i < 44; i++) {
+                    const a = (i / 44) * Math.PI * 2 + rnd() * 0.08;
+                    const r = 64 + rnd() * 52;
+                    const w = 8 + rnd() * 10, d = 8 + rnd() * 8, h = 22 + rnd() * 58;
+                    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+                    const ry = Math.atan2(x, z);            // local +z faces away from the arena
+                    towers.push(part(w, h, d, x, y0(h), z, ry));
+                    // Window rows on the face looking at the arena
+                    const fx = x - Math.sin(ry) * (d / 2 + 0.05), fz = z - Math.cos(ry) * (d / 2 + 0.05);
+                    const rows = Math.floor(h / 3.2);
+                    for (let row = 1; row < rows; row++) {
+                        if (rnd() < 0.3) continue;
+                        const segs = 1 + Math.floor(rnd() * 3);
+                        for (let k = 0; k < segs; k++) {
+                            const sw = w * (0.18 + rnd() * 0.22);
+                            const off = (rnd() - 0.5) * (w - sw);
+                            const px = fx + Math.cos(ry) * off, pz = fz - Math.sin(ry) * off;
+                            lit[Math.floor(rnd() * 3)].push(part(sw, 0.9, 0.1, px, row * 3.2, pz, ry));
+                        }
+                    }
+                }
+                const add = (parts, hex) => {
+                    const mesh = new THREE.Mesh(mergeGeometryParts(parts), new THREE.MeshBasicMaterial({ color: hex }));
+                    mesh.matrixAutoUpdate = false;
+                    g.add(mesh);
+                    return mesh;
+                };
+                add(towers, 0x0a0e1c);
+                add(lit[0], 0xffc46b);
+                add(lit[1], 0x7dd3fc);
+                add(lit[2], 0xf472b6);
+                // Billboard faces on the deck frames (x = +-38.5), framed ad panels
+                const magenta = [part(0.06, 4.4, 11.4, -38.2, 7, 0), part(0.06, 4.4, 11.4, 38.2, 7, 0)];
+                add(magenta, 0xff2bd6);
+                add([part(0.08, 2.2, 6, -38.15, 7.6, -2), part(0.08, 1.2, 4, -38.15, 5.6, 2.6), part(0.08, 2.2, 6, 38.15, 7.6, 2), part(0.08, 1.2, 4, 38.15, 5.6, -2.6)], 0x22e6ff);
+                add([part(0.09, 0.5, 9, -38.1, 6.0, -1), part(0.09, 0.5, 9, 38.1, 6.0, 1)], 0xfef08a);
+                // Neon tubes along the outer walls and under the skybridges
+                const tubes = [];
+                for (const sgn of [-1, 1]) {
+                    tubes.push(part(0.12, 0.12, 96, 49.4 * sgn, 3.2, 0));
+                    tubes.push(part(96, 0.12, 0.12, 0, 3.2, 49.4 * sgn));
+                    tubes.push(part(22, 0.08, 0.08, 0, 3.55, 38 * sgn - 1.5));
+                    tubes.push(part(22, 0.08, 0.08, 0, 3.55, 38 * sgn + 1.5));
+                }
+                add(tubes, 0x22e6ff);
+                // Water tower legs, helipad "H" and ring
+                const legs = [];
+                for (const [lx, lz] of [[-2.6, -2.6], [2.6, -2.6], [-2.6, 2.6], [2.6, 2.6]]) legs.push(part(0.3, 4.8, 0.3, -18 + lx, 2.4, -6 + lz));
+                add(legs, 0x1e2433);
+                add([part(0.6, 0.04, 4, -1.2, 3.02, 0), part(0.6, 0.04, 4, 1.2, 3.02, 0), part(1.8, 0.04, 0.6, 0, 3.02, 0)], 0xfacc15);
+                const ringGeo = new THREE.RingGeometry(2.9, 3.2, 40);
+                ringGeo.rotateX(-Math.PI / 2);
+                const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+                ring.position.set(0, 3.02, 0);
+                g.add(ring);
+                // Antenna masts on the stair towers, with blinking red lights
+                const masts = [];
+                this.skylineBeacons = [];
+                const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2030 });
+                const beaconGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+                for (const [mx, mz] of [[-14, -38], [14, -38], [-14, 38], [14, 38]]) {
+                    masts.push(part(0.14, 5, 0.14, mx + 2, 6.5, mz + 2));
+                    const b = new THREE.Mesh(beaconGeo, beaconMat);
+                    b.position.set(mx + 2, 9.1, mz + 2);
+                    g.add(b);
+                    this.skylineBeacons.push(b);
+                }
+                add(masts, 0x334155);
+                this.skylineBeaconMat = beaconMat;
+                unit.dispose();
+                g.visible = false;
+                g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.updateMatrix(); o.matrixAutoUpdate = false; } });
+                this.skylineGroup = g;
+                scene.add(g);
+            },
+
             onMapChanged: function(mapId) {
                 if (this.lotusGroup) this.lotusGroup.visible = (mapId === 'lotus');
                 if (this.splitGroup) this.splitGroup.visible = (mapId === 'split');
+                if (this.skylineGroup) this.skylineGroup.visible = (mapId === 'skyline');
             },
 
             updateMapMechanics: function(delta, now) {
+                // SKYLINE antenna lights blink (a colour change only)
+                if (this.skylineGroup && this.skylineGroup.visible && this.skylineBeaconMat) {
+                    const on = (now % 1600) < 260;
+                    if (on !== this._beaconOn) {
+                        this._beaconOn = on;
+                        this.skylineBeaconMat.color.setHex(on ? 0xff2030 : 0x3a0a10).convertSRGBToLinear();
+                    }
+                }
                 const px = characterController.position.x;
                 const py = characterController.position.y;
                 const pz = characterController.position.z;

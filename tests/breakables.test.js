@@ -23,7 +23,7 @@ const FIRE = `
 test('props on every map: glass and barrels on open floor, away from spawns, with no shader compiles', { timeout: 400000 }, async () => {
     const { page, errors, frames, evaluate } = await boot({ quality: 'medium' });
     const [baseline] = await programState(page);
-    for (const map of ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split']) {
+    for (const map of ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split', 'skyline']) {
         await evaluate((map) => tacticalDirector.cycleMapPreset(map), map);
         await frames(3);
         const r = await evaluate(() => {

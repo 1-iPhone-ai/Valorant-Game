@@ -21,12 +21,12 @@ test('weather: off by default; each map has its own; rain wets the floor; off on
         game.userSettings.weather = 'map';
         const out = {};
         const was = game.mapPreset;
-        for (const m of ['ascent', 'bind', 'haven', 'split', 'icebox', 'lotus']) { game.mapPreset = m; out[m] = weatherFX.resolve(); }
+        for (const m of ['ascent', 'bind', 'haven', 'split', 'icebox', 'lotus', 'skyline']) { game.mapPreset = m; out[m] = weatherFX.resolve(); }
         game.mapPreset = was;
         game.userSettings.weather = 'off';
         return out;
     });
-    assert.deepEqual(perMap, { ascent: 'leaves', bind: 'rain', haven: 'sand', split: 'storm', icebox: 'snow', lotus: 'leaves' });
+    assert.deepEqual(perMap, { ascent: 'leaves', bind: 'rain', haven: 'sand', split: 'storm', icebox: 'snow', lotus: 'leaves', skyline: 'rain' });
 
     // Rain from the settings pill: particles and splashes on, wet floor, darker and foggier
     await setWeather(evaluate, 'rain');
@@ -143,14 +143,14 @@ test('storms: lightning flashes and fades (softened by Reduce Flashes); sunset a
     assert.deepEqual(errors, []);
 });
 
-test('Map weather on all 6 maps at sunset: each map gets its own weather, no errors, no shader compiles', { timeout: 400000 }, async () => {
+test('Map weather on all 7 maps at sunset: each map gets its own weather, no errors, no shader compiles', { timeout: 400000 }, async () => {
     const { page, errors, frames, evaluate } = await boot({ quality: 'high' });
     const [baseline] = await programState(page);
     await evaluate(() => {
         document.querySelector('#setting-atmosphere-pills [data-atmos="sunset"]').click();
         document.querySelector('#setting-weather-pills [data-weather="map"]').click();
     });
-    const want = { ascent: 'leaves', bind: 'rain', haven: 'sand', icebox: 'snow', lotus: 'leaves', split: 'storm' };
+    const want = { ascent: 'leaves', bind: 'rain', haven: 'sand', icebox: 'snow', lotus: 'leaves', split: 'storm', skyline: 'rain' };
     for (const map of Object.keys(want)) {
         await evaluate((map) => tacticalDirector.cycleMapPreset(map), map);
         await frames(4);

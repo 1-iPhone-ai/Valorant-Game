@@ -16,13 +16,13 @@ The `tests/` folder holds headless browser tests. They need no GPU, because Chro
 - **Load:** the game loads without errors.
 - **Shader compiles:** none happen after warm-up, including when switching quality.
 - **Abilities:** every agent's abilities and ultimate cast, and ground effects stay circular.
-- **Maps and modes:** all 6 maps × 3 atmosphere modes.
+- **Maps and modes:** all 7 maps × 3 atmosphere modes.
 - **Controller:** input works through a simulated gamepad.
 - **Game modes:** Wave, Retake and the 30-bot Range play through planting, defusing, detonation, round changes and the range scorecard.
 - **HUD and settings:** the HUD has no overlapping panels at common window sizes, and settings survive a reload (and the opt-out sticks).
 - **Audio and hit feedback:** 3D enemy audio and hit feedback work.
 - **Viewmodel animation:** animated draw, a recoil spring that settles, reload with the magazine out and back in, inspect, and shell casings that land and clear; the gun always returns exactly to rest.
-- **Weather and time of day:** weather is off by default; Map weather gives each of the 6 maps its own (rain, storm, snow, sand, leaves); rain wets the floor and the floor dries when it stops; storms flash lightning (softened by Reduce Flashes) and fade back exactly; Low turns it off; Sunset and Dawn move the sun and refit the shadows, and Daylight restores them exactly; no shader compiles on any map.
+- **Weather and time of day:** weather is off by default; Map weather gives each of the 7 maps its own (rain, storm, snow, sand, leaves); rain wets the floor and the floor dries when it stops; storms flash lightning (softened by Reduce Flashes) and fade back exactly; Low turns it off; Sunset and Dawn move the sun and refit the shadows, and Daylight restores them exactly; no shader compiles on any map.
 - **Reflections and lit abilities:** the floor reflection runs every frame on Ultra and Cinematic, every other frame on High only while the floor is wet, and never on Medium or Low; the mirrored camera clips everything below the floor; ability blasts, fire zones and gunfire light the floor and walls, fade out exactly, and the 6 nearest are used; Low turns them off; Cinematic draws light shafts from them; no new shader programs.
 - **Kill cam and highlights:** after a death the kill cam replays the last seconds from the killer's side, names the killer, puts every bot and the camera back exactly after each replay frame, holds the respawn until it ends, and Space skips it; the setting turns it off; in Match mode the round MVP card shows, the best play of the round replays and the next round waits for it, and the result screen shows the round strip, K/D, MVPs and the best play.
 - **Main menu and agent select:** the start screen pauses the game under an orbiting camera with an agent preview; keyboard, mouse and controller drive it (Start pauses, D-pad and A select, B backs out); agent select describes all four abilities of all 29 agents and LOCK IN starts the chosen mode; Esc opens the pause menu and the round timer stands still; Skip Menu On Start is remembered; the menu adds no shader programs. (The other tests start in play: the harness skips the start screen unless a test asks for it.)
@@ -37,9 +37,10 @@ The `tests/` folder holds headless browser tests. They need no GPU, because Chro
 - **Music, ambience and HUD size:** music and ambience are off by default, play per map when switched on and fade out when switched off; HUD Size 80–130% scales every panel with no overlaps at 1280×720, 1920×1080 and 1024×600.
 - **Accessibility and bot skill:** Reduce Flashes softens washes and flashbangs and stops the low-health pulse; the cyan colour-blind option recolours bots; bot tactics scale with Bot Skill (Iron never flanks, Radiant peeks pre-aimed).
 - **Bot tactics:** every map has cover spots; hurt bots take cover out of sight, peek to shoot and never fire while running; pairs flank, and a bot whose partner dies takes cover.
+- **Skyline (the 7th map):** a neon rooftop city at night, in the F4 cycle after Split and in the main menu's MAP button; the city around it shows only there; Map weather rains; it has its own music; both spike sites and the spawns are clear; you can climb the stairs onto a skybridge, walk across it and under it, and step up onto the side decks and the helipad; antenna lights blink; no new shader programs.
 - **Bot colours and animation:** bots are drawn as soldiers (helmet and visor, arms holding the rifle, chest rig, knee pads and boots) in their archetype colours, as are the wingmen, the menu preview and the kill-cam ghost; they walk with bending knees, flinch, recoil and topple over when killed; the drawn body stays inside the original hitboxes, which stay fixed.
 - **High detail characters and guns:** the setting is off by default; when on, bots, wingmen, guns and hands are drawn with rounded, detailed shapes while hitboxes, weapon skins and shaders stay unchanged.
-- **High detail maps:** the setting is off by default; when on, it adds textures and props on all 6 maps without new shader compiles or a brightness shift, and the Low profile turns it off.
+- **High detail maps:** the setting is off by default; when on, it adds textures and props on all 7 maps without new shader compiles or a brightness shift, and the Low profile turns it off.
 
 ```bash
 cd tests

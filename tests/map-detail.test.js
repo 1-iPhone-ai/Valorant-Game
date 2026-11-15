@@ -49,7 +49,7 @@ test('High Detail Maps on every map: props and textures, no shader compiles, sam
     }));
     assert.deepEqual(on, { setting: 'on', uniform: 1, floor: 1, decor: true, size: 512, saved: 'on' });
 
-    for (const map of ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split']) {
+    for (const map of ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split', 'skyline']) {
         await evaluate((m) => tacticalDirector.cycleMapPreset(m), map);
         await frames(4);
         const m = await evaluate(() => ({
