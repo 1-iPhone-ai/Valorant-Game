@@ -3843,6 +3843,28 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>Slide</strong>
+                                    <small>Crouch while sprinting to slide low and fast; jump out of a slide to keep the speed</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-slide-pills">
+                                    <button class="settings-pill-opt active" data-slide="on">ON</button>
+                                    <button class="settings-pill-opt" data-slide="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Mantle</strong>
+                                    <small>Jump into a ledge or crate up to chest height while moving forward to climb onto it</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-mantle-pills">
+                                    <button class="settings-pill-opt active" data-mantle="on">ON</button>
+                                    <button class="settings-pill-opt" data-mantle="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Breakable Props</strong>
                                     <small>Glass panes that shatter and explosive barrels that blow up when shot (they come back next round, or after 30 s)</small>
                                 </div>
@@ -5379,6 +5401,8 @@
                 skipMenu: false,       // V1.7: start straight in the game (no start screen)
                 breakables: true,      // glass panes and explosive barrels on the maps
                 showBody: true,        // your legs and body when you look down, and your shadow
+                slide: true,           // crouch while sprinting to slide
+                mantle: true,          // jump into a ledge up to chest height to climb onto it
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -6669,6 +6693,20 @@
             updraftTimer: 0,
             isGliding: false,
             
+            // V1.7 movement: slide, mantle and air momentum
+            slideTimer: 0,                         // > 0 while sliding (seconds left)
+            slideCooldown: 0,                      // seconds until the next slide
+            slideStarts: 0,
+            mantleT: -1,                           // 0..1 while climbing a ledge, -1 otherwise
+            mantleDur: 0.32,
+            mantleTop: 0,
+            mantleCount: 0,
+            _mantleFrom: new THREE.Vector3(),
+            _mantleTo: new THREE.Vector3(),
+            _mantleScratch: [],
+            _ledge: null, _ledgeNX: 0, _ledgeNZ: 0,
+            _airCap: -1,                           // horizontal speed cap while airborne (-1: not set)
+            
             // Rotation properties
             rotation: new THREE.Euler(0, 0, 0, 'YXZ'), // Character body rotation (YXZ order)
             targetRotation: new THREE.Euler(0, 0, 0, 'YXZ'), // Target rotation for smooth turning
@@ -6714,9 +6752,99 @@
             
             // Set crouch state (Ctrl / Z / C)
             setCrouching: function(crouching) {
+                const was = this.isCrouching;
                 this.isCrouching = !!crouching;
                 if (this.isCrouching) {
+                    // Crouch while sprinting: slide
+                    if (!was) this.tryStartSlide();
                     this.sprinting = false;
+                } else if (this.slideTimer > 0) {
+                    this.slideTimer = 0;
+                }
+            },
+            
+            // Top speed (per tick) for an input acceleration at ground friction
+            terminalSpeed: function(accel) {
+                return accel * this.friction / (1 - this.friction);
+            },
+            
+            // Slide: a burst of speed in the direction you were running that bleeds off
+            // slowly; low steering; you stay crouched. Off by setting.
+            tryStartSlide: function() {
+                if (game.userSettings && game.userSettings.slide === false) return false;
+                if (!this.grounded || !this.sprinting || this.slideCooldown > 0 || this.dashTimer > 0 || this.mantleT >= 0) return false;
+                const hs = Math.hypot(this.velocity.x, this.velocity.z);
+                const walkTop = this.terminalSpeed(this.walkSpeed * this.speedMultiplier);
+                if (hs < walkTop * 1.05) return false;
+                const boost = Math.max(hs, this.terminalSpeed(this.sprintSpeed * this.speedMultiplier)) * 1.22;
+                this.velocity.x *= boost / hs;
+                this.velocity.z *= boost / hs;
+                this.slideTimer = 0.85;
+                this.slideCooldown = 1.1;
+                this.slideStarts++;
+                if (soundFX.noiseLayer) {
+                    soundFX.noiseLayer(0.55, 0.11, 0, 'bandpass', 700, 0.5);
+                    soundFX.noiseLayer(0.3, 0.06, 0.02, 'highpass', 2600, 0.7);
+                }
+                return true;
+            },
+            
+            // Mantle: jumping into a ledge up to chest height climbs onto it, if there
+            // is room to stand on top. Off by setting.
+            tryMantle: function(box, nx, nz) {
+                if (game.userSettings && game.userSettings.mantle === false) return false;
+                if (this.mantleT >= 0 || this.isCrouching || this.dashTimer > 0) return false;
+                if (box.maxX - box.minX < 0.7 || box.maxZ - box.minZ < 0.7) return false;
+                const top = box.maxY;
+                const r = this.radius;
+                let lx = this.position.x - nx * (r + 0.4);
+                let lz = this.position.z - nz * (r + 0.4);
+                lx = Math.min(box.maxX - 0.3, Math.max(box.minX + 0.3, lx));
+                lz = Math.min(box.maxZ - 0.3, Math.max(box.minZ + 0.3, lz));
+                // Room to stand on top: nothing else in the standing space
+                const list = collisionIndex.query(lx - r, lz - r, lx + r, lz + r, this._mantleScratch);
+                for (let i = 0; i < list.length; i++) {
+                    const b = list[i];
+                    if (b === box) continue;
+                    if (b.maxX < lx - r || b.minX > lx + r || b.maxZ < lz - r || b.minZ > lz + r) continue;
+                    if (b.minY < top + this.standHeight && b.maxY > top + 0.05) return false;
+                }
+                this._mantleFrom.copy(this.position);
+                this._mantleTo.set(lx, top + this.height, lz);
+                this.mantleT = 0;
+                this.mantleTop = top;
+                this.mantleCount++;
+                this.slideTimer = 0;
+                this.velocity.set(0, 0, 0);
+                this.grounded = false;
+                jumpQueued = false;
+                if (soundFX.noiseLayer) {
+                    soundFX.noiseLayer(0.12, 0.09, 0, 'lowpass', 900, 0.6);
+                    soundFX.noiseLayer(0.16, 0.07, 0.2, 'bandpass', 1300, 0.8);
+                }
+                return true;
+            },
+            
+            // Rise first, then pull forward onto the ledge
+            stepMantle: function(delta) {
+                this.mantleT = Math.min(1, this.mantleT + delta / this.mantleDur);
+                const t = this.mantleT;
+                const ty = Math.min(1, t / 0.6), txz = Math.max(0, (t - 0.35) / 0.65);
+                const ey = 1 - (1 - ty) * (1 - ty);
+                const exz = txz * txz * (3 - 2 * txz);
+                const a = this._mantleFrom, b = this._mantleTo;
+                this.position.set(a.x + (b.x - a.x) * exz, a.y + (b.y - a.y) * ey, a.z + (b.z - a.z) * exz);
+                this.velocity.set(0, 0, 0);
+                this.grounded = false;
+                if (t >= 1) {
+                    this.mantleT = -1;
+                    this.position.copy(b);
+                    this.grounded = true;
+                    this.jumping = false;
+                    this.supportY = this.mantleTop;
+                    this._airCap = -1;
+                    this.lastPosition.copy(this.position);
+                    this.lastMoveTime = Date.now();
                 }
             },
             
@@ -6768,6 +6896,13 @@
                 // Store previous position for collision detection
                 const previousPosition = this._previousPosition.copy(this.position);
                 
+                if (this.slideCooldown > 0) this.slideCooldown = Math.max(0, this.slideCooldown - delta);
+                // Climbing a ledge: scripted, no input or collision until on top
+                if (this.mantleT >= 0) {
+                    this.stepMantle(delta);
+                    return;
+                }
+                
                 // Active Dash override (sub-stepped so high speed never tunnels through walls)
                 if (this.dashTimer > 0) {
                     this.dashTimer = Math.max(0, this.dashTimer - delta);
@@ -6786,6 +6921,7 @@
                     if (this.dashTimer <= 0) {
                         this.velocity.x = this.dashVelX * 0.35;
                         this.velocity.z = this.dashVelZ * 0.35;
+                        this._airCap = -1;
                     }
                     this.checkIfStuck();
                     return;
@@ -6819,14 +6955,21 @@
                 const crouchSpeedScale = 1 - this.crouchBlend * (1 - this.crouchSpeedMultiplier);
                 const currentSpeed = baseSpeed * crouchSpeedScale * this.speedMultiplier;
                 
+                // Sliding: light steering only. In the air: a little less push but
+                // less drag, so momentum carries through jumps and you can curve.
+                const sliding = this.slideTimer > 0;
+                const airborne = !this.grounded;
+                const startSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+                const accelScale = sliding ? 0.12 : (airborne ? 0.75 : 1);
+                
                 // Apply movement directly aligned to camera.rotation.y
                 if (moveX !== 0 || moveZ !== 0) {
                     const sinY = Math.sin(this.rotation.y);
                     const cosY = Math.cos(this.rotation.y);
                     
                     // Camera-relative movement: Forward(-Z) = (-sinY, -cosY), Right(+X) = (cosY, -sinY)
-                    this.velocity.x += (sinY * moveZ + cosY * moveX) * currentSpeed;
-                    this.velocity.z += (cosY * moveZ - sinY * moveX) * currentSpeed;
+                    this.velocity.x += (sinY * moveZ + cosY * moveX) * currentSpeed * accelScale;
+                    this.velocity.z += (cosY * moveZ - sinY * moveX) * currentSpeed * accelScale;
                 }
                 
                 // Updraft reduced-gravity ascent timer
@@ -6856,9 +6999,29 @@
                     jumpQueued = false;
                 }
                 
+                // Jumping out of a slide keeps the speed (now in the air)
+                if (this.slideTimer > 0 && !this.isCrouching) this.slideTimer = 0;
+                
                 // Apply friction to horizontal movement
-                this.velocity.x *= this.friction;
-                this.velocity.z *= this.friction;
+                const drag = (this.slideTimer > 0 && this.grounded) ? 0.99 : (!this.grounded ? 0.9 : this.friction);
+                this.velocity.x *= drag;
+                this.velocity.z *= drag;
+                const hSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+                if (!this.grounded && this.dashTimer <= 0) {
+                    // Never faster in the air than when you left the ground (or your
+                    // top speed on foot), so less drag cannot be used to gain speed
+                    if (this._airCap < 0) this._airCap = Math.max(startSpeed, this.terminalSpeed(currentSpeed));
+                    if (hSpeed > this._airCap) {
+                        this.velocity.x *= this._airCap / hSpeed;
+                        this.velocity.z *= this._airCap / hSpeed;
+                    }
+                } else {
+                    this._airCap = -1;
+                }
+                if (this.slideTimer > 0) {
+                    this.slideTimer = Math.max(0, this.slideTimer - delta);
+                    if (this.grounded && hSpeed < this.terminalSpeed(this.walkSpeed * this.speedMultiplier) * 0.8) this.slideTimer = 0;
+                }
                 
                 // Update position based on velocity
                 this.position.x += this.velocity.x;
@@ -6876,6 +7039,12 @@
                 
                 // Check for collisions with objects (including landing on elevated rooftops)
                 this.handleCollisions(previousPosition);
+                
+                // Jumped into a ledge while pushing forward towards it: climb up
+                if (this._ledge && !this.grounded && moveZ < -0.3) {
+                    const fx = -Math.sin(this.rotation.y), fz = -Math.cos(this.rotation.y);
+                    if (fx * -this._ledgeNX + fz * -this._ledgeNZ > 0.4) this.tryMantle(this._ledge, this._ledgeNX, this._ledgeNZ);
+                }
                 
                 // Check for being stuck
                 this.checkIfStuck();
@@ -6924,6 +7093,7 @@
                 let collided = false;
                 let highestSupport = 0;
                 this.supportRec = null;
+                this._ledge = null;
                 const prevFootY = previousPosition.y - this.height;
                 
                 for (let n = 0; n < candidates.length; n++) {
@@ -6987,8 +7157,13 @@
                         overlapZ = characterBox.max.z - box.minZ;
                     }
                     
+                    // A ledge we ran into, above a step but within chest height
+                    const rise = box.maxY - (this.position.y - this.height);
+                    const ledge = rise > 0.5 && rise <= 1.6;
+                    
                     // Resolve collision on smallest horizontal overlap axis
                     if (overlapX < overlapZ) {
+                        if (ledge) { this._ledge = box; this._ledgeNX = this.position.x > objectCenterX ? 1 : -1; this._ledgeNZ = 0; }
                         if (this.position.x > objectCenterX) {
                             this.position.x = box.maxX + this.radius;
                         } else {
@@ -6996,6 +7171,7 @@
                         }
                         this.velocity.x = 0;
                     } else {
+                        if (ledge) { this._ledge = box; this._ledgeNX = 0; this._ledgeNZ = this.position.z > objectCenterZ ? 1 : -1; }
                         if (this.position.z > objectCenterZ) {
                             this.position.z = box.maxZ + this.radius;
                         } else {
@@ -7079,6 +7255,9 @@
             // Reset character to a safe position
             reset: function() {
                 this.isCrouching = false;
+                this.slideTimer = 0;
+                this.mantleT = -1;
+                this._airCap = -1;
                 this.height = this.standHeight;
                 this.crouchBlend = 0;
                 this.position.set(0, this.height, 15);
@@ -36581,6 +36760,26 @@
             camera.position.z = prev.z + (curr.z - prev.z) * alpha;
         }
         
+        // V1.7: the view tilts while sliding (towards the side you steer) and
+        // levels out after. Applied as a change on top of the look rotation, so
+        // nothing else that turns the camera is disturbed; it is exactly 0 at rest.
+        const slideCamera = {
+            roll: 0, applied: 0,
+            update: function (dt) {
+                if (replayDirector.clip || mainMenu.open) return;
+                const cc = characterController;
+                let target = 0;
+                if (cc.slideTimer > 0 && cc.grounded) {
+                    const steer = (game.keys.d ? 1 : 0) - (game.keys.a ? 1 : 0);
+                    target = steer ? -0.09 * steer : 0.06;
+                }
+                this.roll += (target - this.roll) * (1 - Math.exp(-10 * dt));
+                if (!target && Math.abs(this.roll) < 1e-4) this.roll = 0;
+                camera.rotation.z += this.roll - this.applied;
+                this.applied = this.roll;
+            }
+        };
+        
         // Update function using character controller
         function updateGameState(delta) {
             // Update character controller (collision at movement frequency)
@@ -37355,6 +37554,8 @@
             skipMenu: false,
             breakables: true,
             showBody: true,
+            slide: true,
+            mantle: true,
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -39207,7 +39408,7 @@
                         <div class="mm-view" data-view="controls">
                             <div class="mm-controls">
                                 <div><b>WASD</b> Move</div><div><b>Mouse</b> Aim • <b>Left / Right click</b> Shoot / Aim down sights</div>
-                                <div><b>Space</b> Jump (hold: glide) • <b>Ctrl / Z</b> Crouch</div><div><b>R</b> Reload • <b>Y</b> Inspect • <b>1–4</b> Weapons • <b>V</b> Variants</div>
+                                <div><b>Space</b> Jump (hold: glide; into a ledge: climb) • <b>Ctrl / Z</b> Crouch (while sprinting: slide)</div><div><b>R</b> Reload • <b>Y</b> Inspect • <b>1–4</b> Weapons • <b>V</b> Variants</div>
                                 <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings</div>
                                 <div><b>F1 / F2 / F3</b> Wave / Range / Retake • <b>F4</b> Maps • <b>T</b> Ping</div><div><b>Esc</b> This menu</div>
                                 <div class="mm-controls-pad"><b>Controller:</b> sticks move and aim • RT shoot • LT aim • A jump • B crouch • X reload • LB / RB / D-pad abilities • Start this menu • hold View: agents</div>
@@ -39613,6 +39814,17 @@
 
                 this.bindPillGroup('setting-showbody-pills', 'data-showbody', (val) => {
                     game.userSettings.showBody = val !== 'off';
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-slide-pills', 'data-slide', (val) => {
+                    game.userSettings.slide = val !== 'off';
+                    if (!game.userSettings.slide) characterController.slideTimer = 0;
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-mantle-pills', 'data-mantle', (val) => {
+                    game.userSettings.mantle = val !== 'off';
                     this.saveToStorage();
                 });
 
@@ -40790,6 +41002,8 @@
                 setActivePill('setting-skipmenu-pills', 'data-skipmenu', cfg.skipMenu ? 'on' : 'off');
                 setActivePill('setting-breakables-pills', 'data-breakables', cfg.breakables === false ? 'off' : 'on');
                 setActivePill('setting-showbody-pills', 'data-showbody', cfg.showBody === false ? 'off' : 'on');
+                setActivePill('setting-slide-pills', 'data-slide', cfg.slide === false ? 'off' : 'on');
+                setActivePill('setting-mantle-pills', 'data-mantle', cfg.mantle === false ? 'off' : 'on');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
@@ -42668,6 +42882,7 @@
             // (autoClear is off; info.autoReset is off and reset here)
             renderer.info.reset();
             fxKit.applyShake(now, Math.min(0.05, delta));
+            slideCamera.update(Math.min(0.05, delta));
             // V1.7: kill cam / highlight replay poses the world for this frame only
             replayDirector.beginFrame(now);
             skyDome.position.copy(camera.position);
