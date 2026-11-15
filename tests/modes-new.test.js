@@ -115,15 +115,25 @@ test('Spike Rush: first to 4, a random gun each round, full abilities, power-up 
     assert.deepEqual([orbs.health, orbs.shield, orbs.ultPts], [100, 50, 2]);
     assert.ok(orbs.haste);
 
-    // Rounds: a win, then a new round with a (possibly different) random gun; 4 wins ends it
-    await evaluate(() => { matchMode.phaseEndsAt = performance.now(); });
-    await frames(3);
-    await evaluate(() => { for (const e of enemyObjects) if (e.isActive && !e.hit) damageEnemyActor(e, 9999, performance.now(), Date.now(), 'Vandal', 'torso'); replayDirector.stop(); matchMode.phaseEndsAt = performance.now(); });
-    await frames(4);
+    // Rounds: a win, then a new round with a (possibly different) random gun; 4 wins ends it.
+    // Each step waits for the phase it needs: on a slow runner the 4 s start can already be
+    // over, and ending a live round early would count as running out of time.
+    const goLive = async () => {
+        await evaluate(() => { if (matchMode.phase === 'buy') matchMode.phaseEndsAt = performance.now(); });
+        await page.waitForFunction(() => matchMode.phase === 'live', null, { timeout: 30000 });
+    };
+    const winRound = async () => {
+        await evaluate(() => { for (const e of enemyObjects) if (e.isActive && !e.hit) damageEnemyActor(e, 9999, performance.now(), Date.now(), 'Vandal', 'torso'); });
+        await page.waitForFunction(() => matchMode.phase === 'post' || matchMode.phase === 'over', null, { timeout: 30000 });
+        await evaluate(() => { replayDirector.stop(); if (matchMode.phase === 'post') matchMode.phaseEndsAt = performance.now(); });
+    };
+    await goLive();
+    await winRound();
+    await page.waitForFunction(() => matchMode.round === 2 && matchMode.phase !== 'post', null, { timeout: 30000 });
     assert.deepEqual(await evaluate(() => [matchMode.round, matchMode.us, spikeRush.orbs.filter((o) => o.active).length]), [2, 1, 4], 'round 2 with fresh orbs');
-    await evaluate(() => { matchMode.us = 3; matchMode.phaseEndsAt = performance.now(); });
-    await frames(3);
-    await evaluate(() => { for (const e of enemyObjects) if (e.isActive && !e.hit) damageEnemyActor(e, 9999, performance.now(), Date.now(), 'Vandal', 'torso'); replayDirector.stop(); matchMode.phaseEndsAt = performance.now(); });
+    await evaluate(() => { matchMode.us = 3; });
+    await goLive();
+    await winRound();
     await page.waitForFunction(() => matchMode.phase === 'over', null, { timeout: 30000 });
     assert.equal(await evaluate(() => matchMode.us), 4, 'first to 4');
 
