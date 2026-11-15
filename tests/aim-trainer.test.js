@@ -116,8 +116,12 @@ test('aim trainer: Flick shows one small target; Tracking scores time on a movin
         await evaluate(() => __aimAt(aimTrainer.targets[0].mesh.position));
         await frames(1);
     }
-    const on = await evaluate(() => ({ onTime: aimTrainer.onTime, total: aimTrainer.total, score: aimTrainer.score, moved: aimTrainer.targets[0].mesh.position.distanceTo(new THREE.Vector3()) }));
-    await evaluate(() => camera.rotation.set(1.2, 0, 0, 'YXZ'));
+    // Read the score and look away in the same step, so no frame in between counts
+    const on = await evaluate(() => {
+        const r = { onTime: aimTrainer.onTime, total: aimTrainer.total, score: aimTrainer.score };
+        camera.rotation.set(1.2, 0, 0, 'YXZ');
+        return r;
+    });
     await frames(10);
     const off = await evaluate(() => ({ onTime: aimTrainer.onTime, total: aimTrainer.total, pos: aimTrainer.targets[0].mesh.position.clone() }));
     assert.ok(on.onTime > 0 && on.score === Math.round(on.onTime * 100), `time on target scores (${on.onTime.toFixed(2)} s)`);
