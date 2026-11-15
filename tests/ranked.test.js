@@ -148,3 +148,66 @@ test('ranked: bots play at your level; leaving after a round counts as a loss, l
     assert.deepEqual(r.lateLeave, [true, false, true]);
     assert.deepEqual(errors, []);
 });
+
+test('ranked screen in the main menu, PLAY RANKED, the result bar moving from the old RR, and promotion and demotion banners', { timeout: 400000 }, async () => {
+    const { page, errors, frames, evaluate } = await boot({ quality: 'medium', menu: true });
+    await evaluate(HELPERS);
+    const unranked = await evaluate(() => {
+        rankedLadder.placements = [{ won: true, diff: 3, perf: 2 }, { won: false, diff: -2, perf: 0 }];
+        mainMenu.render();
+        const menuVal = document.getElementById('mm-rank-val').textContent;
+        document.querySelector('[data-act="ranked"]').click();
+        const el = document.getElementById('mm-ranked');
+        return { view: mainMenu.view, menuVal, name: el.querySelector('#rk-name').textContent, dots: Array.from(el.querySelectorAll('.rk-dots i')).map((i) => i.className).join(','), rr: el.querySelector('#rk-rr').textContent };
+    });
+    assert.deepEqual(unranked, { view: 'ranked', menuVal: 'UNRANKED • 2/5 PLACEMENTS', name: 'UNRANKED', dots: 'w,l,,,', rr: 'PLACEMENTS 2 / 5' });
+
+    const placed = await evaluate(() => {
+        __placeAt(10, 88);
+        rankedLadder.history = [{ won: true, us: 7, them: 4, map: 'skyline', delta: 24, event: null, kd: 1.8, step: 10, rr: 88, placed: true }];
+        mainMenu.back(); document.querySelector('[data-act="ranked"]').click();
+        const el = document.getElementById('mm-ranked');
+        return { name: el.querySelector('#rk-name').textContent, rows: el.querySelectorAll('.rk-row.w').length, row: el.querySelector('.rk-row').textContent.replace(/\s+/g, ' '),
+            card: document.getElementById('mm-card').textContent };
+    });
+    assert.equal(placed.name, 'GOLD 2');
+    assert.equal(placed.rows, 1);
+    assert.match(placed.row, /WIN.*7 : 4.*SKYLINE.*\+24 RR/);
+    assert.match(placed.card, /GOLD 2/, 'rank under your card');
+
+    // PLAY RANKED goes through agent select, then starts a ranked match
+    await evaluate(() => document.querySelector('[data-act="playranked"]').click());
+    assert.deepEqual(await evaluate(() => [game.agentPickerOpen, mainMenu.mode]), [true, 'ranked']);
+    await evaluate(() => { mainMenu.onAgentLocked(); });
+    await frames(3);
+    assert.equal(await evaluate(() => currentModeId()), 'ranked');
+
+    // Win at 88 RR: the bar starts at 88, fills, then shows the new rank's RR; banner
+    await evaluate(() => __finish(7, 3, 20, 9));
+    const start = await evaluate(() => document.getElementById('rk-bar-fill').style.width);
+    assert.equal(start, '88%', 'the bar starts at the old RR');
+    await page.waitForFunction(() => document.getElementById('rk-bar-fill').style.width === document.getElementById('rk-bar-fill').dataset.to + '%', null, { timeout: 15000 });
+    const promo = await evaluate(() => ({
+        to: document.getElementById('rk-bar-fill').dataset.to, rr: rankedLadder.rr,
+        banner: document.getElementById('rank-up-ceremony').classList.contains('visible'), title: document.getElementById('rank-up-title').textContent,
+        hud: document.getElementById('open-career-btn').textContent
+    }));
+    assert.equal(+promo.to, promo.rr);
+    assert.ok(promo.banner);
+    assert.match(promo.title, /PROMOTED TO GOLD 3/);
+    assert.match(promo.hud, /GOLD 3/);
+
+    // Demotion banner in red
+    const demo = await evaluate(() => {
+        __placeAt(10, 4); matchMode.start('match', true);
+        __finish(0, 7, 2, 14);
+        const t = document.getElementById('rank-up-title');
+        return [rankedLadder.nameOf(rankedLadder.step), t.textContent, t.style.color];
+    });
+    assert.equal(demo[0], 'GOLD 1');
+    assert.match(demo[1], /DEMOTED TO GOLD 1/);
+    assert.match(demo[2], /255, 70, 85|#ff4655/);
+    const [programs, watermark] = await programState(page);
+    assert.equal(programs, watermark);
+    assert.deepEqual(errors, []);
+});

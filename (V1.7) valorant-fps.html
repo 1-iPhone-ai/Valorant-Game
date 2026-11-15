@@ -229,6 +229,22 @@
         .level-toast.big b { font-size: 26px; color: #ffd166; }
         .level-toast span { display: block; font-size: 11px; letter-spacing: 2px; color: #cbd5e1; margin-top: 2px; }
         .skin-card-btn.locked { opacity: 0.5; }
+        .rk-emblem { display: flex; align-items: center; gap: 12px; }
+        .rk-emblem .rk-icon { font-size: 40px; }
+        .rk-emblem b { font-size: 26px; letter-spacing: 4px; }
+        .rk-bar.big { height: 10px; margin: 8px 0 4px; }
+        .rk-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: 11px; color: #cbd5e1; letter-spacing: 1px; margin: 4px 0; }
+        .rk-shield { color: #38f6ff; }
+        .rk-dots { display: flex; gap: 8px; margin: 10px 0 4px; }
+        .rk-dots i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(148, 163, 184, 0.5); }
+        .rk-dots i.w { background: #2bf0a5; border-color: #2bf0a5; } .rk-dots i.l { background: #ff4655; border-color: #ff4655; }
+        .rk-hist { display: flex; flex-direction: column; gap: 4px; }
+        .rk-row { display: grid; grid-template-columns: 52px 52px 1fr 70px 110px; gap: 6px; align-items: center; font-size: 11px; padding: 5px 8px; background: rgba(30, 41, 59, 0.6); border-left: 3px solid #64748b; border-radius: 2px; }
+        .rk-row.w { border-left-color: #2bf0a5; } .rk-row.l { border-left-color: #ff4655; }
+        .rk-row b { letter-spacing: 2px; } .rk-row em { font-style: normal; text-align: right; color: #ffd166; }
+        .rk-row span:only-child { grid-column: 1 / -1; color: #94a3b8; }
+        .mm-btn.mm-rk-play { border-left-color: #ffd166; }
+        .mm-agent-tag #mm-card .mm-card-rank { display: block; }
         .match-result-title small { display: block; font-size: 12px; letter-spacing: 6px; color: #ffd166; margin-top: 2px; }
         .rk-panel { margin: 10px auto; padding: 10px 14px; max-width: 420px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .rk-panel b { font-size: 18px; letter-spacing: 3px; }
@@ -38304,6 +38320,7 @@
                         </div>
                     </div>`;
                 this.overlay.classList.add('visible');
+                if (rankChange) animateRankedBar();
                 const again = { variant: this.variant, ranked: this.ranked };
                 document.getElementById('match-again-btn').addEventListener('click', () => this.start(again.variant, again.ranked));
                 document.getElementById('match-exit-btn').addEventListener('click', () => tacticalDirector.setGameMode('wave'));
@@ -40644,6 +40661,26 @@
         const RANK_BASE = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'ASCENDANT', 'IMMORTAL'];
         const RANK_STEPS = RANK_BASE.length * 3 + 1;           // 25: Iron 1 .. Immortal 3, Radiant
         const RANKED_PLACEMENTS = 5;
+        // The RANKED screen in the main menu
+        function renderRankedScreen() {
+            const el = document.getElementById('mm-ranked');
+            if (!el) return;
+            const L = rankedLadder;
+            const skill = L.botSkill().toUpperCase();
+            const head = L.placed
+                ? `<div class="rk-emblem" style="color:${L.colorOf(L.step)}"><span class="rk-icon">${L.iconOf(L.step)}</span><b id="rk-name">${L.nameOf(L.step)}</b></div>
+                   <div class="rk-bar big"><i style="width:${Math.max(2, Math.min(100, L.rr))}%"></i></div>
+                   <div class="rk-line"><span id="rk-rr">${L.rr} / 100 RR</span>${L.shield ? '<span class="rk-shield">🛡 DEMOTION SHIELD</span>' : ''}<span>PEAK ${L.nameOf(L.peak)}</span></div>`
+                : `<div class="rk-emblem"><span class="rk-icon">◇</span><b id="rk-name">UNRANKED</b></div>
+                   <div class="rk-dots">${[0, 1, 2, 3, 4].map((i) => { const p = L.placements[i]; return `<i class="${p ? (p.won ? 'w' : 'l') : ''}"></i>`; }).join('')}</div>
+                   <div class="rk-line"><span id="rk-rr">PLACEMENTS ${L.placements.length} / ${RANKED_PLACEMENTS}</span><span>Win them to start higher</span></div>`;
+            const rows = L.history.map((h) => `<div class="rk-row ${h.won ? 'w' : 'l'}"><b>${h.won ? 'WIN' : h.abandoned ? 'LEFT' : 'LOSS'}</b><span>${h.us} : ${h.them}</span><span>${(MAP_PRESETS[h.map] || { name: h.map || '' }).name}</span><span>K/D ${h.kd}</span><em>${!h.placed ? 'PLACEMENT' : h.event === 'placed' ? `PLACED ${L.nameOf(h.step)}` : `${h.delta >= 0 ? '+' : ''}${h.delta} RR`}</em></div>`).join('');
+            el.innerHTML = `${head}
+                <div class="rk-line"><span>RECORD ${L.wins} W • ${L.matches - L.wins} L</span><span>BOTS PLAY AT ${skill} LEVEL</span></div>
+                <div class="cr-sec">LAST MATCHES</div>
+                <div class="rk-hist">${rows || '<div class="rk-row"><span>No ranked matches yet. First to 7 rounds; leaving a started match counts as a loss.</span></div>'}</div>`;
+        }
+
         // The ranked block on the match result card
         function rankedPanelHtml(c) {
             const L = rankedLadder;
@@ -40654,10 +40691,25 @@
                 return `<div class="rk-panel placed"><span>YOUR RANK</span><b style="color:${L.colorOf(c.after.step)}">${L.iconOf(c.after.step)} ${L.nameOf(c.after.step)}</b><span>${c.after.rr} RR</span></div>`;
             }
             const sign = c.delta >= 0 ? '+' : '';
+            const from = c.before.placed ? c.before.rr : 0;
             const banner = c.event === 'promoted' ? `<em class="up">PROMOTED TO ${L.nameOf(c.after.step)}</em>` : c.event === 'demoted' ? `<em class="down">DEMOTED TO ${L.nameOf(c.after.step)}</em>` : c.event === 'shielded' ? '<em>DEMOTION SHIELD USED</em>' : '';
             return `<div class="rk-panel"><b style="color:${L.colorOf(c.after.step)}">${L.iconOf(c.after.step)} ${L.nameOf(c.after.step)}</b>
                 <span class="rk-delta ${c.delta >= 0 ? 'pos' : 'neg'}">${sign}${c.delta} RR</span>
-                <div class="rk-bar"><i style="width:${Math.max(0, Math.min(100, c.after.rr))}%"></i></div><span>${c.after.rr} / 100 RR</span>${banner}</div>`;
+                <div class="rk-bar"><i id="rk-bar-fill" data-from="${from}" data-to="${Math.max(0, Math.min(100, c.after.rr))}" data-event="${c.event || ''}" style="width:${from}%"></i></div><span>${c.after.rr} / 100 RR</span>${banner}</div>`;
+        }
+        // The RR bar on the result card moves from the old RR to the new one (a
+        // promotion fills it first, a demotion empties it first)
+        function animateRankedBar() {
+            const bar = document.getElementById('rk-bar-fill');
+            if (!bar) return;
+            const to = +bar.dataset.to, ev = bar.dataset.event;
+            const set = (w, ms) => { bar.style.transition = ms ? `width ${ms}ms ease-out` : 'none'; bar.style.width = `${w}%`; };
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                if (ev === 'promoted' || ev === 'demoted') {
+                    set(ev === 'promoted' ? 100 : 0, 700);
+                    setTimeout(() => { set(ev === 'promoted' ? 0 : 100, 0); requestAnimationFrame(() => requestAnimationFrame(() => set(to, 700))); }, 750);
+                } else set(to, 1100);
+            }));
         }
         const rankedLadder = {
             placed: false, placements: [], step: 0, rr: 0, peak: 0, shield: false, history: [], matches: 0, wins: 0,
@@ -40774,7 +40826,10 @@
                 this.history.length = Math.min(10, this.history.length);
                 this.lastChange = { before, after: { placed: this.placed, step: this.step, rr: this.rr }, delta, event };
                 this.save();
-                if (typeof tacticalEnhancements !== 'undefined') tacticalEnhancements.updateRankHUD();
+                if (typeof tacticalEnhancements !== 'undefined') {
+                    tacticalEnhancements.updateRankHUD();
+                    if (event === 'promoted' || event === 'demoted' || event === 'placed') tacticalEnhancements.triggerRankUpCeremony(event);
+                }
                 return this.lastChange;
             }
         };
@@ -40823,11 +40878,17 @@
                             <button class="mm-btn mm-pause-only" data-act="agent">AGENT SELECT</button>
                             <button class="mm-btn" data-act="modes">MODES <span class="mm-val" id="mm-mode-val">WAVE</span></button>
                             <button class="mm-btn" data-act="map">MAP <span class="mm-val" id="mm-map-val">ASCENT</span></button>
+                            <button class="mm-btn" data-act="ranked">RANKED <span class="mm-val" id="mm-rank-val">UNRANKED</span></button>
                             <button class="mm-btn" data-act="career">CAREER <span class="mm-val" id="mm-level-val">LEVEL 1</span></button>
                             <button class="mm-btn" data-act="workshop">WORKSHOP <span class="mm-val" id="mm-skin-val">STANDARD</span></button>
                             <button class="mm-btn" data-act="settings">SETTINGS</button>
                             <button class="mm-btn" data-act="controls">CONTROLS</button>
                             <button class="mm-btn mm-pause-only" data-act="photo">PHOTO MODE <span class="mm-val">[J]</span></button>
+                        </div>
+                        <div class="mm-view" data-view="ranked">
+                            <div class="mm-career mm-ranked" id="mm-ranked"></div>
+                            <button class="mm-btn mm-rk-play" data-act="playranked">PLAY RANKED</button>
+                            <button class="mm-btn mm-back" data-act="back">BACK</button>
                         </div>
                         <div class="mm-view" data-view="workshop">
                             <div class="mm-career mm-workshop" id="mm-workshop"></div>
@@ -40961,11 +41022,14 @@
                 document.getElementById('mm-mode-val').textContent = m[1];
                 const mp = (typeof MAP_PRESETS !== 'undefined' && MAP_PRESETS[game.mapPreset]) || null;
                 document.getElementById('mm-map-val').textContent = mp ? mp.name : 'ASCENT';
-                this.el.classList.toggle('career', this.view === 'career' || this.view === 'workshop');
+                this.el.classList.toggle('career', this.view === 'career' || this.view === 'workshop' || this.view === 'ranked');
+                const RL = rankedLadder;
+                document.getElementById('mm-rank-val').textContent = RL.placed ? `${RL.nameOf(RL.step)} • ${RL.rr} RR` : `UNRANKED • ${RL.placements.length}/${RANKED_PLACEMENTS} PLACEMENTS`;
                 const skinTheme = WEAPON_SKIN_THEMES[game.userSettings.weaponSkin] || WEAPON_SKIN_THEMES.standard;
                 document.getElementById('mm-skin-val').textContent = skinTheme.label.split(' // ')[0];
                 document.getElementById('mm-level-val').textContent = `LEVEL ${progression.level}`;
-                document.getElementById('mm-card').innerHTML = progression.cardHtml(progression.card, true) + `<small>LEVEL ${progression.level}</small>`;
+                document.getElementById('mm-card').innerHTML = progression.cardHtml(progression.card, true) + `<small>LEVEL ${progression.level}</small>` +
+                    `<small class="mm-card-rank" style="color:${RL.placed ? RL.colorOf(RL.step) : '#94a3b8'}">${RL.placed ? `${RL.iconOf(RL.step)} ${RL.nameOf(RL.step)}` : 'UNRANKED'}</small>`;
                 this.el.querySelectorAll('.mm-mode').forEach((b) => b.classList.toggle('selected', b.dataset.mode === this.mode));
             },
 
@@ -40977,6 +41041,8 @@
                 else if (a === 'modes') this.setView('modes');
                 else if (a === 'career') { progression.renderCareer(); this.setView('career'); }
                 else if (a === 'workshop') { skinWorkshop.open(); this.setView('workshop'); }
+                else if (a === 'ranked') { renderRankedScreen(); this.setView('ranked'); }
+                else if (a === 'playranked') { this.mode = 'ranked'; this.setView('main'); if (this.kind === 'start') this.openAgentSelect(); else this.resume(); }
                 else if (a === 'photo') { this.resume(); photoMode.enter(); }
                 else if (a === 'map') { tacticalDirector.cycleMapPreset(); this.render(); }
                 else if (a === 'controls') this.setView('controls');
@@ -43100,16 +43166,19 @@
             // rounds, the Range and aces give XP instead
             awardRR: function(deltaRR, reason) {},
 
-            triggerRankUpCeremony: function(tierDef) {
+            // V1.7: called by the ranked ladder (event: 'promoted' | 'demoted' | 'placed')
+            triggerRankUpCeremony: function(event) {
+                const L = rankedLadder;
                 const banner = document.getElementById('rank-up-ceremony');
                 const titleEl = document.getElementById('rank-up-title');
                 const subEl = document.getElementById('rank-up-sub');
+                const word = event === 'demoted' ? 'DEMOTED TO' : event === 'placed' ? 'PLACED IN' : 'PROMOTED TO';
                 if (titleEl) {
-                    titleEl.textContent = `${tierDef.icon} PROMOTED TO ${tierDef.name}!`;
-                    titleEl.style.color = tierDef.color;
+                    titleEl.textContent = `${L.iconOf(L.step)} ${word} ${L.nameOf(L.step)}${event === 'demoted' ? '' : '!'}`;
+                    titleEl.style.color = event === 'demoted' ? '#ff4655' : L.colorOf(L.step);
                 }
                 if (subEl) {
-                    subEl.textContent = `COMPETITIVE ACT RANK UP • ${this.rr} RR • PRESS [K] FOR CAREER CARD`;
+                    subEl.textContent = `RANKED • ${L.rr} RR${event === 'promoted' ? ' • DEMOTION SHIELD ON' : ''} • PRESS [K] FOR CAREER CARD`;
                 }
                 if (banner) {
                     banner.classList.add('visible');
@@ -43118,7 +43187,7 @@
                         banner.classList.remove('visible');
                     }, 3800);
                 }
-                this.playFinisherStinger('prime');
+                if (event !== 'demoted') this.playFinisherStinger('prime');
             },
 
             updateRankHUD: function() {
