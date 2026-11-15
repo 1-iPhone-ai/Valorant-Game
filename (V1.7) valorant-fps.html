@@ -246,6 +246,28 @@
         .mm-btn.ws-save { border-left-color: #2bf0a5; }
         .skin-lock { font-size: 10px; color: #ffd166; letter-spacing: 1px; margin-top: 4px; }
         body.menu-open #ui-root > *:not(#main-menu):not(#agent-picker-overlay):not(#settings-panel) { visibility: hidden; }
+        /* V1.7 photo mode */
+        body.photo-on #ui-root > *:not(#photo-mode) { visibility: hidden; }
+        .photo-mode { position: absolute; inset: 0; z-index: 60; display: none; pointer-events: none; }
+        .photo-mode.visible { display: block; }
+        .pm-vignette, .pm-bar { position: absolute; display: none; pointer-events: none; }
+        .photo-mode.vignette .pm-vignette { display: block; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.75) 100%); }
+        .photo-mode.letterbox .pm-bar { display: block; left: 0; right: 0; height: 11%; background: #000; }
+        .pm-bar.top { top: 0; } .pm-bar.bottom { bottom: 0; }
+        .pm-panel { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: min(280px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+            pointer-events: auto; background: rgba(8, 12, 22, 0.86); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; padding: 12px; color: #e2e8f0; font-size: 11px; letter-spacing: 1px; box-sizing: border-box; }
+        .photo-mode.panel-hidden .pm-panel { display: none; }
+        .pm-title { font-size: 15px; font-weight: 900; letter-spacing: 4px; color: #ff4655; margin-bottom: 8px; }
+        .pm-panel label { display: block; margin: 6px 0; font-weight: 800; }
+        .pm-panel label b { float: right; color: #ffd166; }
+        .pm-panel input[type=range] { width: 100%; }
+        .pm-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+        .pm-panel button { background: rgba(30, 41, 59, 0.9); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 3px; padding: 5px 7px; font-size: 10px; font-weight: 800; letter-spacing: 1px; cursor: pointer; }
+        .pm-panel button.on { border-color: #ffd166; color: #ffd166; }
+        .pm-panel .pm-shot, .pm-panel [data-pm="exit"] { display: block; width: 100%; margin-top: 6px; padding: 8px; font-size: 12px; }
+        .pm-panel .pm-shot { border-color: #2bf0a5; color: #2bf0a5; }
+        .pm-help { margin-top: 8px; color: #94a3b8; font-size: 10px; line-height: 1.5; }
+        .pm-saved { margin-top: 4px; color: #2bf0a5; font-size: 10px; word-break: break-all; }
         body.menu-open.agent-select .agent-picker-overlay { background: linear-gradient(270deg, rgba(6, 11, 19, 0.92) 0%, rgba(6, 11, 19, 0.6) 55%, rgba(6, 11, 19, 0) 70%);
             backdrop-filter: none; justify-content: flex-end; }
         body.menu-open.agent-select .agent-picker-panel { width: min(760px, 60vw); margin-right: 3vw; max-height: 94vh; }
@@ -7413,6 +7435,9 @@
             // Handle mouse movement with smoothing
             handleMouseMove: function(e) {
                 if (!isPointerLocked) return;
+                // Just after photo mode re-locks the mouse, the first moves can carry a
+                // jump from where the cursor was; the restored view must not be thrown off
+                if (typeof photoMode !== 'undefined' && performance.now() < photoMode.lookQuietUntil) return;
                 
                 // Scale sensitivity when zoomed in ADS / Sniper Scope so high-zoom aiming feels precise
                 const fovRatio = (camera && game.baseFov) ? (camera.fov / game.baseFov) : 1.0;
@@ -12717,6 +12742,17 @@
                 mainMenu.onKey(event);
                 return;
             }
+            // V1.7: photo mode takes the keyboard while active; J enters it
+            if (photoMode.active) {
+                if (event.target && event.target.tagName === 'INPUT') return;
+                event.preventDefault();
+                photoMode.onKey(event, true);
+                return;
+            }
+            if (event.code === 'KeyJ' && !event.repeat && photoMode.canEnter()) {
+                photoMode.enter();
+                return;
+            }
             if (event.code === 'KeyN' && !event.repeat && !game.buyMenuOpen && !game.settingsOpen && !game.agentPickerOpen && !mainMenu.open) {
                 progression.doSpray(performance.now());
             }
@@ -12959,6 +12995,7 @@
         });
         
         document.addEventListener('keyup', (event) => {
+            if (photoMode.active) { photoMode.onKey(event, false); return; }
             let effectiveCode = event.code;
             const kb = game.userSettings && game.userSettings.keybinds;
             if (kb) {
@@ -36873,7 +36910,7 @@
         const slideCamera = {
             roll: 0, applied: 0,
             update: function (dt) {
-                if (replayDirector.clip || mainMenu.open) return;
+                if (replayDirector.clip || mainMenu.open || photoMode.active) return;
                 const cc = characterController;
                 let target = 0;
                 if (cc.slideTimer > 0 && cc.grounded) {
@@ -39365,7 +39402,7 @@
 
             update: function (dt) {
                 if (!this.group) return;
-                const show = this.enabled() && !mainMenu.open && !replayDirector.clip && game.health > 0;
+                const show = this.enabled() && !mainMenu.open && !replayDirector.clip && !photoMode.active && game.health > 0;
                 if (!show) {
                     if (this.group.visible) { this.group.visible = false; shadowManager.markEvent(); }
                     return;
@@ -40033,6 +40070,247 @@
             }
         };
 
+        // =============================================
+        // V1.7 Photo mode [J]: the game freezes and you fly a free camera with the
+        // HUD and gun hidden. Field of view, tilt, brightness, filters, vignette and
+        // letterbox; Take Photo saves a PNG with the look applied. Leaving puts the
+        // camera, view and timers back exactly. Filters are CSS on the canvas (no
+        // shader changes).
+        // =============================================
+        const PHOTO_FILTERS = {
+            none:  { label: 'NONE',  css: '' },
+            noir:  { label: 'NOIR',  css: 'grayscale(1) contrast(1.25)' },
+            warm:  { label: 'WARM',  css: 'sepia(0.35) saturate(1.3) hue-rotate(-10deg)' },
+            cool:  { label: 'COOL',  css: 'saturate(1.1) hue-rotate(18deg) brightness(1.05)' },
+            vivid: { label: 'VIVID', css: 'saturate(1.6) contrast(1.1)' }
+        };
+        const photoMode = {
+            active: false, el: null, keys: {}, saved: null,
+            yaw: 0, pitch: 0, roll: 0, fov: 70, exposure: 100, speed: 6,
+            filter: 'none', vignette: false, letterbox: false, hideGun: true, panelHidden: false,
+            captureNext: false, lastPhoto: null, photos: 0, _drag: null, _baseExposure: 1, lookQuietUntil: 0,
+
+            init: function () {
+                if (this.el) return;
+                const el = document.createElement('div');
+                el.id = 'photo-mode';
+                el.className = 'photo-mode';
+                el.innerHTML = `
+                    <div class="pm-vignette"></div><div class="pm-bar top"></div><div class="pm-bar bottom"></div>
+                    <div class="pm-panel">
+                        <div class="pm-title">PHOTO MODE</div>
+                        <label>FIELD OF VIEW <b id="pm-fov-val"></b><input type="range" id="pm-fov" min="20" max="110" step="1"></label>
+                        <label>TILT <b id="pm-roll-val"></b><input type="range" id="pm-roll" min="-30" max="30" step="1"></label>
+                        <label>BRIGHTNESS <b id="pm-exp-val"></b><input type="range" id="pm-exp" min="40" max="200" step="5"></label>
+                        <label>CAMERA SPEED <b id="pm-speed-val"></b><input type="range" id="pm-speed" min="1" max="20" step="1"></label>
+                        <div class="pm-row">${Object.keys(PHOTO_FILTERS).map((k) => `<button data-pm="filter:${k}">${PHOTO_FILTERS[k].label}</button>`).join('')}</div>
+                        <div class="pm-row"><button data-pm="vignette">VIGNETTE</button><button data-pm="letterbox">LETTERBOX</button><button data-pm="gun">SHOW GUN</button></div>
+                        <button class="pm-shot" data-pm="shot">TAKE PHOTO [ENTER]</button>
+                        <button data-pm="exit">EXIT [J / ESC]</button>
+                        <div class="pm-help">WASD move • Q / E down / up • Shift faster • drag to look • wheel: zoom • H hide this panel</div>
+                        <div class="pm-saved" id="pm-saved"></div>
+                    </div>`;
+                document.getElementById('ui-root').appendChild(el);
+                this.el = el;
+                el.addEventListener('click', (e) => {
+                    const b = e.target.closest('[data-pm]');
+                    if (!b) return;
+                    e.stopPropagation();
+                    const [k, v] = b.dataset.pm.split(':');
+                    if (k === 'filter') this.filter = v;
+                    else if (k === 'vignette') this.vignette = !this.vignette;
+                    else if (k === 'letterbox') this.letterbox = !this.letterbox;
+                    else if (k === 'gun') this.hideGun = !this.hideGun;
+                    else if (k === 'shot') this.takePhoto();
+                    else if (k === 'exit') this.exit();
+                    this.render();
+                });
+                el.addEventListener('input', (e) => {
+                    const t = e.target, v = +t.value;
+                    if (t.id === 'pm-fov') this.fov = v;
+                    else if (t.id === 'pm-roll') this.roll = v * Math.PI / 180;
+                    else if (t.id === 'pm-exp') this.exposure = v;
+                    else if (t.id === 'pm-speed') this.speed = v;
+                    this.render();
+                });
+                // While active, the mouse drives the camera (drag) and zoom (wheel), never the gun
+                const block = (e) => {
+                    if (!this.active || e.target.closest('.pm-panel')) return;
+                    e.stopPropagation();
+                    if (e.type === 'mousedown') this._drag = { x: e.clientX, y: e.clientY };
+                    else if (e.type === 'mouseup') this._drag = null;
+                    else if (e.type === 'wheel') { this.fov = Math.max(20, Math.min(110, this.fov + Math.sign(e.deltaY) * 3)); this.render(); }
+                };
+                for (const t of ['mousedown', 'mouseup', 'click', 'contextmenu', 'wheel']) window.addEventListener(t, block, true);
+                window.addEventListener('mousemove', (e) => {
+                    if (!this.active) return;
+                    if (!e.target.closest || !e.target.closest('.pm-panel')) e.stopPropagation();   // never the normal mouse look
+                    if (!this._drag) return;
+                    this.look(e.clientX - this._drag.x, e.clientY - this._drag.y);
+                    this._drag.x = e.clientX; this._drag.y = e.clientY;
+                }, true);
+            },
+
+            canEnter: function () {
+                return !mainMenu.open && !replayDirector.clip && !game.buyMenuOpen && !game.settingsOpen && !game.agentPickerOpen &&
+                    !(typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) && matchMode.phase !== 'over';
+            },
+            toggle: function () { return this.active ? this.exit() : this.enter(); },
+
+            enter: function () {
+                if (this.active || !this.canEnter()) return false;
+                this.init();
+                // Take the view as it is now, without the slide tilt
+                camera.rotation.z -= slideCamera.applied;
+                slideCamera.roll = slideCamera.applied = 0;
+                this.saved = {
+                    pos: camera.position.clone(), rx: camera.rotation.x, ry: camera.rotation.y, rz: camera.rotation.z, fov: camera.fov,
+                    gun: weaponGroup.visible, exposure: renderer.toneMappingExposure
+                };
+                this._baseExposure = renderer.toneMappingExposure;
+                this.yaw = camera.rotation.y; this.pitch = camera.rotation.x; this.roll = 0;
+                this.fov = Math.round(camera.fov);
+                this.exposure = 100;
+                this.active = true;
+                this.keys = {};
+                this._drag = null;
+                mouseLookController.currentLookSpeed.x = mouseLookController.currentLookSpeed.y = 0;
+                for (const k in game.keys) game.keys[k] = false;
+                game.mouseDown = false;
+                if (typeof setAdsState === 'function') setAdsState(false);
+                mainMenu._lastNow = performance.now();
+                if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) {} }
+                document.body.classList.add('photo-on');
+                this.panelHidden = false;
+                this.render();
+                return true;
+            },
+
+            exit: function () {
+                if (!this.active) return false;
+                mainMenu._freezeTimers(performance.now());
+                mainMenu._lastNow = 0;
+                this.active = false;
+                this._drag = null;
+                const s = this.saved;
+                mouseLookController.currentLookSpeed.x = mouseLookController.currentLookSpeed.y = 0;
+                camera.position.copy(s.pos);
+                camera.rotation.set(s.rx, s.ry, s.rz, 'YXZ');
+                camera.fov = s.fov;
+                camera.updateProjectionMatrix();
+                weaponGroup.visible = s.gun;
+                renderer.toneMappingExposure = s.exposure;
+                renderer.domElement.style.filter = '';
+                document.body.classList.remove('photo-on');
+                this.render();
+                if (typeof timingResetPending !== 'undefined') timingResetPending = true;
+                this.lookQuietUntil = performance.now() + 250;
+                if (!deviceInfo.touchEnabled && !document.pointerLockElement) { try { document.body.requestPointerLock(); } catch (e) {} }
+                return true;
+            },
+
+            look: function (dx, dy) {
+                this.yaw -= dx * 0.004;
+                this.pitch = Math.max(-1.5, Math.min(1.5, this.pitch - dy * 0.004));
+            },
+
+            onKey: function (e, down) {
+                if (down && !e.repeat) {
+                    if (e.code === 'Escape' || e.code === 'KeyJ') { this.exit(); return; }
+                    if (e.code === 'Enter') { this.takePhoto(); return; }
+                    if (e.code === 'KeyH') { this.panelHidden = !this.panelHidden; this.render(); return; }
+                }
+                this.keys[e.code] = down;
+            },
+
+            // Every frame while active: timers stand still, the free camera moves
+            update: function (dt, now) {
+                mainMenu._freezeTimers(now);
+                const k = this.keys;
+                const sp = this.speed * (k.ShiftLeft || k.ShiftRight ? 3 : 1) * Math.min(0.05, dt);
+                const fx = -Math.sin(this.yaw) * Math.cos(this.pitch), fy = Math.sin(this.pitch), fz = -Math.cos(this.yaw) * Math.cos(this.pitch);
+                const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
+                const f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0), r = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0), u = (k.KeyE ? 1 : 0) - (k.KeyQ ? 1 : 0);
+                const p = camera.position;
+                p.x = Math.max(-60, Math.min(60, p.x + (fx * f + rx * r) * sp));
+                p.y = Math.max(0.3, Math.min(40, p.y + (fy * f + u) * sp));
+                p.z = Math.max(-60, Math.min(60, p.z + (fz * f + rz * r) * sp));
+                this.preRender();
+            },
+            // Again just before drawing, after anything else this frame (aim-down-sights
+            // zoom, weapon follow) touched the camera
+            preRender: function () {
+                if (!this.active) return;
+                camera.rotation.set(this.pitch, this.yaw, this.roll, 'YXZ');
+                if (Math.abs(camera.fov - this.fov) > 1e-6) { camera.fov = this.fov; camera.updateProjectionMatrix(); }
+                renderer.toneMappingExposure = this._baseExposure * this.exposure / 100;
+                weaponGroup.visible = !this.hideGun;
+            },
+
+            // Called right after the frame is drawn: the canvas still holds the image
+            afterRender: function () {
+                if (!this.captureNext) return;
+                this.captureNext = false;
+                const src = renderer.domElement;
+                const c = document.createElement('canvas');
+                c.width = src.width; c.height = src.height;
+                const g = c.getContext('2d');
+                g.filter = PHOTO_FILTERS[this.filter].css || 'none';
+                g.drawImage(src, 0, 0);
+                g.filter = 'none';
+                if (this.vignette) {
+                    const grd = g.createRadialGradient(c.width / 2, c.height / 2, Math.min(c.width, c.height) * 0.35, c.width / 2, c.height / 2, Math.max(c.width, c.height) * 0.75);
+                    grd.addColorStop(0, 'rgba(0,0,0,0)');
+                    grd.addColorStop(1, 'rgba(0,0,0,0.75)');
+                    g.fillStyle = grd;
+                    g.fillRect(0, 0, c.width, c.height);
+                }
+                if (this.letterbox) {
+                    const bar = Math.round(c.height * 0.11);
+                    g.fillStyle = '#000';
+                    g.fillRect(0, 0, c.width, bar);
+                    g.fillRect(0, c.height - bar, c.width, bar);
+                }
+                try {
+                    this.lastPhoto = c.toDataURL('image/png');
+                } catch (e) { this.lastPhoto = null; return; }
+                this.photos++;
+                const d = new Date();
+                const name = `valorant-photo-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}.png`;
+                this.lastName = name;
+                if (!this.noDownload) {
+                    const a = document.createElement('a');
+                    a.href = this.lastPhoto;
+                    a.download = name;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                }
+                const saved = document.getElementById('pm-saved');
+                if (saved) saved.textContent = `Saved ${name}`;
+                if (soundFX.noiseLayer) soundFX.noiseLayer(0.08, 0.12, 0, 'highpass', 2400, 0.7);
+            },
+            takePhoto: function () { if (this.active) this.captureNext = true; },
+
+            render: function () {
+                if (!this.el) return;
+                this.el.classList.toggle('visible', this.active);
+                this.el.classList.toggle('vignette', this.vignette);
+                this.el.classList.toggle('letterbox', this.letterbox);
+                this.el.classList.toggle('panel-hidden', this.panelHidden);
+                renderer.domElement.style.filter = this.active ? PHOTO_FILTERS[this.filter].css : '';
+                const set = (id, v, label) => { const i = document.getElementById(id); if (i && document.activeElement !== i) i.value = v; const b = document.getElementById(id + '-val'); if (b) b.textContent = label; };
+                set('pm-fov', this.fov, `${Math.round(this.fov)}°`);
+                set('pm-roll', Math.round(this.roll * 180 / Math.PI), `${Math.round(this.roll * 180 / Math.PI)}°`);
+                set('pm-exp', this.exposure, `${this.exposure}%`);
+                set('pm-speed', this.speed, `${this.speed} m/s`);
+                this.el.querySelectorAll('[data-pm]').forEach((b) => {
+                    const [k, v] = b.dataset.pm.split(':');
+                    b.classList.toggle('on', (k === 'filter' && v === this.filter) || (k === 'vignette' && this.vignette) || (k === 'letterbox' && this.letterbox) || (k === 'gun' && !this.hideGun));
+                });
+            }
+        };
+
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
@@ -40079,6 +40357,7 @@
                             <button class="mm-btn" data-act="workshop">WORKSHOP <span class="mm-val" id="mm-skin-val">STANDARD</span></button>
                             <button class="mm-btn" data-act="settings">SETTINGS</button>
                             <button class="mm-btn" data-act="controls">CONTROLS</button>
+                            <button class="mm-btn mm-pause-only" data-act="photo">PHOTO MODE <span class="mm-val">[J]</span></button>
                         </div>
                         <div class="mm-view" data-view="workshop">
                             <div class="mm-career mm-workshop" id="mm-workshop"></div>
@@ -40096,7 +40375,7 @@
                             <div class="mm-controls">
                                 <div><b>WASD</b> Move</div><div><b>Mouse</b> Aim • <b>Left / Right click</b> Shoot / Aim down sights</div>
                                 <div><b>Space</b> Jump (hold: glide; into a ledge: climb) • <b>Ctrl / Z</b> Crouch (while sprinting: slide)</div><div><b>R</b> Reload • <b>Y</b> Inspect • <b>1–4</b> Weapons • <b>V</b> Variants</div>
-                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings • <b>N</b> Spray</div>
+                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings • <b>N</b> Spray • <b>J</b> Photo mode</div>
                                 <div><b>F1 / F2 / F3</b> Wave / Range / Retake • <b>F4</b> Maps • <b>T</b> Ping</div><div><b>Esc</b> This menu</div>
                                 <div class="mm-controls-pad"><b>Controller:</b> sticks move and aim • RT shoot • LT aim • A jump • B crouch • X reload • LB / RB / D-pad abilities • Start this menu • hold View: agents</div>
                             </div>
@@ -40228,6 +40507,7 @@
                 else if (a === 'modes') this.setView('modes');
                 else if (a === 'career') { progression.renderCareer(); this.setView('career'); }
                 else if (a === 'workshop') { skinWorkshop.open(); this.setView('workshop'); }
+                else if (a === 'photo') { this.resume(); photoMode.enter(); }
                 else if (a === 'map') { tacticalDirector.cycleMapPreset(); this.render(); }
                 else if (a === 'controls') this.setView('controls');
                 else if (a === 'back') this.back();
@@ -40292,7 +40572,7 @@
                 const was = this.lockWas;
                 this.lockWas = locked;
                 if (!was || locked || !this.started || this.open) return;
-                if (game.buyMenuOpen || game.agentPickerOpen || game.settingsOpen) return;
+                if (game.buyMenuOpen || game.agentPickerOpen || game.settingsOpen || photoMode.active) return;
                 if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) return;
                 if (matchMode.phase === 'over' || replayDirector.clip) return;
                 this.show('pause');
@@ -43403,6 +43683,7 @@
             settingsManager.init();
             tacticalEnhancements.init();
             progression.init();
+            photoMode.init();
             gamepadController.init();
             controlsHelp.init();
             ambientAudio.init();
@@ -43555,7 +43836,7 @@
             spaceWasDown = !!game.keys.space;
             
             // V1.7: the main / pause menu pauses the simulation
-            simAccumulator += mainMenu.paused() ? 0 : delta;
+            simAccumulator += (mainMenu.paused() || photoMode.active) ? 0 : delta;
             const simBudget = SIM_DT * SIM_MAX_STEPS;
             if (simAccumulator > simBudget) {
                 perfTelemetry.droppedSimMs += (simAccumulator - simBudget) * 1000;
@@ -43569,8 +43850,9 @@
                 simAccumulator -= SIM_DT;
                 simStepsThisFrame++;
             }
-            presentPlayerCamera(simAccumulator / SIM_DT);
             const now = performance.now();
+            if (photoMode.active) photoMode.update(delta, now);
+            else presentPlayerCamera(simAccumulator / SIM_DT);
             mainMenu.update(delta, now);
             playerBody.update(delta);
             updateGunplayAndCrosshair(delta, time, now);
@@ -43621,6 +43903,7 @@
             // Render scene: world, then the viewmodel over a cleared depth buffer
             // (autoClear is off; info.autoReset is off and reset here)
             renderer.info.reset();
+            photoMode.preRender();
             fxKit.applyShake(now, Math.min(0.05, delta));
             slideCamera.update(Math.min(0.05, delta));
             // V1.7: kill cam / highlight replay poses the world for this frame only
@@ -43644,6 +43927,7 @@
                 renderer.render(viewmodelScene, viewmodelCamera);
             }
             replayDirector.endFrame();
+            photoMode.afterRender();
             perfTelemetry.summary.drawCalls = renderer.info.render.calls;
             perfTelemetry.summary.triangles = renderer.info.render.triangles;
             const programCount = renderer.info.programs ? renderer.info.programs.length : 0;
