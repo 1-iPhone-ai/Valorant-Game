@@ -229,6 +229,16 @@
         .level-toast.big b { font-size: 26px; color: #ffd166; }
         .level-toast span { display: block; font-size: 11px; letter-spacing: 2px; color: #cbd5e1; margin-top: 2px; }
         .skin-card-btn.locked { opacity: 0.5; }
+        .match-result-title small { display: block; font-size: 12px; letter-spacing: 6px; color: #ffd166; margin-top: 2px; }
+        .rk-panel { margin: 10px auto; padding: 10px 14px; max-width: 420px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .rk-panel b { font-size: 18px; letter-spacing: 3px; }
+        .rk-panel span { font-size: 11px; color: #cbd5e1; letter-spacing: 2px; }
+        .rk-panel .rk-delta { font-size: 16px; font-weight: 900; }
+        .rk-delta.pos { color: #2bf0a5; } .rk-delta.neg { color: #ff4655; }
+        .rk-bar { width: 100%; height: 8px; background: rgba(148, 163, 184, 0.2); border-radius: 4px; overflow: hidden; }
+        .rk-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff4655, #ffd166); transition: width 1.2s ease-out; }
+        .rk-panel em { font-style: normal; font-weight: 900; letter-spacing: 3px; font-size: 13px; color: #ffd166; }
+        .rk-panel em.up { color: #2bf0a5; } .rk-panel em.down { color: #ff4655; }
         .mm-workshop { display: flex; flex-direction: column; gap: 8px; }
         .ws-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
         .mm-btn.ws-slot { font-size: 12px; padding: 7px 10px; }
@@ -34064,14 +34074,15 @@
             },
 
             setGameMode: function(mode) {
-                if (['wave', 'range', 'retake', 'match', 'deathmatch', 'spikerush', 'aim'].indexOf(mode) === -1) return;
+                if (['wave', 'range', 'retake', 'match', 'deathmatch', 'spikerush', 'aim', 'ranked'].indexOf(mode) === -1) return;
                 replayDirector.stop();
                 aimTrainer.stop();
                 if (matchMode.active) matchMode.stop();
                 if (dmMode.active) dmMode.stop();
-                // Spike Rush runs on the Match engine
+                // Spike Rush and Ranked run on the Match engine
                 const variant = mode === 'spikerush' ? 'spikerush' : 'match';
-                if (mode === 'spikerush') mode = 'match';
+                const ranked = mode === 'ranked';
+                if (mode === 'spikerush' || mode === 'ranked') mode = 'match';
                 game.gameMode = mode;
                 game.roundKillStreak = 0;
 
@@ -34101,7 +34112,7 @@
                     this.rangeActive = false;
                     this.activeRangeBot = null;
                     if (rangeChallengeHud) rangeChallengeHud.classList.remove('visible');
-                    matchMode.start(variant);
+                    matchMode.start(variant, ranked);
                 } else if (mode === 'range') {
                     if (rangeChallengeHud) rangeChallengeHud.classList.add('visible');
                     if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
@@ -37964,10 +37975,14 @@
             stats: null,
             overlay: null,
 
-            start: function (variant) {
+            start: function (variant, ranked) {
                 const now = performance.now();
+                if (this.active && this.ranked && this.phase !== 'over') this.abandonRanked();
                 this.variant = variant === 'spikerush' ? 'spikerush' : 'match';
                 this.cfg = this.variant === 'spikerush' ? SPIKE_RUSH : MATCH;
+                // Ranked: a full Match (never Spike Rush) against bots at your level
+                this.ranked = !!ranked && this.variant === 'match';
+                if (this.ranked) rankedLadder.onMatchStart();
                 this.active = true;
                 this.round = 0;
                 this.us = 0;
@@ -37978,11 +37993,24 @@
                 this.bestPlay = null;
                 game.creds = this.cfg.startCreds;
                 this.hideOverlay();
-                addCustomKillFeedMessage(`<span style="color:#ffd166;font-weight:900;">[${this.variant === 'spikerush' ? 'SPIKE RUSH' : 'MATCH'}]</span> First to ${this.cfg.winTarget} rounds. You attack first; sides swap after round ${this.cfg.halfRounds}.`);
+                addCustomKillFeedMessage(`<span style="color:#ffd166;font-weight:900;">[${this.variant === 'spikerush' ? 'SPIKE RUSH' : this.ranked ? 'RANKED' : 'MATCH'}]</span>${this.ranked ? ` ${rankedLadder.label()} •` : ''} First to ${this.cfg.winTarget} rounds. You attack first; sides swap after round ${this.cfg.halfRounds}.`);
                 this.startRound(now);
             },
 
+            // Leaving a ranked match after it started counts as a loss
+            abandonRanked: function () {
+                if (!this.ranked) return;
+                const played = this.round > 1 || this.us + this.them > 0;
+                const s = this.stats || { kills: 0, deaths: 0 };
+                if (played) rankedLadder.onMatchEnd({ won: false, us: this.us, them: Math.max(this.them, this.cfg.winTarget), kills: s.kills, deaths: s.deaths, mvps: 0, abandoned: true });
+                else rankedLadder.restoreDifficulty();
+                this.ranked = false;
+            },
+
             stop: function () {
+                if (this.active && this.ranked && this.phase !== 'over') this.abandonRanked();
+                this.ranked = false;
+                rankedLadder.restoreDifficulty();
                 this.active = false;
                 this.phase = 'idle';
                 spikeRush.clear();
@@ -38233,8 +38261,10 @@
             finish: function (now) {
                 this.phase = 'over';
                 const won = this.us > this.them;
-                progression.onMatchEnd(won, this.variant === 'spikerush' ? 'spikerush' : 'match');
+                progression.onMatchEnd(won, this.variant === 'spikerush' ? 'spikerush' : this.ranked ? 'ranked' : 'match');
                 const s = this.stats;
+                const mvpCount = (this.roundLog || []).filter((r) => r.mvp).length;
+                const rankChange = this.ranked ? rankedLadder.onMatchEnd({ won, us: this.us, them: this.them, kills: s.kills, deaths: s.deaths, mvps: mvpCount }) : null;
                 const hs = s.kills ? Math.round(s.headshots / s.kills * 100) : 0;
                 const mins = Math.max(1, Math.round((now - s.startedAt) / 60000));
                 const log = this.roundLog || [];
@@ -38251,7 +38281,8 @@
                 }
                 this.overlay.innerHTML = `
                     <div class="match-result-card ${won ? 'won' : 'lost'}">
-                        <div class="match-result-title">${won ? 'VICTORY' : 'DEFEAT'}</div>
+                        <div class="match-result-title">${won ? 'VICTORY' : 'DEFEAT'}${this.ranked ? '<small>RANKED</small>' : ''}</div>
+                        ${rankChange ? rankedPanelHtml(rankChange) : ''}
                         <div class="match-result-score">${this.us} : ${this.them}</div>
                         <div class="match-rounds" id="match-rounds">${strip}</div>
                         <div class="match-result-grid">
@@ -38273,7 +38304,8 @@
                         </div>
                     </div>`;
                 this.overlay.classList.add('visible');
-                document.getElementById('match-again-btn').addEventListener('click', () => this.start());
+                const again = { variant: this.variant, ranked: this.ranked };
+                document.getElementById('match-again-btn').addEventListener('click', () => this.start(again.variant, again.ranked));
                 document.getElementById('match-exit-btn').addEventListener('click', () => tacticalDirector.setGameMode('wave'));
                 if (document.pointerLockElement) document.exitPointerLock();
                 soundFX.ult();
@@ -38658,6 +38690,7 @@
         // Which mode the player is in, including the Match variants
         function currentModeId() {
             if (game.gameMode === 'match' && matchMode.active && matchMode.variant === 'spikerush') return 'spikerush';
+            if (game.gameMode === 'match' && matchMode.active && matchMode.ranked) return 'ranked';
             return game.gameMode;
         }
 
@@ -40600,6 +40633,152 @@
             }
         };
 
+        // =============================================
+        // V1.7 Ranked ladder. Ranked is a full Match. The first 5 are placements;
+        // then every result moves your RR: a win gives more for a bigger margin and
+        // a better game, a loss takes less for a close game and a good one. 100 RR
+        // promotes (with a one-match shield against dropping straight back),
+        // below 0 demotes. Iron 1 .. Immortal 3, then Radiant. Bots get tougher as
+        // you climb. Only ranked matches change your rank.
+        // =============================================
+        const RANK_BASE = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'ASCENDANT', 'IMMORTAL'];
+        const RANK_STEPS = RANK_BASE.length * 3 + 1;           // 25: Iron 1 .. Immortal 3, Radiant
+        const RANKED_PLACEMENTS = 5;
+        // The ranked block on the match result card
+        function rankedPanelHtml(c) {
+            const L = rankedLadder;
+            if (c.event === 'placement') {
+                return `<div class="rk-panel"><b>PLACEMENT ${L.placements.length} / ${RANKED_PLACEMENTS}</b><span>${RANKED_PLACEMENTS - L.placements.length} more to get your rank</span></div>`;
+            }
+            if (c.event === 'placed') {
+                return `<div class="rk-panel placed"><span>YOUR RANK</span><b style="color:${L.colorOf(c.after.step)}">${L.iconOf(c.after.step)} ${L.nameOf(c.after.step)}</b><span>${c.after.rr} RR</span></div>`;
+            }
+            const sign = c.delta >= 0 ? '+' : '';
+            const banner = c.event === 'promoted' ? `<em class="up">PROMOTED TO ${L.nameOf(c.after.step)}</em>` : c.event === 'demoted' ? `<em class="down">DEMOTED TO ${L.nameOf(c.after.step)}</em>` : c.event === 'shielded' ? '<em>DEMOTION SHIELD USED</em>' : '';
+            return `<div class="rk-panel"><b style="color:${L.colorOf(c.after.step)}">${L.iconOf(c.after.step)} ${L.nameOf(c.after.step)}</b>
+                <span class="rk-delta ${c.delta >= 0 ? 'pos' : 'neg'}">${sign}${c.delta} RR</span>
+                <div class="rk-bar"><i style="width:${Math.max(0, Math.min(100, c.after.rr))}%"></i></div><span>${c.after.rr} / 100 RR</span>${banner}</div>`;
+        }
+        const rankedLadder = {
+            placed: false, placements: [], step: 0, rr: 0, peak: 0, shield: false, history: [], matches: 0, wins: 0,
+            KEY: 'valorant_v17_ranked',
+            _savedDiff: null, lastChange: null,
+
+            tierOf: function (step) { return Math.min(RANK_TIERS.length - 1, Math.floor(step / 3)); },
+            nameOf: function (step) {
+                if (step >= RANK_STEPS - 1) return 'RADIANT';
+                return `${RANK_BASE[Math.floor(step / 3)]} ${step % 3 + 1}`;
+            },
+            iconOf: function (step) { return RANK_TIERS[this.tierOf(step)].icon; },
+            colorOf: function (step) { return RANK_TIERS[this.tierOf(step)].color; },
+            label: function () {
+                return this.placed ? `${this.iconOf(this.step)} ${this.nameOf(this.step)} • ${this.rr} RR` : `UNRANKED • PLACEMENT ${this.placements.length}/${RANKED_PLACEMENTS}`;
+            },
+            // Bots in a ranked match play at your level (placements at Gold)
+            botSkill: function () {
+                if (!this.placed) return 'gold';
+                const t = this.tierOf(this.step);
+                return t <= 1 ? 'iron' : t <= 4 ? 'gold' : t <= 7 ? 'immortal' : 'radiant';
+            },
+
+            init: function () { this.load(); },
+            load: function () {
+                if (typeof settingsManager === 'undefined' || !settingsManager.lsEnabled) return;
+                try {
+                    const d = JSON.parse(localStorage.getItem(this.KEY) || 'null');
+                    if (!d) return;
+                    this.placed = !!d.placed;
+                    this.placements = Array.isArray(d.placements) ? d.placements.slice(0, RANKED_PLACEMENTS) : [];
+                    this.step = Math.max(0, Math.min(RANK_STEPS - 1, d.step | 0));
+                    this.rr = Math.max(0, d.rr | 0);
+                    this.peak = Math.max(this.step, d.peak | 0);
+                    this.shield = !!d.shield;
+                    this.history = Array.isArray(d.history) ? d.history.slice(0, 10) : [];
+                    this.matches = d.matches | 0;
+                    this.wins = d.wins | 0;
+                } catch (e) {}
+            },
+            save: function () {
+                if (typeof settingsManager === 'undefined' || !settingsManager.lsEnabled) return;
+                try {
+                    localStorage.setItem(this.KEY, JSON.stringify({ placed: this.placed, placements: this.placements, step: this.step, rr: this.rr,
+                        peak: this.peak, shield: this.shield, history: this.history, matches: this.matches, wins: this.wins }));
+                } catch (e) {}
+            },
+
+            // How well you played: K/D and round MVPs, -3 .. +7
+            performance: function (r) {
+                const kd = r.deaths ? r.kills / r.deaths : r.kills;
+                const kdBonus = kd >= 2 ? 5 : kd >= 1.5 ? 3 : kd >= 1 ? 1 : kd < 0.6 ? -3 : 0;
+                return kdBonus + Math.min(2, r.mvps || 0);
+            },
+            rrFor: function (r) {
+                const perf = this.performance(r);
+                if (r.won) return Math.max(10, Math.min(32, 18 + Math.min(6, r.us - r.them) + perf));
+                const margin = r.them - r.us;
+                return -Math.max(8, Math.min(28, 14 + Math.min(7, margin) - perf));
+            },
+
+            onMatchStart: function () {
+                this._savedDiff = game.userSettings.botDifficulty;
+                game.userSettings.botDifficulty = this.botSkill();
+                this.inMatch = true;
+            },
+            restoreDifficulty: function () {
+                if (this._savedDiff !== null) game.userSettings.botDifficulty = this._savedDiff;
+                this._savedDiff = null;
+                this.inMatch = false;
+            },
+
+            // r: { won, us, them, kills, deaths, mvps, abandoned }
+            onMatchEnd: function (r) {
+                this.restoreDifficulty();
+                this.matches++;
+                if (r.won) this.wins++;
+                const before = { placed: this.placed, step: this.step, rr: this.rr };
+                let delta = 0, event = null;
+                if (!this.placed) {
+                    this.placements.push({ won: !!r.won, diff: r.us - r.them, perf: this.performance(r) });
+                    event = 'placement';
+                    if (this.placements.length >= RANKED_PLACEMENTS) {
+                        // Placements are against Gold bots: wins set the band (Bronze 1 .. Platinum 3),
+                        // the average round margin and how you played nudge it
+                        const wins = this.placements.filter((p) => p.won).length;
+                        const diff = this.placements.reduce((a, p) => a + p.diff, 0) / this.placements.length;
+                        const perf = this.placements.reduce((a, p) => a + p.perf, 0) / this.placements.length;
+                        const step = 4 + Math.round(wins * 1.6) + Math.round(diff / 3) + (perf >= 4 ? 1 : perf <= -1 ? -1 : 0);
+                        this.step = Math.max(3, Math.min(14, step));
+                        this.rr = Math.max(0, Math.min(60, Math.round(30 + diff * 3 + perf * 3)));
+                        this.placed = true;
+                        this.peak = Math.max(this.peak, this.step);
+                        event = 'placed';
+                    }
+                } else {
+                    delta = this.rrFor(r);
+                    this.rr += delta;
+                    if (this.rr >= 100 && this.step < RANK_STEPS - 1) {
+                        while (this.rr >= 100 && this.step < RANK_STEPS - 1) { this.rr -= 100; this.step++; }
+                        this.shield = true;
+                        event = 'promoted';
+                    } else if (this.rr < 0) {
+                        if (this.shield) { this.rr = 0; this.shield = false; event = 'shielded'; }
+                        else if (this.step > 0) { this.step--; this.rr += 100; event = 'demoted'; }
+                        else this.rr = 0;
+                    } else if (delta > 0) {
+                        this.shield = false;
+                    }
+                    this.peak = Math.max(this.peak, this.step);
+                }
+                this.history.unshift({ won: !!r.won, us: r.us, them: r.them, map: game.mapPreset, delta, event,
+                    kd: r.deaths ? +(r.kills / r.deaths).toFixed(2) : r.kills, step: this.step, rr: this.rr, placed: this.placed, abandoned: !!r.abandoned, at: Date.now() });
+                this.history.length = Math.min(10, this.history.length);
+                this.lastChange = { before, after: { placed: this.placed, step: this.step, rr: this.rr }, delta, event };
+                this.save();
+                if (typeof tacticalEnhancements !== 'undefined') tacticalEnhancements.updateRankHUD();
+                return this.lastChange;
+            }
+        };
+
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
@@ -40607,7 +40786,8 @@
             ['range', 'RANGE', '30 bots against the clock, with a scorecard'],
             ['deathmatch', 'DEATHMATCH', 'Free-for-all: first to 40 kills, instant respawns'],
             ['spikerush', 'SPIKE RUSH', 'First to 4 rounds, a random gun each round, power-up orbs'],
-            ['aim', 'AIM TRAINER', 'Gridshot, Flick and Tracking drills with best scores']
+            ['aim', 'AIM TRAINER', 'Gridshot, Flick and Tracking drills with best scores'],
+            ['ranked', 'RANKED', 'A full Match that moves your rank: 5 placements, then RR']
         ];
         const mainMenu = {
             open: false, kind: 'start', view: 'main', started: false, selecting: false,
@@ -42916,37 +43096,9 @@
                 this.awardRR(gainedRR, `30-BOT CHALLENGE (${totalSec.toFixed(1)}s • Acc ${accPct}% • ${rangeRank})`);
             },
 
-            awardRR: function(deltaRR, reason) {
-                const prevTier = this.rankTierIdx;
-                this.rr += deltaRR;
-
-                while (this.rr >= 100 && this.rankTierIdx < RANK_TIERS.length - 1) {
-                    this.rr -= 100;
-                    this.rankTierIdx++;
-                }
-                if (this.rankTierIdx === RANK_TIERS.length - 1) {
-                    this.rr = Math.min(999, this.rr);
-                }
-                if (this.rankTierIdx > this.peakRankTierIdx) {
-                    this.peakRankTierIdx = this.rankTierIdx;
-                }
-
-                const tierDef = RANK_TIERS[this.rankTierIdx] || RANK_TIERS[3];
-                this.rrHistory.unshift({
-                    reason: reason,
-                    delta: deltaRR,
-                    tierName: tierDef.name,
-                    rrAfter: this.rr
-                });
-                if (this.rrHistory.length > 8) this.rrHistory.pop();
-
-                this.updateRankHUD();
-                this.saveCareerIfEnabled();
-
-                if (this.rankTierIdx > prevTier) {
-                    this.triggerRankUpCeremony(tierDef);
-                }
-            },
+            // V1.7: only ranked matches change your rank now (see rankedLadder); casual
+            // rounds, the Range and aces give XP instead
+            awardRR: function(deltaRR, reason) {},
 
             triggerRankUpCeremony: function(tierDef) {
                 const banner = document.getElementById('rank-up-ceremony');
@@ -42970,11 +43122,11 @@
             },
 
             updateRankHUD: function() {
-                const tierDef = RANK_TIERS[this.rankTierIdx] || RANK_TIERS[3];
+                const L = rankedLadder;
                 const btn = document.getElementById('open-career-btn');
                 if (btn) {
-                    btn.textContent = `${tierDef.icon} ${tierDef.name} • ${this.rr} RR [K]`;
-                    btn.style.color = tierDef.color;
+                    btn.textContent = L.placed ? `${L.iconOf(L.step)} ${L.nameOf(L.step)} • ${L.rr} RR [K]` : `UNRANKED ${L.placements.length}/${RANKED_PLACEMENTS} [K]`;
+                    btn.style.color = L.placed ? L.colorOf(L.step) : '#94a3b8';
                 }
             },
 
@@ -43052,9 +43204,6 @@
             },
 
             renderCareerModal: function() {
-                const tierDef = RANK_TIERS[this.rankTierIdx] || RANK_TIERS[3];
-                const peakDef = RANK_TIERS[this.peakRankTierIdx] || tierDef;
-
                 const setEl = (id, text, color) => {
                     const el = document.getElementById(id);
                     if (!el) return;
@@ -43062,12 +43211,14 @@
                     if (color) el.style.color = color;
                 };
 
-                setEl('career-rank-icon', tierDef.icon);
-                setEl('career-rank-tier-name', tierDef.name, tierDef.color);
-                setEl('career-rank-rr-text', `${this.rr} / 100 RR`);
-                setEl('career-peak-rank-label', `PEAK ACT RANK: ${peakDef.icon} ${peakDef.name}`);
+                // Rank from the ranked ladder
+                const L = rankedLadder;
+                setEl('career-rank-icon', L.placed ? L.iconOf(L.step) : '◇');
+                setEl('career-rank-tier-name', L.placed ? L.nameOf(L.step) : 'UNRANKED', L.placed ? L.colorOf(L.step) : '#94a3b8');
+                setEl('career-rank-rr-text', L.placed ? `${L.rr} / 100 RR` : `PLACEMENTS ${L.placements.length} / ${RANKED_PLACEMENTS}`);
+                setEl('career-peak-rank-label', L.placed ? `PEAK RANK: ${L.iconOf(L.peak)} ${L.nameOf(L.peak)} • ${L.wins} / ${L.matches} RANKED WINS` : 'PLAY RANKED IN THE MAIN MENU TO GET A RANK');
                 const rrBar = document.getElementById('career-rr-bar-fill');
-                if (rrBar) rrBar.style.width = `${Math.max(2, Math.min(100, this.rr))}%`;
+                if (rrBar) rrBar.style.width = `${L.placed ? Math.max(2, Math.min(100, L.rr)) : L.placements.length / RANKED_PLACEMENTS * 100}%`;
 
                 // Aggregate Hit-Zone totals
                 let totalKills = 0, totalHead = 0, totalBody = 0, totalLegs = 0, totalDmg = 0;
@@ -43096,19 +43247,13 @@
                 setEl('career-kpi-dmg', `${totalDmg.toLocaleString()}`);
                 setEl('career-kpi-finisher-sub', `3D SKIN FINISHERS: ${this.finisherCount}`);
 
-                // RR History List
+                // Ranked match history
                 const histEl = document.getElementById('career-rr-history-list');
-                if (histEl && this.rrHistory.length > 0) {
-                    let html = '';
-                    for (let i = 0; i < this.rrHistory.length; i++) {
-                        const item = this.rrHistory[i];
-                        const sign = item.delta >= 0 ? '+' : '';
-                        html += `<div class="career-history-item">
-                            <span><b>[${item.tierName}]</b> ${item.reason}</span>
-                            <span class="career-rr-delta ${item.delta >= 0 ? 'pos' : 'neg'}">${sign}${item.delta} RR (${item.rrAfter} RR)</span>
-                        </div>`;
-                    }
-                    histEl.innerHTML = html;
+                if (histEl) {
+                    histEl.innerHTML = L.history.length ? L.history.map((h) => `<div class="career-history-item">
+                            <span><b>[${h.won ? 'WIN' : h.abandoned ? 'LEFT' : 'LOSS'} ${h.us}-${h.them}]</b> ${(MAP_PRESETS[h.map] || { name: h.map }).name} • K/D ${h.kd}</span>
+                            <span class="career-rr-delta ${h.delta >= 0 ? 'pos' : 'neg'}">${h.placed && h.event !== 'placed' ? `${h.delta >= 0 ? '+' : ''}${h.delta} RR (${h.rr} RR)` : h.event === 'placed' ? `PLACED ${L.nameOf(h.step)}` : 'PLACEMENT'}</span>
+                        </div>`).join('') : '<div class="career-history-item"><span>No ranked matches yet</span></div>';
                 }
 
                 // Combat Report Hit-Matrix Table
@@ -43973,6 +44118,7 @@
             tacticalRadar.init();
             tacticalDirector.init();
             settingsManager.init();
+            rankedLadder.init();
             tacticalEnhancements.init();
             progression.init();
             photoMode.init();
