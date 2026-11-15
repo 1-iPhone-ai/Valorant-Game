@@ -229,8 +229,69 @@
         .level-toast.big b { font-size: 26px; color: #ffd166; }
         .level-toast span { display: block; font-size: 11px; letter-spacing: 2px; color: #cbd5e1; margin-top: 2px; }
         .skin-card-btn.locked { opacity: 0.5; }
+        .mm-workshop { display: flex; flex-direction: column; gap: 8px; }
+        .ws-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .mm-btn.ws-slot { font-size: 12px; padding: 7px 10px; }
+        .ws-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+        .ws-label { width: 62px; font-size: 11px; font-weight: 900; letter-spacing: 2px; color: #cbd5e1; }
+        .mm-btn.ws-sw { width: 26px; height: 26px; padding: 0; border-radius: 4px; border: 2px solid rgba(148, 163, 184, 0.35); }
+        .mm-btn.ws-sw:hover, .mm-btn.ws-sw:focus { padding: 0; border-color: #fff; }
+        .mm-btn.ws-sw.selected { border-color: #ffd166; box-shadow: 0 0 0 2px #ffd166; }
+        .ws-pick { width: 34px; height: 28px; border: none; background: none; padding: 0; cursor: pointer; }
+        .ws-name { flex: 1; min-width: 120px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.35); color: #fff; padding: 6px 8px; font-weight: 800; letter-spacing: 2px; border-radius: 3px; }
+        .mm-btn.ws-fin { font-size: 11px; padding: 6px 10px; }
+        #ws-glow { flex: 1; min-width: 120px; }
+        .ws-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+        .ws-actions .mm-btn { font-size: 12px; padding: 8px 12px; }
+        .mm-btn.ws-save { border-left-color: #2bf0a5; }
         .skin-lock { font-size: 10px; color: #ffd166; letter-spacing: 1px; margin-top: 4px; }
         body.menu-open #ui-root > *:not(#main-menu):not(#agent-picker-overlay):not(#settings-panel) { visibility: hidden; }
+        /* V1.7 photo mode */
+        body.photo-on #ui-root > *:not(#photo-mode) { visibility: hidden; }
+        .photo-mode { position: absolute; inset: 0; z-index: 60; display: none; pointer-events: none; }
+        .photo-mode.visible { display: block; }
+        .pm-vignette, .pm-bar { position: absolute; display: none; pointer-events: none; }
+        .photo-mode.vignette .pm-vignette { display: block; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.75) 100%); }
+        .photo-mode.letterbox .pm-bar { display: block; left: 0; right: 0; height: 11%; background: #000; }
+        .pm-bar.top { top: 0; } .pm-bar.bottom { bottom: 0; }
+        .pm-panel { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: min(280px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+            pointer-events: auto; background: rgba(8, 12, 22, 0.86); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; padding: 12px; color: #e2e8f0; font-size: 11px; letter-spacing: 1px; box-sizing: border-box; }
+        .photo-mode.panel-hidden .pm-panel { display: none; }
+        .pm-title { font-size: 15px; font-weight: 900; letter-spacing: 4px; color: #ff4655; margin-bottom: 8px; }
+        .pm-panel label { display: block; margin: 6px 0; font-weight: 800; }
+        .pm-panel label b { float: right; color: #ffd166; }
+        .pm-panel input[type=range] { width: 100%; }
+        .pm-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+        .pm-panel button { background: rgba(30, 41, 59, 0.9); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 3px; padding: 5px 7px; font-size: 10px; font-weight: 800; letter-spacing: 1px; cursor: pointer; }
+        .pm-panel button.on { border-color: #ffd166; color: #ffd166; }
+        .pm-panel .pm-shot, .pm-panel [data-pm="exit"] { display: block; width: 100%; margin-top: 6px; padding: 8px; font-size: 12px; }
+        .pm-panel .pm-shot { border-color: #2bf0a5; color: #2bf0a5; }
+        .pm-help { margin-top: 8px; color: #94a3b8; font-size: 10px; line-height: 1.5; }
+        .pm-saved { margin-top: 4px; color: #2bf0a5; font-size: 10px; word-break: break-all; }
+        /* V1.7 aim trainer */
+        .aim-trainer { position: absolute; inset: 0; z-index: 55; display: none; pointer-events: none; color: #e2e8f0; }
+        .aim-trainer.visible { display: block; }
+        .aim-panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100vw - 32px)); box-sizing: border-box; pointer-events: auto;
+            background: rgba(8, 12, 22, 0.9); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; padding: 16px; text-align: center; }
+        .aim-title { font-size: 18px; font-weight: 900; letter-spacing: 5px; color: #ff4655; margin-bottom: 12px; }
+        .aim-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-bottom: 10px; }
+        .aim-card { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 4px; color: #e2e8f0; padding: 12px; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 6px; }
+        .aim-card:hover, .aim-card:focus { border-color: #ff4655; outline: none; }
+        .aim-card b { font-size: 15px; letter-spacing: 3px; }
+        .aim-card span { font-size: 11px; color: #94a3b8; }
+        .aim-card small { font-size: 10px; color: #ffd166; letter-spacing: 1px; }
+        .aim-btn { background: rgba(30, 41, 59, 0.9); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 3px; padding: 8px 14px; font-weight: 800; letter-spacing: 2px; cursor: pointer; }
+        .aim-btn:hover, .aim-btn:focus { border-color: #ff4655; outline: none; }
+        .aim-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+        .aim-score-big { font-size: 44px; font-weight: 900; color: #ffd166; letter-spacing: 3px; }
+        .aim-score-big em { display: block; font-style: normal; font-size: 12px; color: #2bf0a5; letter-spacing: 4px; }
+        .aim-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; margin-top: 10px; text-align: left; }
+        .aim-stats div { background: rgba(30, 41, 59, 0.7); padding: 6px 10px; border-radius: 3px; display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+        .aim-stats span { color: #94a3b8; letter-spacing: 1px; }
+        .aim-hud { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; background: rgba(8, 12, 22, 0.75);
+            border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; padding: 6px 14px; font-size: 12px; font-weight: 800; letter-spacing: 2px; white-space: nowrap; max-width: calc(100vw - 32px); }
+        .aim-hud b { color: #ff4655; }
+        .aim-count { position: absolute; top: 38%; left: 50%; transform: translateX(-50%); font-size: 72px; font-weight: 900; color: #ffd166; text-shadow: 0 4px 18px rgba(0,0,0,0.7); }
         body.menu-open.agent-select .agent-picker-overlay { background: linear-gradient(270deg, rgba(6, 11, 19, 0.92) 0%, rgba(6, 11, 19, 0.6) 55%, rgba(6, 11, 19, 0) 70%);
             backdrop-filter: none; justify-content: flex-end; }
         body.menu-open.agent-select .agent-picker-panel { width: min(760px, 60vw); margin-right: 3vw; max-height: 94vh; }
@@ -4602,6 +4663,9 @@
                                         <span style="background:#2bf0a5;"></span>
                                     </div>
                                 </button>
+                                <button class="skin-card-btn ws-card" data-skin="custom1" style="display:none"><div class="ws-card-name" style="font-weight:800; font-size:13px;">CUSTOM 1</div><div class="ws-card-sub" style="font-size:11px; color:#94a3b8;"></div><div class="skin-swatch-strip"><span></span><span></span><span></span><span></span></div></button>
+                                <button class="skin-card-btn ws-card" data-skin="custom2" style="display:none"><div class="ws-card-name" style="font-weight:800; font-size:13px;">CUSTOM 2</div><div class="ws-card-sub" style="font-size:11px; color:#94a3b8;"></div><div class="skin-swatch-strip"><span></span><span></span><span></span><span></span></div></button>
+                                <button class="skin-card-btn ws-card" data-skin="custom3" style="display:none"><div class="ws-card-name" style="font-weight:800; font-size:13px;">CUSTOM 3</div><div class="ws-card-sub" style="font-size:11px; color:#94a3b8;"></div><div class="skin-swatch-strip"><span></span><span></span><span></span><span></span></div></button>
                                 <button class="skin-card-btn" data-skin="ember">
                                     <div style="font-weight:800; font-size:13px; color:#fb923c;">EMBER // FORGE</div>
                                     <div style="font-size:11px; color:#94a3b8;">Charred Steel &amp; Molten Orange</div>
@@ -5481,6 +5545,7 @@
                 skipMenu: false,       // V1.7: start straight in the game (no start screen)
                 breakables: true,      // glass panes and explosive barrels on the maps
                 showBody: true,        // your legs and body when you look down, and your shadow
+                customSkins: [],       // V1.7 skin workshop: up to three of your own designs
                 slide: true,           // crouch while sprinting to slide
                 mantle: true,          // jump into a ledge up to chest height to climb onto it
                 fpsCap: 0,
@@ -5513,7 +5578,7 @@
                 showHints: true,
                 showDamageNumbers: true,
                 hudScale: 100,         // V1.7: HUD Size % (80-130)
-                weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx' | level rewards: 'ember' | 'glacier' | 'neontide' | 'onyx'
+                weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx' | level rewards: 'ember' | 'glacier' | 'neontide' | 'onyx' | workshop: 'custom1'..'custom3'
                 botDifficulty: 'gold', // 'iron' | 'gold' | 'immortal' | 'radiant'
                 infiniteAbilities: false,
                 infiniteUlt: false,
@@ -7394,6 +7459,9 @@
             // Handle mouse movement with smoothing
             handleMouseMove: function(e) {
                 if (!isPointerLocked) return;
+                // Just after photo mode re-locks the mouse, the first moves can carry a
+                // jump from where the cursor was; the restored view must not be thrown off
+                if (typeof photoMode !== 'undefined' && performance.now() < photoMode.lookQuietUntil) return;
                 
                 // Scale sensitivity when zoomed in ADS / Sniper Scope so high-zoom aiming feels precise
                 const fovRatio = (camera && game.baseFov) ? (camera.fov / game.baseFov) : 1.0;
@@ -12698,6 +12766,17 @@
                 mainMenu.onKey(event);
                 return;
             }
+            // V1.7: photo mode takes the keyboard while active; J enters it
+            if (photoMode.active) {
+                if (event.target && event.target.tagName === 'INPUT') return;
+                event.preventDefault();
+                photoMode.onKey(event, true);
+                return;
+            }
+            if (event.code === 'KeyJ' && !event.repeat && photoMode.canEnter()) {
+                photoMode.enter();
+                return;
+            }
             if (event.code === 'KeyN' && !event.repeat && !game.buyMenuOpen && !game.settingsOpen && !game.agentPickerOpen && !mainMenu.open) {
                 progression.doSpray(performance.now());
             }
@@ -12940,6 +13019,7 @@
         });
         
         document.addEventListener('keyup', (event) => {
+            if (photoMode.active) { photoMode.onKey(event, false); return; }
             let effectiveCode = event.code;
             const kb = game.userSettings && game.userSettings.keybinds;
             if (kb) {
@@ -33984,8 +34064,9 @@
             },
 
             setGameMode: function(mode) {
-                if (['wave', 'range', 'retake', 'match', 'deathmatch', 'spikerush'].indexOf(mode) === -1) return;
+                if (['wave', 'range', 'retake', 'match', 'deathmatch', 'spikerush', 'aim'].indexOf(mode) === -1) return;
                 replayDirector.stop();
+                aimTrainer.stop();
                 if (matchMode.active) matchMode.stop();
                 if (dmMode.active) dmMode.stop();
                 // Spike Rush runs on the Match engine
@@ -34005,7 +34086,13 @@
                 if (modeDmBtn) modeDmBtn.classList.toggle('active', mode === 'deathmatch');
                 if (rangeScorecard) rangeScorecard.classList.remove('visible');
 
-                if (mode === 'deathmatch') {
+                if (mode === 'aim') {
+                    this.rangeActive = false;
+                    this.activeRangeBot = null;
+                    this.spikeState = 'unplanted';
+                    if (this.spikeCanister) this.spikeCanister.visible = false;
+                    aimTrainer.start();
+                } else if (mode === 'deathmatch') {
                     this.rangeActive = false;
                     this.activeRangeBot = null;
                     if (rangeChallengeHud) rangeChallengeHud.classList.remove('visible');
@@ -35312,6 +35399,8 @@
                 } else if (game.gameMode === 'match') {
                     if (matchMode.phase === 'live') this.updateSpikeSystem(delta, now);
                     matchMode.update(delta, now);
+                } else if (game.gameMode === 'aim') {
+                    aimTrainer.update(delta, now);
                 } else {
                     this.updateSpikeSystem(delta, now);
                     this.updateWaveHUD(now);
@@ -35691,6 +35780,7 @@
                     if (pIdx === 0 && typeof agentSystem !== 'undefined' && agentSystem.checkShootIsoOrb) {
                         agentSystem.checkShootIsoOrb(raycaster.ray, effectNow);
                     }
+                    if (pIdx === 0 && aimTrainer.active) aimTrainer.onShot(raycaster.ray, effectNow);
 
                     const intersects = collectShotIntersections();
                     _actorHitCandidates.clear();
@@ -36854,7 +36944,7 @@
         const slideCamera = {
             roll: 0, applied: 0,
             update: function (dt) {
-                if (replayDirector.clip || mainMenu.open) return;
+                if (replayDirector.clip || mainMenu.open || photoMode.active) return;
                 const cc = characterController;
                 let target = 0;
                 if (cc.slideTimer > 0 && cc.grounded) {
@@ -37644,6 +37734,7 @@
             showBody: true,
             slide: true,
             mantle: true,
+            customSkins: [],
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -39345,7 +39436,7 @@
 
             update: function (dt) {
                 if (!this.group) return;
-                const show = this.enabled() && !mainMenu.open && !replayDirector.clip && game.health > 0;
+                const show = this.enabled() && !mainMenu.open && !replayDirector.clip && !photoMode.active && game.health > 0;
                 if (!show) {
                     if (this.group.visible) { this.group.visible = false; shadowManager.markEvent(); }
                     return;
@@ -39831,13 +39922,692 @@
             }
         };
 
+        // =============================================
+        // V1.7 Weapon skin workshop: design your own skins (body, trim, glow and
+        // tracer colours, a finish and glow strength) in three named slots, with a
+        // live rotating preview of your gun. Saved with your settings; equipped like
+        // any other skin (Settings, Career). The preview is a clone of the real gun
+        // sharing its materials, so it adds no shader programs.
+        // =============================================
+        const WORKSHOP_FINISHES = {
+            matte:  { label: 'MATTE',  metalness: 0.2,  roughness: 0.75 },
+            satin:  { label: 'SATIN',  metalness: 0.5,  roughness: 0.45 },
+            metal:  { label: 'METAL',  metalness: 0.85, roughness: 0.25 },
+            chrome: { label: 'CHROME', metalness: 1.0,  roughness: 0.08 }
+        };
+        const WORKSHOP_CHANNELS = [
+            ['body', 'BODY'], ['secondary', 'TRIM'], ['accent', 'GLOW'], ['tracer', 'TRACER']
+        ];
+        const WORKSHOP_SWATCHES = ['#0a0a0a', '#334155', '#e2e8f0', '#ff4655', '#f97316', '#facc15', '#2bf0a5', '#22e6ff', '#6366f1', '#ff2bd6'];
+        const hexStr = (n) => '#' + n.toString(16).padStart(6, '0');
+
+        const skinWorkshop = {
+            slot: 0, draft: null, weapon: 'rifle', preview: null, previewKey: '',
+
+            blank: function (i) {
+                return { name: `CUSTOM ${i + 1}`, body: 0x1e293b, secondary: 0x334155, accent: 0x22e6ff, tracer: 0x22e6ff, finish: 'satin', glow: 1 };
+            },
+            slots: function () { return (game.userSettings && Array.isArray(game.userSettings.customSkins)) ? game.userSettings.customSkins : []; },
+            themeOf: function (d) {
+                const f = WORKSHOP_FINISHES[d.finish] || WORKSHOP_FINISHES.satin;
+                return { label: `${(d.name || 'CUSTOM').toUpperCase()} // WORKSHOP`, body: d.body, secondary: d.secondary, accent: d.accent,
+                    tracer: d.tracer, metalness: f.metalness, roughness: f.roughness, glow: d.glow, custom: true };
+            },
+            // Saved slots become skins 'custom1'..'custom3'
+            sync: function () {
+                const list = this.slots();
+                for (let i = 0; i < 3; i++) {
+                    const id = 'custom' + (i + 1);
+                    if (list[i]) WEAPON_SKIN_THEMES[id] = this.themeOf(list[i]);
+                    else delete WEAPON_SKIN_THEMES[id];
+                }
+                this.syncCards();
+            },
+            // The three Settings skin cards for the slots: shown once saved
+            syncCards: function () {
+                const list = this.slots();
+                for (let i = 0; i < 3; i++) {
+                    const c = document.querySelector(`#setting-skin-cards [data-skin="custom${i + 1}"]`);
+                    if (!c) continue;
+                    const d = list[i];
+                    c.style.display = d ? '' : 'none';
+                    if (!d) continue;
+                    c.querySelector('.ws-card-name').textContent = `${d.name.toUpperCase()} // WORKSHOP`;
+                    c.querySelector('.ws-card-name').style.color = hexStr(d.accent);
+                    c.querySelector('.ws-card-sub').textContent = `Your design • ${(WORKSHOP_FINISHES[d.finish] || WORKSHOP_FINISHES.satin).label} finish`;
+                    const sw = c.querySelectorAll('.skin-swatch-strip span');
+                    [d.body, d.secondary, d.accent, d.tracer].forEach((v, k) => { if (sw[k]) sw[k].style.background = hexStr(v); });
+                }
+            },
+
+            open: function () {
+                this.slot = 0;
+                const eq = /^custom([1-3])$/.exec(game.userSettings.weaponSkin || '');
+                if (eq) this.slot = +eq[1] - 1;
+                this.loadSlot(this.slot);
+            },
+            loadSlot: function (i) {
+                this.slot = i;
+                const saved = this.slots()[i];
+                this.draft = Object.assign(this.blank(i), saved || {});
+                this.render();
+                this.apply();
+            },
+            set: function (key, value) {
+                if (key === 'name') this.draft.name = String(value).slice(0, 16) || `CUSTOM ${this.slot + 1}`;
+                else if (key === 'finish') { if (WORKSHOP_FINISHES[value]) this.draft.finish = value; }
+                else if (key === 'glow') this.draft.glow = Math.max(0, Math.min(2, +value));
+                else this.draft[key] = typeof value === 'string' ? parseInt(value.replace('#', ''), 16) : value;
+                this.apply();
+                if (key !== 'name' && key !== 'glow') this.render();
+            },
+            // Live preview on the real guns (shared materials)
+            apply: function () { settingsManager.applyWeaponSkin('_workshop', this.themeOf(this.draft)); },
+            save: function () {
+                const list = this.slots().slice();
+                while (list.length <= this.slot) list.push(null);
+                list[this.slot] = Object.assign({}, this.draft);
+                game.userSettings.customSkins = list.slice(0, 3);
+                game.userSettings.weaponSkin = 'custom' + (this.slot + 1);
+                this.sync();
+                settingsManager.applyWeaponSkin(game.userSettings.weaponSkin);
+                settingsManager.saveToStorage();
+                settingsManager.syncAllUI();
+                if (soundFX.buySuccess) soundFX.buySuccess();
+                this.render();
+                if (typeof mainMenu !== 'undefined' && mainMenu.open) mainMenu.render();
+                return game.userSettings.weaponSkin;
+            },
+            // Leaving: back to whatever is equipped
+            close: function () {
+                settingsManager.applyWeaponSkin(game.userSettings.weaponSkin || 'standard');
+                this.removePreview();
+            },
+            cycleWeapon: function () {
+                const order = ['rifle', 'sniper', 'pistol', 'knife'];
+                this.weapon = order[(order.indexOf(this.weapon) + 1) % order.length];
+                this.render();
+            },
+
+            // A clone of the chosen gun, sized to the showcase spot
+            ensurePreview: function (parent) {
+                if (this.previewKey === this.weapon && this.preview) return this.preview;
+                this.removePreview();
+                const src = game.weapons[this.weapon] && game.weapons[this.weapon].model;
+                if (!src) return null;
+                const g = new THREE.Group();
+                const clone = src.clone();
+                clone.position.set(0, 0, 0);
+                clone.rotation.set(0, 0, 0);
+                clone.scale.set(1, 1, 1);
+                clone.traverse((o) => {
+                    if (o.userData.isHands) o.visible = false;
+                    if (o === src.userData.muzzleFlash || (o.material && o.material.blending === THREE.AdditiveBlending)) o.visible = false;
+                });
+                clone.updateMatrixWorld(true);
+                const box = new THREE.Box3().setFromObject(clone);
+                const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+                const s = 2.1 / Math.max(0.001, size.x, size.y, size.z);
+                clone.position.copy(center).multiplyScalar(-s);
+                clone.scale.setScalar(s);
+                g.add(clone);
+                parent.add(g);
+                this.preview = g;
+                this.previewKey = this.weapon;
+                return g;
+            },
+            removePreview: function () {
+                if (this.preview && this.preview.parent) this.preview.parent.remove(this.preview);
+                this.preview = null;
+                this.previewKey = '';
+            },
+
+            render: function () {
+                const el = document.getElementById('mm-workshop');
+                if (!el || !this.draft) return;
+                const d = this.draft, list = this.slots();
+                const slots = [0, 1, 2].map((i) => `<button class="mm-btn ws-slot${i === this.slot ? ' selected' : ''}" data-ws="slot:${i}">SLOT ${i + 1}<small>${list[i] ? list[i].name : 'EMPTY'}</small></button>`).join('');
+                const rows = WORKSHOP_CHANNELS.map(([key, label]) => {
+                    const sw = WORKSHOP_SWATCHES.map((h) => `<button class="mm-btn ws-sw${parseInt(h.slice(1), 16) === d[key] ? ' selected' : ''}" data-ws="${key}:${h}" style="background:${h}" aria-label="${label} ${h}"></button>`).join('');
+                    return `<div class="ws-row"><span class="ws-label">${label}</span>${sw}<input type="color" class="ws-pick" data-wspick="${key}" value="${hexStr(d[key])}"></div>`;
+                }).join('');
+                const fin = Object.keys(WORKSHOP_FINISHES).map((k) => `<button class="mm-btn ws-fin${d.finish === k ? ' selected' : ''}" data-ws="finish:${k}">${WORKSHOP_FINISHES[k].label}</button>`).join('');
+                const equipped = game.userSettings.weaponSkin === 'custom' + (this.slot + 1);
+                el.innerHTML = `
+                    <div class="ws-slots">${slots}</div>
+                    <div class="ws-row"><span class="ws-label">NAME</span><input class="ws-name" id="ws-name" maxlength="16" value="${d.name.replace(/"/g, '&quot;')}"></div>
+                    ${rows}
+                    <div class="ws-row"><span class="ws-label">FINISH</span>${fin}</div>
+                    <div class="ws-row"><span class="ws-label">GLOW</span><input type="range" id="ws-glow" min="0" max="200" step="5" value="${Math.round(d.glow * 100)}"><b id="ws-glow-val">${Math.round(d.glow * 100)}%</b></div>
+                    <div class="ws-actions">
+                        <button class="mm-btn" data-ws="weapon">PREVIEW: ${this.weapon.toUpperCase()}</button>
+                        <button class="mm-btn" data-ws="revert">RESET</button>
+                        <button class="mm-btn ws-save" data-ws="save">${equipped ? 'SAVE (EQUIPPED)' : 'SAVE &amp; EQUIP'}</button>
+                    </div>`;
+            },
+
+            // Clicks and inputs inside the workshop panel (from the main menu)
+            onClick: function (b) {
+                const [k, v] = b.dataset.ws.split(':');
+                if (k === 'slot') this.loadSlot(+v);
+                else if (k === 'weapon') this.cycleWeapon();
+                else if (k === 'revert') this.loadSlot(this.slot);
+                else if (k === 'save') this.save();
+                else this.set(k, v);
+                const again = document.querySelector(`#mm-workshop [data-ws="${b.dataset.ws}"]`);
+                if (again) again.focus({ preventScroll: true });
+            },
+            onInput: function (t) {
+                if (t.id === 'ws-name') this.set('name', t.value);
+                else if (t.id === 'ws-glow') { this.set('glow', t.value / 100); const v = document.getElementById('ws-glow-val'); if (v) v.textContent = t.value + '%'; }
+                else if (t.dataset.wspick) this.set(t.dataset.wspick, t.value);
+            }
+        };
+
+        // =============================================
+        // V1.7 Photo mode [J]: the game freezes and you fly a free camera with the
+        // HUD and gun hidden. Field of view, tilt, brightness, filters, vignette and
+        // letterbox; Take Photo saves a PNG with the look applied. Leaving puts the
+        // camera, view and timers back exactly. Filters are CSS on the canvas (no
+        // shader changes).
+        // =============================================
+        const PHOTO_FILTERS = {
+            none:  { label: 'NONE',  css: '' },
+            noir:  { label: 'NOIR',  css: 'grayscale(1) contrast(1.25)' },
+            warm:  { label: 'WARM',  css: 'sepia(0.35) saturate(1.3) hue-rotate(-10deg)' },
+            cool:  { label: 'COOL',  css: 'saturate(1.1) hue-rotate(18deg) brightness(1.05)' },
+            vivid: { label: 'VIVID', css: 'saturate(1.6) contrast(1.1)' }
+        };
+        const photoMode = {
+            active: false, el: null, keys: {}, saved: null,
+            yaw: 0, pitch: 0, roll: 0, fov: 70, exposure: 100, speed: 6,
+            filter: 'none', vignette: false, letterbox: false, hideGun: true, panelHidden: false,
+            captureNext: false, lastPhoto: null, photos: 0, _drag: null, _baseExposure: 1, lookQuietUntil: 0,
+
+            init: function () {
+                if (this.el) return;
+                const el = document.createElement('div');
+                el.id = 'photo-mode';
+                el.className = 'photo-mode';
+                el.innerHTML = `
+                    <div class="pm-vignette"></div><div class="pm-bar top"></div><div class="pm-bar bottom"></div>
+                    <div class="pm-panel">
+                        <div class="pm-title">PHOTO MODE</div>
+                        <label>FIELD OF VIEW <b id="pm-fov-val"></b><input type="range" id="pm-fov" min="20" max="110" step="1"></label>
+                        <label>TILT <b id="pm-roll-val"></b><input type="range" id="pm-roll" min="-30" max="30" step="1"></label>
+                        <label>BRIGHTNESS <b id="pm-exp-val"></b><input type="range" id="pm-exp" min="40" max="200" step="5"></label>
+                        <label>CAMERA SPEED <b id="pm-speed-val"></b><input type="range" id="pm-speed" min="1" max="20" step="1"></label>
+                        <div class="pm-row">${Object.keys(PHOTO_FILTERS).map((k) => `<button data-pm="filter:${k}">${PHOTO_FILTERS[k].label}</button>`).join('')}</div>
+                        <div class="pm-row"><button data-pm="vignette">VIGNETTE</button><button data-pm="letterbox">LETTERBOX</button><button data-pm="gun">SHOW GUN</button></div>
+                        <button class="pm-shot" data-pm="shot">TAKE PHOTO [ENTER]</button>
+                        <button data-pm="exit">EXIT [J / ESC]</button>
+                        <div class="pm-help">WASD move • Q / E down / up • Shift faster • drag to look • wheel: zoom • H hide this panel</div>
+                        <div class="pm-saved" id="pm-saved"></div>
+                    </div>`;
+                document.getElementById('ui-root').appendChild(el);
+                this.el = el;
+                el.addEventListener('click', (e) => {
+                    const b = e.target.closest('[data-pm]');
+                    if (!b) return;
+                    e.stopPropagation();
+                    const [k, v] = b.dataset.pm.split(':');
+                    if (k === 'filter') this.filter = v;
+                    else if (k === 'vignette') this.vignette = !this.vignette;
+                    else if (k === 'letterbox') this.letterbox = !this.letterbox;
+                    else if (k === 'gun') this.hideGun = !this.hideGun;
+                    else if (k === 'shot') this.takePhoto();
+                    else if (k === 'exit') this.exit();
+                    this.render();
+                });
+                el.addEventListener('input', (e) => {
+                    const t = e.target, v = +t.value;
+                    if (t.id === 'pm-fov') this.fov = v;
+                    else if (t.id === 'pm-roll') this.roll = v * Math.PI / 180;
+                    else if (t.id === 'pm-exp') this.exposure = v;
+                    else if (t.id === 'pm-speed') this.speed = v;
+                    this.render();
+                });
+                // While active, the mouse drives the camera (drag) and zoom (wheel), never the gun
+                const block = (e) => {
+                    if (!this.active || e.target.closest('.pm-panel')) return;
+                    e.stopPropagation();
+                    if (e.type === 'mousedown') this._drag = { x: e.clientX, y: e.clientY };
+                    else if (e.type === 'mouseup') this._drag = null;
+                    else if (e.type === 'wheel') { this.fov = Math.max(20, Math.min(110, this.fov + Math.sign(e.deltaY) * 3)); this.render(); }
+                };
+                for (const t of ['mousedown', 'mouseup', 'click', 'contextmenu', 'wheel']) window.addEventListener(t, block, true);
+                window.addEventListener('mousemove', (e) => {
+                    if (!this.active) return;
+                    if (!e.target.closest || !e.target.closest('.pm-panel')) e.stopPropagation();   // never the normal mouse look
+                    if (!this._drag) return;
+                    this.look(e.clientX - this._drag.x, e.clientY - this._drag.y);
+                    this._drag.x = e.clientX; this._drag.y = e.clientY;
+                }, true);
+            },
+
+            canEnter: function () {
+                return !mainMenu.open && !replayDirector.clip && !game.buyMenuOpen && !game.settingsOpen && !game.agentPickerOpen &&
+                    !(typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) && matchMode.phase !== 'over';
+            },
+            toggle: function () { return this.active ? this.exit() : this.enter(); },
+
+            enter: function () {
+                if (this.active || !this.canEnter()) return false;
+                this.init();
+                // Take the view as it is now, without the slide tilt
+                camera.rotation.z -= slideCamera.applied;
+                slideCamera.roll = slideCamera.applied = 0;
+                this.saved = {
+                    pos: camera.position.clone(), rx: camera.rotation.x, ry: camera.rotation.y, rz: camera.rotation.z, fov: camera.fov,
+                    gun: weaponGroup.visible, exposure: renderer.toneMappingExposure
+                };
+                this._baseExposure = renderer.toneMappingExposure;
+                this.yaw = camera.rotation.y; this.pitch = camera.rotation.x; this.roll = 0;
+                this.fov = Math.round(camera.fov);
+                this.exposure = 100;
+                this.active = true;
+                this.keys = {};
+                this._drag = null;
+                mouseLookController.currentLookSpeed.x = mouseLookController.currentLookSpeed.y = 0;
+                for (const k in game.keys) game.keys[k] = false;
+                game.mouseDown = false;
+                if (typeof setAdsState === 'function') setAdsState(false);
+                mainMenu._lastNow = performance.now();
+                if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) {} }
+                document.body.classList.add('photo-on');
+                this.panelHidden = false;
+                this.render();
+                return true;
+            },
+
+            exit: function () {
+                if (!this.active) return false;
+                mainMenu._freezeTimers(performance.now());
+                mainMenu._lastNow = 0;
+                this.active = false;
+                this._drag = null;
+                const s = this.saved;
+                mouseLookController.currentLookSpeed.x = mouseLookController.currentLookSpeed.y = 0;
+                camera.position.copy(s.pos);
+                camera.rotation.set(s.rx, s.ry, s.rz, 'YXZ');
+                camera.fov = s.fov;
+                camera.updateProjectionMatrix();
+                weaponGroup.visible = s.gun;
+                renderer.toneMappingExposure = s.exposure;
+                renderer.domElement.style.filter = '';
+                document.body.classList.remove('photo-on');
+                this.render();
+                if (typeof timingResetPending !== 'undefined') timingResetPending = true;
+                this.lookQuietUntil = performance.now() + 250;
+                if (!deviceInfo.touchEnabled && !document.pointerLockElement) { try { document.body.requestPointerLock(); } catch (e) {} }
+                return true;
+            },
+
+            look: function (dx, dy) {
+                this.yaw -= dx * 0.004;
+                this.pitch = Math.max(-1.5, Math.min(1.5, this.pitch - dy * 0.004));
+            },
+
+            onKey: function (e, down) {
+                if (down && !e.repeat) {
+                    if (e.code === 'Escape' || e.code === 'KeyJ') { this.exit(); return; }
+                    if (e.code === 'Enter') { this.takePhoto(); return; }
+                    if (e.code === 'KeyH') { this.panelHidden = !this.panelHidden; this.render(); return; }
+                }
+                this.keys[e.code] = down;
+            },
+
+            // Every frame while active: timers stand still, the free camera moves
+            update: function (dt, now) {
+                mainMenu._freezeTimers(now);
+                const k = this.keys;
+                const sp = this.speed * (k.ShiftLeft || k.ShiftRight ? 3 : 1) * Math.min(0.05, dt);
+                const fx = -Math.sin(this.yaw) * Math.cos(this.pitch), fy = Math.sin(this.pitch), fz = -Math.cos(this.yaw) * Math.cos(this.pitch);
+                const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
+                const f = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0), r = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0), u = (k.KeyE ? 1 : 0) - (k.KeyQ ? 1 : 0);
+                const p = camera.position;
+                p.x = Math.max(-60, Math.min(60, p.x + (fx * f + rx * r) * sp));
+                p.y = Math.max(0.3, Math.min(40, p.y + (fy * f + u) * sp));
+                p.z = Math.max(-60, Math.min(60, p.z + (fz * f + rz * r) * sp));
+                this.preRender();
+            },
+            // Again just before drawing, after anything else this frame (aim-down-sights
+            // zoom, weapon follow) touched the camera
+            preRender: function () {
+                if (!this.active) return;
+                camera.rotation.set(this.pitch, this.yaw, this.roll, 'YXZ');
+                if (Math.abs(camera.fov - this.fov) > 1e-6) { camera.fov = this.fov; camera.updateProjectionMatrix(); }
+                renderer.toneMappingExposure = this._baseExposure * this.exposure / 100;
+                weaponGroup.visible = !this.hideGun;
+            },
+
+            // Called right after the frame is drawn: the canvas still holds the image
+            afterRender: function () {
+                if (!this.captureNext) return;
+                this.captureNext = false;
+                const src = renderer.domElement;
+                const c = document.createElement('canvas');
+                c.width = src.width; c.height = src.height;
+                const g = c.getContext('2d');
+                g.filter = PHOTO_FILTERS[this.filter].css || 'none';
+                g.drawImage(src, 0, 0);
+                g.filter = 'none';
+                if (this.vignette) {
+                    const grd = g.createRadialGradient(c.width / 2, c.height / 2, Math.min(c.width, c.height) * 0.35, c.width / 2, c.height / 2, Math.max(c.width, c.height) * 0.75);
+                    grd.addColorStop(0, 'rgba(0,0,0,0)');
+                    grd.addColorStop(1, 'rgba(0,0,0,0.75)');
+                    g.fillStyle = grd;
+                    g.fillRect(0, 0, c.width, c.height);
+                }
+                if (this.letterbox) {
+                    const bar = Math.round(c.height * 0.11);
+                    g.fillStyle = '#000';
+                    g.fillRect(0, 0, c.width, bar);
+                    g.fillRect(0, c.height - bar, c.width, bar);
+                }
+                try {
+                    this.lastPhoto = c.toDataURL('image/png');
+                } catch (e) { this.lastPhoto = null; return; }
+                this.photos++;
+                const d = new Date();
+                const name = `valorant-photo-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}.png`;
+                this.lastName = name;
+                if (!this.noDownload) {
+                    const a = document.createElement('a');
+                    a.href = this.lastPhoto;
+                    a.download = name;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                }
+                const saved = document.getElementById('pm-saved');
+                if (saved) saved.textContent = `Saved ${name}`;
+                if (soundFX.noiseLayer) soundFX.noiseLayer(0.08, 0.12, 0, 'highpass', 2400, 0.7);
+            },
+            takePhoto: function () { if (this.active) this.captureNext = true; },
+
+            render: function () {
+                if (!this.el) return;
+                this.el.classList.toggle('visible', this.active);
+                this.el.classList.toggle('vignette', this.vignette);
+                this.el.classList.toggle('letterbox', this.letterbox);
+                this.el.classList.toggle('panel-hidden', this.panelHidden);
+                renderer.domElement.style.filter = this.active ? PHOTO_FILTERS[this.filter].css : '';
+                const set = (id, v, label) => { const i = document.getElementById(id); if (i && document.activeElement !== i) i.value = v; const b = document.getElementById(id + '-val'); if (b) b.textContent = label; };
+                set('pm-fov', this.fov, `${Math.round(this.fov)}°`);
+                set('pm-roll', Math.round(this.roll * 180 / Math.PI), `${Math.round(this.roll * 180 / Math.PI)}°`);
+                set('pm-exp', this.exposure, `${this.exposure}%`);
+                set('pm-speed', this.speed, `${this.speed} m/s`);
+                this.el.querySelectorAll('[data-pm]').forEach((b) => {
+                    const [k, v] = b.dataset.pm.split(':');
+                    b.classList.toggle('on', (k === 'filter' && v === this.filter) || (k === 'vignette' && this.vignette) || (k === 'letterbox' && this.letterbox) || (k === 'gun' && !this.hideGun));
+                });
+            }
+        };
+
+        // =============================================
+        // V1.7 Aim trainer (main menu mode): three timed drills against floating
+        // targets in front of you, with no bots. Gridshot keeps three targets up,
+        // Flick shows one small target anywhere, Tracking scores the time your
+        // crosshair stays on a moving target. Score, accuracy and reaction time;
+        // best scores saved; XP. Targets use the spike-rush orb material set-up
+        // (no new shader programs); hits use the real shot ray, spread included.
+        // =============================================
+        const AIM_DRILLS = {
+            gridshot: { name: 'GRIDSHOT', desc: 'Three targets at a time. Hit them as fast as you can.', secs: 30, size: 0.42, color: 0x22e6ff },
+            flick:    { name: 'FLICK',    desc: 'One small target at a time, anywhere in front of you.', secs: 30, size: 0.3,  color: 0xff4655 },
+            tracking: { name: 'TRACKING', desc: 'Keep your crosshair on the moving target.',            secs: 20, size: 0.45, color: 0x2bf0a5 }
+        };
+        const aimTrainer = {
+            active: false, drill: 'gridshot', state: 'idle', el: null, group: null, targets: [],
+            t: 0, countdown: 0, score: 0, hits: 0, misses: 0, reactions: [], onTime: 0, total: 0,
+            origin: new THREE.Vector3(), best: {}, lastResult: null, _ray: new THREE.Ray(), _v: new THREE.Vector3(),
+            KEY: 'valorant_v17_aim_best',
+
+            init: function () {
+                if (this.group) return;
+                this.group = new THREE.Group();
+                this.group.visible = false;
+                scene.add(this.group);
+                const geo = new THREE.SphereGeometry(1, 20, 14);
+                for (let i = 0; i < 3; i++) {
+                    const mat = new THREE.MeshStandardMaterial({ color: 0x22e6ff, emissive: 0x22e6ff, emissiveIntensity: 0.8, roughness: 0.3 });
+                    const m = new THREE.Mesh(geo, mat);
+                    m.visible = false;
+                    this.group.add(m);
+                    this.targets.push({ mesh: m, alive: false, bornAt: 0, popT: -1, cell: -1 });
+                }
+                const el = document.createElement('div');
+                el.id = 'aim-trainer';
+                el.className = 'aim-trainer';
+                document.getElementById('ui-root').appendChild(el);
+                this.el = el;
+                el.addEventListener('mousedown', (e) => e.stopPropagation());
+                el.addEventListener('click', (e) => {
+                    const b = e.target.closest('[data-aim]');
+                    if (!b) return;
+                    e.stopPropagation();
+                    const [k, v] = b.dataset.aim.split(':');
+                    if (k === 'drill') this.begin(v);
+                    else if (k === 'again') this.begin(this.drill);
+                    else if (k === 'pick') this.showPicker();
+                    else if (k === 'leave') tacticalDirector.setGameMode('wave');
+                });
+                try { if (settingsManager.lsEnabled) this.best = JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}; } catch (e) { this.best = {}; }
+            },
+
+            // From setGameMode('aim'): clear the bots, stand at the start spot, pick a drill
+            start: function () {
+                this.init();
+                this.active = true;
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    e.isActive = false; e.hit = true; e.renderActive = false;
+                    setCasterVisible(e.mesh, false, true);
+                    if (e.broadKeys) actorBroadphase.remove(e);
+                    e.generation++;                         // drops pending respawns
+                }
+                const cc = characterController;
+                cc.reset();
+                cc.position.set(0, cc.standHeight, 30);
+                cc.prevSimPosition.copy(cc.position);
+                camera.rotation.set(0, 0, 0, 'YXZ');
+                this.origin.set(0, 0, 30);
+                game.health = 100;
+                if (tacticalDirector.spikeGroup) tacticalDirector.spikeGroup.visible = false;
+                if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
+                if (rangeChallengeHud) rangeChallengeHud.classList.remove('visible');
+                if (roundTitleEl) roundTitleEl.textContent = 'AIM TRAINER';
+                if (roundSubstatusEl) roundSubstatusEl.textContent = 'GRIDSHOT • FLICK • TRACKING';
+                this.group.visible = true;
+                this.showPicker();
+            },
+            stop: function () {
+                if (!this.active) return;
+                this.active = false;
+                this.state = 'idle';
+                for (const t of this.targets) { t.alive = false; t.mesh.visible = false; }
+                if (this.group) this.group.visible = false;
+                if (this.el) this.el.className = 'aim-trainer';
+            },
+
+            releaseMouse: function () { if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) {} } },
+            lockMouse: function () { if (!deviceInfo.touchEnabled && !document.pointerLockElement && !mainMenu.open) { try { document.body.requestPointerLock(); } catch (e) {} } },
+
+            showPicker: function () {
+                this.state = 'pick';
+                for (const t of this.targets) { t.alive = false; t.mesh.visible = false; }
+                const cards = Object.keys(AIM_DRILLS).map((id) => {
+                    const d = AIM_DRILLS[id], b = this.best[id];
+                    return `<button class="aim-card" data-aim="drill:${id}"><b>${d.name}</b><span>${d.desc}</span><small>${d.secs} s • BEST ${b ? b.score : '—'}</small></button>`;
+                }).join('');
+                this.el.innerHTML = `<div class="aim-panel"><div class="aim-title">AIM TRAINER</div><div class="aim-cards">${cards}</div><button class="aim-btn" data-aim="leave">LEAVE</button></div>`;
+                this.el.className = 'aim-trainer visible picking';
+                this.releaseMouse();
+            },
+
+            begin: function (drill) {
+                if (!AIM_DRILLS[drill]) return;
+                this.drill = drill;
+                this.state = 'countdown';
+                this.countdown = 3;
+                this.t = 0; this.score = 0; this.hits = 0; this.misses = 0; this.reactions = []; this.onTime = 0; this.total = 0;
+                for (const t of this.targets) {
+                    t.alive = false; t.mesh.visible = false;
+                    t.mesh.material.color.setHex(AIM_DRILLS[drill].color).convertSRGBToLinear();
+                    t.mesh.material.emissive.copy(t.mesh.material.color);
+                }
+                this.el.className = 'aim-trainer visible running';
+                this.el.innerHTML = `<div class="aim-hud"><b id="aim-drill">${AIM_DRILLS[drill].name}</b><span id="aim-time"></span><span id="aim-score"></span><span id="aim-acc"></span></div><div class="aim-count" id="aim-count"></div>`;
+                this.lockMouse();
+                this.renderHud();
+            },
+
+            // Grid of 5 x 3 spots 10 m ahead; Flick picks anywhere in a wider box
+            spawn: function (t, now) {
+                const d = AIM_DRILLS[this.drill], o = this.origin;
+                let x, y, z = o.z - 10;
+                if (this.drill === 'gridshot') {
+                    const used = this.targets.filter((u) => u.alive && u !== t).map((u) => u.cell);
+                    let cell;
+                    do { cell = Math.floor(Math.random() * 15); } while (used.indexOf(cell) !== -1 || cell === t.cell);
+                    t.cell = cell;
+                    x = o.x + ((cell % 5) - 2) * 1.5;
+                    y = 1.2 + Math.floor(cell / 5) * 1.1;
+                } else if (this.drill === 'flick') {
+                    x = o.x + (Math.random() - 0.5) * 11;
+                    y = 0.9 + Math.random() * 2.9;
+                    z = o.z - 8 - Math.random() * 6;
+                } else {
+                    x = o.x; y = 2.1;
+                }
+                t.mesh.position.set(x, y, z);
+                t.mesh.scale.setScalar(d.size);
+                t.mesh.visible = true;
+                t.alive = true;
+                t.bornAt = now;
+                t.popT = -1;
+            },
+
+            // The player's shot (first pellet, with its real spread)
+            onShot: function (ray, now) {
+                if (!this.active || this.state !== 'live' || this.drill === 'tracking') return;
+                let best = null, bestD = Infinity;
+                for (const t of this.targets) {
+                    if (!t.alive) continue;
+                    const r = t.mesh.scale.x;
+                    if (!rayHitsSphere(ray, t.mesh.position, r, 80)) continue;
+                    const d = this._v.copy(t.mesh.position).sub(ray.origin).dot(ray.direction);
+                    if (d < bestD) { bestD = d; best = t; }
+                }
+                if (!best) { this.misses++; this.score = Math.max(0, this.score - 25); this.renderHud(); return; }
+                const reaction = now - best.bornAt;
+                this.reactions.push(reaction);
+                this.hits++;
+                this.score += 100 + Math.max(0, Math.round(100 - reaction / 10));
+                best.alive = false;
+                best.popT = 0;
+                if (soundFX.hitTick) soundFX.hitTick(false);
+                if (typeof showHitMarker === 'function') showHitMarker('kill');
+                this.renderHud();
+            },
+
+            update: function (delta, now) {
+                if (!this.active) return;
+                // Unlimited ammo, no reloads
+                const w = game.weapons[game.activeWeapon];
+                if (w && !w.isMelee && w.ammo < w.maxAmmo) { w.ammo = w.maxAmmo; game.reloading = false; if (ammoValue) ammoValue.textContent = w.ammo; }
+                for (const t of this.targets) {
+                    if (t.popT < 0) continue;
+                    t.popT += delta;
+                    const k = Math.min(1, t.popT / 0.12);
+                    t.mesh.scale.setScalar(AIM_DRILLS[this.drill].size * (1 + k * 0.6) * (1 - k));
+                    if (k >= 1) { t.popT = -1; t.mesh.visible = false; }
+                }
+                if (mainMenu.open || photoMode.active || this.state === 'pick' || this.state === 'done') return;
+                const dt = Math.min(0.05, delta);
+                if (this.state === 'countdown') {
+                    this.countdown -= dt;
+                    const c = document.getElementById('aim-count');
+                    if (c) c.textContent = this.countdown > 0 ? String(Math.ceil(this.countdown)) : 'GO';
+                    if (this.countdown <= 0) {
+                        this.state = 'live';
+                        this.t = 0;
+                        if (c) setTimeout(() => { if (c.textContent === 'GO') c.textContent = ''; }, 400);
+                        const n = this.drill === 'gridshot' ? 3 : 1;
+                        for (let i = 0; i < n; i++) this.spawn(this.targets[i], now);
+                    }
+                    return;
+                }
+                // Live
+                this.t += dt;
+                if (this.drill === 'tracking') {
+                    const t = this.targets[0], o = this.origin, s = this.t;
+                    t.mesh.position.set(o.x + 3.4 * Math.sin(s * 1.25) + 0.8 * Math.sin(s * 3.1), 2.1 + 0.9 * Math.sin(s * 1.9 + 1), o.z - 10);
+                    camera.updateMatrixWorld();
+                    this._ray.origin.copy(camera.position);
+                    this._ray.direction.set(0, 0, -1).transformDirection(camera.matrixWorld);
+                    const on = rayHitsSphere(this._ray, t.mesh.position, t.mesh.scale.x, 80);
+                    this.total += dt;
+                    if (on) { this.onTime += dt; this.score = Math.round(this.onTime * 100); }
+                    t.mesh.material.emissiveIntensity = on ? 1.4 : 0.6;
+                } else {
+                    for (const t of this.targets) {
+                        if (this.drill === 'flick' && t !== this.targets[0]) continue;
+                        if (!t.alive && t.popT < 0) this.spawn(t, now);
+                    }
+                }
+                this.renderHud();
+                if (this.t >= AIM_DRILLS[this.drill].secs) this.finish();
+            },
+
+            accuracy: function () {
+                if (this.drill === 'tracking') return this.total ? Math.round(this.onTime / this.total * 100) : 0;
+                const shots = this.hits + this.misses;
+                return shots ? Math.round(this.hits / shots * 100) : 0;
+            },
+
+            renderHud: function () {
+                const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+                const left = Math.max(0, AIM_DRILLS[this.drill].secs - (this.state === 'live' ? this.t : 0));
+                set('aim-time', `${left.toFixed(1)} s`);
+                set('aim-score', `SCORE ${this.score}`);
+                set('aim-acc', this.drill === 'tracking' ? `ON TARGET ${this.accuracy()}%` : `HITS ${this.hits} • ACC ${this.accuracy()}%`);
+            },
+
+            finish: function () {
+                this.state = 'done';
+                for (const t of this.targets) { t.alive = false; if (t.popT < 0) t.mesh.visible = false; }
+                const d = AIM_DRILLS[this.drill];
+                const avg = this.reactions.length ? Math.round(this.reactions.reduce((a, b) => a + b, 0) / this.reactions.length) : 0;
+                const prev = this.best[this.drill];
+                const isBest = !prev || this.score > prev.score;
+                if (isBest) this.best[this.drill] = { score: this.score, acc: this.accuracy(), at: Date.now() };
+                try { if (settingsManager.lsEnabled) localStorage.setItem(this.KEY, JSON.stringify(this.best)); } catch (e) {}
+                const xp = Math.min(600, 150 + Math.round(this.score / 20));
+                progression.award(xp, `Aim trainer: ${d.name}`);
+                this.lastResult = { drill: this.drill, score: this.score, hits: this.hits, misses: this.misses, accuracy: this.accuracy(), avgReaction: avg, best: isBest, xp };
+                const line = this.drill === 'tracking'
+                    ? `<div><span>ON TARGET</span><b>${this.onTime.toFixed(1)} s (${this.accuracy()}%)</b></div>`
+                    : `<div><span>HITS / MISSES</span><b>${this.hits} / ${this.misses}</b></div><div><span>ACCURACY</span><b>${this.accuracy()}%</b></div><div><span>AVG REACTION</span><b>${avg ? avg + ' ms' : '—'}</b></div>`;
+                this.el.className = 'aim-trainer visible done';
+                this.el.innerHTML = `<div class="aim-panel"><div class="aim-title">${d.name} RESULT</div>
+                    <div class="aim-score-big">${this.score}${isBest ? '<em>NEW BEST</em>' : ''}</div>
+                    <div class="aim-stats">${line}<div><span>BEST</span><b>${this.best[this.drill].score}</b></div><div><span>XP</span><b>+${xp}</b></div></div>
+                    <div class="aim-actions"><button class="aim-btn" data-aim="again">AGAIN</button><button class="aim-btn" data-aim="pick">CHANGE DRILL</button><button class="aim-btn" data-aim="leave">LEAVE</button></div></div>`;
+                if (soundFX.ult) soundFX.ult();
+                this.releaseMouse();
+            }
+        };
+
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
             ['retake', 'RETAKE', 'Retake a planted site before the spike goes off'],
             ['range', 'RANGE', '30 bots against the clock, with a scorecard'],
             ['deathmatch', 'DEATHMATCH', 'Free-for-all: first to 40 kills, instant respawns'],
-            ['spikerush', 'SPIKE RUSH', 'First to 4 rounds, a random gun each round, power-up orbs']
+            ['spikerush', 'SPIKE RUSH', 'First to 4 rounds, a random gun each round, power-up orbs'],
+            ['aim', 'AIM TRAINER', 'Gridshot, Flick and Tracking drills with best scores']
         ];
         const mainMenu = {
             open: false, kind: 'start', view: 'main', started: false, selecting: false,
@@ -39874,8 +40644,14 @@
                             <button class="mm-btn" data-act="modes">MODES <span class="mm-val" id="mm-mode-val">WAVE</span></button>
                             <button class="mm-btn" data-act="map">MAP <span class="mm-val" id="mm-map-val">ASCENT</span></button>
                             <button class="mm-btn" data-act="career">CAREER <span class="mm-val" id="mm-level-val">LEVEL 1</span></button>
+                            <button class="mm-btn" data-act="workshop">WORKSHOP <span class="mm-val" id="mm-skin-val">STANDARD</span></button>
                             <button class="mm-btn" data-act="settings">SETTINGS</button>
                             <button class="mm-btn" data-act="controls">CONTROLS</button>
+                            <button class="mm-btn mm-pause-only" data-act="photo">PHOTO MODE <span class="mm-val">[J]</span></button>
+                        </div>
+                        <div class="mm-view" data-view="workshop">
+                            <div class="mm-career mm-workshop" id="mm-workshop"></div>
+                            <button class="mm-btn mm-back" data-act="back">BACK</button>
                         </div>
                         <div class="mm-view" data-view="career">
                             <div class="mm-career" id="mm-career"></div>
@@ -39889,7 +40665,7 @@
                             <div class="mm-controls">
                                 <div><b>WASD</b> Move</div><div><b>Mouse</b> Aim • <b>Left / Right click</b> Shoot / Aim down sights</div>
                                 <div><b>Space</b> Jump (hold: glide; into a ledge: climb) • <b>Ctrl / Z</b> Crouch (while sprinting: slide)</div><div><b>R</b> Reload • <b>Y</b> Inspect • <b>1–4</b> Weapons • <b>V</b> Variants</div>
-                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings • <b>N</b> Spray</div>
+                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings • <b>N</b> Spray • <b>J</b> Photo mode</div>
                                 <div><b>F1 / F2 / F3</b> Wave / Range / Retake • <b>F4</b> Maps • <b>T</b> Ping</div><div><b>Esc</b> This menu</div>
                                 <div class="mm-controls-pad"><b>Controller:</b> sticks move and aim • RT shoot • LT aim • A jump • B crouch • X reload • LB / RB / D-pad abilities • Start this menu • hold View: agents</div>
                             </div>
@@ -39901,11 +40677,14 @@
                 document.getElementById('ui-root').appendChild(el);
                 this.el = el;
                 el.addEventListener('mousedown', (e) => e.stopPropagation());
+                el.addEventListener('input', (e) => { if (e.target.closest('#mm-workshop')) skinWorkshop.onInput(e.target); });
+                el.addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT') e.stopPropagation(); });
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const b = e.target.closest('button');
                     if (!b) return;
                     if (b.dataset.mode) { this.mode = b.dataset.mode; this.setView('main'); return; }
+                    if (b.dataset.ws) { skinWorkshop.onClick(b); return; }
                     if (b.dataset.equip) {
                         const [type, id] = b.dataset.equip.split(':');
                         if (!progression.equip(type, id) && soundFX.buyDeny) soundFX.buyDeny();
@@ -39982,8 +40761,11 @@
                     camera.fov = this.savedLook.fov;
                     camera.updateProjectionMatrix();
                 }
+                if (this.view === 'workshop') skinWorkshop.close();
+                this.figure.visible = true;
                 this.showcase.visible = false;
                 weaponGroup.visible = true;
+                slideCamera.roll = slideCamera.applied = 0;
                 if (typeof timingResetPending !== 'undefined') timingResetPending = true;
             },
 
@@ -39999,7 +40781,9 @@
                 document.getElementById('mm-mode-val').textContent = m[1];
                 const mp = (typeof MAP_PRESETS !== 'undefined' && MAP_PRESETS[game.mapPreset]) || null;
                 document.getElementById('mm-map-val').textContent = mp ? mp.name : 'ASCENT';
-                this.el.classList.toggle('career', this.view === 'career');
+                this.el.classList.toggle('career', this.view === 'career' || this.view === 'workshop');
+                const skinTheme = WEAPON_SKIN_THEMES[game.userSettings.weaponSkin] || WEAPON_SKIN_THEMES.standard;
+                document.getElementById('mm-skin-val').textContent = skinTheme.label.split(' // ')[0];
                 document.getElementById('mm-level-val').textContent = `LEVEL ${progression.level}`;
                 document.getElementById('mm-card').innerHTML = progression.cardHtml(progression.card, true) + `<small>LEVEL ${progression.level}</small>`;
                 this.el.querySelectorAll('.mm-mode').forEach((b) => b.classList.toggle('selected', b.dataset.mode === this.mode));
@@ -40012,6 +40796,8 @@
                 } else if (a === 'agent') this.openAgentSelect();
                 else if (a === 'modes') this.setView('modes');
                 else if (a === 'career') { progression.renderCareer(); this.setView('career'); }
+                else if (a === 'workshop') { skinWorkshop.open(); this.setView('workshop'); }
+                else if (a === 'photo') { this.resume(); photoMode.enter(); }
                 else if (a === 'map') { tacticalDirector.cycleMapPreset(); this.render(); }
                 else if (a === 'controls') this.setView('controls');
                 else if (a === 'back') this.back();
@@ -40019,6 +40805,7 @@
             },
 
             back: function () {
+                if (this.view === 'workshop') skinWorkshop.close();
                 if (this.view !== 'main') { this.setView('main'); return; }
                 if (this.kind === 'pause') this.resume();
             },
@@ -40075,7 +40862,9 @@
                 const was = this.lockWas;
                 this.lockWas = locked;
                 if (!was || locked || !this.started || this.open) return;
-                if (game.buyMenuOpen || game.agentPickerOpen || game.settingsOpen) return;
+                if (game.buyMenuOpen || game.agentPickerOpen || game.settingsOpen || photoMode.active) return;
+                // The aim trainer's drill picker and result card let go of the mouse on purpose
+                if (aimTrainer.active && (aimTrainer.state === 'pick' || aimTrainer.state === 'done')) return;
                 if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) return;
                 if (matchMode.phase === 'over' || replayDirector.clip) return;
                 this.show('pause');
@@ -40108,6 +40897,13 @@
                 const yaw = Math.atan2(camera.position.x - sc.position.x, camera.position.z - sc.position.z);
                 sc.rotation.set(0, yaw, 0);
                 this.figure.rotation.y = Math.PI + Math.sin(this.t * 0.6) * 0.9;
+                // Workshop: the gun you are designing turns in place of the figure
+                const ws = this.view === 'workshop';
+                this.figure.visible = !ws;
+                if (ws) {
+                    const p = skinWorkshop.ensurePreview(sc);
+                    if (p) { p.position.set(-0.2, 1.15, 0.4); p.rotation.set(0.25, this.t * 0.8, 0); }
+                } else if (skinWorkshop.preview) skinWorkshop.removePreview();
                 document.getElementById('mm-agent-name').textContent = def ? def.name : '';
                 document.getElementById('mm-agent-role').textContent = def ? def.role : '';
             }
@@ -41091,8 +41887,10 @@
                 refreshSceneLighting();
             },
 
-            applyWeaponSkin: function(skinId) {
-                const theme = WEAPON_SKIN_THEMES[skinId] || WEAPON_SKIN_THEMES.standard;
+            applyWeaponSkin: function(skinId, themeOverride) {
+                if (!themeOverride && typeof skinWorkshop !== 'undefined') skinWorkshop.sync();
+                const theme = themeOverride || WEAPON_SKIN_THEMES[skinId] || WEAPON_SKIN_THEMES.standard;
+                const glow = typeof theme.glow === 'number' ? theme.glow : 1;
                 const badge = document.getElementById('active-skin-badge');
                 if (badge) badge.textContent = theme.label;
 
@@ -41110,9 +41908,17 @@
                         if (!mesh || !mesh.material || mesh === wObj.muzzleFlash) continue;
                         // Skip the skin-tone hands mesh (V1.7: no longer always the last child)
                         if (mesh.userData.isHands) continue;
-                        if (mesh.material.emissive && mesh.material.emissiveIntensity > 0.2) {
+                        // Glowing parts are found once, by an actual glow colour (parts made without
+                        // one still report the default intensity of 1, so intensity alone is not
+                        // enough), and keep their original intensity as the base
+                        if (mesh.userData.skinGlowBase === undefined && mesh.material.emissive) {
+                            const e = mesh.material.emissive;
+                            mesh.userData.skinGlowBase = (e.r + e.g + e.b > 0.01 && mesh.material.emissiveIntensity > 0.2) ? mesh.material.emissiveIntensity : 0;
+                        }
+                        if (mesh.material.emissive && mesh.userData.skinGlowBase > 0) {
                             mesh.material.color.setHex(theme.accent).convertSRGBToLinear();
                             mesh.material.emissive.setHex(theme.accent).convertSRGBToLinear();
+                            mesh.material.emissiveIntensity = mesh.userData.skinGlowBase * glow;
                         } else if (i === 0) {
                             mesh.material.color.setHex(theme.body).convertSRGBToLinear();
                             if (mesh.material.isMeshStandardMaterial) {
@@ -41430,6 +42236,7 @@
                 hudScale.apply();
                 this.applyAtmosphereTheme();
                 if (typeof progression !== 'undefined' && cfg.weaponSkin && !progression.has('skin', cfg.weaponSkin)) cfg.weaponSkin = 'standard';
+                if (typeof skinWorkshop !== 'undefined') { skinWorkshop.sync(); if (/^custom/.test(cfg.weaponSkin || '') && !WEAPON_SKIN_THEMES[cfg.weaponSkin]) cfg.weaponSkin = 'standard'; }
                 this.applyWeaponSkin(cfg.weaponSkin || 'standard');
                 this.applyCrosshairStyle();
                 this.applyHudVisibility();
@@ -42713,7 +43520,7 @@
 
             updateWingmanBots: function(delta, now) {
                 if (!this.wingmanGroup) return;
-                const showWingman = this.wingmanEnabled && (game.gameMode !== 'range') && (game.gameMode !== 'match') && (game.gameMode !== 'deathmatch');
+                const showWingman = this.wingmanEnabled && (game.gameMode !== 'range') && (game.gameMode !== 'match') && (game.gameMode !== 'deathmatch') && (game.gameMode !== 'aim');
                 if (this.wingmanGroup.visible !== showWingman) {
                     this.wingmanGroup.visible = showWingman;
                 }
@@ -43168,6 +43975,8 @@
             settingsManager.init();
             tacticalEnhancements.init();
             progression.init();
+            photoMode.init();
+            aimTrainer.init();
             gamepadController.init();
             controlsHelp.init();
             ambientAudio.init();
@@ -43320,7 +44129,7 @@
             spaceWasDown = !!game.keys.space;
             
             // V1.7: the main / pause menu pauses the simulation
-            simAccumulator += mainMenu.paused() ? 0 : delta;
+            simAccumulator += (mainMenu.paused() || photoMode.active) ? 0 : delta;
             const simBudget = SIM_DT * SIM_MAX_STEPS;
             if (simAccumulator > simBudget) {
                 perfTelemetry.droppedSimMs += (simAccumulator - simBudget) * 1000;
@@ -43334,8 +44143,9 @@
                 simAccumulator -= SIM_DT;
                 simStepsThisFrame++;
             }
-            presentPlayerCamera(simAccumulator / SIM_DT);
             const now = performance.now();
+            if (photoMode.active) photoMode.update(delta, now);
+            else presentPlayerCamera(simAccumulator / SIM_DT);
             mainMenu.update(delta, now);
             playerBody.update(delta);
             updateGunplayAndCrosshair(delta, time, now);
@@ -43386,6 +44196,7 @@
             // Render scene: world, then the viewmodel over a cleared depth buffer
             // (autoClear is off; info.autoReset is off and reset here)
             renderer.info.reset();
+            photoMode.preRender();
             fxKit.applyShake(now, Math.min(0.05, delta));
             slideCamera.update(Math.min(0.05, delta));
             // V1.7: kill cam / highlight replay poses the world for this frame only
@@ -43409,6 +44220,7 @@
                 renderer.render(viewmodelScene, viewmodelCamera);
             }
             replayDirector.endFrame();
+            photoMode.afterRender();
             perfTelemetry.summary.drawCalls = renderer.info.render.calls;
             perfTelemetry.summary.triangles = renderer.info.render.triangles;
             const programCount = renderer.info.programs ? renderer.info.programs.length : 0;
