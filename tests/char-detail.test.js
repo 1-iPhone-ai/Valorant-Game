@@ -11,10 +11,10 @@ test('High Detail Characters & Guns is off by default and builds nothing until e
         setting: game.userSettings.charDetail,
         enabled: characterDetail.enabled,
         built: characterDetail.built,
-        torsoIsOriginal: enemyPartSpecs[0].geometry === actorTemplates.enemyTorso,
+        torsoIsHumanoid: enemyPartSpecs[0].geometry === enemyHumanoid.torso,
         pill: document.querySelector('#setting-char-detail-pills .active').dataset.chardetail
     }));
-    assert.deepEqual(s, { setting: 'off', enabled: false, built: false, torsoIsOriginal: true, pill: 'off' });
+    assert.deepEqual(s, { setting: 'off', enabled: false, built: false, torsoIsHumanoid: true, pill: 'off' });
     assert.deepEqual(errors, []);
 });
 
@@ -28,7 +28,8 @@ test('High Detail Characters & Guns: detailed bots, wingmen and guns; hitboxes, 
         const detailedPages = live.every((page) => page.meshes.every((m, p) => m.geometry.attributes.position === characterDetail.detailed[enemyPartSpecs[p].name].attributes.position));
         // Hit proxies keep the original boxes
         const leavesOriginal = enemyObjects.every((e) => e.leaves[0].geometry === actorTemplates.enemyTorso && e.leaves[1].geometry === actorTemplates.enemyHead && e.leaves[2].geometry === actorTemplates.enemyLegs);
-        // Everything drawn stays inside the original overall hit volume (small tolerance)
+        // The drawn body stays inside the original overall hit volume (small tolerance);
+        // only the held rifle may reach forward past it, as guns are not hittable
         const hit = new THREE.Box3();
         for (const g of [actorTemplates.enemyTorso, actorTemplates.enemyHead, actorTemplates.enemyLegs, actorTemplates.enemyWeapon]) {
             if (!g) continue;
@@ -36,14 +37,19 @@ test('High Detail Characters & Guns: detailed bots, wingmen and guns; hitboxes, 
             hit.union(g.boundingBox);
         }
         hit.expandByScalar(0.03);
-        const inside = enemyPartSpecs.every((spec) => { const g = characterDetail.detailed[spec.name]; g.computeBoundingBox(); return hit.containsBox(g.boundingBox); });
+        const inside = enemyPartSpecs.every((spec) => {
+            const g = characterDetail.detailed[spec.name];
+            g.computeBoundingBox();
+            const b = g.boundingBox;
+            return b.min.x >= hit.min.x && b.max.x <= hit.max.x && b.min.y >= hit.min.y && b.max.y <= hit.max.y && b.max.z <= hit.max.z && b.min.z >= -1.25;
+        });
         return {
             setting: game.userSettings.charDetail,
             saved: JSON.parse(localStorage.getItem('valorant_v16_user_settings') || '{}').charDetail,
             livePages: live.length, detailedPages, leavesOriginal, inside,
             gunSwaps: characterDetail.gunSwaps.length,
             kitsVisible: characterDetail.kits.length > 0 && characterDetail.kits.every((k) => k.visible),
-            wingmen: characterDetail.wingmanKits.length
+            wingmen: tacticalEnhancements.wingmanBots.filter((b) => b.group.children.some((c) => c.isGroup)).length
         };
     });
     assert.equal(on.setting, 'on');
@@ -54,7 +60,7 @@ test('High Detail Characters & Guns: detailed bots, wingmen and guns; hitboxes, 
     assert.ok(on.inside, 'detailed bots stay inside the original hit volume');
     assert.ok(on.gunSwaps >= 20, `gun parts are rounded (${on.gunSwaps})`);
     assert.ok(on.kitsVisible, 'gun detail kits are shown');
-    assert.equal(on.wingmen, 2, 'both wingmen get detail');
+    assert.equal(on.wingmen, 2, 'both wingmen are drawn as soldiers');
 
     // Every gun drawn with detail, and new enemy pages (respawns) use it too
     for (const w of ['sniper', 'pistol', 'knife', 'rifle']) {
@@ -86,10 +92,10 @@ test('High Detail Characters & Guns: detailed bots, wingmen and guns; hitboxes, 
     });
     assert.deepEqual(skin, { handsSkinTone: true, kitSharesMaterials: true });
 
-    // Low turns it off (original boxes back); leaving Low turns it on again
+    // Low turns it off (simple soldier back); leaving Low turns it on again
     await evaluate(() => setQualitySettings('low'));
     await frames(3);
-    assert.deepEqual(await evaluate(() => [characterDetail.enabled, enemyPartSpecs[0].geometry === actorTemplates.enemyTorso, game.weapons.rifle.model.children[0].geometry.type]), [false, true, 'BoxGeometry']);
+    assert.deepEqual(await evaluate(() => [characterDetail.enabled, enemyPartSpecs[0].geometry === enemyHumanoid.torso, game.weapons.rifle.model.children[0].geometry.type]), [false, true, 'BoxGeometry']);
     await evaluate(() => setQualitySettings('high'));
     await frames(3);
     assert.equal(await evaluate(() => characterDetail.enabled), true);

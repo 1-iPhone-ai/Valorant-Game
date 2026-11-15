@@ -37,7 +37,7 @@ The `tests/` folder holds headless browser tests. They need no GPU, because Chro
 - **Music, ambience and HUD size:** music and ambience are off by default, play per map when switched on and fade out when switched off; HUD Size 80–130% scales every panel with no overlaps at 1280×720, 1920×1080 and 1024×600.
 - **Accessibility and bot skill:** Reduce Flashes softens washes and flashbangs and stops the low-health pulse; the cyan colour-blind option recolours bots; bot tactics scale with Bot Skill (Iron never flanks, Radiant peeks pre-aimed).
 - **Bot tactics:** every map has cover spots; hurt bots take cover out of sight, peek to shoot and never fire while running; pairs flank, and a bot whose partner dies takes cover.
-- **Bot colours and animation:** bots spawn in their archetype colours, they walk, flinch, recoil and topple over when killed, and their hitboxes stay fixed.
+- **Bot colours and animation:** bots are drawn as soldiers (helmet and visor, arms holding the rifle, chest rig, knee pads and boots) in their archetype colours, as are the wingmen, the menu preview and the kill-cam ghost; they walk with bending knees, flinch, recoil and topple over when killed; the drawn body stays inside the original hitboxes, which stay fixed.
 - **High detail characters and guns:** the setting is off by default; when on, bots, wingmen, guns and hands are drawn with rounded, detailed shapes while hitboxes, weapon skins and shaders stay unchanged.
 - **High detail maps:** the setting is off by default; when on, it adds textures and props on all 6 maps without new shader compiles or a brightness shift, and the Low profile turns it off.
 

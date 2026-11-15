@@ -10395,60 +10395,81 @@
             const uPart = { value: partIndex };
             material.onBeforeCompile = (shader) => {
                 shader.uniforms.uPart = uPart;
-                shader.uniforms.uSplitLegs = enemyAnimUniforms.uSplitLegs;
-                shader.uniforms.uArmSwing = enemyAnimUniforms.uArmSwing;
+                // Humanoid soldier animation. instanceAnim: x walk phase, y stride amount,
+                // z flinch, w recoil. Each leg swings from the hip and bends at the knee
+                // on its forward swing (the boots follow the shins); the upper body bobs
+                // with the stride and leans back on a hit; the rifle and forearms kick.
                 shader.vertexShader = shader.vertexShader
                     .replace('#include <common>', `#include <common>
                         attribute vec4 instanceAnim;
-                        uniform float uPart; uniform float uSplitLegs; uniform float uArmSwing;
-                        vec3 animRotX(vec3 p, float a, float py) {
+                        uniform float uPart;
+                        vec3 animRotX(vec3 p, float a, float py, float pz) {
                             float c = cos(a), s = sin(a);
-                            p.y -= py;
-                            return vec3(p.x, c * p.y - s * p.z + py, s * p.y + c * p.z);
+                            p.y -= py; p.z -= pz;
+                            return vec3(p.x, c * p.y - s * p.z + py, s * p.y + c * p.z + pz);
                         }
-                        // x: limb angle, y: limb pivot height, z: lean angle, w: upper-body weight
-                        vec4 enemyAnimParams(vec3 p) {
-                            float sw = sin(instanceAnim.x) * instanceAnim.y;
-                            float side = p.x >= 0.0 ? 1.0 : -1.0;
+                        // hip angle (+ = forward) and knee bend for the leg on this side
+                        vec2 legPose(float side) {
+                            float ph = instanceAnim.x + (side > 0.0 ? 0.0 : 3.14159265);
+                            return vec2(sin(ph) * 0.5, max(0.0, cos(ph)) * 0.85) * instanceAnim.y;
+                        }
+                        bool isLegVertex(vec3 p) {
                             float isLegs = step(1.5, uPart) * step(uPart, 2.5);
-                            float isGear = step(2.5, uPart);
-                            float limb = 0.0, pivot = 0.0;
-                            if (isLegs > 0.5 || (isGear > 0.5 && p.y < 0.26 && abs(p.x) < 0.45)) {
-                                limb = sw * 0.5 * side * uSplitLegs; pivot = 0.86;
-                            } else if ((uPart < 0.5 || isGear > 0.5) && p.x < -0.47 && p.y > 0.55 && p.y < 1.46) {
-                                limb = sw * 0.45 * uArmSwing; pivot = 1.52;
-                            }
-                            float upper = smoothstep(0.8, 1.15, p.y) * (1.0 - isLegs);
-                            return vec4(limb, pivot, instanceAnim.z * 0.26 * upper, upper);
+                            return isLegs > 0.5 || (p.y < 0.2 && abs(p.x) < 0.42);
                         }`)
                     .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
-                        vec4 eAnim = enemyAnimParams(position);
-                        objectNormal = animRotX(animRotX(objectNormal, eAnim.x, 0.0), eAnim.z, 0.0);`)
+                        float eUpper = smoothstep(0.9, 1.1, position.y);
+                        if (isLegVertex(position)) {
+                            vec2 lp = legPose(position.x >= 0.0 ? 1.0 : -1.0);
+                            if (position.y < 0.5) objectNormal = animRotX(objectNormal, -lp.y, 0.0, 0.0);
+                            objectNormal = animRotX(objectNormal, lp.x, 0.0, 0.0);
+                        } else {
+                            objectNormal = animRotX(objectNormal, instanceAnim.z * 0.26 * eUpper, 0.0, 0.0);
+                        }`)
                     .replace('#include <begin_vertex>', `#include <begin_vertex>
-                        transformed = animRotX(transformed, eAnim.x, eAnim.y);
-                        // Recoil: the rifle (and, on separate-limb shapes, the right arm) kicks back
-                        if (position.x > 0.42 && position.y > 0.6 && position.y < 1.4) {
-                            if (uPart > 2.5) transformed.z += instanceAnim.w * 0.09;
-                            else if (uPart < 0.5) transformed.z += instanceAnim.w * 0.05 * uArmSwing;
-                        }
-                        transformed.y += abs(sin(instanceAnim.x)) * 0.035 * instanceAnim.y * eAnim.w;
-                        transformed = animRotX(transformed, eAnim.z, 0.9);`);
+                        if (isLegVertex(position)) {
+                            vec2 lp = legPose(position.x >= 0.0 ? 1.0 : -1.0);
+                            if (position.y < 0.5) transformed = animRotX(transformed, -lp.y, 0.5, 0.0);
+                            transformed = animRotX(transformed, lp.x, 0.92, 0.0);
+                        } else {
+                            // Rifle, gloves and forearms kick back on each shot
+                            if (position.z < -0.18 && position.y > 1.0 && position.y < 1.5) transformed.z += instanceAnim.w * 0.09;
+                            // The body rises and dips with each step
+                            transformed.y += abs(sin(instanceAnim.x)) * 0.04 * instanceAnim.y * eUpper;
+                            transformed = animRotX(transformed, instanceAnim.z * 0.26 * eUpper, 0.95, 0.0);
+                        }`);
             };
             material.customProgramCacheKey = () => 'enemyAnim';
         }
         
+        let enemyHumanoid = null;
+        let humanoidRounded = null;
+        // The rounded soldier, as plain meshes: { torso, head, legs, gear } materials
+        function humanoidFigure(mats) {
+            if (!humanoidRounded) humanoidRounded = buildHumanoidEnemyGeometry(true, true);
+            const g = new THREE.Group();
+            for (const [part, key] of [['torso', 'torso'], ['head', 'head'], ['legs', 'legs'], ['weapon', 'gear']]) {
+                const m = new THREE.Mesh(humanoidRounded[part], mats[key]);
+                m.castShadow = true;
+                m.receiveShadow = true;
+                g.add(m);
+            }
+            return g;
+        }
         function initEnemyBatches() {
             const T = actorTemplates;
             syncEnemyAnimUniforms();
             enemyPartSpecs.length = 0;
             enemyPartMaterials.length = 0;
+            // Drawn as a humanoid soldier; the hit boxes (T.enemy*) are unchanged
+            if (!enemyHumanoid) enemyHumanoid = buildHumanoidEnemyGeometry(false, !!T.enemyWeapon);
             enemyPartSpecs.push(
-                { name: 'torso', geometry: T.enemyTorso, color: 0x3c4e5d },
-                { name: 'head', geometry: T.enemyHead, color: 0x546e7a },
-                { name: 'legs', geometry: T.enemyLegs, color: 0x2c3e50 }
+                { name: 'torso', geometry: enemyHumanoid.torso, color: 0x3c4e5d },
+                { name: 'head', geometry: enemyHumanoid.head, color: 0x546e7a },
+                { name: 'legs', geometry: enemyHumanoid.legs, color: 0x2c3e50 }
             );
             if (T.enemyWeapon) {
-                enemyPartSpecs.push({ name: 'weapon', geometry: T.enemyWeapon, color: 0x222222 });
+                enemyPartSpecs.push({ name: 'weapon', geometry: enemyHumanoid.weapon, color: 0x222222 });
             }
             for (let p = 0; p < enemyPartSpecs.length; p++) {
                 const material = new THREE.MeshStandardMaterial({
@@ -11369,6 +11390,75 @@
         // actors' leaves) keep the original boxes, so hit zones and damage are
         // identical. Every part stays inside its original hit volume, so a visible
         // limb is always hittable. Same local space as actorTemplates; forward is -z.
+        // Real-looking bots: a soldier figure drawn over the unchanged hit boxes.
+        // Helmet with visor, neck, chest rig with pouches, backpack, shoulder pads,
+        // both hands on a rifle held at the ready, thighs, knee pads, shins and
+        // boots. Parts by material: torso (body colour), head, legs and gear (dark:
+        // rifle, visor, belt, gloves, boots). rounded = the High Detail version.
+        // When the device tier has no separate gear part, gear goes into the
+        // torso, head and legs parts instead. Faces -Z, feet at y = 0.
+        function buildHumanoidEnemyGeometry(rounded, hasGearPart) {
+            const R = (w, h, d) => rounded ? Math.min(0.07, Math.min(w, h, d) * 0.3) : 0;
+            const box = (w, h, d, x, y, z, rx, ry, rz) => ({
+                geometry: rounded ? roundedBoxGeometry(w, h, d, R(w, h, d), 2) : new THREE.BoxGeometry(w, h, d),
+                matrix: partMatrix(x, y, z, rx || 0, ry || 0, rz || 0)
+            });
+            const cyl = (r0, r1, h, x, y, z, rx, rz) => ({ geometry: new THREE.CylinderGeometry(r0, r1, h, rounded ? 14 : 8), matrix: partMatrix(x, y, z, rx || 0, 0, rz || 0) });
+            const X = Math.PI / 2;
+            const torso = [
+                box(0.56, 0.2, 0.32, 0, 0.98, 0),                 // pelvis
+                box(0.52, 0.26, 0.3, 0, 1.17, 0),                 // abdomen
+                box(0.74, 0.38, 0.4, 0, 1.43, 0),                 // chest
+                box(0.5, 0.52, 0.18, 0, 1.36, 0.22),              // backpack
+                cyl(0.1, 0.11, 0.12, 0, 1.67, 0),                 // neck
+                box(0.24, 0.14, 0.32, -0.42, 1.58, 0, 0, 0, 0.25), // shoulder pads
+                box(0.24, 0.14, 0.32, 0.42, 1.58, 0, 0, 0, -0.25),
+                // Right arm: shoulder down to the grip
+                box(0.15, 0.36, 0.15, 0.41, 1.37, -0.08, -0.55),
+                box(0.13, 0.13, 0.3, 0.3, 1.19, -0.27),
+                // Left arm: reaching across to the handguard
+                box(0.15, 0.36, 0.15, -0.38, 1.37, -0.1, -0.7, 0, -0.2),
+                box(0.12, 0.12, 0.55, -0.1, 1.22, -0.48, 0, -0.81, 0)
+            ];
+            const head = [
+                box(0.5, 0.46, 0.52, 0, 1.93, 0),                 // helmet
+                box(0.34, 0.18, 0.34, 0, 1.74, -0.03),            // jaw
+                cyl(0.07, 0.07, 0.08, -0.27, 1.9, 0, 0, X),       // ear pieces
+                cyl(0.07, 0.07, 0.08, 0.27, 1.9, 0, 0, X)
+            ];
+            const legs = [];
+            for (const s of [-1, 1]) {
+                legs.push(box(0.24, 0.44, 0.26, s * 0.17, 0.7, 0));      // thigh
+                legs.push(box(0.17, 0.12, 0.06, s * 0.17, 0.5, -0.14));  // knee pad
+                legs.push(box(0.2, 0.42, 0.22, s * 0.17, 0.29, 0.01));   // shin
+            }
+            const gearUpper = [
+                box(0.6, 0.08, 0.36, 0, 0.92, 0),                  // belt
+                box(0.18, 0.14, 0.08, -0.2, 1.3, -0.23),           // chest pouches
+                box(0.18, 0.14, 0.08, 0.0, 1.3, -0.23),
+                box(0.18, 0.14, 0.08, 0.2, 1.3, -0.23),
+                box(0.1, 0.16, 0.55, 0.2, 1.25, -0.5),             // rifle receiver
+                cyl(0.025, 0.025, 0.36, 0.2, 1.27, -0.95, X),      // barrel
+                box(0.08, 0.13, 0.26, 0.2, 1.3, -0.1),             // stock
+                box(0.07, 0.2, 0.1, 0.2, 1.08, -0.45, 0.25),       // magazine
+                box(0.06, 0.06, 0.18, 0.2, 1.37, -0.48),           // scope
+                box(0.12, 0.12, 0.12, 0.24, 1.17, -0.38),          // right glove (grip)
+                box(0.12, 0.12, 0.12, 0.17, 1.24, -0.72)           // left glove (handguard)
+            ];
+            const gearHead = [box(0.44, 0.12, 0.06, 0, 1.93, -0.27)];   // visor
+            const gearLegs = [];
+            for (const s of [-1, 1]) gearLegs.push(box(0.24, 0.14, 0.38, s * 0.17, 0.07, -0.05));   // boots
+            const merge = (parts) => {
+                const m = mergeGeometryParts(parts);
+                for (const p of parts) p.geometry.dispose();
+                return m;
+            };
+            if (hasGearPart) {
+                return { torso: merge(torso), head: merge(head), legs: merge(legs), weapon: merge(gearUpper.concat(gearHead, gearLegs)) };
+            }
+            return { torso: merge(torso.concat(gearUpper)), head: merge(head.concat(gearHead)), legs: merge(legs.concat(gearLegs)), weapon: null };
+        }
+
         function buildDetailedEnemyGeometry() {
             const rb = (w, h, d, r, x, y, z, rx) => ({ geometry: roundedBoxGeometry(w, h, d, r, 2), matrix: partMatrix(x, y, z, rx || 0, 0, 0) });
             const cyl = (rt, rbm, h, x, y, z, rx, rz) => ({ geometry: new THREE.CylinderGeometry(rt, rbm, h, 14), matrix: partMatrix(x, y, z, rx || 0, 0, rz || 0) });
@@ -11442,8 +11532,8 @@
                 if (this.built) return;
                 const t0 = performance.now();
                 const T = actorTemplates;
-                this.simple = { torso: T.enemyTorso, head: T.enemyHead, legs: T.enemyLegs, weapon: T.enemyWeapon };
-                this.detailed = buildDetailedEnemyGeometry();
+                this.simple = enemyHumanoid || { torso: T.enemyTorso, head: T.enemyHead, legs: T.enemyLegs, weapon: T.enemyWeapon };
+                this.detailed = buildHumanoidEnemyGeometry(true, !!T.enemyWeapon);
                 this._buildGuns();
                 this._buildWingmen();
                 this.built = true;
@@ -11595,6 +11685,8 @@
                 const visorMat = new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: 0.2, metalness: 0.6 });
                 for (const bot of td.wingmanBots) {
                     const g = bot.group;
+                    // Wingmen are drawn as the soldier figure now: the old limb kit is not needed
+                    if (g.children.some((c) => c.isGroup)) continue;
                     const torsoMat = g.children[0].material, headMat = g.children[1].material, gunMat = bot.gunMesh.material;
                     const kit = new THREE.Group();
                     const add = (geo, mat, x, y, z, rx) => {
@@ -38233,18 +38325,14 @@
             init: function () {
                 if (this.ghost) return;
                 // Stand-in body for the player in the kill cam (wingman materials: same programs)
-                const g = new THREE.Group();
-                const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.44, 1.2, 12),
-                    new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x38f6ff, emissiveIntensity: 0.35, roughness: 0.4 }));
-                torso.position.y = 0.82;
-                const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10),
-                    new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.55 }));
-                head.position.y = 1.62;
-                const gun = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.8), new THREE.MeshBasicMaterial({ color: 0x38f6ff }));
-                gun.position.set(0.32, 1.12, -0.38);
-                g.add(torso, head, gun);
+                // The same soldier figure as the bots, in your agent's colour
+                const torsoMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x38f6ff, emissiveIntensity: 0.35, roughness: 0.4 });
+                const headMat = new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.55 });
+                const gearMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.45, metalness: 0.4 });
+                const g = humanoidFigure({ torso: torsoMat, head: headMat, legs: torsoMat, gear: gearMat });
+                g.scale.setScalar(0.82);
                 g.visible = false;
-                g.userData.parts = [torso, head, gun];
+                g.userData.parts = [g.children[0], g.children[1], g.children[3]];
                 scene.add(g);
                 this.ghost = g;
                 const ov = document.createElement('div');
@@ -39087,10 +39175,10 @@
                     rb(0.5, 0.05, 0.31, 0, 1.06, 0),                                                     // belt
                     rb(0.08, 0.3, 0.05, 0, 1.36, -0.16)                                                  // chest stripe
                 ];
-                const fig = new THREE.Group();
-                fig.add(new THREE.Mesh(mergeGeometryParts(bodyParts), body));
-                fig.add(new THREE.Mesh(mergeGeometryParts(accentParts), this.accentMat));
                 for (const p of bodyParts.concat(accentParts)) p.geometry.dispose();
+                // The same soldier figure as the bots, in the agent's colour
+                const fig = humanoidFigure({ torso: this.accentMat, head: body, legs: body, gear: body });
+                fig.scale.setScalar(0.85);
                 const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40), this.ringMat);
                 ring.rotation.x = -Math.PI / 2;
                 const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.79, 40), this.ringMat);
@@ -41678,6 +41766,13 @@
                     const gun = new THREE.Mesh(gunGeo, gunMat);
                     gun.position.set(0.38, 1.12, -0.35);
                     g.add(gun);
+                    // Drawn as the same soldier figure as the bots (torso, head and gun kept as
+                    // references: the figure replaces how they look, not where they are)
+                    torso.visible = false; head.visible = false; gun.visible = false;
+                    const fig = humanoidFigure({ torso: torsoMat, head: headMat, legs: torsoMat,
+                        gear: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.45, metalness: 0.4 }) });
+                    fig.scale.setScalar(0.86);
+                    g.add(fig);
 
                     // Emerald Ally Base Ring
                     const ringGeo = new THREE.RingGeometry(0.65, 0.82, 24);
