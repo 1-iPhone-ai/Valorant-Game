@@ -190,6 +190,46 @@
         .mm-agent-tag { position: absolute; right: 8vw; bottom: 12vh; text-align: right; color: #fff; font-weight: 900; letter-spacing: 4px; font-size: 26px; }
         .mm-agent-tag small { display: block; font-size: 11px; color: #94a3b8; letter-spacing: 4px; }
         body.agent-select .mm-agent-tag { display: none; }
+        /* V1.7 progression: Career view, player cards, level toast */
+        .main-menu.career .mm-side { width: min(760px, 92vw); max-height: 92vh; overflow-y: auto; }
+        .main-menu.career .mm-agent-tag { display: none; }
+        .mm-career { background: rgba(10, 15, 28, 0.78); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 4px; padding: 12px 14px; color: #e2e8f0; font-size: 12px; }
+        .cr-head { display: flex; gap: 14px; align-items: center; }
+        .cr-lv { flex: 1; min-width: 0; }
+        .cr-lv b { font-size: 20px; letter-spacing: 3px; color: #ffd166; }
+        .cr-lv small, .cr-ch small { color: #94a3b8; }
+        .cr-bar { height: 6px; background: rgba(148, 163, 184, 0.2); border-radius: 3px; margin: 5px 0 3px; overflow: hidden; }
+        .cr-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff4655, #ffd166); }
+        .cr-sec { margin: 12px 0 6px; font-weight: 900; letter-spacing: 3px; color: #cbd5e1; font-size: 11px; }
+        .cr-sec small { color: #64748b; letter-spacing: 1px; margin-left: 6px; }
+        .cr-ch { margin-bottom: 7px; }
+        .cr-ch-top { display: flex; justify-content: space-between; gap: 8px; }
+        .cr-ch-top b { color: #ffd166; white-space: nowrap; }
+        .cr-ch.done .cr-ch-top span { color: #2bf0a5; }
+        .cr-ch.done .cr-bar i { background: #2bf0a5; }
+        .cr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+        .mm-btn.cr-item { font-size: 11px; letter-spacing: 1px; padding: 7px 9px; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 7px; }
+        .mm-btn.cr-item span { flex: 1; min-width: 0; }
+        .mm-btn.cr-item small { width: 100%; margin-top: 0; }
+        .mm-btn.cr-item.locked { opacity: 0.55; }
+        .mm-btn.cr-item.selected small { color: #2bf0a5; }
+        .cr-sw { width: 16px; height: 16px; border-radius: 3px; display: inline-block; flex: none; }
+        .cr-stats { margin-top: 12px; color: #94a3b8; font-size: 11px; }
+        .pc-card { width: 200px; height: 58px; border-radius: 4px; border: 1px solid; display: flex; align-items: center; gap: 10px; padding: 0 12px; box-sizing: border-box; flex: none; }
+        .pc-card.small { width: 170px; height: 44px; margin: 8px 0 2px auto; }
+        .pc-icon { font-size: 24px; }
+        .pc-card.small .pc-icon { font-size: 18px; }
+        .pc-name { font-size: 12px; letter-spacing: 3px; color: #fff; font-weight: 900; }
+        .mm-agent-tag #mm-card small { font-size: 10px; color: #ffd166; letter-spacing: 3px; }
+        .level-toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%) translateY(-8px); opacity: 0; pointer-events: none; z-index: 1150;
+            background: linear-gradient(135deg, rgba(12, 20, 34, 0.95), rgba(40, 20, 30, 0.95)); border: 1px solid #ffd166; border-radius: 6px;
+            padding: 8px 22px; text-align: center; transition: opacity 0.25s, transform 0.25s; color: #fff; max-width: 90vw; }
+        .level-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .level-toast b { display: block; font-size: 15px; letter-spacing: 4px; color: #2bf0a5; }
+        .level-toast.big b { font-size: 26px; color: #ffd166; }
+        .level-toast span { display: block; font-size: 11px; letter-spacing: 2px; color: #cbd5e1; margin-top: 2px; }
+        .skin-card-btn.locked { opacity: 0.5; }
+        .skin-lock { font-size: 10px; color: #ffd166; letter-spacing: 1px; margin-top: 4px; }
         body.menu-open #ui-root > *:not(#main-menu):not(#agent-picker-overlay):not(#settings-panel) { visibility: hidden; }
         body.menu-open.agent-select .agent-picker-overlay { background: linear-gradient(270deg, rgba(6, 11, 19, 0.92) 0%, rgba(6, 11, 19, 0.6) 55%, rgba(6, 11, 19, 0) 70%);
             backdrop-filter: none; justify-content: flex-end; }
@@ -3843,6 +3883,28 @@
 
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
+                                    <strong>Slide</strong>
+                                    <small>Crouch while sprinting to slide low and fast; jump out of a slide to keep the speed</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-slide-pills">
+                                    <button class="settings-pill-opt active" data-slide="on">ON</button>
+                                    <button class="settings-pill-opt" data-slide="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Mantle</strong>
+                                    <small>Jump into a ledge or crate up to chest height while moving forward to climb onto it</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-mantle-pills">
+                                    <button class="settings-pill-opt active" data-mantle="on">ON</button>
+                                    <button class="settings-pill-opt" data-mantle="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
                                     <strong>Breakable Props</strong>
                                     <small>Glass panes that shatter and explosive barrels that blow up when shot (they come back next round, or after 30 s)</small>
                                 </div>
@@ -4538,6 +4600,46 @@
                                         <span style="background:#10b981;"></span>
                                         <span style="background:#2bf0a5;"></span>
                                         <span style="background:#2bf0a5;"></span>
+                                    </div>
+                                </button>
+                                <button class="skin-card-btn" data-skin="ember">
+                                    <div style="font-weight:800; font-size:13px; color:#fb923c;">EMBER // FORGE</div>
+                                    <div style="font-size:11px; color:#94a3b8;">Charred Steel &amp; Molten Orange</div>
+                                    <div class="skin-swatch-strip">
+                                        <span style="background:#1c1917;"></span>
+                                        <span style="background:#7c2d12;"></span>
+                                        <span style="background:#f97316;"></span>
+                                        <span style="background:#fb923c;"></span>
+                                    </div>
+                                </button>
+                                <button class="skin-card-btn" data-skin="glacier">
+                                    <div style="font-weight:800; font-size:13px; color:#7dd3fc;">GLACIER // WHITEOUT</div>
+                                    <div style="font-size:11px; color:#94a3b8;">Frost White &amp; Ice Blue</div>
+                                    <div class="skin-swatch-strip">
+                                        <span style="background:#e2e8f0;"></span>
+                                        <span style="background:#7dd3fc;"></span>
+                                        <span style="background:#0ea5e9;"></span>
+                                        <span style="background:#bae6fd;"></span>
+                                    </div>
+                                </button>
+                                <button class="skin-card-btn" data-skin="neontide">
+                                    <div style="font-weight:800; font-size:13px; color:#ff2bd6;">NEON TIDE // SKYLINE</div>
+                                    <div style="font-size:11px; color:#94a3b8;">Midnight Violet, Magenta &amp; Cyan Tracer</div>
+                                    <div class="skin-swatch-strip">
+                                        <span style="background:#120a2a;"></span>
+                                        <span style="background:#3b0764;"></span>
+                                        <span style="background:#ff2bd6;"></span>
+                                        <span style="background:#22e6ff;"></span>
+                                    </div>
+                                </button>
+                                <button class="skin-card-btn" data-skin="onyx">
+                                    <div style="font-weight:800; font-size:13px; color:#facc15;">GILDED ONYX // ELITE</div>
+                                    <div style="font-size:11px; color:#94a3b8;">Black Onyx &amp; Gold Leaf</div>
+                                    <div class="skin-swatch-strip">
+                                        <span style="background:#0a0a0a;"></span>
+                                        <span style="background:#b45309;"></span>
+                                        <span style="background:#facc15;"></span>
+                                        <span style="background:#fde68a;"></span>
                                     </div>
                                 </button>
                             </div>
@@ -5379,6 +5481,8 @@
                 skipMenu: false,       // V1.7: start straight in the game (no start screen)
                 breakables: true,      // glass panes and explosive barrels on the maps
                 showBody: true,        // your legs and body when you look down, and your shadow
+                slide: true,           // crouch while sprinting to slide
+                mantle: true,          // jump into a ledge up to chest height to climb onto it
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
                 showSparkline: true,
@@ -5409,7 +5513,7 @@
                 showHints: true,
                 showDamageNumbers: true,
                 hudScale: 100,         // V1.7: HUD Size % (80-130)
-                weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx'
+                weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx' | level rewards: 'ember' | 'glacier' | 'neontide' | 'onyx'
                 botDifficulty: 'gold', // 'iron' | 'gold' | 'immortal' | 'radiant'
                 infiniteAbilities: false,
                 infiniteUlt: false,
@@ -5428,7 +5532,7 @@
                 localStorageEnabled: false
             },
             gameMode: 'wave', // 'wave' (Wave & Spike Assault) | 'range' (30-Bot Range) | 'retake' (Site Retake & Defuse)
-            mapPreset: 'ascent', // 'ascent' | 'bind' | 'haven' | 'icebox'
+            mapPreset: 'ascent', // 'ascent' | 'bind' | 'haven' | 'icebox' | 'lotus' | 'split' | 'skyline'
             botAbilityAI: true,
             roundNumber: 1,
             primaryVariant: 'vandal', // 'vandal' | 'phantom' | 'bulldog' | 'judge'
@@ -6669,6 +6773,20 @@
             updraftTimer: 0,
             isGliding: false,
             
+            // V1.7 movement: slide, mantle and air momentum
+            slideTimer: 0,                         // > 0 while sliding (seconds left)
+            slideCooldown: 0,                      // seconds until the next slide
+            slideStarts: 0,
+            mantleT: -1,                           // 0..1 while climbing a ledge, -1 otherwise
+            mantleDur: 0.32,
+            mantleTop: 0,
+            mantleCount: 0,
+            _mantleFrom: new THREE.Vector3(),
+            _mantleTo: new THREE.Vector3(),
+            _mantleScratch: [],
+            _ledge: null, _ledgeNX: 0, _ledgeNZ: 0,
+            _airCap: -1,                           // horizontal speed cap while airborne (-1: not set)
+            
             // Rotation properties
             rotation: new THREE.Euler(0, 0, 0, 'YXZ'), // Character body rotation (YXZ order)
             targetRotation: new THREE.Euler(0, 0, 0, 'YXZ'), // Target rotation for smooth turning
@@ -6714,9 +6832,101 @@
             
             // Set crouch state (Ctrl / Z / C)
             setCrouching: function(crouching) {
+                const was = this.isCrouching;
                 this.isCrouching = !!crouching;
                 if (this.isCrouching) {
+                    // Crouch while sprinting: slide
+                    if (!was) this.tryStartSlide();
                     this.sprinting = false;
+                } else if (this.slideTimer > 0) {
+                    this.slideTimer = 0;
+                }
+            },
+            
+            // Top speed (per tick) for an input acceleration at ground friction
+            terminalSpeed: function(accel) {
+                return accel * this.friction / (1 - this.friction);
+            },
+            
+            // Slide: a burst of speed in the direction you were running that bleeds off
+            // slowly; low steering; you stay crouched. Off by setting.
+            tryStartSlide: function() {
+                if (game.userSettings && game.userSettings.slide === false) return false;
+                if (!this.grounded || !this.sprinting || this.slideCooldown > 0 || this.dashTimer > 0 || this.mantleT >= 0) return false;
+                const hs = Math.hypot(this.velocity.x, this.velocity.z);
+                const walkTop = this.terminalSpeed(this.walkSpeed * this.speedMultiplier);
+                if (hs < walkTop * 1.05) return false;
+                const boost = Math.max(hs, this.terminalSpeed(this.sprintSpeed * this.speedMultiplier)) * 1.22;
+                this.velocity.x *= boost / hs;
+                this.velocity.z *= boost / hs;
+                this.slideTimer = 0.85;
+                this.slideCooldown = 1.1;
+                this.slideStarts++;
+                progression.count('slide');
+                if (soundFX.noiseLayer) {
+                    soundFX.noiseLayer(0.55, 0.11, 0, 'bandpass', 700, 0.5);
+                    soundFX.noiseLayer(0.3, 0.06, 0.02, 'highpass', 2600, 0.7);
+                }
+                return true;
+            },
+            
+            // Mantle: jumping into a ledge up to chest height climbs onto it, if there
+            // is room to stand on top. Off by setting.
+            tryMantle: function(box, nx, nz) {
+                if (game.userSettings && game.userSettings.mantle === false) return false;
+                if (this.mantleT >= 0 || this.isCrouching || this.dashTimer > 0) return false;
+                if (box.maxX - box.minX < 0.7 || box.maxZ - box.minZ < 0.7) return false;
+                const top = box.maxY;
+                const r = this.radius;
+                let lx = this.position.x - nx * (r + 0.4);
+                let lz = this.position.z - nz * (r + 0.4);
+                lx = Math.min(box.maxX - 0.3, Math.max(box.minX + 0.3, lx));
+                lz = Math.min(box.maxZ - 0.3, Math.max(box.minZ + 0.3, lz));
+                // Room to stand on top: nothing else in the standing space
+                const list = collisionIndex.query(lx - r, lz - r, lx + r, lz + r, this._mantleScratch);
+                for (let i = 0; i < list.length; i++) {
+                    const b = list[i];
+                    if (b === box) continue;
+                    if (b.maxX < lx - r || b.minX > lx + r || b.maxZ < lz - r || b.minZ > lz + r) continue;
+                    if (b.minY < top + this.standHeight && b.maxY > top + 0.05) return false;
+                }
+                this._mantleFrom.copy(this.position);
+                this._mantleTo.set(lx, top + this.height, lz);
+                this.mantleT = 0;
+                this.mantleTop = top;
+                this.mantleCount++;
+                progression.count('mantle');
+                this.slideTimer = 0;
+                this.velocity.set(0, 0, 0);
+                this.grounded = false;
+                jumpQueued = false;
+                if (soundFX.noiseLayer) {
+                    soundFX.noiseLayer(0.12, 0.09, 0, 'lowpass', 900, 0.6);
+                    soundFX.noiseLayer(0.16, 0.07, 0.2, 'bandpass', 1300, 0.8);
+                }
+                return true;
+            },
+            
+            // Rise first, then pull forward onto the ledge
+            stepMantle: function(delta) {
+                this.mantleT = Math.min(1, this.mantleT + delta / this.mantleDur);
+                const t = this.mantleT;
+                const ty = Math.min(1, t / 0.6), txz = Math.max(0, (t - 0.35) / 0.65);
+                const ey = 1 - (1 - ty) * (1 - ty);
+                const exz = txz * txz * (3 - 2 * txz);
+                const a = this._mantleFrom, b = this._mantleTo;
+                this.position.set(a.x + (b.x - a.x) * exz, a.y + (b.y - a.y) * ey, a.z + (b.z - a.z) * exz);
+                this.velocity.set(0, 0, 0);
+                this.grounded = false;
+                if (t >= 1) {
+                    this.mantleT = -1;
+                    this.position.copy(b);
+                    this.grounded = true;
+                    this.jumping = false;
+                    this.supportY = this.mantleTop;
+                    this._airCap = -1;
+                    this.lastPosition.copy(this.position);
+                    this.lastMoveTime = Date.now();
                 }
             },
             
@@ -6768,6 +6978,13 @@
                 // Store previous position for collision detection
                 const previousPosition = this._previousPosition.copy(this.position);
                 
+                if (this.slideCooldown > 0) this.slideCooldown = Math.max(0, this.slideCooldown - delta);
+                // Climbing a ledge: scripted, no input or collision until on top
+                if (this.mantleT >= 0) {
+                    this.stepMantle(delta);
+                    return;
+                }
+                
                 // Active Dash override (sub-stepped so high speed never tunnels through walls)
                 if (this.dashTimer > 0) {
                     this.dashTimer = Math.max(0, this.dashTimer - delta);
@@ -6786,6 +7003,7 @@
                     if (this.dashTimer <= 0) {
                         this.velocity.x = this.dashVelX * 0.35;
                         this.velocity.z = this.dashVelZ * 0.35;
+                        this._airCap = -1;
                     }
                     this.checkIfStuck();
                     return;
@@ -6819,14 +7037,21 @@
                 const crouchSpeedScale = 1 - this.crouchBlend * (1 - this.crouchSpeedMultiplier);
                 const currentSpeed = baseSpeed * crouchSpeedScale * this.speedMultiplier;
                 
+                // Sliding: light steering only. In the air: a little less push but
+                // less drag, so momentum carries through jumps and you can curve.
+                const sliding = this.slideTimer > 0;
+                const airborne = !this.grounded;
+                const startSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+                const accelScale = sliding ? 0.12 : (airborne ? 0.75 : 1);
+                
                 // Apply movement directly aligned to camera.rotation.y
                 if (moveX !== 0 || moveZ !== 0) {
                     const sinY = Math.sin(this.rotation.y);
                     const cosY = Math.cos(this.rotation.y);
                     
                     // Camera-relative movement: Forward(-Z) = (-sinY, -cosY), Right(+X) = (cosY, -sinY)
-                    this.velocity.x += (sinY * moveZ + cosY * moveX) * currentSpeed;
-                    this.velocity.z += (cosY * moveZ - sinY * moveX) * currentSpeed;
+                    this.velocity.x += (sinY * moveZ + cosY * moveX) * currentSpeed * accelScale;
+                    this.velocity.z += (cosY * moveZ - sinY * moveX) * currentSpeed * accelScale;
                 }
                 
                 // Updraft reduced-gravity ascent timer
@@ -6856,9 +7081,29 @@
                     jumpQueued = false;
                 }
                 
+                // Jumping out of a slide keeps the speed (now in the air)
+                if (this.slideTimer > 0 && !this.isCrouching) this.slideTimer = 0;
+                
                 // Apply friction to horizontal movement
-                this.velocity.x *= this.friction;
-                this.velocity.z *= this.friction;
+                const drag = (this.slideTimer > 0 && this.grounded) ? 0.99 : (!this.grounded ? 0.9 : this.friction);
+                this.velocity.x *= drag;
+                this.velocity.z *= drag;
+                const hSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+                if (!this.grounded && this.dashTimer <= 0) {
+                    // Never faster in the air than when you left the ground (or your
+                    // top speed on foot), so less drag cannot be used to gain speed
+                    if (this._airCap < 0) this._airCap = Math.max(startSpeed, this.terminalSpeed(currentSpeed));
+                    if (hSpeed > this._airCap) {
+                        this.velocity.x *= this._airCap / hSpeed;
+                        this.velocity.z *= this._airCap / hSpeed;
+                    }
+                } else {
+                    this._airCap = -1;
+                }
+                if (this.slideTimer > 0) {
+                    this.slideTimer = Math.max(0, this.slideTimer - delta);
+                    if (this.grounded && hSpeed < this.terminalSpeed(this.walkSpeed * this.speedMultiplier) * 0.8) this.slideTimer = 0;
+                }
                 
                 // Update position based on velocity
                 this.position.x += this.velocity.x;
@@ -6876,6 +7121,12 @@
                 
                 // Check for collisions with objects (including landing on elevated rooftops)
                 this.handleCollisions(previousPosition);
+                
+                // Jumped into a ledge while pushing forward towards it: climb up
+                if (this._ledge && !this.grounded && moveZ < -0.3) {
+                    const fx = -Math.sin(this.rotation.y), fz = -Math.cos(this.rotation.y);
+                    if (fx * -this._ledgeNX + fz * -this._ledgeNZ > 0.4) this.tryMantle(this._ledge, this._ledgeNX, this._ledgeNZ);
+                }
                 
                 // Check for being stuck
                 this.checkIfStuck();
@@ -6924,6 +7175,7 @@
                 let collided = false;
                 let highestSupport = 0;
                 this.supportRec = null;
+                this._ledge = null;
                 const prevFootY = previousPosition.y - this.height;
                 
                 for (let n = 0; n < candidates.length; n++) {
@@ -6987,8 +7239,13 @@
                         overlapZ = characterBox.max.z - box.minZ;
                     }
                     
+                    // A ledge we ran into, above a step but within chest height
+                    const rise = box.maxY - (this.position.y - this.height);
+                    const ledge = rise > 0.5 && rise <= 1.6;
+                    
                     // Resolve collision on smallest horizontal overlap axis
                     if (overlapX < overlapZ) {
+                        if (ledge) { this._ledge = box; this._ledgeNX = this.position.x > objectCenterX ? 1 : -1; this._ledgeNZ = 0; }
                         if (this.position.x > objectCenterX) {
                             this.position.x = box.maxX + this.radius;
                         } else {
@@ -6996,6 +7253,7 @@
                         }
                         this.velocity.x = 0;
                     } else {
+                        if (ledge) { this._ledge = box; this._ledgeNX = 0; this._ledgeNZ = this.position.z > objectCenterZ ? 1 : -1; }
                         if (this.position.z > objectCenterZ) {
                             this.position.z = box.maxZ + this.radius;
                         } else {
@@ -7079,6 +7337,9 @@
             // Reset character to a safe position
             reset: function() {
                 this.isCrouching = false;
+                this.slideTimer = 0;
+                this.mantleT = -1;
+                this._airCap = -1;
                 this.height = this.standHeight;
                 this.crouchBlend = 0;
                 this.position.set(0, this.height, 15);
@@ -8722,6 +8983,78 @@
                     createBox(-9, 1.2, 25, 3, 2.4, 3, 0xec4899);
                     createBox(9, 1.2, -25, 3, 2.4, 3, 0xeab308);
                 }
+            },
+            skyline: {
+                id: 'skyline',
+                name: 'SKYLINE',
+                subtitle: 'Neon Rooftop City at Night, Skybridges & Billboards',
+                skyColor: 0x0b0a1f,
+                // Night city: cool moonlight, magenta/cyan neon accents
+                sunColor: 0xa9b8ff,
+                sunIntensity: 1.15,
+                accentA: 0xff2bd6,
+                accentB: 0x22e6ff,
+                floorColor: 0x1b1e2b,
+                wallColor: 0x121624,
+                build: function() {
+                    // Stairs: solid 1 m steps rising towards (dx, dz) from the start point
+                    const stairs = (x, z, dx, dz, count, width, hex) => {
+                        for (let i = 0; i < count; i++) {
+                            const h = i + 1;
+                            const cx = x + dx * i * 1.2, cz = z + dz * i * 1.2;
+                            createBox(cx, h / 2, cz, dx ? 1.2 : width, h, dz ? 1.2 : width, hex);
+                        }
+                    };
+                    // Central helipad block with steps up its east side
+                    createBox(0, 1.5, 0, 10, 3, 8, 0x262a3d);
+                    stairs(6.8, 0, -1, 0, 2, 3.2, 0x2e3448);
+                    // West water tower: base, overhead deck (legs and tank are decor)
+                    createBox(-18, 0.6, -6, 3, 1.2, 3, 0x334155);
+                    createBox(-18, 5, -6, 6.4, 0.4, 6.4, 0x1e2433);
+                    createCylinder(-18, 8.4, -6, 2.7, 6, 0x3b3f58);
+                    // East vent farm: AC units and exhaust stacks
+                    createBox(17, 1, 5, 3, 2, 2.2, 0x475569);
+                    createBox(20.5, 1, 8, 2.2, 2, 3, 0x475569);
+                    createBox(16.5, 0.6, 10, 2.4, 1.2, 2, 0x3f4a5c);
+                    createCylinder(20, 3, 3.5, 0.6, 6, 0x64748b);
+                    createCylinder(14.5, 2.5, 7.5, 0.5, 5, 0x64748b);
+                    // Raised side decks with steps, and the billboards standing on them
+                    createBox(-35, 1.1, 0, 10, 2.2, 18, 0x23283a);
+                    createBox(35, 1.1, 0, 10, 2.2, 18, 0x23283a);
+                    for (const sx of [-1, 1]) {
+                        createBox(28.5 * sx, 0.375, 0, 1, 0.75, 4, 0x2e3448);
+                        createBox(29.5 * sx, 0.75, 0, 1, 1.5, 4, 0x2e3448);
+                    }
+                    createBox(-38.5, 7, 0, 0.5, 5, 12, 0x101522);
+                    createBox(38.5, 7, 0, 0.5, 5, 12, 0x101522);
+                    createCylinder(-38.5, 3.5, -4.5, 0.25, 4, 0x1e2433);
+                    createCylinder(-38.5, 3.5, 4.5, 0.25, 4, 0x1e2433);
+                    createCylinder(38.5, 3.5, -4.5, 0.25, 4, 0x1e2433);
+                    createCylinder(38.5, 3.5, 4.5, 0.25, 4, 0x1e2433);
+                    // North and south skybridges between stair towers (walk under or across)
+                    for (const zs of [-1, 1]) {
+                        const z = 38 * zs;
+                        createBox(-14, 2, z, 6, 4, 6, 0x1f2437);
+                        createBox(14, 2, z, 6, 4, 6, 0x1f2437);
+                        createBox(0, 3.8, z, 22, 0.4, 3, 0x2a3049);
+                        createBox(0, 4.55, z - 1.4, 22, 1.1, 0.2, 0x1a1f30);    // railings
+                        createBox(0, 4.55, z + 1.4, 22, 1.1, 0.2, 0x1a1f30);
+                        stairs(-14, z - zs * 6, 0, zs, 3, 3, 0x2e3448);
+                        stairs(14, z - zs * 6, 0, zs, 3, 3, 0x2e3448);
+                    }
+                    // Cover around A (north) and B (south)
+                    createBox(-6, 0.6, -25, 2.4, 1.2, 1.2, 0x3f4a5c);
+                    createBox(6.5, 1, -18.5, 2, 2, 2, 0x4c5672);
+                    createBox(-4, 0.6, -29, 4, 1.2, 0.8, 0x2e3448);
+                    createBox(6, 0.6, 25, 2.4, 1.2, 1.2, 0x3f4a5c);
+                    createBox(-6.5, 1, 18.5, 2, 2, 2, 0x4c5672);
+                    createBox(4.5, 0.6, 29.5, 4, 1.2, 0.8, 0x2e3448);
+                    // Rooftop access huts in the corners of the flanks
+                    createBox(-26, 1.75, -22, 5, 3.5, 4, 0x262a3d);
+                    createBox(26, 1.75, 22, 5, 3.5, 4, 0x262a3d);
+                    createBox(26, 1, -24, 3, 2, 3, 0x334155);
+                    createBox(-26, 1, 24, 3, 2, 3, 0x334155);
+                }
             }
         };
 
@@ -8996,7 +9329,7 @@
         // Which procedural texture a map piece uses (+10 marks a cylinder)
         function classifyMapSurface(shape, sx, sy, sz, color) {
             const preset = (typeof game !== 'undefined' && game.mapPreset) || 'ascent';
-            const metalMap = preset === 'icebox' || preset === 'split';
+            const metalMap = preset === 'icebox' || preset === 'split' || preset === 'skyline';
             const cyl = shape === 'cylinder';
             let id;
             if (cyl) id = metalMap ? MAP_SURF.metal : MAP_SURF.stone;
@@ -9004,7 +9337,7 @@
             else if (Math.max(sx, sz) <= 3.2 && sy <= 3.2) id = metalMap ? MAP_SURF.metal : MAP_SURF.wood;
             else if (sy <= 1.2) id = MAP_SURF.metal;
             else if (preset === 'icebox') id = (color === 0x475569 || color === 0x1e293b) ? MAP_SURF.concrete : MAP_SURF.metal;
-            else if (preset === 'split') id = MAP_SURF.concrete;
+            else if (preset === 'split' || preset === 'skyline') id = MAP_SURF.concrete;
             else id = MAP_SURF.stone;
             return id + (cyl ? 10 : 0);
         }
@@ -10395,60 +10728,81 @@
             const uPart = { value: partIndex };
             material.onBeforeCompile = (shader) => {
                 shader.uniforms.uPart = uPart;
-                shader.uniforms.uSplitLegs = enemyAnimUniforms.uSplitLegs;
-                shader.uniforms.uArmSwing = enemyAnimUniforms.uArmSwing;
+                // Humanoid soldier animation. instanceAnim: x walk phase, y stride amount,
+                // z flinch, w recoil. Each leg swings from the hip and bends at the knee
+                // on its forward swing (the boots follow the shins); the upper body bobs
+                // with the stride and leans back on a hit; the rifle and forearms kick.
                 shader.vertexShader = shader.vertexShader
                     .replace('#include <common>', `#include <common>
                         attribute vec4 instanceAnim;
-                        uniform float uPart; uniform float uSplitLegs; uniform float uArmSwing;
-                        vec3 animRotX(vec3 p, float a, float py) {
+                        uniform float uPart;
+                        vec3 animRotX(vec3 p, float a, float py, float pz) {
                             float c = cos(a), s = sin(a);
-                            p.y -= py;
-                            return vec3(p.x, c * p.y - s * p.z + py, s * p.y + c * p.z);
+                            p.y -= py; p.z -= pz;
+                            return vec3(p.x, c * p.y - s * p.z + py, s * p.y + c * p.z + pz);
                         }
-                        // x: limb angle, y: limb pivot height, z: lean angle, w: upper-body weight
-                        vec4 enemyAnimParams(vec3 p) {
-                            float sw = sin(instanceAnim.x) * instanceAnim.y;
-                            float side = p.x >= 0.0 ? 1.0 : -1.0;
+                        // hip angle (+ = forward) and knee bend for the leg on this side
+                        vec2 legPose(float side) {
+                            float ph = instanceAnim.x + (side > 0.0 ? 0.0 : 3.14159265);
+                            return vec2(sin(ph) * 0.5, max(0.0, cos(ph)) * 0.85) * instanceAnim.y;
+                        }
+                        bool isLegVertex(vec3 p) {
                             float isLegs = step(1.5, uPart) * step(uPart, 2.5);
-                            float isGear = step(2.5, uPart);
-                            float limb = 0.0, pivot = 0.0;
-                            if (isLegs > 0.5 || (isGear > 0.5 && p.y < 0.26 && abs(p.x) < 0.45)) {
-                                limb = sw * 0.5 * side * uSplitLegs; pivot = 0.86;
-                            } else if ((uPart < 0.5 || isGear > 0.5) && p.x < -0.47 && p.y > 0.55 && p.y < 1.46) {
-                                limb = sw * 0.45 * uArmSwing; pivot = 1.52;
-                            }
-                            float upper = smoothstep(0.8, 1.15, p.y) * (1.0 - isLegs);
-                            return vec4(limb, pivot, instanceAnim.z * 0.26 * upper, upper);
+                            return isLegs > 0.5 || (p.y < 0.2 && abs(p.x) < 0.42);
                         }`)
                     .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
-                        vec4 eAnim = enemyAnimParams(position);
-                        objectNormal = animRotX(animRotX(objectNormal, eAnim.x, 0.0), eAnim.z, 0.0);`)
+                        float eUpper = smoothstep(0.9, 1.1, position.y);
+                        if (isLegVertex(position)) {
+                            vec2 lp = legPose(position.x >= 0.0 ? 1.0 : -1.0);
+                            if (position.y < 0.5) objectNormal = animRotX(objectNormal, -lp.y, 0.0, 0.0);
+                            objectNormal = animRotX(objectNormal, lp.x, 0.0, 0.0);
+                        } else {
+                            objectNormal = animRotX(objectNormal, instanceAnim.z * 0.26 * eUpper, 0.0, 0.0);
+                        }`)
                     .replace('#include <begin_vertex>', `#include <begin_vertex>
-                        transformed = animRotX(transformed, eAnim.x, eAnim.y);
-                        // Recoil: the rifle (and, on separate-limb shapes, the right arm) kicks back
-                        if (position.x > 0.42 && position.y > 0.6 && position.y < 1.4) {
-                            if (uPart > 2.5) transformed.z += instanceAnim.w * 0.09;
-                            else if (uPart < 0.5) transformed.z += instanceAnim.w * 0.05 * uArmSwing;
-                        }
-                        transformed.y += abs(sin(instanceAnim.x)) * 0.035 * instanceAnim.y * eAnim.w;
-                        transformed = animRotX(transformed, eAnim.z, 0.9);`);
+                        if (isLegVertex(position)) {
+                            vec2 lp = legPose(position.x >= 0.0 ? 1.0 : -1.0);
+                            if (position.y < 0.5) transformed = animRotX(transformed, -lp.y, 0.5, 0.0);
+                            transformed = animRotX(transformed, lp.x, 0.92, 0.0);
+                        } else {
+                            // Rifle, gloves and forearms kick back on each shot
+                            if (position.z < -0.18 && position.y > 1.0 && position.y < 1.5) transformed.z += instanceAnim.w * 0.09;
+                            // The body rises and dips with each step
+                            transformed.y += abs(sin(instanceAnim.x)) * 0.04 * instanceAnim.y * eUpper;
+                            transformed = animRotX(transformed, instanceAnim.z * 0.26 * eUpper, 0.95, 0.0);
+                        }`);
             };
             material.customProgramCacheKey = () => 'enemyAnim';
         }
         
+        let enemyHumanoid = null;
+        let humanoidRounded = null;
+        // The rounded soldier, as plain meshes: { torso, head, legs, gear } materials
+        function humanoidFigure(mats) {
+            if (!humanoidRounded) humanoidRounded = buildHumanoidEnemyGeometry(true, true);
+            const g = new THREE.Group();
+            for (const [part, key] of [['torso', 'torso'], ['head', 'head'], ['legs', 'legs'], ['weapon', 'gear']]) {
+                const m = new THREE.Mesh(humanoidRounded[part], mats[key]);
+                m.castShadow = true;
+                m.receiveShadow = true;
+                g.add(m);
+            }
+            return g;
+        }
         function initEnemyBatches() {
             const T = actorTemplates;
             syncEnemyAnimUniforms();
             enemyPartSpecs.length = 0;
             enemyPartMaterials.length = 0;
+            // Drawn as a humanoid soldier; the hit boxes (T.enemy*) are unchanged
+            if (!enemyHumanoid) enemyHumanoid = buildHumanoidEnemyGeometry(false, !!T.enemyWeapon);
             enemyPartSpecs.push(
-                { name: 'torso', geometry: T.enemyTorso, color: 0x3c4e5d },
-                { name: 'head', geometry: T.enemyHead, color: 0x546e7a },
-                { name: 'legs', geometry: T.enemyLegs, color: 0x2c3e50 }
+                { name: 'torso', geometry: enemyHumanoid.torso, color: 0x3c4e5d },
+                { name: 'head', geometry: enemyHumanoid.head, color: 0x546e7a },
+                { name: 'legs', geometry: enemyHumanoid.legs, color: 0x2c3e50 }
             );
             if (T.enemyWeapon) {
-                enemyPartSpecs.push({ name: 'weapon', geometry: T.enemyWeapon, color: 0x222222 });
+                enemyPartSpecs.push({ name: 'weapon', geometry: enemyHumanoid.weapon, color: 0x222222 });
             }
             for (let p = 0; p < enemyPartSpecs.length; p++) {
                 const material = new THREE.MeshStandardMaterial({
@@ -11369,6 +11723,75 @@
         // actors' leaves) keep the original boxes, so hit zones and damage are
         // identical. Every part stays inside its original hit volume, so a visible
         // limb is always hittable. Same local space as actorTemplates; forward is -z.
+        // Real-looking bots: a soldier figure drawn over the unchanged hit boxes.
+        // Helmet with visor, neck, chest rig with pouches, backpack, shoulder pads,
+        // both hands on a rifle held at the ready, thighs, knee pads, shins and
+        // boots. Parts by material: torso (body colour), head, legs and gear (dark:
+        // rifle, visor, belt, gloves, boots). rounded = the High Detail version.
+        // When the device tier has no separate gear part, gear goes into the
+        // torso, head and legs parts instead. Faces -Z, feet at y = 0.
+        function buildHumanoidEnemyGeometry(rounded, hasGearPart) {
+            const R = (w, h, d) => rounded ? Math.min(0.07, Math.min(w, h, d) * 0.3) : 0;
+            const box = (w, h, d, x, y, z, rx, ry, rz) => ({
+                geometry: rounded ? roundedBoxGeometry(w, h, d, R(w, h, d), 2) : new THREE.BoxGeometry(w, h, d),
+                matrix: partMatrix(x, y, z, rx || 0, ry || 0, rz || 0)
+            });
+            const cyl = (r0, r1, h, x, y, z, rx, rz) => ({ geometry: new THREE.CylinderGeometry(r0, r1, h, rounded ? 14 : 8), matrix: partMatrix(x, y, z, rx || 0, 0, rz || 0) });
+            const X = Math.PI / 2;
+            const torso = [
+                box(0.56, 0.2, 0.32, 0, 0.98, 0),                 // pelvis
+                box(0.52, 0.26, 0.3, 0, 1.17, 0),                 // abdomen
+                box(0.74, 0.38, 0.4, 0, 1.43, 0),                 // chest
+                box(0.5, 0.52, 0.18, 0, 1.36, 0.22),              // backpack
+                cyl(0.1, 0.11, 0.12, 0, 1.67, 0),                 // neck
+                box(0.24, 0.14, 0.32, -0.42, 1.58, 0, 0, 0, 0.25), // shoulder pads
+                box(0.24, 0.14, 0.32, 0.42, 1.58, 0, 0, 0, -0.25),
+                // Right arm: shoulder down to the grip
+                box(0.15, 0.36, 0.15, 0.41, 1.37, -0.08, -0.55),
+                box(0.13, 0.13, 0.3, 0.3, 1.19, -0.27),
+                // Left arm: reaching across to the handguard
+                box(0.15, 0.36, 0.15, -0.38, 1.37, -0.1, -0.7, 0, -0.2),
+                box(0.12, 0.12, 0.55, -0.1, 1.22, -0.48, 0, -0.81, 0)
+            ];
+            const head = [
+                box(0.5, 0.46, 0.52, 0, 1.93, 0),                 // helmet
+                box(0.34, 0.18, 0.34, 0, 1.74, -0.03),            // jaw
+                cyl(0.07, 0.07, 0.08, -0.27, 1.9, 0, 0, X),       // ear pieces
+                cyl(0.07, 0.07, 0.08, 0.27, 1.9, 0, 0, X)
+            ];
+            const legs = [];
+            for (const s of [-1, 1]) {
+                legs.push(box(0.24, 0.44, 0.26, s * 0.17, 0.7, 0));      // thigh
+                legs.push(box(0.17, 0.12, 0.06, s * 0.17, 0.5, -0.14));  // knee pad
+                legs.push(box(0.2, 0.42, 0.22, s * 0.17, 0.29, 0.01));   // shin
+            }
+            const gearUpper = [
+                box(0.6, 0.08, 0.36, 0, 0.92, 0),                  // belt
+                box(0.18, 0.14, 0.08, -0.2, 1.3, -0.23),           // chest pouches
+                box(0.18, 0.14, 0.08, 0.0, 1.3, -0.23),
+                box(0.18, 0.14, 0.08, 0.2, 1.3, -0.23),
+                box(0.1, 0.16, 0.55, 0.2, 1.25, -0.5),             // rifle receiver
+                cyl(0.025, 0.025, 0.36, 0.2, 1.27, -0.95, X),      // barrel
+                box(0.08, 0.13, 0.26, 0.2, 1.3, -0.1),             // stock
+                box(0.07, 0.2, 0.1, 0.2, 1.08, -0.45, 0.25),       // magazine
+                box(0.06, 0.06, 0.18, 0.2, 1.37, -0.48),           // scope
+                box(0.12, 0.12, 0.12, 0.24, 1.17, -0.38),          // right glove (grip)
+                box(0.12, 0.12, 0.12, 0.17, 1.24, -0.72)           // left glove (handguard)
+            ];
+            const gearHead = [box(0.44, 0.12, 0.06, 0, 1.93, -0.27)];   // visor
+            const gearLegs = [];
+            for (const s of [-1, 1]) gearLegs.push(box(0.24, 0.14, 0.38, s * 0.17, 0.07, -0.05));   // boots
+            const merge = (parts) => {
+                const m = mergeGeometryParts(parts);
+                for (const p of parts) p.geometry.dispose();
+                return m;
+            };
+            if (hasGearPart) {
+                return { torso: merge(torso), head: merge(head), legs: merge(legs), weapon: merge(gearUpper.concat(gearHead, gearLegs)) };
+            }
+            return { torso: merge(torso.concat(gearUpper)), head: merge(head.concat(gearHead)), legs: merge(legs.concat(gearLegs)), weapon: null };
+        }
+
         function buildDetailedEnemyGeometry() {
             const rb = (w, h, d, r, x, y, z, rx) => ({ geometry: roundedBoxGeometry(w, h, d, r, 2), matrix: partMatrix(x, y, z, rx || 0, 0, 0) });
             const cyl = (rt, rbm, h, x, y, z, rx, rz) => ({ geometry: new THREE.CylinderGeometry(rt, rbm, h, 14), matrix: partMatrix(x, y, z, rx || 0, 0, rz || 0) });
@@ -11442,8 +11865,8 @@
                 if (this.built) return;
                 const t0 = performance.now();
                 const T = actorTemplates;
-                this.simple = { torso: T.enemyTorso, head: T.enemyHead, legs: T.enemyLegs, weapon: T.enemyWeapon };
-                this.detailed = buildDetailedEnemyGeometry();
+                this.simple = enemyHumanoid || { torso: T.enemyTorso, head: T.enemyHead, legs: T.enemyLegs, weapon: T.enemyWeapon };
+                this.detailed = buildHumanoidEnemyGeometry(true, !!T.enemyWeapon);
                 this._buildGuns();
                 this._buildWingmen();
                 this.built = true;
@@ -11595,6 +12018,8 @@
                 const visorMat = new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: 0.2, metalness: 0.6 });
                 for (const bot of td.wingmanBots) {
                     const g = bot.group;
+                    // Wingmen are drawn as the soldier figure now: the old limb kit is not needed
+                    if (g.children.some((c) => c.isGroup)) continue;
                     const torsoMat = g.children[0].material, headMat = g.children[1].material, gunMat = bot.gunMesh.material;
                     const kit = new THREE.Group();
                     const add = (geo, mat, x, y, z, rx) => {
@@ -12272,6 +12697,9 @@
             if (mainMenu.open && !game.settingsOpen && !game.agentPickerOpen) {
                 mainMenu.onKey(event);
                 return;
+            }
+            if (event.code === 'KeyN' && !event.repeat && !game.buyMenuOpen && !game.settingsOpen && !game.agentPickerOpen && !mainMenu.open) {
+                progression.doSpray(performance.now());
             }
             if (event.code === 'KeyP') {
                 event.preventDefault();
@@ -13493,7 +13921,7 @@
                       sky: 0xa07c50, skyMix: 0.62, fog: 3.6, sun: 0.55, amb: 1.2, sand: 1 },
             leaves: { id: 4, box: 24, speed: 1.0, wind: [2.2, 0, 0.9], size: [0.13, 0.09], color: [1, 1, 1], opacity: 0.95, count: 900 }
         };
-        const MAP_WEATHER = { ascent: 'leaves', bind: 'rain', haven: 'sand', split: 'storm', icebox: 'snow', lotus: 'leaves' };
+        const MAP_WEATHER = { ascent: 'leaves', bind: 'rain', haven: 'sand', split: 'storm', icebox: 'snow', lotus: 'leaves', skyline: 'rain' };
         const WEATHER_DENSITY = { low: 0, medium: 0.45, high: 0.7, ultra: 1, cinematic: 1 };
 
         const weatherFX = {
@@ -16462,6 +16890,7 @@
                 const archBadge = `<span style="color:${arch.badgeColor};font-weight:800;">[${arch.label}]</span> `;
                 addCustomKillFeedMessage(`${wbBadge}${prefixBadge}${archBadge}Eliminated ${arch.shortName} with ${sourceLabel}`);
                 replayRec.onKill(enemy, isHeadshot, sourceLabel);
+                progression.onKill(isHeadshot, sourceLabel);
                 soundFX.kill(isHeadshot);
                 showHitMarker('kill');                       // V1.7: red kill marker
                 gamepadController.rumble(0.9, 0.6, 120);
@@ -17570,7 +17999,9 @@
             lotus:  { root: 55, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 5, 4, 0], tempo: 62, wave: 'triangle', cutoff: 1100,
                       bed: { type: 'lowpass', freq: 420, q: 0.4, gain: 0.4 }, hum: 0, events: ['drip', 'bell', 'bird'] },
             split:  { root: 53, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 6, 5, 6], tempo: 76, wave: 'sawtooth', cutoff: 1800,
-                      bed: { type: 'lowpass', freq: 220, q: 0.6, gain: 0.55 }, hum: 120, events: ['neon', 'creak'] }
+                      bed: { type: 'lowpass', freq: 220, q: 0.6, gain: 0.55 }, hum: 120, events: ['neon', 'creak'] },
+            skyline: { root: 51, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 3, 4], tempo: 84, wave: 'sawtooth', cutoff: 1500,
+                      bed: { type: 'lowpass', freq: 300, q: 0.5, gain: 0.6 }, hum: 90, events: ['neon', 'drip', 'creak'] }
         };
         const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -33899,6 +34330,7 @@
 
                             if (this.spikeDefuseProgress >= 1) {
                                 soundFX.spikeDefuse(true);
+                                progression.onDefuse();
                                 game.score += 650;
                                 scoreValue.textContent = game.score;
                                 this.awardCreds(350);
@@ -34015,6 +34447,7 @@
             },
 
             completeSpikePlant: function(now, siteKey = 'A') {
+                progression.onPlant();
                 const siteInfo = this.spikeSites[siteKey] || this.spikeSites.A;
                 this.activeSpikeSiteKey = siteKey;
                 this.activeSpikeSitePos.copy(siteInfo.pos);
@@ -34542,7 +34975,7 @@
             },
 
             cycleMapPreset: function(targetPreset) {
-                const order = ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split'];
+                const order = ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split', 'skyline'];
                 const currIdx = order.indexOf(game.mapPreset || 'ascent');
                 const nextId = (targetPreset && MAP_PRESETS && MAP_PRESETS[targetPreset])
                     ? targetPreset
@@ -36415,6 +36848,26 @@
             camera.position.z = prev.z + (curr.z - prev.z) * alpha;
         }
         
+        // V1.7: the view tilts while sliding (towards the side you steer) and
+        // levels out after. Applied as a change on top of the look rotation, so
+        // nothing else that turns the camera is disturbed; it is exactly 0 at rest.
+        const slideCamera = {
+            roll: 0, applied: 0,
+            update: function (dt) {
+                if (replayDirector.clip || mainMenu.open) return;
+                const cc = characterController;
+                let target = 0;
+                if (cc.slideTimer > 0 && cc.grounded) {
+                    const steer = (game.keys.d ? 1 : 0) - (game.keys.a ? 1 : 0);
+                    target = steer ? -0.09 * steer : 0.06;
+                }
+                this.roll += (target - this.roll) * (1 - Math.exp(-10 * dt));
+                if (!target && Math.abs(this.roll) < 1e-4) this.roll = 0;
+                camera.rotation.z += this.roll - this.applied;
+                this.applied = this.roll;
+            }
+        };
+        
         // Update function using character controller
         function updateGameState(delta) {
             // Update character controller (collision at movement frequency)
@@ -37189,6 +37642,8 @@
             skipMenu: false,
             breakables: true,
             showBody: true,
+            slide: true,
+            mantle: true,
             gpLookSens: 1.0,
             gpDeadzone: 12,
             gpInvertY: false,
@@ -37291,6 +37746,43 @@
                 tracer: 0x2bf0a5,
                 metalness: 0.82,
                 roughness: 0.24
+            },
+            // V1.7 progression rewards (unlocked by level)
+            ember: {
+                label: 'EMBER // FORGE',
+                body: 0x1c1917,
+                secondary: 0x7c2d12,
+                accent: 0xf97316,
+                tracer: 0xfb923c,
+                metalness: 0.7,
+                roughness: 0.32
+            },
+            glacier: {
+                label: 'GLACIER // WHITEOUT',
+                body: 0xe2e8f0,
+                secondary: 0x7dd3fc,
+                accent: 0x0ea5e9,
+                tracer: 0xbae6fd,
+                metalness: 0.6,
+                roughness: 0.3
+            },
+            neontide: {
+                label: 'NEON TIDE // SKYLINE',
+                body: 0x120a2a,
+                secondary: 0x3b0764,
+                accent: 0xff2bd6,
+                tracer: 0x22e6ff,
+                metalness: 0.8,
+                roughness: 0.2
+            },
+            onyx: {
+                label: 'GILDED ONYX // ELITE',
+                body: 0x0a0a0a,
+                secondary: 0xb45309,
+                accent: 0xfacc15,
+                tracer: 0xfde68a,
+                metalness: 0.92,
+                roughness: 0.16
             }
         };
 
@@ -37597,6 +38089,7 @@
                 if (won) {
                     this.us++;
                     this.lossStreak = 0;
+                    progression.onRoundWon();
                     if (this.side === 'attack') this.stats.roundsAttack++; else this.stats.roundsDefend++;
                     td.awardCreds(3000);
                     soundFX.ult();
@@ -37649,6 +38142,7 @@
             finish: function (now) {
                 this.phase = 'over';
                 const won = this.us > this.them;
+                progression.onMatchEnd(won, this.variant === 'spikerush' ? 'spikerush' : 'match');
                 const s = this.stats;
                 const hs = s.kills ? Math.round(s.headshots / s.kills * 100) : 0;
                 const mins = Math.max(1, Math.round((now - s.startedAt) / 60000));
@@ -37945,6 +38439,7 @@
                 this.renderBoard(performance.now());
                 const r = this.ranked();
                 const place = r.findIndex((s) => s.name === 'YOU') + 1;
+                progression.onMatchEnd(place === 1, 'deathmatch', place);
                 const sfx = (n) => n === 1 ? 'ST' : n === 2 ? 'ND' : n === 3 ? 'RD' : 'TH';
                 if (!this.overlay) {
                     const el = document.createElement('div');
@@ -38233,18 +38728,14 @@
             init: function () {
                 if (this.ghost) return;
                 // Stand-in body for the player in the kill cam (wingman materials: same programs)
-                const g = new THREE.Group();
-                const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.44, 1.2, 12),
-                    new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x38f6ff, emissiveIntensity: 0.35, roughness: 0.4 }));
-                torso.position.y = 0.82;
-                const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10),
-                    new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.55 }));
-                head.position.y = 1.62;
-                const gun = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.8), new THREE.MeshBasicMaterial({ color: 0x38f6ff }));
-                gun.position.set(0.32, 1.12, -0.38);
-                g.add(torso, head, gun);
+                // The same soldier figure as the bots, in your agent's colour
+                const torsoMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x38f6ff, emissiveIntensity: 0.35, roughness: 0.4 });
+                const headMat = new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.55 });
+                const gearMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.45, metalness: 0.4 });
+                const g = humanoidFigure({ torso: torsoMat, head: headMat, legs: torsoMat, gear: gearMat });
+                g.scale.setScalar(0.82);
                 g.visible = false;
-                g.userData.parts = [torso, head, gun];
+                g.userData.parts = [g.children[0], g.children[1], g.children[3]];
                 scene.add(g);
                 this.ghost = g;
                 const ov = document.createElement('div');
@@ -38993,6 +39484,353 @@
         };
 
         // =============================================
+        // =============================================
+        // V1.7 Progression: XP and levels, unlocks (gun skins, sprays, player cards),
+        // three daily challenges, and the Career screen in the main menu. Saved in
+        // localStorage (when saving is on). Separate from competitive RR ([K]).
+        // =============================================
+        const XP_AWARDS = { kill: 100, headshot: 50, round: 250, plant: 150, defuse: 250, matchWin: 1000, matchPlayed: 400, dmPlayed: 500, dmPodium: 250, dmWin: 500, range: 400 };
+        const LEVEL_REWARDS = {
+            2: ['card', 'nightshift'], 3: ['spray', 'chevrons'], 4: ['skin', 'ember'], 5: ['card', 'skyline'],
+            6: ['spray', 'target'], 7: ['skin', 'glacier'], 8: ['card', 'overdrive'], 9: ['spray', 'wings'],
+            10: ['skin', 'neontide'], 12: ['card', 'dawn'], 14: ['spray', 'crown'], 16: ['skin', 'onyx'],
+            18: ['card', 'apex'], 20: ['spray', 'city']
+        };
+        const PLAYER_CARDS = {
+            protocol:   { name: 'PROTOCOL',     a: '#1e293b', b: '#ff4655', icon: '◆' },
+            nightshift: { name: 'NIGHT SHIFT',  a: '#0b1020', b: '#6366f1', icon: '☾' },
+            skyline:    { name: 'SKYLINE',      a: '#120a2a', b: '#ff2bd6', icon: '▙' },
+            overdrive:  { name: 'OVERDRIVE',    a: '#1a0f05', b: '#f97316', icon: '⚡' },
+            dawn:       { name: 'RADIANT DAWN', a: '#2a1a05', b: '#ffd166', icon: '☀' },
+            apex:       { name: 'APEX',         a: '#04201a', b: '#2bf0a5', icon: '▲' }
+        };
+        const SPRAYS = {
+            star:     { name: 'RADIANT STAR', color: 0xffd166 },
+            chevrons: { name: 'CHEVRONS',     color: 0xff4655 },
+            target:   { name: 'ON TARGET',    color: 0x38f6ff },
+            wings:    { name: 'WINGS',        color: 0xf8fafc },
+            crown:    { name: 'CROWN',        color: 0xfacc15 },
+            city:     { name: 'NIGHT CITY',   color: 0xff2bd6 }
+        };
+        const DAILY_POOL = [
+            { id: 'kills15',  text: 'Get 15 kills',                          ev: 'kill',           n: 15, xp: 600 },
+            { id: 'hs8',      text: 'Get 8 headshot kills',                  ev: 'headshot',       n: 8,  xp: 700 },
+            { id: 'rounds3',  text: 'Win 3 rounds',                          ev: 'round',          n: 3,  xp: 600 },
+            { id: 'plant2',   text: 'Plant the spike 2 times',               ev: 'plant',          n: 2,  xp: 500 },
+            { id: 'defuse1',  text: 'Defuse the spike',                      ev: 'defuse',         n: 1,  xp: 500 },
+            { id: 'pistol5',  text: 'Get 5 kills with the pistol out',       ev: 'kill:pistol',    n: 5,  xp: 600 },
+            { id: 'sniper4',  text: 'Get 4 kills with the sniper out',       ev: 'kill:sniper',    n: 4,  xp: 600 },
+            { id: 'knife1',   text: 'Get a knife kill',                      ev: 'kill:knife',     n: 1,  xp: 700 },
+            { id: 'slide10',  text: 'Slide 10 times',                        ev: 'slide',          n: 10, xp: 400 },
+            { id: 'mantle5',  text: 'Climb onto 5 ledges',                   ev: 'mantle',         n: 5,  xp: 400 },
+            { id: 'skyline1', text: 'Win a round on Skyline',                ev: 'round:skyline',  n: 1,  xp: 600 },
+            { id: 'finish1',  text: 'Finish a Match, Spike Rush or Deathmatch', ev: 'matchEnd',    n: 1,  xp: 700 }
+        ];
+
+        // Flat sprays, built from shapes (plain coloured material: no new shader programs)
+        function buildSprayGeometry(id) {
+            const parts = [];
+            const I = new THREE.Matrix4();
+            const poly = (pts) => {
+                const s = new THREE.Shape();
+                pts.forEach((p, i) => (i ? s.lineTo(p[0], p[1]) : s.moveTo(p[0], p[1])));
+                parts.push({ geometry: new THREE.ShapeGeometry(s), matrix: I });
+            };
+            const rect = (x, y, w, h) => poly([[x - w / 2, y - h / 2], [x + w / 2, y - h / 2], [x + w / 2, y + h / 2], [x - w / 2, y + h / 2]]);
+            const ring = (r0, r1) => parts.push({ geometry: new THREE.RingGeometry(r0, r1, 40), matrix: I });
+            const disc = (x, y, r) => parts.push({ geometry: new THREE.CircleGeometry(r, 28), matrix: new THREE.Matrix4().makeTranslation(x, y, 0) });
+            if (id === 'chevrons') {
+                for (let k = 0; k < 3; k++) { const y = 0.32 - k * 0.3; poly([[-0.5, y], [0, y - 0.28], [0.5, y], [0.5, y - 0.12], [0, y - 0.4], [-0.5, y - 0.12]]); }
+            } else if (id === 'target') {
+                ring(0.48, 0.58); ring(0.22, 0.3); disc(0, 0, 0.07);
+                rect(0, 0.45, 0.06, 0.3); rect(0, -0.45, 0.06, 0.3); rect(0.45, 0, 0.3, 0.06); rect(-0.45, 0, 0.3, 0.06);
+            } else if (id === 'wings') {
+                for (const s of [-1, 1]) {
+                    poly([[0.08 * s, 0.02], [0.62 * s, 0.34], [0.5 * s, 0.14], [0.6 * s, 0.1], [0.44 * s, -0.04], [0.5 * s, -0.1], [0.08 * s, -0.12]]);
+                }
+                poly([[0, 0.14], [0.1, 0], [0, -0.3], [-0.1, 0]]);
+            } else if (id === 'crown') {
+                poly([[-0.5, -0.2], [-0.5, 0.3], [-0.25, 0.05], [0, 0.42], [0.25, 0.05], [0.5, 0.3], [0.5, -0.2]]);
+                rect(0, -0.3, 1.0, 0.12); disc(-0.5, 0.36, 0.06); disc(0, 0.48, 0.07); disc(0.5, 0.36, 0.06);
+            } else if (id === 'city') {
+                const hs = [0.35, 0.6, 0.45, 0.8, 0.5, 0.65, 0.3];
+                hs.forEach((h, i) => rect(-0.48 + i * 0.16, -0.45 + h / 2, 0.14, h));
+                disc(0.32, 0.42, 0.12);
+            } else {
+                const pts = [];
+                for (let i = 0; i < 16; i++) { const a = Math.PI / 2 + i * Math.PI / 8, r = i % 2 ? 0.24 : 0.6; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+                poly(pts);
+            }
+            const g = mergeGeometryParts(parts);
+            for (const p of parts) p.geometry.dispose();
+            return g;
+        }
+
+        const progression = {
+            level: 1, xp: 0, totalXp: 0,
+            unlocked: { skin: [], spray: ['star'], card: ['protocol'] },
+            card: 'protocol', spray: 'star',
+            daily: { date: '', list: [] },
+            stats: { kills: 0, headshots: 0, rounds: 0, plants: 0, defuses: 0, matches: 0 },
+            sprayMesh: null, sprayGeos: {}, lastSprayAt: -1e9, toastEl: null, _toastTimer: 0,
+            KEY: 'valorant_v17_progression',
+            _today: null,                                   // tests can pin the date
+
+            today: function () {
+                if (this._today) return this._today;
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            },
+            need: function (level) { return 800 + 200 * (level - 1); },
+            skinLevel: function (skinId) {
+                for (const lv of Object.keys(LEVEL_REWARDS)) if (LEVEL_REWARDS[lv][0] === 'skin' && LEVEL_REWARDS[lv][1] === skinId) return +lv;
+                return 0;
+            },
+            has: function (type, id) {
+                if (type === 'skin') return !this.skinLevel(id) || this.unlocked.skin.indexOf(id) !== -1;
+                return this.unlocked[type].indexOf(id) !== -1;
+            },
+            rewardName: function (type, id) {
+                if (type === 'skin') return (WEAPON_SKIN_THEMES[id] || {}).label || id;
+                if (type === 'spray') return SPRAYS[id].name + ' SPRAY';
+                return PLAYER_CARDS[id].name + ' CARD';
+            },
+
+            init: function () {
+                this.load();
+                this.ensureDaily();
+                const el = document.createElement('div');
+                el.id = 'level-toast';
+                el.className = 'level-toast';
+                document.getElementById('ui-root').appendChild(el);
+                this.toastEl = el;
+                const mat = new THREE.MeshBasicMaterial({ color: SPRAYS.star.color, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+                this.sprayMesh = new THREE.Mesh(this.sprayGeo('star'), mat);
+                this.sprayMesh.visible = false;
+                this.sprayMesh.renderOrder = 1;
+                scene.add(this.sprayMesh);
+                this.refreshSkinCards();
+            },
+
+            load: function () {
+                if (typeof settingsManager === 'undefined' || !settingsManager.lsEnabled) return;
+                try {
+                    const d = JSON.parse(localStorage.getItem(this.KEY) || 'null');
+                    if (!d) return;
+                    if (d.level >= 1) this.level = Math.floor(d.level);
+                    if (d.xp >= 0) this.xp = d.xp;
+                    if (d.totalXp >= 0) this.totalXp = d.totalXp;
+                    for (const t of ['skin', 'spray', 'card']) if (d.unlocked && Array.isArray(d.unlocked[t])) this.unlocked[t] = Array.from(new Set(this.unlocked[t].concat(d.unlocked[t])));
+                    if (d.card && PLAYER_CARDS[d.card]) this.card = d.card;
+                    if (d.spray && SPRAYS[d.spray]) this.spray = d.spray;
+                    if (d.daily && Array.isArray(d.daily.list)) this.daily = d.daily;
+                    if (d.stats) Object.assign(this.stats, d.stats);
+                } catch (e) {}
+            },
+            save: function () {
+                if (typeof settingsManager === 'undefined' || !settingsManager.lsEnabled) return;
+                try {
+                    localStorage.setItem(this.KEY, JSON.stringify({ level: this.level, xp: this.xp, totalXp: this.totalXp, unlocked: this.unlocked,
+                        card: this.card, spray: this.spray, daily: this.daily, stats: this.stats }));
+                } catch (e) {}
+            },
+
+            // Three challenges a day, the same for everyone on that date
+            ensureDaily: function () {
+                const date = this.today();
+                if (this.daily.date === date && this.daily.list.length === 3) return;
+                let seed = 7;
+                for (let i = 0; i < date.length; i++) seed = (seed * 131 + date.charCodeAt(i)) % 2147483647;
+                const pool = DAILY_POOL.slice();
+                const list = [];
+                while (list.length < 3) {
+                    seed = (seed * 16807) % 2147483647;
+                    const c = pool.splice(seed % pool.length, 1)[0];
+                    list.push({ id: c.id, progress: 0, done: false });
+                }
+                this.daily = { date: date, list: list };
+                this.save();
+            },
+
+            award: function (amount, reason) {
+                if (!(amount > 0)) return;
+                this.xp += amount;
+                this.totalXp += amount;
+                const rewards = [];
+                while (this.xp >= this.need(this.level)) {
+                    this.xp -= this.need(this.level);
+                    this.level++;
+                    const r = LEVEL_REWARDS[this.level];
+                    if (r && this.unlocked[r[0]].indexOf(r[1]) === -1) { this.unlocked[r[0]].push(r[1]); rewards.push(r); }
+                    this.toast(`LEVEL ${this.level}`, r ? `UNLOCKED: ${this.rewardName(r[0], r[1])}` : `+${amount} XP • ${reason}`, true);
+                }
+                if (rewards.some((r) => r[0] === 'skin')) this.refreshSkinCards();
+                this.save();
+                if (typeof mainMenu !== 'undefined' && mainMenu.open) {
+                    mainMenu.render();
+                    if (mainMenu.view === 'career') this.renderCareer();
+                }
+            },
+
+            // Count an event towards today's challenges (and finish them)
+            count: function (ev, n) {
+                this.ensureDaily();
+                for (const c of this.daily.list) {
+                    if (c.done) continue;
+                    const def = DAILY_POOL.find((d) => d.id === c.id);
+                    if (!def || def.ev !== ev) continue;
+                    c.progress = Math.min(def.n, c.progress + (n || 1));
+                    if (c.progress >= def.n) {
+                        c.done = true;
+                        this.toast('CHALLENGE COMPLETE', `${def.text} • +${def.xp} XP`, false);
+                        this.award(def.xp, 'Daily challenge');
+                    }
+                }
+                this.save();
+            },
+
+            onKill: function (isHeadshot, source) {
+                if (/wingman/i.test(source || '') || (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.wingmanBots.some((b) => b.name === source))) return;
+                this.stats.kills++;
+                this.award(XP_AWARDS.kill + (isHeadshot ? XP_AWARDS.headshot : 0), isHeadshot ? 'Headshot kill' : 'Kill');
+                this.count('kill');
+                if (isHeadshot) { this.stats.headshots++; this.count('headshot'); }
+                if (game.activeWeapon) this.count('kill:' + game.activeWeapon);
+            },
+            onRoundWon: function () {
+                this.stats.rounds++;
+                this.award(XP_AWARDS.round, 'Round won');
+                this.count('round');
+                this.count('round:' + (game.mapPreset || 'ascent'));
+            },
+            onPlant: function () { this.stats.plants++; this.award(XP_AWARDS.plant, 'Spike planted'); this.count('plant'); },
+            onDefuse: function () { this.stats.defuses++; this.award(XP_AWARDS.defuse, 'Spike defused'); this.count('defuse'); },
+            onMatchEnd: function (won, kind, place) {
+                this.stats.matches++;
+                if (kind === 'deathmatch') this.award(XP_AWARDS.dmPlayed + (place === 1 ? XP_AWARDS.dmWin : place <= 3 ? XP_AWARDS.dmPodium : 0), `Deathmatch #${place}`);
+                else this.award(won ? XP_AWARDS.matchWin : XP_AWARDS.matchPlayed, won ? 'Match won' : 'Match played');
+                this.count('matchEnd');
+            },
+            onRange: function () { this.award(XP_AWARDS.range, 'Range finished'); },
+
+            toast: function (title, sub, big) {
+                if (!this.toastEl) return;
+                this.toastEl.innerHTML = `<b>${title}</b><span>${sub}</span>`;
+                this.toastEl.classList.toggle('big', !!big);
+                this.toastEl.classList.add('visible');
+                if (big && soundFX.ult) soundFX.ult();
+                clearTimeout(this._toastTimer);
+                this._toastTimer = setTimeout(() => this.toastEl.classList.remove('visible'), 3200);
+            },
+
+            sprayGeo: function (id) {
+                if (!this.sprayGeos[id]) this.sprayGeos[id] = buildSprayGeometry(id);
+                return this.sprayGeos[id];
+            },
+
+            // [N]: your equipped spray on the wall in front of you (within 4 m), or the floor
+            doSpray: function (now) {
+                if (!this.sprayMesh || now - this.lastSprayAt < 1500) return false;
+                camera.updateMatrixWorld();
+                const origin = camera.position, dir = new THREE.Vector3(0, 0, -1).transformDirection(camera.matrixWorld);
+                const savedFar = raycaster.far;
+                raycaster.ray.origin.copy(origin);
+                raycaster.ray.direction.copy(dir);
+                raycaster.far = 4.5;
+                _shotHits.length = 0;
+                envShotIndex.raycast(raycaster.ray, 4.5);
+                _shotHits.sort(compareHitDistance);
+                const hit = _shotHits.find((h) => h.face && h.distance <= 4.5);
+                const point = new THREE.Vector3(), normal = new THREE.Vector3();
+                if (hit) {
+                    normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+                    point.copy(hit.point);
+                } else if (dir.y < -0.15 && origin.y / -dir.y <= 6) {
+                    point.copy(origin).addScaledVector(dir, origin.y / -dir.y);
+                    normal.set(0, 1, 0);
+                }
+                _shotHits.length = 0;
+                raycaster.far = savedFar;
+                if (!normal.lengthSq()) return false;
+                const m = this.sprayMesh;
+                m.geometry = this.sprayGeo(this.spray);
+                m.material.color.setHex(SPRAYS[this.spray].color).convertSRGBToLinear();
+                m.position.copy(point).addScaledVector(normal, 0.02);
+                if (Math.abs(normal.y) > 0.9) m.up.set(dir.x, 0, dir.z).normalize();
+                else m.up.set(0, 1, 0);
+                m.lookAt(m.position.x + normal.x, m.position.y + normal.y, m.position.z + normal.z);
+                m.scale.setScalar(1.1);
+                m.visible = true;
+                this.sprayMap = game.mapPreset;
+                this.lastSprayAt = now;
+                if (soundFX.noiseLayer) soundFX.noiseLayer(0.4, 0.07, 0, 'highpass', 3200, 0.6);
+                return true;
+            },
+            hideSpray: function () { if (this.sprayMesh) this.sprayMesh.visible = false; },
+
+            equip: function (type, id) {
+                if (!this.has(type, id)) return false;
+                if (type === 'card') this.card = id;
+                else if (type === 'spray') this.spray = id;
+                else if (type === 'skin') {
+                    game.userSettings.weaponSkin = id;
+                    settingsManager.applyWeaponSkin(id);
+                    settingsManager.saveToStorage();
+                    document.querySelectorAll('#setting-skin-cards .skin-card-btn').forEach((c) => c.classList.toggle('active', c.getAttribute('data-skin') === id));
+                }
+                this.save();
+                this.renderCareer();
+                if (typeof mainMenu !== 'undefined') mainMenu.render();
+                return true;
+            },
+
+            // Locked skins in Settings show the level that unlocks them
+            refreshSkinCards: function () {
+                document.querySelectorAll('#setting-skin-cards .skin-card-btn').forEach((c) => {
+                    const id = c.getAttribute('data-skin');
+                    const lv = this.skinLevel(id);
+                    const locked = !this.has('skin', id);
+                    c.classList.toggle('locked', locked);
+                    let tag = c.querySelector('.skin-lock');
+                    if (lv && !tag) { tag = document.createElement('div'); tag.className = 'skin-lock'; c.appendChild(tag); }
+                    if (tag) tag.textContent = locked ? `🔒 UNLOCKS AT LEVEL ${lv}` : `LEVEL ${lv} REWARD`;
+                });
+            },
+
+            cardHtml: function (id, small) {
+                const c = PLAYER_CARDS[id] || PLAYER_CARDS.protocol;
+                return `<div class="pc-card${small ? ' small' : ''}" style="background:linear-gradient(120deg, ${c.a} 0%, ${c.a} 45%, ${c.b} 140%); border-color:${c.b}"><span class="pc-icon" style="color:${c.b}">${c.icon}</span><span class="pc-name">${c.name}</span></div>`;
+            },
+
+            renderCareer: function () {
+                const el = document.getElementById('mm-career');
+                if (!el) return;
+                this.ensureDaily();
+                const need = this.need(this.level);
+                const next = Object.keys(LEVEL_REWARDS).map(Number).filter((lv) => lv > this.level).sort((a, b) => a - b)[0];
+                const daily = this.daily.list.map((c) => {
+                    const d = DAILY_POOL.find((x) => x.id === c.id) || { text: c.id, n: 1, xp: 0 };
+                    return `<div class="cr-ch${c.done ? ' done' : ''}"><div class="cr-ch-top"><span>${c.done ? '✓ ' : ''}${d.text}</span><b>+${d.xp} XP</b></div><div class="cr-bar"><i style="width:${Math.round(c.progress / d.n * 100)}%"></i></div><small>${c.progress} / ${d.n}</small></div>`;
+                }).join('');
+                const item = (type, id, label, sw) => {
+                    const owned = this.has(type, id);
+                    const eq = (type === 'card' && this.card === id) || (type === 'spray' && this.spray === id) || (type === 'skin' && (game.userSettings.weaponSkin || 'standard') === id);
+                    const lv = type === 'skin' ? this.skinLevel(id) : +(Object.keys(LEVEL_REWARDS).find((k) => LEVEL_REWARDS[k][0] === type && LEVEL_REWARDS[k][1] === id) || 0);
+                    return `<button class="mm-btn cr-item${owned ? '' : ' locked'}${eq ? ' selected' : ''}" data-equip="${type}:${id}"${owned ? '' : ' aria-disabled="true"'}>${sw}<span>${label}</span><small>${eq ? 'EQUIPPED' : owned ? 'EQUIP' : `🔒 LEVEL ${lv}`}</small></button>`;
+                };
+                const skins = Object.keys(WEAPON_SKIN_THEMES).map((id) => { const t = WEAPON_SKIN_THEMES[id]; return item('skin', id, t.label, `<i class="cr-sw" style="background:linear-gradient(90deg,#${t.body.toString(16).padStart(6, '0')} 50%,#${t.accent.toString(16).padStart(6, '0')} 50%)"></i>`); }).join('');
+                const sprays = Object.keys(SPRAYS).map((id) => item('spray', id, SPRAYS[id].name, `<i class="cr-sw" style="background:#${SPRAYS[id].color.toString(16).padStart(6, '0')}"></i>`)).join('');
+                const cards = Object.keys(PLAYER_CARDS).map((id) => item('card', id, PLAYER_CARDS[id].name, `<i class="cr-sw" style="background:${PLAYER_CARDS[id].b}"></i>`)).join('');
+                el.innerHTML = `
+                    <div class="cr-head">${this.cardHtml(this.card)}<div class="cr-lv"><b id="cr-level">LEVEL ${this.level}</b><div class="cr-bar"><i style="width:${Math.round(this.xp / need * 100)}%"></i></div><small id="cr-xp">${this.xp} / ${need} XP${next ? ` • next unlock at level ${next}: ${this.rewardName(LEVEL_REWARDS[next][0], LEVEL_REWARDS[next][1])}` : ''}</small></div></div>
+                    <div class="cr-sec">DAILY CHALLENGES</div>${daily}
+                    <div class="cr-sec">GUN SKINS</div><div class="cr-grid">${skins}</div>
+                    <div class="cr-sec">SPRAYS <small>[N] to spray</small></div><div class="cr-grid">${sprays}</div>
+                    <div class="cr-sec">PLAYER CARDS</div><div class="cr-grid">${cards}</div>
+                    <div class="cr-stats">${this.stats.kills} kills • ${this.stats.headshots} headshots • ${this.stats.rounds} rounds won • ${this.stats.matches} matches • ${this.totalXp} XP total</div>`;
+            }
+        };
+
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
@@ -39034,8 +39872,14 @@
                             <button class="mm-btn" data-act="play">PLAY</button>
                             <button class="mm-btn mm-pause-only" data-act="agent">AGENT SELECT</button>
                             <button class="mm-btn" data-act="modes">MODES <span class="mm-val" id="mm-mode-val">WAVE</span></button>
+                            <button class="mm-btn" data-act="map">MAP <span class="mm-val" id="mm-map-val">ASCENT</span></button>
+                            <button class="mm-btn" data-act="career">CAREER <span class="mm-val" id="mm-level-val">LEVEL 1</span></button>
                             <button class="mm-btn" data-act="settings">SETTINGS</button>
                             <button class="mm-btn" data-act="controls">CONTROLS</button>
+                        </div>
+                        <div class="mm-view" data-view="career">
+                            <div class="mm-career" id="mm-career"></div>
+                            <button class="mm-btn mm-back" data-act="back">BACK</button>
                         </div>
                         <div class="mm-view" data-view="modes">
                             ${MENU_MODES.map((m) => `<button class="mm-btn mm-mode" data-mode="${m[0]}">${m[1]}<small>${m[2]}</small></button>`).join('')}
@@ -39044,8 +39888,8 @@
                         <div class="mm-view" data-view="controls">
                             <div class="mm-controls">
                                 <div><b>WASD</b> Move</div><div><b>Mouse</b> Aim • <b>Left / Right click</b> Shoot / Aim down sights</div>
-                                <div><b>Space</b> Jump (hold: glide) • <b>Ctrl / Z</b> Crouch</div><div><b>R</b> Reload • <b>Y</b> Inspect • <b>1–4</b> Weapons • <b>V</b> Variants</div>
-                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings</div>
+                                <div><b>Space</b> Jump (hold: glide; into a ledge: climb) • <b>Ctrl / Z</b> Crouch (while sprinting: slide)</div><div><b>R</b> Reload • <b>Y</b> Inspect • <b>1–4</b> Weapons • <b>V</b> Variants</div>
+                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings • <b>N</b> Spray</div>
                                 <div><b>F1 / F2 / F3</b> Wave / Range / Retake • <b>F4</b> Maps • <b>T</b> Ping</div><div><b>Esc</b> This menu</div>
                                 <div class="mm-controls-pad"><b>Controller:</b> sticks move and aim • RT shoot • LT aim • A jump • B crouch • X reload • LB / RB / D-pad abilities • Start this menu • hold View: agents</div>
                             </div>
@@ -39053,7 +39897,7 @@
                         </div>
                         <div class="mm-foot">Enter / Ⓐ select • Esc / Ⓑ back</div>
                     </div>
-                    <div class="mm-agent-tag"><span id="mm-agent-name">JETT</span><small id="mm-agent-role">DUELIST</small></div>`;
+                    <div class="mm-agent-tag"><span id="mm-agent-name">JETT</span><small id="mm-agent-role">DUELIST</small><div id="mm-card"></div></div>`;
                 document.getElementById('ui-root').appendChild(el);
                 this.el = el;
                 el.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -39062,6 +39906,13 @@
                     const b = e.target.closest('button');
                     if (!b) return;
                     if (b.dataset.mode) { this.mode = b.dataset.mode; this.setView('main'); return; }
+                    if (b.dataset.equip) {
+                        const [type, id] = b.dataset.equip.split(':');
+                        if (!progression.equip(type, id) && soundFX.buyDeny) soundFX.buyDeny();
+                        const again = this.el.querySelector(`[data-equip="${b.dataset.equip}"]`);
+                        if (again) again.focus({ preventScroll: true });
+                        return;
+                    }
                     this.act(b.dataset.act);
                 });
                 this.buildShowcase();
@@ -39073,24 +39924,9 @@
                 const body = new THREE.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.5, metalness: 0.2, toneMapped: false });
                 this.accentMat = new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.6, roughness: 0.35, toneMapped: false });
                 this.ringMat = new THREE.MeshBasicMaterial({ color: 0x38f6ff, transparent: true, opacity: 0.85, toneMapped: false });
-                const rb = (w, h, d, x, y, z, rx, rz) => ({ geometry: roundedBoxGeometry(w, h, d, Math.min(w, h, d) * 0.3, 2), matrix: partMatrix(x, y, z, rx || 0, 0, rz || 0) });
-                const bodyParts = [
-                    rb(0.17, 0.82, 0.2, -0.12, 0.41, 0), rb(0.17, 0.82, 0.2, 0.12, 0.41, 0.02, -0.06),   // legs
-                    rb(0.46, 0.26, 0.28, 0, 0.92, 0),                                                    // hips
-                    rb(0.5, 0.56, 0.3, 0, 1.3, 0),                                                       // torso
-                    rb(0.14, 0.62, 0.15, -0.34, 1.26, 0.02, 0, 0.12), rb(0.14, 0.62, 0.15, 0.34, 1.26, -0.04, -0.4, -0.1), // arms
-                    rb(0.24, 0.27, 0.26, 0, 1.76, 0)                                                     // head
-                ];
-                const accentParts = [
-                    rb(0.21, 0.07, 0.04, 0, 1.78, -0.14),                                                // visor
-                    rb(0.18, 0.12, 0.3, -0.31, 1.55, 0), rb(0.18, 0.12, 0.3, 0.31, 1.55, 0),            // shoulders
-                    rb(0.5, 0.05, 0.31, 0, 1.06, 0),                                                     // belt
-                    rb(0.08, 0.3, 0.05, 0, 1.36, -0.16)                                                  // chest stripe
-                ];
-                const fig = new THREE.Group();
-                fig.add(new THREE.Mesh(mergeGeometryParts(bodyParts), body));
-                fig.add(new THREE.Mesh(mergeGeometryParts(accentParts), this.accentMat));
-                for (const p of bodyParts.concat(accentParts)) p.geometry.dispose();
+                // The same soldier figure as the bots, in the agent's colour
+                const fig = humanoidFigure({ torso: this.accentMat, head: body, legs: body, gear: body });
+                fig.scale.setScalar(0.85);
                 const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.68, 40), this.ringMat);
                 ring.rotation.x = -Math.PI / 2;
                 const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.79, 40), this.ringMat);
@@ -39161,6 +39997,11 @@
                 this.el.querySelector('[data-act="play"]').textContent = this.kind === 'pause' ? 'RESUME' : 'PLAY';
                 const m = MENU_MODES.find((x) => x[0] === this.mode) || MENU_MODES[0];
                 document.getElementById('mm-mode-val').textContent = m[1];
+                const mp = (typeof MAP_PRESETS !== 'undefined' && MAP_PRESETS[game.mapPreset]) || null;
+                document.getElementById('mm-map-val').textContent = mp ? mp.name : 'ASCENT';
+                this.el.classList.toggle('career', this.view === 'career');
+                document.getElementById('mm-level-val').textContent = `LEVEL ${progression.level}`;
+                document.getElementById('mm-card').innerHTML = progression.cardHtml(progression.card, true) + `<small>LEVEL ${progression.level}</small>`;
                 this.el.querySelectorAll('.mm-mode').forEach((b) => b.classList.toggle('selected', b.dataset.mode === this.mode));
             },
 
@@ -39170,6 +40011,8 @@
                     else this.resume();
                 } else if (a === 'agent') this.openAgentSelect();
                 else if (a === 'modes') this.setView('modes');
+                else if (a === 'career') { progression.renderCareer(); this.setView('career'); }
+                else if (a === 'map') { tacticalDirector.cycleMapPreset(); this.render(); }
                 else if (a === 'controls') this.setView('controls');
                 else if (a === 'back') this.back();
                 else if (a === 'settings' && typeof settingsManager !== 'undefined') settingsManager.toggleSettings(true);
@@ -39273,6 +40116,8 @@
         const settingsManager = {
             LS_CONSENT_KEY: 'valorant_v16_ls_consent',
             LS_DATA_KEY: 'valorant_v16_user_settings',
+            // Career (RR) and progression save only while settings are remembered
+            get lsEnabled() { return !!(game.userSettings && game.userSettings.localStorageEnabled); },
             sparkSamples: new Float32Array(88),
             sparkHead: 0,
             sparkCount: 0,
@@ -39345,6 +40190,8 @@
             wipeStorage: function() {
                 try {
                     localStorage.removeItem(this.LS_DATA_KEY);
+                    localStorage.removeItem('valorant_v16_career_rr');
+                    localStorage.removeItem('valorant_v17_progression');
                     // Remember the opt-out itself, so saving stays off on the next visit
                     localStorage.setItem(this.LS_CONSENT_KEY, 'false');
                 } catch (err) {}
@@ -39462,6 +40309,17 @@
 
                 this.bindPillGroup('setting-showbody-pills', 'data-showbody', (val) => {
                     game.userSettings.showBody = val !== 'off';
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-slide-pills', 'data-slide', (val) => {
+                    game.userSettings.slide = val !== 'off';
+                    if (!game.userSettings.slide) characterController.slideTimer = 0;
+                    this.saveToStorage();
+                });
+
+                this.bindPillGroup('setting-mantle-pills', 'data-mantle', (val) => {
+                    game.userSettings.mantle = val !== 'off';
                     this.saveToStorage();
                 });
 
@@ -40027,6 +40885,11 @@
                     card.addEventListener('click', (e) => {
                         e.stopPropagation();
                         const skinId = card.getAttribute('data-skin') || 'standard';
+                        if (typeof progression !== 'undefined' && !progression.has('skin', skinId)) {
+                            if (typeof soundFX !== 'undefined' && soundFX.buyDeny) soundFX.buyDeny();
+                            showNotification(`Locked: reach level ${progression.skinLevel(skinId)} to unlock this skin`, 2000);
+                            return;
+                        }
                         game.userSettings.weaponSkin = skinId;
                         skinCards.forEach(c => c.classList.toggle('active', c.getAttribute('data-skin') === skinId));
                         this.applyWeaponSkin(skinId);
@@ -40566,6 +41429,7 @@
                 this.applyAccessibility();
                 hudScale.apply();
                 this.applyAtmosphereTheme();
+                if (typeof progression !== 'undefined' && cfg.weaponSkin && !progression.has('skin', cfg.weaponSkin)) cfg.weaponSkin = 'standard';
                 this.applyWeaponSkin(cfg.weaponSkin || 'standard');
                 this.applyCrosshairStyle();
                 this.applyHudVisibility();
@@ -40639,6 +41503,8 @@
                 setActivePill('setting-skipmenu-pills', 'data-skipmenu', cfg.skipMenu ? 'on' : 'off');
                 setActivePill('setting-breakables-pills', 'data-breakables', cfg.breakables === false ? 'off' : 'on');
                 setActivePill('setting-showbody-pills', 'data-showbody', cfg.showBody === false ? 'off' : 'on');
+                setActivePill('setting-slide-pills', 'data-slide', cfg.slide === false ? 'off' : 'on');
+                setActivePill('setting-mantle-pills', 'data-mantle', cfg.mantle === false ? 'off' : 'on');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
@@ -40961,6 +41827,7 @@
                 this.loadCareerIfEnabled();
                 this.buildLotusDoors3D();
                 this.buildSplitZiplines3D();
+                this.buildSkylineCity3D();
                 this.buildWingmanBots3D();
                 this.pingGroup = new THREE.Group();
                 scene.add(this.pingGroup);
@@ -41229,6 +42096,7 @@
             // =============================================
             onRoundWon: function(reasonText, mode, now) {
                 this.roundsWon++;
+                progression.onRoundWon();
                 const isRetake = (mode === 'retake');
                 const isSpike = reasonText && reasonText.indexOf('SPIKE') !== -1;
                 const gainedRR = isRetake ? 28 : (isSpike ? 26 : 22);
@@ -41236,6 +42104,7 @@
             },
 
             onRangeCompleted: function(totalSec, accPct, hsPct, rangeRank) {
+                progression.onRange();
                 const gainedRR = totalSec <= 28 ? 30 : (totalSec <= 42 ? 24 : 18);
                 this.awardRR(gainedRR, `30-BOT CHALLENGE (${totalSec.toFixed(1)}s • Acc ${accPct}% • ${rangeRank})`);
             },
@@ -41583,12 +42452,115 @@
                 scene.add(this.splitGroup);
             },
 
+            // SKYLINE: the city around the rooftop arena. Distant towers with lit
+            // windows, neon billboard faces, wall neon, a helipad ring and blinking
+            // antenna lights. All plain coloured materials (no new shader programs),
+            // merged into a few meshes; nothing here collides.
+            buildSkylineCity3D: function() {
+                const g = new THREE.Group();
+                g.name = 'skylineCity';
+                let seed = 4242;
+                const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+                const unit = new THREE.BoxGeometry(1, 1, 1);
+                const part = (sx, sy, sz, x, y, z, ry) => {
+                    const m = partMatrix(x, y, z, 0, ry || 0, 0);
+                    m.multiply(new THREE.Matrix4().makeScale(sx, sy, sz));
+                    return { geometry: unit, matrix: m };
+                };
+                const towers = [], lit = [[], [], []];
+                const y0 = (h) => h / 2 - 2;          // towers rise from below the rooftop
+                for (let i = 0; i < 44; i++) {
+                    const a = (i / 44) * Math.PI * 2 + rnd() * 0.08;
+                    const r = 64 + rnd() * 52;
+                    const w = 8 + rnd() * 10, d = 8 + rnd() * 8, h = 22 + rnd() * 58;
+                    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+                    const ry = Math.atan2(x, z);            // local +z faces away from the arena
+                    towers.push(part(w, h, d, x, y0(h), z, ry));
+                    // Window rows on the face looking at the arena
+                    const fx = x - Math.sin(ry) * (d / 2 + 0.05), fz = z - Math.cos(ry) * (d / 2 + 0.05);
+                    const rows = Math.floor(h / 3.2);
+                    for (let row = 1; row < rows; row++) {
+                        if (rnd() < 0.3) continue;
+                        const segs = 1 + Math.floor(rnd() * 3);
+                        for (let k = 0; k < segs; k++) {
+                            const sw = w * (0.18 + rnd() * 0.22);
+                            const off = (rnd() - 0.5) * (w - sw);
+                            const px = fx + Math.cos(ry) * off, pz = fz - Math.sin(ry) * off;
+                            lit[Math.floor(rnd() * 3)].push(part(sw, 0.9, 0.1, px, row * 3.2, pz, ry));
+                        }
+                    }
+                }
+                const add = (parts, hex) => {
+                    const mesh = new THREE.Mesh(mergeGeometryParts(parts), new THREE.MeshBasicMaterial({ color: hex }));
+                    mesh.matrixAutoUpdate = false;
+                    g.add(mesh);
+                    return mesh;
+                };
+                add(towers, 0x0a0e1c);
+                add(lit[0], 0xffc46b);
+                add(lit[1], 0x7dd3fc);
+                add(lit[2], 0xf472b6);
+                // Billboard faces on the deck frames (x = +-38.5), framed ad panels
+                const magenta = [part(0.06, 4.4, 11.4, -38.2, 7, 0), part(0.06, 4.4, 11.4, 38.2, 7, 0)];
+                add(magenta, 0xff2bd6);
+                add([part(0.08, 2.2, 6, -38.15, 7.6, -2), part(0.08, 1.2, 4, -38.15, 5.6, 2.6), part(0.08, 2.2, 6, 38.15, 7.6, 2), part(0.08, 1.2, 4, 38.15, 5.6, -2.6)], 0x22e6ff);
+                add([part(0.09, 0.5, 9, -38.1, 6.0, -1), part(0.09, 0.5, 9, 38.1, 6.0, 1)], 0xfef08a);
+                // Neon tubes along the outer walls and under the skybridges
+                const tubes = [];
+                for (const sgn of [-1, 1]) {
+                    tubes.push(part(0.12, 0.12, 96, 49.4 * sgn, 3.2, 0));
+                    tubes.push(part(96, 0.12, 0.12, 0, 3.2, 49.4 * sgn));
+                    tubes.push(part(22, 0.08, 0.08, 0, 3.55, 38 * sgn - 1.5));
+                    tubes.push(part(22, 0.08, 0.08, 0, 3.55, 38 * sgn + 1.5));
+                }
+                add(tubes, 0x22e6ff);
+                // Water tower legs, helipad "H" and ring
+                const legs = [];
+                for (const [lx, lz] of [[-2.6, -2.6], [2.6, -2.6], [-2.6, 2.6], [2.6, 2.6]]) legs.push(part(0.3, 4.8, 0.3, -18 + lx, 2.4, -6 + lz));
+                add(legs, 0x1e2433);
+                add([part(0.6, 0.04, 4, -1.2, 3.02, 0), part(0.6, 0.04, 4, 1.2, 3.02, 0), part(1.8, 0.04, 0.6, 0, 3.02, 0)], 0xfacc15);
+                const ringGeo = new THREE.RingGeometry(2.9, 3.2, 40);
+                ringGeo.rotateX(-Math.PI / 2);
+                const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+                ring.position.set(0, 3.02, 0);
+                g.add(ring);
+                // Antenna masts on the stair towers, with blinking red lights
+                const masts = [];
+                this.skylineBeacons = [];
+                const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2030 });
+                const beaconGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+                for (const [mx, mz] of [[-14, -38], [14, -38], [-14, 38], [14, 38]]) {
+                    masts.push(part(0.14, 5, 0.14, mx + 2, 6.5, mz + 2));
+                    const b = new THREE.Mesh(beaconGeo, beaconMat);
+                    b.position.set(mx + 2, 9.1, mz + 2);
+                    g.add(b);
+                    this.skylineBeacons.push(b);
+                }
+                add(masts, 0x334155);
+                this.skylineBeaconMat = beaconMat;
+                unit.dispose();
+                g.visible = false;
+                g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.updateMatrix(); o.matrixAutoUpdate = false; } });
+                this.skylineGroup = g;
+                scene.add(g);
+            },
+
             onMapChanged: function(mapId) {
                 if (this.lotusGroup) this.lotusGroup.visible = (mapId === 'lotus');
                 if (this.splitGroup) this.splitGroup.visible = (mapId === 'split');
+                if (this.skylineGroup) this.skylineGroup.visible = (mapId === 'skyline');
+                if (typeof progression !== 'undefined' && progression.sprayMesh) progression.hideSpray();
             },
 
             updateMapMechanics: function(delta, now) {
+                // SKYLINE antenna lights blink (a colour change only)
+                if (this.skylineGroup && this.skylineGroup.visible && this.skylineBeaconMat) {
+                    const on = (now % 1600) < 260;
+                    if (on !== this._beaconOn) {
+                        this._beaconOn = on;
+                        this.skylineBeaconMat.color.setHex(on ? 0xff2030 : 0x3a0a10).convertSRGBToLinear();
+                    }
+                }
                 const px = characterController.position.x;
                 const py = characterController.position.y;
                 const pz = characterController.position.z;
@@ -41678,6 +42650,13 @@
                     const gun = new THREE.Mesh(gunGeo, gunMat);
                     gun.position.set(0.38, 1.12, -0.35);
                     g.add(gun);
+                    // Drawn as the same soldier figure as the bots (torso, head and gun kept as
+                    // references: the figure replaces how they look, not where they are)
+                    torso.visible = false; head.visible = false; gun.visible = false;
+                    const fig = humanoidFigure({ torso: torsoMat, head: headMat, legs: torsoMat,
+                        gear: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.45, metalness: 0.4 }) });
+                    fig.scale.setScalar(0.86);
+                    g.add(fig);
 
                     // Emerald Ally Base Ring
                     const ringGeo = new THREE.RingGeometry(0.65, 0.82, 24);
@@ -42188,6 +43167,7 @@
             tacticalDirector.init();
             settingsManager.init();
             tacticalEnhancements.init();
+            progression.init();
             gamepadController.init();
             controlsHelp.init();
             ambientAudio.init();
@@ -42407,6 +43387,7 @@
             // (autoClear is off; info.autoReset is off and reset here)
             renderer.info.reset();
             fxKit.applyShake(now, Math.min(0.05, delta));
+            slideCamera.update(Math.min(0.05, delta));
             // V1.7: kill cam / highlight replay poses the world for this frame only
             replayDirector.beginFrame(now);
             skyDome.position.copy(camera.position);

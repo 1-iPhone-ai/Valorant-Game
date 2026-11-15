@@ -5,12 +5,12 @@ const { boot, closeBrowser, programState } = require('./harness');
 
 after(closeBrowser);
 
-test('all 6 maps in all 3 atmosphere modes: no errors, no shader compiles', { timeout: 600000 }, async () => {
+test('all 7 maps in all 3 atmosphere modes: no errors, no shader compiles', { timeout: 600000 }, async () => {
     const { page, errors, frames } = await boot();
     const [baseline] = await programState(page);
     for (const mode of ['daylight', 'competitive', 'night']) {
         await page.evaluate((mode) => { game.userSettings.atmosphereMode = mode; settingsManager.applyAtmosphereTheme(); }, mode);
-        for (const map of ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split']) {
+        for (const map of ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split', 'skyline']) {
             await page.evaluate((map) => tacticalDirector.cycleMapPreset(map), map);
             await frames(3);
             const s = await page.evaluate(() => ({ map: game.mapPreset, env: !!scene.environment, programs: renderer.info.programs.length }));

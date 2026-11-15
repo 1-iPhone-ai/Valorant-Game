@@ -31,7 +31,7 @@ test('every map has cover spots, all reachable (outside walls and pieces, inside
     const { evaluate, errors } = await boot({ quality: 'low' });
     const maps = await evaluate(() => {
         const out = {};
-        for (const m of ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split']) {
+        for (const m of ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split', 'skyline']) {
             tacticalDirector.cycleMapPreset(m);
             const bad = enemyTactics.covers.filter((c) => {
                 const p = new THREE.Vector3(c.x, 0, c.z);
