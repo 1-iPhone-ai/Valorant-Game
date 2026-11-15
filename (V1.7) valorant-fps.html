@@ -190,6 +190,46 @@
         .mm-agent-tag { position: absolute; right: 8vw; bottom: 12vh; text-align: right; color: #fff; font-weight: 900; letter-spacing: 4px; font-size: 26px; }
         .mm-agent-tag small { display: block; font-size: 11px; color: #94a3b8; letter-spacing: 4px; }
         body.agent-select .mm-agent-tag { display: none; }
+        /* V1.7 progression: Career view, player cards, level toast */
+        .main-menu.career .mm-side { width: min(760px, 92vw); max-height: 92vh; overflow-y: auto; }
+        .main-menu.career .mm-agent-tag { display: none; }
+        .mm-career { background: rgba(10, 15, 28, 0.78); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 4px; padding: 12px 14px; color: #e2e8f0; font-size: 12px; }
+        .cr-head { display: flex; gap: 14px; align-items: center; }
+        .cr-lv { flex: 1; min-width: 0; }
+        .cr-lv b { font-size: 20px; letter-spacing: 3px; color: #ffd166; }
+        .cr-lv small, .cr-ch small { color: #94a3b8; }
+        .cr-bar { height: 6px; background: rgba(148, 163, 184, 0.2); border-radius: 3px; margin: 5px 0 3px; overflow: hidden; }
+        .cr-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff4655, #ffd166); }
+        .cr-sec { margin: 12px 0 6px; font-weight: 900; letter-spacing: 3px; color: #cbd5e1; font-size: 11px; }
+        .cr-sec small { color: #64748b; letter-spacing: 1px; margin-left: 6px; }
+        .cr-ch { margin-bottom: 7px; }
+        .cr-ch-top { display: flex; justify-content: space-between; gap: 8px; }
+        .cr-ch-top b { color: #ffd166; white-space: nowrap; }
+        .cr-ch.done .cr-ch-top span { color: #2bf0a5; }
+        .cr-ch.done .cr-bar i { background: #2bf0a5; }
+        .cr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+        .mm-btn.cr-item { font-size: 11px; letter-spacing: 1px; padding: 7px 9px; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 7px; }
+        .mm-btn.cr-item span { flex: 1; min-width: 0; }
+        .mm-btn.cr-item small { width: 100%; margin-top: 0; }
+        .mm-btn.cr-item.locked { opacity: 0.55; }
+        .mm-btn.cr-item.selected small { color: #2bf0a5; }
+        .cr-sw { width: 16px; height: 16px; border-radius: 3px; display: inline-block; flex: none; }
+        .cr-stats { margin-top: 12px; color: #94a3b8; font-size: 11px; }
+        .pc-card { width: 200px; height: 58px; border-radius: 4px; border: 1px solid; display: flex; align-items: center; gap: 10px; padding: 0 12px; box-sizing: border-box; flex: none; }
+        .pc-card.small { width: 170px; height: 44px; margin: 8px 0 2px auto; }
+        .pc-icon { font-size: 24px; }
+        .pc-card.small .pc-icon { font-size: 18px; }
+        .pc-name { font-size: 12px; letter-spacing: 3px; color: #fff; font-weight: 900; }
+        .mm-agent-tag #mm-card small { font-size: 10px; color: #ffd166; letter-spacing: 3px; }
+        .level-toast { position: absolute; top: 22%; left: 50%; transform: translateX(-50%) translateY(-8px); opacity: 0; pointer-events: none; z-index: 1150;
+            background: linear-gradient(135deg, rgba(12, 20, 34, 0.95), rgba(40, 20, 30, 0.95)); border: 1px solid #ffd166; border-radius: 6px;
+            padding: 8px 22px; text-align: center; transition: opacity 0.25s, transform 0.25s; color: #fff; max-width: 90vw; }
+        .level-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .level-toast b { display: block; font-size: 15px; letter-spacing: 4px; color: #2bf0a5; }
+        .level-toast.big b { font-size: 26px; color: #ffd166; }
+        .level-toast span { display: block; font-size: 11px; letter-spacing: 2px; color: #cbd5e1; margin-top: 2px; }
+        .skin-card-btn.locked { opacity: 0.5; }
+        .skin-lock { font-size: 10px; color: #ffd166; letter-spacing: 1px; margin-top: 4px; }
         body.menu-open #ui-root > *:not(#main-menu):not(#agent-picker-overlay):not(#settings-panel) { visibility: hidden; }
         body.menu-open.agent-select .agent-picker-overlay { background: linear-gradient(270deg, rgba(6, 11, 19, 0.92) 0%, rgba(6, 11, 19, 0.6) 55%, rgba(6, 11, 19, 0) 70%);
             backdrop-filter: none; justify-content: flex-end; }
@@ -4562,6 +4602,46 @@
                                         <span style="background:#2bf0a5;"></span>
                                     </div>
                                 </button>
+                                <button class="skin-card-btn" data-skin="ember">
+                                    <div style="font-weight:800; font-size:13px; color:#fb923c;">EMBER // FORGE</div>
+                                    <div style="font-size:11px; color:#94a3b8;">Charred Steel &amp; Molten Orange</div>
+                                    <div class="skin-swatch-strip">
+                                        <span style="background:#1c1917;"></span>
+                                        <span style="background:#7c2d12;"></span>
+                                        <span style="background:#f97316;"></span>
+                                        <span style="background:#fb923c;"></span>
+                                    </div>
+                                </button>
+                                <button class="skin-card-btn" data-skin="glacier">
+                                    <div style="font-weight:800; font-size:13px; color:#7dd3fc;">GLACIER // WHITEOUT</div>
+                                    <div style="font-size:11px; color:#94a3b8;">Frost White &amp; Ice Blue</div>
+                                    <div class="skin-swatch-strip">
+                                        <span style="background:#e2e8f0;"></span>
+                                        <span style="background:#7dd3fc;"></span>
+                                        <span style="background:#0ea5e9;"></span>
+                                        <span style="background:#bae6fd;"></span>
+                                    </div>
+                                </button>
+                                <button class="skin-card-btn" data-skin="neontide">
+                                    <div style="font-weight:800; font-size:13px; color:#ff2bd6;">NEON TIDE // SKYLINE</div>
+                                    <div style="font-size:11px; color:#94a3b8;">Midnight Violet, Magenta &amp; Cyan Tracer</div>
+                                    <div class="skin-swatch-strip">
+                                        <span style="background:#120a2a;"></span>
+                                        <span style="background:#3b0764;"></span>
+                                        <span style="background:#ff2bd6;"></span>
+                                        <span style="background:#22e6ff;"></span>
+                                    </div>
+                                </button>
+                                <button class="skin-card-btn" data-skin="onyx">
+                                    <div style="font-weight:800; font-size:13px; color:#facc15;">GILDED ONYX // ELITE</div>
+                                    <div style="font-size:11px; color:#94a3b8;">Black Onyx &amp; Gold Leaf</div>
+                                    <div class="skin-swatch-strip">
+                                        <span style="background:#0a0a0a;"></span>
+                                        <span style="background:#b45309;"></span>
+                                        <span style="background:#facc15;"></span>
+                                        <span style="background:#fde68a;"></span>
+                                    </div>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -5433,7 +5513,7 @@
                 showHints: true,
                 showDamageNumbers: true,
                 hudScale: 100,         // V1.7: HUD Size % (80-130)
-                weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx'
+                weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx' | level rewards: 'ember' | 'glacier' | 'neontide' | 'onyx'
                 botDifficulty: 'gold', // 'iron' | 'gold' | 'immortal' | 'radiant'
                 infiniteAbilities: false,
                 infiniteUlt: false,
@@ -6782,6 +6862,7 @@
                 this.slideTimer = 0.85;
                 this.slideCooldown = 1.1;
                 this.slideStarts++;
+                progression.count('slide');
                 if (soundFX.noiseLayer) {
                     soundFX.noiseLayer(0.55, 0.11, 0, 'bandpass', 700, 0.5);
                     soundFX.noiseLayer(0.3, 0.06, 0.02, 'highpass', 2600, 0.7);
@@ -6814,6 +6895,7 @@
                 this.mantleT = 0;
                 this.mantleTop = top;
                 this.mantleCount++;
+                progression.count('mantle');
                 this.slideTimer = 0;
                 this.velocity.set(0, 0, 0);
                 this.grounded = false;
@@ -12616,6 +12698,9 @@
                 mainMenu.onKey(event);
                 return;
             }
+            if (event.code === 'KeyN' && !event.repeat && !game.buyMenuOpen && !game.settingsOpen && !game.agentPickerOpen && !mainMenu.open) {
+                progression.doSpray(performance.now());
+            }
             if (event.code === 'KeyP') {
                 event.preventDefault();
                 if (!event.repeat && typeof settingsManager !== 'undefined') {
@@ -16805,6 +16890,7 @@
                 const archBadge = `<span style="color:${arch.badgeColor};font-weight:800;">[${arch.label}]</span> `;
                 addCustomKillFeedMessage(`${wbBadge}${prefixBadge}${archBadge}Eliminated ${arch.shortName} with ${sourceLabel}`);
                 replayRec.onKill(enemy, isHeadshot, sourceLabel);
+                progression.onKill(isHeadshot, sourceLabel);
                 soundFX.kill(isHeadshot);
                 showHitMarker('kill');                       // V1.7: red kill marker
                 gamepadController.rumble(0.9, 0.6, 120);
@@ -34244,6 +34330,7 @@
 
                             if (this.spikeDefuseProgress >= 1) {
                                 soundFX.spikeDefuse(true);
+                                progression.onDefuse();
                                 game.score += 650;
                                 scoreValue.textContent = game.score;
                                 this.awardCreds(350);
@@ -34360,6 +34447,7 @@
             },
 
             completeSpikePlant: function(now, siteKey = 'A') {
+                progression.onPlant();
                 const siteInfo = this.spikeSites[siteKey] || this.spikeSites.A;
                 this.activeSpikeSiteKey = siteKey;
                 this.activeSpikeSitePos.copy(siteInfo.pos);
@@ -37658,6 +37746,43 @@
                 tracer: 0x2bf0a5,
                 metalness: 0.82,
                 roughness: 0.24
+            },
+            // V1.7 progression rewards (unlocked by level)
+            ember: {
+                label: 'EMBER // FORGE',
+                body: 0x1c1917,
+                secondary: 0x7c2d12,
+                accent: 0xf97316,
+                tracer: 0xfb923c,
+                metalness: 0.7,
+                roughness: 0.32
+            },
+            glacier: {
+                label: 'GLACIER // WHITEOUT',
+                body: 0xe2e8f0,
+                secondary: 0x7dd3fc,
+                accent: 0x0ea5e9,
+                tracer: 0xbae6fd,
+                metalness: 0.6,
+                roughness: 0.3
+            },
+            neontide: {
+                label: 'NEON TIDE // SKYLINE',
+                body: 0x120a2a,
+                secondary: 0x3b0764,
+                accent: 0xff2bd6,
+                tracer: 0x22e6ff,
+                metalness: 0.8,
+                roughness: 0.2
+            },
+            onyx: {
+                label: 'GILDED ONYX // ELITE',
+                body: 0x0a0a0a,
+                secondary: 0xb45309,
+                accent: 0xfacc15,
+                tracer: 0xfde68a,
+                metalness: 0.92,
+                roughness: 0.16
             }
         };
 
@@ -37964,6 +38089,7 @@
                 if (won) {
                     this.us++;
                     this.lossStreak = 0;
+                    progression.onRoundWon();
                     if (this.side === 'attack') this.stats.roundsAttack++; else this.stats.roundsDefend++;
                     td.awardCreds(3000);
                     soundFX.ult();
@@ -38016,6 +38142,7 @@
             finish: function (now) {
                 this.phase = 'over';
                 const won = this.us > this.them;
+                progression.onMatchEnd(won, this.variant === 'spikerush' ? 'spikerush' : 'match');
                 const s = this.stats;
                 const hs = s.kills ? Math.round(s.headshots / s.kills * 100) : 0;
                 const mins = Math.max(1, Math.round((now - s.startedAt) / 60000));
@@ -38312,6 +38439,7 @@
                 this.renderBoard(performance.now());
                 const r = this.ranked();
                 const place = r.findIndex((s) => s.name === 'YOU') + 1;
+                progression.onMatchEnd(place === 1, 'deathmatch', place);
                 const sfx = (n) => n === 1 ? 'ST' : n === 2 ? 'ND' : n === 3 ? 'RD' : 'TH';
                 if (!this.overlay) {
                     const el = document.createElement('div');
@@ -39356,6 +39484,353 @@
         };
 
         // =============================================
+        // =============================================
+        // V1.7 Progression: XP and levels, unlocks (gun skins, sprays, player cards),
+        // three daily challenges, and the Career screen in the main menu. Saved in
+        // localStorage (when saving is on). Separate from competitive RR ([K]).
+        // =============================================
+        const XP_AWARDS = { kill: 100, headshot: 50, round: 250, plant: 150, defuse: 250, matchWin: 1000, matchPlayed: 400, dmPlayed: 500, dmPodium: 250, dmWin: 500, range: 400 };
+        const LEVEL_REWARDS = {
+            2: ['card', 'nightshift'], 3: ['spray', 'chevrons'], 4: ['skin', 'ember'], 5: ['card', 'skyline'],
+            6: ['spray', 'target'], 7: ['skin', 'glacier'], 8: ['card', 'overdrive'], 9: ['spray', 'wings'],
+            10: ['skin', 'neontide'], 12: ['card', 'dawn'], 14: ['spray', 'crown'], 16: ['skin', 'onyx'],
+            18: ['card', 'apex'], 20: ['spray', 'city']
+        };
+        const PLAYER_CARDS = {
+            protocol:   { name: 'PROTOCOL',     a: '#1e293b', b: '#ff4655', icon: '◆' },
+            nightshift: { name: 'NIGHT SHIFT',  a: '#0b1020', b: '#6366f1', icon: '☾' },
+            skyline:    { name: 'SKYLINE',      a: '#120a2a', b: '#ff2bd6', icon: '▙' },
+            overdrive:  { name: 'OVERDRIVE',    a: '#1a0f05', b: '#f97316', icon: '⚡' },
+            dawn:       { name: 'RADIANT DAWN', a: '#2a1a05', b: '#ffd166', icon: '☀' },
+            apex:       { name: 'APEX',         a: '#04201a', b: '#2bf0a5', icon: '▲' }
+        };
+        const SPRAYS = {
+            star:     { name: 'RADIANT STAR', color: 0xffd166 },
+            chevrons: { name: 'CHEVRONS',     color: 0xff4655 },
+            target:   { name: 'ON TARGET',    color: 0x38f6ff },
+            wings:    { name: 'WINGS',        color: 0xf8fafc },
+            crown:    { name: 'CROWN',        color: 0xfacc15 },
+            city:     { name: 'NIGHT CITY',   color: 0xff2bd6 }
+        };
+        const DAILY_POOL = [
+            { id: 'kills15',  text: 'Get 15 kills',                          ev: 'kill',           n: 15, xp: 600 },
+            { id: 'hs8',      text: 'Get 8 headshot kills',                  ev: 'headshot',       n: 8,  xp: 700 },
+            { id: 'rounds3',  text: 'Win 3 rounds',                          ev: 'round',          n: 3,  xp: 600 },
+            { id: 'plant2',   text: 'Plant the spike 2 times',               ev: 'plant',          n: 2,  xp: 500 },
+            { id: 'defuse1',  text: 'Defuse the spike',                      ev: 'defuse',         n: 1,  xp: 500 },
+            { id: 'pistol5',  text: 'Get 5 kills with the pistol out',       ev: 'kill:pistol',    n: 5,  xp: 600 },
+            { id: 'sniper4',  text: 'Get 4 kills with the sniper out',       ev: 'kill:sniper',    n: 4,  xp: 600 },
+            { id: 'knife1',   text: 'Get a knife kill',                      ev: 'kill:knife',     n: 1,  xp: 700 },
+            { id: 'slide10',  text: 'Slide 10 times',                        ev: 'slide',          n: 10, xp: 400 },
+            { id: 'mantle5',  text: 'Climb onto 5 ledges',                   ev: 'mantle',         n: 5,  xp: 400 },
+            { id: 'skyline1', text: 'Win a round on Skyline',                ev: 'round:skyline',  n: 1,  xp: 600 },
+            { id: 'finish1',  text: 'Finish a Match, Spike Rush or Deathmatch', ev: 'matchEnd',    n: 1,  xp: 700 }
+        ];
+
+        // Flat sprays, built from shapes (plain coloured material: no new shader programs)
+        function buildSprayGeometry(id) {
+            const parts = [];
+            const I = new THREE.Matrix4();
+            const poly = (pts) => {
+                const s = new THREE.Shape();
+                pts.forEach((p, i) => (i ? s.lineTo(p[0], p[1]) : s.moveTo(p[0], p[1])));
+                parts.push({ geometry: new THREE.ShapeGeometry(s), matrix: I });
+            };
+            const rect = (x, y, w, h) => poly([[x - w / 2, y - h / 2], [x + w / 2, y - h / 2], [x + w / 2, y + h / 2], [x - w / 2, y + h / 2]]);
+            const ring = (r0, r1) => parts.push({ geometry: new THREE.RingGeometry(r0, r1, 40), matrix: I });
+            const disc = (x, y, r) => parts.push({ geometry: new THREE.CircleGeometry(r, 28), matrix: new THREE.Matrix4().makeTranslation(x, y, 0) });
+            if (id === 'chevrons') {
+                for (let k = 0; k < 3; k++) { const y = 0.32 - k * 0.3; poly([[-0.5, y], [0, y - 0.28], [0.5, y], [0.5, y - 0.12], [0, y - 0.4], [-0.5, y - 0.12]]); }
+            } else if (id === 'target') {
+                ring(0.48, 0.58); ring(0.22, 0.3); disc(0, 0, 0.07);
+                rect(0, 0.45, 0.06, 0.3); rect(0, -0.45, 0.06, 0.3); rect(0.45, 0, 0.3, 0.06); rect(-0.45, 0, 0.3, 0.06);
+            } else if (id === 'wings') {
+                for (const s of [-1, 1]) {
+                    poly([[0.08 * s, 0.02], [0.62 * s, 0.34], [0.5 * s, 0.14], [0.6 * s, 0.1], [0.44 * s, -0.04], [0.5 * s, -0.1], [0.08 * s, -0.12]]);
+                }
+                poly([[0, 0.14], [0.1, 0], [0, -0.3], [-0.1, 0]]);
+            } else if (id === 'crown') {
+                poly([[-0.5, -0.2], [-0.5, 0.3], [-0.25, 0.05], [0, 0.42], [0.25, 0.05], [0.5, 0.3], [0.5, -0.2]]);
+                rect(0, -0.3, 1.0, 0.12); disc(-0.5, 0.36, 0.06); disc(0, 0.48, 0.07); disc(0.5, 0.36, 0.06);
+            } else if (id === 'city') {
+                const hs = [0.35, 0.6, 0.45, 0.8, 0.5, 0.65, 0.3];
+                hs.forEach((h, i) => rect(-0.48 + i * 0.16, -0.45 + h / 2, 0.14, h));
+                disc(0.32, 0.42, 0.12);
+            } else {
+                const pts = [];
+                for (let i = 0; i < 16; i++) { const a = Math.PI / 2 + i * Math.PI / 8, r = i % 2 ? 0.24 : 0.6; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+                poly(pts);
+            }
+            const g = mergeGeometryParts(parts);
+            for (const p of parts) p.geometry.dispose();
+            return g;
+        }
+
+        const progression = {
+            level: 1, xp: 0, totalXp: 0,
+            unlocked: { skin: [], spray: ['star'], card: ['protocol'] },
+            card: 'protocol', spray: 'star',
+            daily: { date: '', list: [] },
+            stats: { kills: 0, headshots: 0, rounds: 0, plants: 0, defuses: 0, matches: 0 },
+            sprayMesh: null, sprayGeos: {}, lastSprayAt: -1e9, toastEl: null, _toastTimer: 0,
+            KEY: 'valorant_v17_progression',
+            _today: null,                                   // tests can pin the date
+
+            today: function () {
+                if (this._today) return this._today;
+                const d = new Date();
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            },
+            need: function (level) { return 800 + 200 * (level - 1); },
+            skinLevel: function (skinId) {
+                for (const lv of Object.keys(LEVEL_REWARDS)) if (LEVEL_REWARDS[lv][0] === 'skin' && LEVEL_REWARDS[lv][1] === skinId) return +lv;
+                return 0;
+            },
+            has: function (type, id) {
+                if (type === 'skin') return !this.skinLevel(id) || this.unlocked.skin.indexOf(id) !== -1;
+                return this.unlocked[type].indexOf(id) !== -1;
+            },
+            rewardName: function (type, id) {
+                if (type === 'skin') return (WEAPON_SKIN_THEMES[id] || {}).label || id;
+                if (type === 'spray') return SPRAYS[id].name + ' SPRAY';
+                return PLAYER_CARDS[id].name + ' CARD';
+            },
+
+            init: function () {
+                this.load();
+                this.ensureDaily();
+                const el = document.createElement('div');
+                el.id = 'level-toast';
+                el.className = 'level-toast';
+                document.getElementById('ui-root').appendChild(el);
+                this.toastEl = el;
+                const mat = new THREE.MeshBasicMaterial({ color: SPRAYS.star.color, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+                this.sprayMesh = new THREE.Mesh(this.sprayGeo('star'), mat);
+                this.sprayMesh.visible = false;
+                this.sprayMesh.renderOrder = 1;
+                scene.add(this.sprayMesh);
+                this.refreshSkinCards();
+            },
+
+            load: function () {
+                if (typeof settingsManager === 'undefined' || !settingsManager.lsEnabled) return;
+                try {
+                    const d = JSON.parse(localStorage.getItem(this.KEY) || 'null');
+                    if (!d) return;
+                    if (d.level >= 1) this.level = Math.floor(d.level);
+                    if (d.xp >= 0) this.xp = d.xp;
+                    if (d.totalXp >= 0) this.totalXp = d.totalXp;
+                    for (const t of ['skin', 'spray', 'card']) if (d.unlocked && Array.isArray(d.unlocked[t])) this.unlocked[t] = Array.from(new Set(this.unlocked[t].concat(d.unlocked[t])));
+                    if (d.card && PLAYER_CARDS[d.card]) this.card = d.card;
+                    if (d.spray && SPRAYS[d.spray]) this.spray = d.spray;
+                    if (d.daily && Array.isArray(d.daily.list)) this.daily = d.daily;
+                    if (d.stats) Object.assign(this.stats, d.stats);
+                } catch (e) {}
+            },
+            save: function () {
+                if (typeof settingsManager === 'undefined' || !settingsManager.lsEnabled) return;
+                try {
+                    localStorage.setItem(this.KEY, JSON.stringify({ level: this.level, xp: this.xp, totalXp: this.totalXp, unlocked: this.unlocked,
+                        card: this.card, spray: this.spray, daily: this.daily, stats: this.stats }));
+                } catch (e) {}
+            },
+
+            // Three challenges a day, the same for everyone on that date
+            ensureDaily: function () {
+                const date = this.today();
+                if (this.daily.date === date && this.daily.list.length === 3) return;
+                let seed = 7;
+                for (let i = 0; i < date.length; i++) seed = (seed * 131 + date.charCodeAt(i)) % 2147483647;
+                const pool = DAILY_POOL.slice();
+                const list = [];
+                while (list.length < 3) {
+                    seed = (seed * 16807) % 2147483647;
+                    const c = pool.splice(seed % pool.length, 1)[0];
+                    list.push({ id: c.id, progress: 0, done: false });
+                }
+                this.daily = { date: date, list: list };
+                this.save();
+            },
+
+            award: function (amount, reason) {
+                if (!(amount > 0)) return;
+                this.xp += amount;
+                this.totalXp += amount;
+                const rewards = [];
+                while (this.xp >= this.need(this.level)) {
+                    this.xp -= this.need(this.level);
+                    this.level++;
+                    const r = LEVEL_REWARDS[this.level];
+                    if (r && this.unlocked[r[0]].indexOf(r[1]) === -1) { this.unlocked[r[0]].push(r[1]); rewards.push(r); }
+                    this.toast(`LEVEL ${this.level}`, r ? `UNLOCKED: ${this.rewardName(r[0], r[1])}` : `+${amount} XP • ${reason}`, true);
+                }
+                if (rewards.some((r) => r[0] === 'skin')) this.refreshSkinCards();
+                this.save();
+                if (typeof mainMenu !== 'undefined' && mainMenu.open) {
+                    mainMenu.render();
+                    if (mainMenu.view === 'career') this.renderCareer();
+                }
+            },
+
+            // Count an event towards today's challenges (and finish them)
+            count: function (ev, n) {
+                this.ensureDaily();
+                for (const c of this.daily.list) {
+                    if (c.done) continue;
+                    const def = DAILY_POOL.find((d) => d.id === c.id);
+                    if (!def || def.ev !== ev) continue;
+                    c.progress = Math.min(def.n, c.progress + (n || 1));
+                    if (c.progress >= def.n) {
+                        c.done = true;
+                        this.toast('CHALLENGE COMPLETE', `${def.text} • +${def.xp} XP`, false);
+                        this.award(def.xp, 'Daily challenge');
+                    }
+                }
+                this.save();
+            },
+
+            onKill: function (isHeadshot, source) {
+                if (/wingman/i.test(source || '') || (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.wingmanBots.some((b) => b.name === source))) return;
+                this.stats.kills++;
+                this.award(XP_AWARDS.kill + (isHeadshot ? XP_AWARDS.headshot : 0), isHeadshot ? 'Headshot kill' : 'Kill');
+                this.count('kill');
+                if (isHeadshot) { this.stats.headshots++; this.count('headshot'); }
+                if (game.activeWeapon) this.count('kill:' + game.activeWeapon);
+            },
+            onRoundWon: function () {
+                this.stats.rounds++;
+                this.award(XP_AWARDS.round, 'Round won');
+                this.count('round');
+                this.count('round:' + (game.mapPreset || 'ascent'));
+            },
+            onPlant: function () { this.stats.plants++; this.award(XP_AWARDS.plant, 'Spike planted'); this.count('plant'); },
+            onDefuse: function () { this.stats.defuses++; this.award(XP_AWARDS.defuse, 'Spike defused'); this.count('defuse'); },
+            onMatchEnd: function (won, kind, place) {
+                this.stats.matches++;
+                if (kind === 'deathmatch') this.award(XP_AWARDS.dmPlayed + (place === 1 ? XP_AWARDS.dmWin : place <= 3 ? XP_AWARDS.dmPodium : 0), `Deathmatch #${place}`);
+                else this.award(won ? XP_AWARDS.matchWin : XP_AWARDS.matchPlayed, won ? 'Match won' : 'Match played');
+                this.count('matchEnd');
+            },
+            onRange: function () { this.award(XP_AWARDS.range, 'Range finished'); },
+
+            toast: function (title, sub, big) {
+                if (!this.toastEl) return;
+                this.toastEl.innerHTML = `<b>${title}</b><span>${sub}</span>`;
+                this.toastEl.classList.toggle('big', !!big);
+                this.toastEl.classList.add('visible');
+                if (big && soundFX.ult) soundFX.ult();
+                clearTimeout(this._toastTimer);
+                this._toastTimer = setTimeout(() => this.toastEl.classList.remove('visible'), 3200);
+            },
+
+            sprayGeo: function (id) {
+                if (!this.sprayGeos[id]) this.sprayGeos[id] = buildSprayGeometry(id);
+                return this.sprayGeos[id];
+            },
+
+            // [N]: your equipped spray on the wall in front of you (within 4 m), or the floor
+            doSpray: function (now) {
+                if (!this.sprayMesh || now - this.lastSprayAt < 1500) return false;
+                camera.updateMatrixWorld();
+                const origin = camera.position, dir = new THREE.Vector3(0, 0, -1).transformDirection(camera.matrixWorld);
+                const savedFar = raycaster.far;
+                raycaster.ray.origin.copy(origin);
+                raycaster.ray.direction.copy(dir);
+                raycaster.far = 4.5;
+                _shotHits.length = 0;
+                envShotIndex.raycast(raycaster.ray, 4.5);
+                _shotHits.sort(compareHitDistance);
+                const hit = _shotHits.find((h) => h.face && h.distance <= 4.5);
+                const point = new THREE.Vector3(), normal = new THREE.Vector3();
+                if (hit) {
+                    normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+                    point.copy(hit.point);
+                } else if (dir.y < -0.15 && origin.y / -dir.y <= 6) {
+                    point.copy(origin).addScaledVector(dir, origin.y / -dir.y);
+                    normal.set(0, 1, 0);
+                }
+                _shotHits.length = 0;
+                raycaster.far = savedFar;
+                if (!normal.lengthSq()) return false;
+                const m = this.sprayMesh;
+                m.geometry = this.sprayGeo(this.spray);
+                m.material.color.setHex(SPRAYS[this.spray].color).convertSRGBToLinear();
+                m.position.copy(point).addScaledVector(normal, 0.02);
+                if (Math.abs(normal.y) > 0.9) m.up.set(dir.x, 0, dir.z).normalize();
+                else m.up.set(0, 1, 0);
+                m.lookAt(m.position.x + normal.x, m.position.y + normal.y, m.position.z + normal.z);
+                m.scale.setScalar(1.1);
+                m.visible = true;
+                this.sprayMap = game.mapPreset;
+                this.lastSprayAt = now;
+                if (soundFX.noiseLayer) soundFX.noiseLayer(0.4, 0.07, 0, 'highpass', 3200, 0.6);
+                return true;
+            },
+            hideSpray: function () { if (this.sprayMesh) this.sprayMesh.visible = false; },
+
+            equip: function (type, id) {
+                if (!this.has(type, id)) return false;
+                if (type === 'card') this.card = id;
+                else if (type === 'spray') this.spray = id;
+                else if (type === 'skin') {
+                    game.userSettings.weaponSkin = id;
+                    settingsManager.applyWeaponSkin(id);
+                    settingsManager.saveToStorage();
+                    document.querySelectorAll('#setting-skin-cards .skin-card-btn').forEach((c) => c.classList.toggle('active', c.getAttribute('data-skin') === id));
+                }
+                this.save();
+                this.renderCareer();
+                if (typeof mainMenu !== 'undefined') mainMenu.render();
+                return true;
+            },
+
+            // Locked skins in Settings show the level that unlocks them
+            refreshSkinCards: function () {
+                document.querySelectorAll('#setting-skin-cards .skin-card-btn').forEach((c) => {
+                    const id = c.getAttribute('data-skin');
+                    const lv = this.skinLevel(id);
+                    const locked = !this.has('skin', id);
+                    c.classList.toggle('locked', locked);
+                    let tag = c.querySelector('.skin-lock');
+                    if (lv && !tag) { tag = document.createElement('div'); tag.className = 'skin-lock'; c.appendChild(tag); }
+                    if (tag) tag.textContent = locked ? `🔒 UNLOCKS AT LEVEL ${lv}` : `LEVEL ${lv} REWARD`;
+                });
+            },
+
+            cardHtml: function (id, small) {
+                const c = PLAYER_CARDS[id] || PLAYER_CARDS.protocol;
+                return `<div class="pc-card${small ? ' small' : ''}" style="background:linear-gradient(120deg, ${c.a} 0%, ${c.a} 45%, ${c.b} 140%); border-color:${c.b}"><span class="pc-icon" style="color:${c.b}">${c.icon}</span><span class="pc-name">${c.name}</span></div>`;
+            },
+
+            renderCareer: function () {
+                const el = document.getElementById('mm-career');
+                if (!el) return;
+                this.ensureDaily();
+                const need = this.need(this.level);
+                const next = Object.keys(LEVEL_REWARDS).map(Number).filter((lv) => lv > this.level).sort((a, b) => a - b)[0];
+                const daily = this.daily.list.map((c) => {
+                    const d = DAILY_POOL.find((x) => x.id === c.id) || { text: c.id, n: 1, xp: 0 };
+                    return `<div class="cr-ch${c.done ? ' done' : ''}"><div class="cr-ch-top"><span>${c.done ? '✓ ' : ''}${d.text}</span><b>+${d.xp} XP</b></div><div class="cr-bar"><i style="width:${Math.round(c.progress / d.n * 100)}%"></i></div><small>${c.progress} / ${d.n}</small></div>`;
+                }).join('');
+                const item = (type, id, label, sw) => {
+                    const owned = this.has(type, id);
+                    const eq = (type === 'card' && this.card === id) || (type === 'spray' && this.spray === id) || (type === 'skin' && (game.userSettings.weaponSkin || 'standard') === id);
+                    const lv = type === 'skin' ? this.skinLevel(id) : +(Object.keys(LEVEL_REWARDS).find((k) => LEVEL_REWARDS[k][0] === type && LEVEL_REWARDS[k][1] === id) || 0);
+                    return `<button class="mm-btn cr-item${owned ? '' : ' locked'}${eq ? ' selected' : ''}" data-equip="${type}:${id}"${owned ? '' : ' aria-disabled="true"'}>${sw}<span>${label}</span><small>${eq ? 'EQUIPPED' : owned ? 'EQUIP' : `🔒 LEVEL ${lv}`}</small></button>`;
+                };
+                const skins = Object.keys(WEAPON_SKIN_THEMES).map((id) => { const t = WEAPON_SKIN_THEMES[id]; return item('skin', id, t.label, `<i class="cr-sw" style="background:linear-gradient(90deg,#${t.body.toString(16).padStart(6, '0')} 50%,#${t.accent.toString(16).padStart(6, '0')} 50%)"></i>`); }).join('');
+                const sprays = Object.keys(SPRAYS).map((id) => item('spray', id, SPRAYS[id].name, `<i class="cr-sw" style="background:#${SPRAYS[id].color.toString(16).padStart(6, '0')}"></i>`)).join('');
+                const cards = Object.keys(PLAYER_CARDS).map((id) => item('card', id, PLAYER_CARDS[id].name, `<i class="cr-sw" style="background:${PLAYER_CARDS[id].b}"></i>`)).join('');
+                el.innerHTML = `
+                    <div class="cr-head">${this.cardHtml(this.card)}<div class="cr-lv"><b id="cr-level">LEVEL ${this.level}</b><div class="cr-bar"><i style="width:${Math.round(this.xp / need * 100)}%"></i></div><small id="cr-xp">${this.xp} / ${need} XP${next ? ` • next unlock at level ${next}: ${this.rewardName(LEVEL_REWARDS[next][0], LEVEL_REWARDS[next][1])}` : ''}</small></div></div>
+                    <div class="cr-sec">DAILY CHALLENGES</div>${daily}
+                    <div class="cr-sec">GUN SKINS</div><div class="cr-grid">${skins}</div>
+                    <div class="cr-sec">SPRAYS <small>[N] to spray</small></div><div class="cr-grid">${sprays}</div>
+                    <div class="cr-sec">PLAYER CARDS</div><div class="cr-grid">${cards}</div>
+                    <div class="cr-stats">${this.stats.kills} kills • ${this.stats.headshots} headshots • ${this.stats.rounds} rounds won • ${this.stats.matches} matches • ${this.totalXp} XP total</div>`;
+            }
+        };
+
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
@@ -39398,8 +39873,13 @@
                             <button class="mm-btn mm-pause-only" data-act="agent">AGENT SELECT</button>
                             <button class="mm-btn" data-act="modes">MODES <span class="mm-val" id="mm-mode-val">WAVE</span></button>
                             <button class="mm-btn" data-act="map">MAP <span class="mm-val" id="mm-map-val">ASCENT</span></button>
+                            <button class="mm-btn" data-act="career">CAREER <span class="mm-val" id="mm-level-val">LEVEL 1</span></button>
                             <button class="mm-btn" data-act="settings">SETTINGS</button>
                             <button class="mm-btn" data-act="controls">CONTROLS</button>
+                        </div>
+                        <div class="mm-view" data-view="career">
+                            <div class="mm-career" id="mm-career"></div>
+                            <button class="mm-btn mm-back" data-act="back">BACK</button>
                         </div>
                         <div class="mm-view" data-view="modes">
                             ${MENU_MODES.map((m) => `<button class="mm-btn mm-mode" data-mode="${m[0]}">${m[1]}<small>${m[2]}</small></button>`).join('')}
@@ -39409,7 +39889,7 @@
                             <div class="mm-controls">
                                 <div><b>WASD</b> Move</div><div><b>Mouse</b> Aim • <b>Left / Right click</b> Shoot / Aim down sights</div>
                                 <div><b>Space</b> Jump (hold: glide; into a ledge: climb) • <b>Ctrl / Z</b> Crouch (while sprinting: slide)</div><div><b>R</b> Reload • <b>Y</b> Inspect • <b>1–4</b> Weapons • <b>V</b> Variants</div>
-                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings</div>
+                                <div><b>C Q E X</b> Abilities and ultimate</div><div><b>F</b> Plant / defuse • <b>B</b> Buy • <b>G</b> Agents • <b>P</b> Settings • <b>N</b> Spray</div>
                                 <div><b>F1 / F2 / F3</b> Wave / Range / Retake • <b>F4</b> Maps • <b>T</b> Ping</div><div><b>Esc</b> This menu</div>
                                 <div class="mm-controls-pad"><b>Controller:</b> sticks move and aim • RT shoot • LT aim • A jump • B crouch • X reload • LB / RB / D-pad abilities • Start this menu • hold View: agents</div>
                             </div>
@@ -39417,7 +39897,7 @@
                         </div>
                         <div class="mm-foot">Enter / Ⓐ select • Esc / Ⓑ back</div>
                     </div>
-                    <div class="mm-agent-tag"><span id="mm-agent-name">JETT</span><small id="mm-agent-role">DUELIST</small></div>`;
+                    <div class="mm-agent-tag"><span id="mm-agent-name">JETT</span><small id="mm-agent-role">DUELIST</small><div id="mm-card"></div></div>`;
                 document.getElementById('ui-root').appendChild(el);
                 this.el = el;
                 el.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -39426,6 +39906,13 @@
                     const b = e.target.closest('button');
                     if (!b) return;
                     if (b.dataset.mode) { this.mode = b.dataset.mode; this.setView('main'); return; }
+                    if (b.dataset.equip) {
+                        const [type, id] = b.dataset.equip.split(':');
+                        if (!progression.equip(type, id) && soundFX.buyDeny) soundFX.buyDeny();
+                        const again = this.el.querySelector(`[data-equip="${b.dataset.equip}"]`);
+                        if (again) again.focus({ preventScroll: true });
+                        return;
+                    }
                     this.act(b.dataset.act);
                 });
                 this.buildShowcase();
@@ -39512,6 +39999,9 @@
                 document.getElementById('mm-mode-val').textContent = m[1];
                 const mp = (typeof MAP_PRESETS !== 'undefined' && MAP_PRESETS[game.mapPreset]) || null;
                 document.getElementById('mm-map-val').textContent = mp ? mp.name : 'ASCENT';
+                this.el.classList.toggle('career', this.view === 'career');
+                document.getElementById('mm-level-val').textContent = `LEVEL ${progression.level}`;
+                document.getElementById('mm-card').innerHTML = progression.cardHtml(progression.card, true) + `<small>LEVEL ${progression.level}</small>`;
                 this.el.querySelectorAll('.mm-mode').forEach((b) => b.classList.toggle('selected', b.dataset.mode === this.mode));
             },
 
@@ -39521,6 +40011,7 @@
                     else this.resume();
                 } else if (a === 'agent') this.openAgentSelect();
                 else if (a === 'modes') this.setView('modes');
+                else if (a === 'career') { progression.renderCareer(); this.setView('career'); }
                 else if (a === 'map') { tacticalDirector.cycleMapPreset(); this.render(); }
                 else if (a === 'controls') this.setView('controls');
                 else if (a === 'back') this.back();
@@ -39625,6 +40116,8 @@
         const settingsManager = {
             LS_CONSENT_KEY: 'valorant_v16_ls_consent',
             LS_DATA_KEY: 'valorant_v16_user_settings',
+            // Career (RR) and progression save only while settings are remembered
+            get lsEnabled() { return !!(game.userSettings && game.userSettings.localStorageEnabled); },
             sparkSamples: new Float32Array(88),
             sparkHead: 0,
             sparkCount: 0,
@@ -39697,6 +40190,8 @@
             wipeStorage: function() {
                 try {
                     localStorage.removeItem(this.LS_DATA_KEY);
+                    localStorage.removeItem('valorant_v16_career_rr');
+                    localStorage.removeItem('valorant_v17_progression');
                     // Remember the opt-out itself, so saving stays off on the next visit
                     localStorage.setItem(this.LS_CONSENT_KEY, 'false');
                 } catch (err) {}
@@ -40390,6 +40885,11 @@
                     card.addEventListener('click', (e) => {
                         e.stopPropagation();
                         const skinId = card.getAttribute('data-skin') || 'standard';
+                        if (typeof progression !== 'undefined' && !progression.has('skin', skinId)) {
+                            if (typeof soundFX !== 'undefined' && soundFX.buyDeny) soundFX.buyDeny();
+                            showNotification(`Locked: reach level ${progression.skinLevel(skinId)} to unlock this skin`, 2000);
+                            return;
+                        }
                         game.userSettings.weaponSkin = skinId;
                         skinCards.forEach(c => c.classList.toggle('active', c.getAttribute('data-skin') === skinId));
                         this.applyWeaponSkin(skinId);
@@ -40929,6 +41429,7 @@
                 this.applyAccessibility();
                 hudScale.apply();
                 this.applyAtmosphereTheme();
+                if (typeof progression !== 'undefined' && cfg.weaponSkin && !progression.has('skin', cfg.weaponSkin)) cfg.weaponSkin = 'standard';
                 this.applyWeaponSkin(cfg.weaponSkin || 'standard');
                 this.applyCrosshairStyle();
                 this.applyHudVisibility();
@@ -41595,6 +42096,7 @@
             // =============================================
             onRoundWon: function(reasonText, mode, now) {
                 this.roundsWon++;
+                progression.onRoundWon();
                 const isRetake = (mode === 'retake');
                 const isSpike = reasonText && reasonText.indexOf('SPIKE') !== -1;
                 const gainedRR = isRetake ? 28 : (isSpike ? 26 : 22);
@@ -41602,6 +42104,7 @@
             },
 
             onRangeCompleted: function(totalSec, accPct, hsPct, rangeRank) {
+                progression.onRange();
                 const gainedRR = totalSec <= 28 ? 30 : (totalSec <= 42 ? 24 : 18);
                 this.awardRR(gainedRR, `30-BOT CHALLENGE (${totalSec.toFixed(1)}s • Acc ${accPct}% • ${rangeRank})`);
             },
@@ -42046,6 +42549,7 @@
                 if (this.lotusGroup) this.lotusGroup.visible = (mapId === 'lotus');
                 if (this.splitGroup) this.splitGroup.visible = (mapId === 'split');
                 if (this.skylineGroup) this.skylineGroup.visible = (mapId === 'skyline');
+                if (typeof progression !== 'undefined' && progression.sprayMesh) progression.hideSpray();
             },
 
             updateMapMechanics: function(delta, now) {
@@ -42663,6 +43167,7 @@
             tacticalDirector.init();
             settingsManager.init();
             tacticalEnhancements.init();
+            progression.init();
             gamepadController.init();
             controlsHelp.init();
             ambientAudio.init();
