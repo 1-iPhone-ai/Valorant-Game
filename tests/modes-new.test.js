@@ -86,7 +86,9 @@ test('Spike Rush: first to 4, a random gun each round, full abilities, power-up 
         charges: ['c', 'q', 'e'].every((k) => { const s = agentSystem.stateByAgent[game.activeAgent][k]; return s.charges === s.maxCharges; }),
         title: document.getElementById('round-title') ? document.getElementById('round-title').textContent : '',
         btn: document.getElementById('mode-rush-btn').classList.contains('active'), matchBtn: document.getElementById('mode-match-btn').classList.contains('active'),
-        buyMs: matchMode.phaseEndsAt - performance.now()
+        // The start phase is 4 s (a slow runner can be past it already, then the round is live)
+        cfgBuy: matchMode.cfg.buyMs, phase: matchMode.phase,
+        buyMs: matchMode.phase === 'buy' ? matchMode.phaseEndsAt - performance.now() : 0
     }));
     assert.equal(r.mode, 'spikerush');
     assert.deepEqual([r.variant, r.win, r.half, r.creds], ['spikerush', 4, 3, 0]);
@@ -94,7 +96,8 @@ test('Spike Rush: first to 4, a random gun each round, full abilities, power-up 
     assert.equal(r.orbs, 4, 'four power-up orbs');
     assert.ok(r.charges, 'abilities full');
     assert.ok(r.btn && !r.matchBtn);
-    assert.ok(r.buyMs <= 4100, 'short start, no buy phase');
+    assert.equal(r.cfgBuy, 4000, 'short 4 s start, no buy phase');
+    assert.ok(r.phase === 'live' || r.buyMs <= 4100, `start phase within 4 s (${r.phase}, ${Math.round(r.buyMs)} ms)`);
 
     // Picking up orbs
     const orbs = await evaluate(() => {
