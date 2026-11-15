@@ -268,6 +268,30 @@
         .pm-panel .pm-shot { border-color: #2bf0a5; color: #2bf0a5; }
         .pm-help { margin-top: 8px; color: #94a3b8; font-size: 10px; line-height: 1.5; }
         .pm-saved { margin-top: 4px; color: #2bf0a5; font-size: 10px; word-break: break-all; }
+        /* V1.7 aim trainer */
+        .aim-trainer { position: absolute; inset: 0; z-index: 55; display: none; pointer-events: none; color: #e2e8f0; }
+        .aim-trainer.visible { display: block; }
+        .aim-panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100vw - 32px)); box-sizing: border-box; pointer-events: auto;
+            background: rgba(8, 12, 22, 0.9); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 6px; padding: 16px; text-align: center; }
+        .aim-title { font-size: 18px; font-weight: 900; letter-spacing: 5px; color: #ff4655; margin-bottom: 12px; }
+        .aim-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-bottom: 10px; }
+        .aim-card { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 4px; color: #e2e8f0; padding: 12px; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 6px; }
+        .aim-card:hover, .aim-card:focus { border-color: #ff4655; outline: none; }
+        .aim-card b { font-size: 15px; letter-spacing: 3px; }
+        .aim-card span { font-size: 11px; color: #94a3b8; }
+        .aim-card small { font-size: 10px; color: #ffd166; letter-spacing: 1px; }
+        .aim-btn { background: rgba(30, 41, 59, 0.9); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 3px; padding: 8px 14px; font-weight: 800; letter-spacing: 2px; cursor: pointer; }
+        .aim-btn:hover, .aim-btn:focus { border-color: #ff4655; outline: none; }
+        .aim-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+        .aim-score-big { font-size: 44px; font-weight: 900; color: #ffd166; letter-spacing: 3px; }
+        .aim-score-big em { display: block; font-style: normal; font-size: 12px; color: #2bf0a5; letter-spacing: 4px; }
+        .aim-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; margin-top: 10px; text-align: left; }
+        .aim-stats div { background: rgba(30, 41, 59, 0.7); padding: 6px 10px; border-radius: 3px; display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+        .aim-stats span { color: #94a3b8; letter-spacing: 1px; }
+        .aim-hud { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; background: rgba(8, 12, 22, 0.75);
+            border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; padding: 6px 14px; font-size: 12px; font-weight: 800; letter-spacing: 2px; white-space: nowrap; max-width: calc(100vw - 32px); }
+        .aim-hud b { color: #ff4655; }
+        .aim-count { position: absolute; top: 38%; left: 50%; transform: translateX(-50%); font-size: 72px; font-weight: 900; color: #ffd166; text-shadow: 0 4px 18px rgba(0,0,0,0.7); }
         body.menu-open.agent-select .agent-picker-overlay { background: linear-gradient(270deg, rgba(6, 11, 19, 0.92) 0%, rgba(6, 11, 19, 0.6) 55%, rgba(6, 11, 19, 0) 70%);
             backdrop-filter: none; justify-content: flex-end; }
         body.menu-open.agent-select .agent-picker-panel { width: min(760px, 60vw); margin-right: 3vw; max-height: 94vh; }
@@ -34040,8 +34064,9 @@
             },
 
             setGameMode: function(mode) {
-                if (['wave', 'range', 'retake', 'match', 'deathmatch', 'spikerush'].indexOf(mode) === -1) return;
+                if (['wave', 'range', 'retake', 'match', 'deathmatch', 'spikerush', 'aim'].indexOf(mode) === -1) return;
                 replayDirector.stop();
+                aimTrainer.stop();
                 if (matchMode.active) matchMode.stop();
                 if (dmMode.active) dmMode.stop();
                 // Spike Rush runs on the Match engine
@@ -34061,7 +34086,13 @@
                 if (modeDmBtn) modeDmBtn.classList.toggle('active', mode === 'deathmatch');
                 if (rangeScorecard) rangeScorecard.classList.remove('visible');
 
-                if (mode === 'deathmatch') {
+                if (mode === 'aim') {
+                    this.rangeActive = false;
+                    this.activeRangeBot = null;
+                    this.spikeState = 'unplanted';
+                    if (this.spikeCanister) this.spikeCanister.visible = false;
+                    aimTrainer.start();
+                } else if (mode === 'deathmatch') {
                     this.rangeActive = false;
                     this.activeRangeBot = null;
                     if (rangeChallengeHud) rangeChallengeHud.classList.remove('visible');
@@ -35368,6 +35399,8 @@
                 } else if (game.gameMode === 'match') {
                     if (matchMode.phase === 'live') this.updateSpikeSystem(delta, now);
                     matchMode.update(delta, now);
+                } else if (game.gameMode === 'aim') {
+                    aimTrainer.update(delta, now);
                 } else {
                     this.updateSpikeSystem(delta, now);
                     this.updateWaveHUD(now);
@@ -35747,6 +35780,7 @@
                     if (pIdx === 0 && typeof agentSystem !== 'undefined' && agentSystem.checkShootIsoOrb) {
                         agentSystem.checkShootIsoOrb(raycaster.ray, effectNow);
                     }
+                    if (pIdx === 0 && aimTrainer.active) aimTrainer.onShot(raycaster.ray, effectNow);
 
                     const intersects = collectShotIntersections();
                     _actorHitCandidates.clear();
@@ -40311,13 +40345,269 @@
             }
         };
 
+        // =============================================
+        // V1.7 Aim trainer (main menu mode): three timed drills against floating
+        // targets in front of you, with no bots. Gridshot keeps three targets up,
+        // Flick shows one small target anywhere, Tracking scores the time your
+        // crosshair stays on a moving target. Score, accuracy and reaction time;
+        // best scores saved; XP. Targets use the spike-rush orb material set-up
+        // (no new shader programs); hits use the real shot ray, spread included.
+        // =============================================
+        const AIM_DRILLS = {
+            gridshot: { name: 'GRIDSHOT', desc: 'Three targets at a time. Hit them as fast as you can.', secs: 30, size: 0.42, color: 0x22e6ff },
+            flick:    { name: 'FLICK',    desc: 'One small target at a time, anywhere in front of you.', secs: 30, size: 0.3,  color: 0xff4655 },
+            tracking: { name: 'TRACKING', desc: 'Keep your crosshair on the moving target.',            secs: 20, size: 0.45, color: 0x2bf0a5 }
+        };
+        const aimTrainer = {
+            active: false, drill: 'gridshot', state: 'idle', el: null, group: null, targets: [],
+            t: 0, countdown: 0, score: 0, hits: 0, misses: 0, reactions: [], onTime: 0, total: 0,
+            origin: new THREE.Vector3(), best: {}, lastResult: null, _ray: new THREE.Ray(), _v: new THREE.Vector3(),
+            KEY: 'valorant_v17_aim_best',
+
+            init: function () {
+                if (this.group) return;
+                this.group = new THREE.Group();
+                this.group.visible = false;
+                scene.add(this.group);
+                const geo = new THREE.SphereGeometry(1, 20, 14);
+                for (let i = 0; i < 3; i++) {
+                    const mat = new THREE.MeshStandardMaterial({ color: 0x22e6ff, emissive: 0x22e6ff, emissiveIntensity: 0.8, roughness: 0.3 });
+                    const m = new THREE.Mesh(geo, mat);
+                    m.visible = false;
+                    this.group.add(m);
+                    this.targets.push({ mesh: m, alive: false, bornAt: 0, popT: -1, cell: -1 });
+                }
+                const el = document.createElement('div');
+                el.id = 'aim-trainer';
+                el.className = 'aim-trainer';
+                document.getElementById('ui-root').appendChild(el);
+                this.el = el;
+                el.addEventListener('mousedown', (e) => e.stopPropagation());
+                el.addEventListener('click', (e) => {
+                    const b = e.target.closest('[data-aim]');
+                    if (!b) return;
+                    e.stopPropagation();
+                    const [k, v] = b.dataset.aim.split(':');
+                    if (k === 'drill') this.begin(v);
+                    else if (k === 'again') this.begin(this.drill);
+                    else if (k === 'pick') this.showPicker();
+                    else if (k === 'leave') tacticalDirector.setGameMode('wave');
+                });
+                try { if (settingsManager.lsEnabled) this.best = JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}; } catch (e) { this.best = {}; }
+            },
+
+            // From setGameMode('aim'): clear the bots, stand at the start spot, pick a drill
+            start: function () {
+                this.init();
+                this.active = true;
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    e.isActive = false; e.hit = true; e.renderActive = false;
+                    setCasterVisible(e.mesh, false, true);
+                    if (e.broadKeys) actorBroadphase.remove(e);
+                    e.generation++;                         // drops pending respawns
+                }
+                const cc = characterController;
+                cc.reset();
+                cc.position.set(0, cc.standHeight, 30);
+                cc.prevSimPosition.copy(cc.position);
+                camera.rotation.set(0, 0, 0, 'YXZ');
+                this.origin.set(0, 0, 30);
+                game.health = 100;
+                if (tacticalDirector.spikeGroup) tacticalDirector.spikeGroup.visible = false;
+                if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
+                if (rangeChallengeHud) rangeChallengeHud.classList.remove('visible');
+                if (roundTitleEl) roundTitleEl.textContent = 'AIM TRAINER';
+                if (roundSubstatusEl) roundSubstatusEl.textContent = 'GRIDSHOT • FLICK • TRACKING';
+                this.group.visible = true;
+                this.showPicker();
+            },
+            stop: function () {
+                if (!this.active) return;
+                this.active = false;
+                this.state = 'idle';
+                for (const t of this.targets) { t.alive = false; t.mesh.visible = false; }
+                if (this.group) this.group.visible = false;
+                if (this.el) this.el.className = 'aim-trainer';
+            },
+
+            releaseMouse: function () { if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) {} } },
+            lockMouse: function () { if (!deviceInfo.touchEnabled && !document.pointerLockElement && !mainMenu.open) { try { document.body.requestPointerLock(); } catch (e) {} } },
+
+            showPicker: function () {
+                this.state = 'pick';
+                for (const t of this.targets) { t.alive = false; t.mesh.visible = false; }
+                const cards = Object.keys(AIM_DRILLS).map((id) => {
+                    const d = AIM_DRILLS[id], b = this.best[id];
+                    return `<button class="aim-card" data-aim="drill:${id}"><b>${d.name}</b><span>${d.desc}</span><small>${d.secs} s • BEST ${b ? b.score : '—'}</small></button>`;
+                }).join('');
+                this.el.innerHTML = `<div class="aim-panel"><div class="aim-title">AIM TRAINER</div><div class="aim-cards">${cards}</div><button class="aim-btn" data-aim="leave">LEAVE</button></div>`;
+                this.el.className = 'aim-trainer visible picking';
+                this.releaseMouse();
+            },
+
+            begin: function (drill) {
+                if (!AIM_DRILLS[drill]) return;
+                this.drill = drill;
+                this.state = 'countdown';
+                this.countdown = 3;
+                this.t = 0; this.score = 0; this.hits = 0; this.misses = 0; this.reactions = []; this.onTime = 0; this.total = 0;
+                for (const t of this.targets) {
+                    t.alive = false; t.mesh.visible = false;
+                    t.mesh.material.color.setHex(AIM_DRILLS[drill].color).convertSRGBToLinear();
+                    t.mesh.material.emissive.copy(t.mesh.material.color);
+                }
+                this.el.className = 'aim-trainer visible running';
+                this.el.innerHTML = `<div class="aim-hud"><b id="aim-drill">${AIM_DRILLS[drill].name}</b><span id="aim-time"></span><span id="aim-score"></span><span id="aim-acc"></span></div><div class="aim-count" id="aim-count"></div>`;
+                this.lockMouse();
+                this.renderHud();
+            },
+
+            // Grid of 5 x 3 spots 10 m ahead; Flick picks anywhere in a wider box
+            spawn: function (t, now) {
+                const d = AIM_DRILLS[this.drill], o = this.origin;
+                let x, y, z = o.z - 10;
+                if (this.drill === 'gridshot') {
+                    const used = this.targets.filter((u) => u.alive && u !== t).map((u) => u.cell);
+                    let cell;
+                    do { cell = Math.floor(Math.random() * 15); } while (used.indexOf(cell) !== -1 || cell === t.cell);
+                    t.cell = cell;
+                    x = o.x + ((cell % 5) - 2) * 1.5;
+                    y = 1.2 + Math.floor(cell / 5) * 1.1;
+                } else if (this.drill === 'flick') {
+                    x = o.x + (Math.random() - 0.5) * 11;
+                    y = 0.9 + Math.random() * 2.9;
+                    z = o.z - 8 - Math.random() * 6;
+                } else {
+                    x = o.x; y = 2.1;
+                }
+                t.mesh.position.set(x, y, z);
+                t.mesh.scale.setScalar(d.size);
+                t.mesh.visible = true;
+                t.alive = true;
+                t.bornAt = now;
+                t.popT = -1;
+            },
+
+            // The player's shot (first pellet, with its real spread)
+            onShot: function (ray, now) {
+                if (!this.active || this.state !== 'live' || this.drill === 'tracking') return;
+                let best = null, bestD = Infinity;
+                for (const t of this.targets) {
+                    if (!t.alive) continue;
+                    const r = t.mesh.scale.x;
+                    if (!rayHitsSphere(ray, t.mesh.position, r, 80)) continue;
+                    const d = this._v.copy(t.mesh.position).sub(ray.origin).dot(ray.direction);
+                    if (d < bestD) { bestD = d; best = t; }
+                }
+                if (!best) { this.misses++; this.score = Math.max(0, this.score - 25); this.renderHud(); return; }
+                const reaction = now - best.bornAt;
+                this.reactions.push(reaction);
+                this.hits++;
+                this.score += 100 + Math.max(0, Math.round(100 - reaction / 10));
+                best.alive = false;
+                best.popT = 0;
+                if (soundFX.hitTick) soundFX.hitTick(false);
+                if (typeof showHitMarker === 'function') showHitMarker('kill');
+                this.renderHud();
+            },
+
+            update: function (delta, now) {
+                if (!this.active) return;
+                // Unlimited ammo, no reloads
+                const w = game.weapons[game.activeWeapon];
+                if (w && !w.isMelee && w.ammo < w.maxAmmo) { w.ammo = w.maxAmmo; game.reloading = false; if (ammoValue) ammoValue.textContent = w.ammo; }
+                for (const t of this.targets) {
+                    if (t.popT < 0) continue;
+                    t.popT += delta;
+                    const k = Math.min(1, t.popT / 0.12);
+                    t.mesh.scale.setScalar(AIM_DRILLS[this.drill].size * (1 + k * 0.6) * (1 - k));
+                    if (k >= 1) { t.popT = -1; t.mesh.visible = false; }
+                }
+                if (mainMenu.open || photoMode.active || this.state === 'pick' || this.state === 'done') return;
+                const dt = Math.min(0.05, delta);
+                if (this.state === 'countdown') {
+                    this.countdown -= dt;
+                    const c = document.getElementById('aim-count');
+                    if (c) c.textContent = this.countdown > 0 ? String(Math.ceil(this.countdown)) : 'GO';
+                    if (this.countdown <= 0) {
+                        this.state = 'live';
+                        this.t = 0;
+                        if (c) setTimeout(() => { if (c.textContent === 'GO') c.textContent = ''; }, 400);
+                        const n = this.drill === 'gridshot' ? 3 : 1;
+                        for (let i = 0; i < n; i++) this.spawn(this.targets[i], now);
+                    }
+                    return;
+                }
+                // Live
+                this.t += dt;
+                if (this.drill === 'tracking') {
+                    const t = this.targets[0], o = this.origin, s = this.t;
+                    t.mesh.position.set(o.x + 3.4 * Math.sin(s * 1.25) + 0.8 * Math.sin(s * 3.1), 2.1 + 0.9 * Math.sin(s * 1.9 + 1), o.z - 10);
+                    camera.updateMatrixWorld();
+                    this._ray.origin.copy(camera.position);
+                    this._ray.direction.set(0, 0, -1).transformDirection(camera.matrixWorld);
+                    const on = rayHitsSphere(this._ray, t.mesh.position, t.mesh.scale.x, 80);
+                    this.total += dt;
+                    if (on) { this.onTime += dt; this.score = Math.round(this.onTime * 100); }
+                    t.mesh.material.emissiveIntensity = on ? 1.4 : 0.6;
+                } else {
+                    for (const t of this.targets) {
+                        if (this.drill === 'flick' && t !== this.targets[0]) continue;
+                        if (!t.alive && t.popT < 0) this.spawn(t, now);
+                    }
+                }
+                this.renderHud();
+                if (this.t >= AIM_DRILLS[this.drill].secs) this.finish();
+            },
+
+            accuracy: function () {
+                if (this.drill === 'tracking') return this.total ? Math.round(this.onTime / this.total * 100) : 0;
+                const shots = this.hits + this.misses;
+                return shots ? Math.round(this.hits / shots * 100) : 0;
+            },
+
+            renderHud: function () {
+                const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+                const left = Math.max(0, AIM_DRILLS[this.drill].secs - (this.state === 'live' ? this.t : 0));
+                set('aim-time', `${left.toFixed(1)} s`);
+                set('aim-score', `SCORE ${this.score}`);
+                set('aim-acc', this.drill === 'tracking' ? `ON TARGET ${this.accuracy()}%` : `HITS ${this.hits} • ACC ${this.accuracy()}%`);
+            },
+
+            finish: function () {
+                this.state = 'done';
+                for (const t of this.targets) { t.alive = false; if (t.popT < 0) t.mesh.visible = false; }
+                const d = AIM_DRILLS[this.drill];
+                const avg = this.reactions.length ? Math.round(this.reactions.reduce((a, b) => a + b, 0) / this.reactions.length) : 0;
+                const prev = this.best[this.drill];
+                const isBest = !prev || this.score > prev.score;
+                if (isBest) this.best[this.drill] = { score: this.score, acc: this.accuracy(), at: Date.now() };
+                try { if (settingsManager.lsEnabled) localStorage.setItem(this.KEY, JSON.stringify(this.best)); } catch (e) {}
+                const xp = Math.min(600, 150 + Math.round(this.score / 20));
+                progression.award(xp, `Aim trainer: ${d.name}`);
+                this.lastResult = { drill: this.drill, score: this.score, hits: this.hits, misses: this.misses, accuracy: this.accuracy(), avgReaction: avg, best: isBest, xp };
+                const line = this.drill === 'tracking'
+                    ? `<div><span>ON TARGET</span><b>${this.onTime.toFixed(1)} s (${this.accuracy()}%)</b></div>`
+                    : `<div><span>HITS / MISSES</span><b>${this.hits} / ${this.misses}</b></div><div><span>ACCURACY</span><b>${this.accuracy()}%</b></div><div><span>AVG REACTION</span><b>${avg ? avg + ' ms' : '—'}</b></div>`;
+                this.el.className = 'aim-trainer visible done';
+                this.el.innerHTML = `<div class="aim-panel"><div class="aim-title">${d.name} RESULT</div>
+                    <div class="aim-score-big">${this.score}${isBest ? '<em>NEW BEST</em>' : ''}</div>
+                    <div class="aim-stats">${line}<div><span>BEST</span><b>${this.best[this.drill].score}</b></div><div><span>XP</span><b>+${xp}</b></div></div>
+                    <div class="aim-actions"><button class="aim-btn" data-aim="again">AGAIN</button><button class="aim-btn" data-aim="pick">CHANGE DRILL</button><button class="aim-btn" data-aim="leave">LEAVE</button></div></div>`;
+                if (soundFX.ult) soundFX.ult();
+                this.releaseMouse();
+            }
+        };
+
         const MENU_MODES = [
             ['wave', 'WAVE', 'Endless waves of bots, spike plants and defuses'],
             ['match', 'MATCH', 'First to 7 rounds: buy phase, economy, halftime swap'],
             ['retake', 'RETAKE', 'Retake a planted site before the spike goes off'],
             ['range', 'RANGE', '30 bots against the clock, with a scorecard'],
             ['deathmatch', 'DEATHMATCH', 'Free-for-all: first to 40 kills, instant respawns'],
-            ['spikerush', 'SPIKE RUSH', 'First to 4 rounds, a random gun each round, power-up orbs']
+            ['spikerush', 'SPIKE RUSH', 'First to 4 rounds, a random gun each round, power-up orbs'],
+            ['aim', 'AIM TRAINER', 'Gridshot, Flick and Tracking drills with best scores']
         ];
         const mainMenu = {
             open: false, kind: 'start', view: 'main', started: false, selecting: false,
@@ -40573,6 +40863,8 @@
                 this.lockWas = locked;
                 if (!was || locked || !this.started || this.open) return;
                 if (game.buyMenuOpen || game.agentPickerOpen || game.settingsOpen || photoMode.active) return;
+                // The aim trainer's drill picker and result card let go of the mouse on purpose
+                if (aimTrainer.active && (aimTrainer.state === 'pick' || aimTrainer.state === 'done')) return;
                 if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.careerModalOpen) return;
                 if (matchMode.phase === 'over' || replayDirector.clip) return;
                 this.show('pause');
@@ -43228,7 +43520,7 @@
 
             updateWingmanBots: function(delta, now) {
                 if (!this.wingmanGroup) return;
-                const showWingman = this.wingmanEnabled && (game.gameMode !== 'range') && (game.gameMode !== 'match') && (game.gameMode !== 'deathmatch');
+                const showWingman = this.wingmanEnabled && (game.gameMode !== 'range') && (game.gameMode !== 'match') && (game.gameMode !== 'deathmatch') && (game.gameMode !== 'aim');
                 if (this.wingmanGroup.visible !== showWingman) {
                     this.wingmanGroup.visible = showWingman;
                 }
@@ -43684,6 +43976,7 @@
             tacticalEnhancements.init();
             progression.init();
             photoMode.init();
+            aimTrainer.init();
             gamepadController.init();
             controlsHelp.init();
             ambientAudio.init();
