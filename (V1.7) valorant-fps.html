@@ -37920,7 +37920,6 @@
                 if (!this.active || this.over) return;
                 if (now >= this.endsAt) { this.finish(); return; }
                 if (!mainMenu.open) this._duels(now);
-                else this.endsAt += dt * 1000;
                 if (now >= this.nextBoardAt) { this.nextBoardAt = now + 400; this.renderBoard(now); }
             },
 
@@ -39010,6 +39009,18 @@
 
             paused: function () { return this.open; },
 
+            // Round and spike timers stand still while the menu is open: push them back
+            // by the real time since the last push (from the moment it opened until it
+            // closes; the frame delta is capped, and a slow frame must not leak time)
+            _freezeTimers: function (now) {
+                const realMs = this._lastNow ? Math.max(0, now - this._lastNow) : 0;
+                this._lastNow = now;
+                if (!realMs) return;
+                if (matchMode.active && matchMode.phaseEndsAt) matchMode.phaseEndsAt += realMs;
+                if (tacticalDirector.spikeState === 'planted' && tacticalDirector.spikeDetonateAt) tacticalDirector.spikeDetonateAt += realMs;
+                if (dmMode.active && !dmMode.over) dmMode.endsAt += realMs;
+            },
+
             init: function () {
                 if (this.el) return;
                 const el = document.createElement('div');
@@ -39106,6 +39117,7 @@
                 if (this.open) { this.kind = kind || this.kind; this.render(); return; }
                 this.kind = kind || (this.started ? 'pause' : 'start');
                 this.open = true;
+                this._lastNow = performance.now();
                 this.view = 'main';
                 this.mode = currentModeId() || 'wave';
                 this.savedLook = { x: camera.rotation.x, y: camera.rotation.y, fov: camera.fov };
@@ -39122,6 +39134,8 @@
 
             hide: function () {
                 if (!this.open) return;
+                this._freezeTimers(performance.now());
+                this._lastNow = 0;
                 this.open = false;
                 this.selecting = false;
                 document.body.classList.remove('menu-open', 'agent-select');
@@ -39226,12 +39240,8 @@
 
             // Every frame while open: paused timers, the orbiting camera and the preview
             update: function (dt, now) {
-                if (!this.open) { this._lastNow = 0; return; }
-                // Round and spike timers stand still (real elapsed time: the frame delta is capped)
-                const realMs = this._lastNow ? Math.max(0, now - this._lastNow) : 0;
-                this._lastNow = now;
-                if (matchMode.active && matchMode.phaseEndsAt) matchMode.phaseEndsAt += realMs;
-                if (tacticalDirector.spikeState === 'planted' && tacticalDirector.spikeDetonateAt) tacticalDirector.spikeDetonateAt += realMs;
+                if (!this.open) return;
+                this._freezeTimers(now);
                 this.t += dt;
                 const a = 0.7 + this.t * 0.05, r = 34;
                 camera.position.set(Math.cos(a) * r, 12, Math.sin(a) * r);

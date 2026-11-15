@@ -72,7 +72,9 @@ test('start screen: game paused under an orbiting camera; keyboard menus; agent 
     await page.keyboard.press('Escape');
     const pause = await evaluate(() => ({ open: mainMenu.open, kind: mainMenu.kind, play: document.querySelector('[data-act="play"]').textContent, left: matchMode.phaseEndsAt - performance.now() }));
     assert.deepEqual([pause.open, pause.kind, pause.play], [true, 'pause', 'RESUME']);
-    await page.waitForTimeout(2500);
+    // Including a slow frame right after pausing (a stalled page must not leak time)
+    await evaluate(() => { const t = performance.now(); while (performance.now() - t < 1500) {} });
+    await page.waitForTimeout(1500);
     const left2 = await evaluate(() => matchMode.phaseEndsAt - performance.now());
     assert.ok(Math.abs(left2 - pause.left) < 600, `buy timer paused (${Math.round(pause.left)} -> ${Math.round(left2)} ms)`);
     assert.equal(await menuShown(), true, 'pause menu on screen');
