@@ -70,7 +70,9 @@ test('walk, stand, jump and crouch poses; the body casts a shadow; no new shader
 
         // Shadow: the floor next to the body is darker with the body shown
         const rt = new THREE.WebGLRenderTarget(64, 64); rt.texture.encoding = THREE.sRGBEncoding;
-        const cam = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+        // A narrow view of the floor where the shadow falls (about 2 m across, the body
+        // itself out of frame), so the shadow is a large part of the picture
+        const cam = new THREE.PerspectiveCamera(14, 1, 0.1, 100);
         const sun = directionalLight.position.clone().normalize();
         const p = playerBody.group.position;
         // Where the body's shadow falls: away from the sun, about 1 m out
@@ -95,7 +97,7 @@ test('walk, stand, jump and crouch poses; the body casts a shadow; no new shader
     assert.ok(r.stand < 0.05, `standing still settles (${r.stand})`);
     assert.ok(r.air[0] < -0.1 && r.air[1] < -0.05, 'legs tuck in the air');
     assert.ok(r.crouch.scale < 0.65 && Math.abs(r.crouch.feet) < 1e-6, `crouched: shorter (${r.crouch.scale.toFixed(2)}) with feet on the floor`);
-    assert.ok(r.shadow[0] < r.shadow[1] - 0.5, `the body casts a shadow (${r.shadow[0].toFixed(1)} vs ${r.shadow[1].toFixed(1)})`);
+    assert.ok(r.shadow[0] < r.shadow[1] - 3, `the body casts a shadow (${r.shadow[0].toFixed(1)} vs ${r.shadow[1].toFixed(1)})`);
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(programs, watermark);
     assert.equal(stalls, 0);
