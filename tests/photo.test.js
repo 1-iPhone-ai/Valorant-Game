@@ -128,9 +128,11 @@ test('photo mode: J in and out, not from the main menu; the pause menu has a PHO
     });
     assert.deepEqual(r, { blocked: true, active: true, menu: false });
     // A planted spike's timer does not run down while in photo mode
-    const t0 = await evaluate(() => { tacticalDirector.spikeState = 'planted'; tacticalDirector.spikeDetonateAt = performance.now() + 30000; return tacticalDirector.spikeDetonateAt - performance.now(); });
+    // The freeze is applied once per frame; bring it up to date before each read so the
+    // time since the last frame does not count as lost (as the menu test does)
+    const t0 = await evaluate(() => { mainMenu._freezeTimers(performance.now()); tacticalDirector.spikeState = 'planted'; tacticalDirector.spikeDetonateAt = performance.now() + 30000; return tacticalDirector.spikeDetonateAt - performance.now(); });
     await frames(30);
-    const t1 = await evaluate(() => tacticalDirector.spikeDetonateAt - performance.now());
+    const t1 = await evaluate(() => { mainMenu._freezeTimers(performance.now()); return tacticalDirector.spikeDetonateAt - performance.now(); });
     assert.ok(Math.abs(t1 - t0) < 150, `spike timer frozen (${(t0 - t1).toFixed(0)} ms lost)`);
     await evaluate(() => { photoMode.exit(); tacticalDirector.spikeState = 'unplanted'; });
     assert.deepEqual(errors, []);
