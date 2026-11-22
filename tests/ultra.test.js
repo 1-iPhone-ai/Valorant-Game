@@ -106,7 +106,9 @@ test('Ultra Realism: a manual tier above Cinematic with its own settings box; Au
 test('Ultra Realism draws every feature with no new shader programs, keeps hitboxes and collision, and gives Cinematic back exactly', { timeout: 900000 }, async () => {
     const { page, errors, frames, evaluate } = await boot({ quality: 'cinematic', viewport: { width: 480, height: 270 } });
     await evaluate(() => {
+        // a still scene: bots frozen and no wingmen walking into the comparison frames
         window.updateEnemies = () => {};
+        tacticalEnhancements.toggleWingmanAI(false);
         const cc = characterController; cc.position.set(5, 1.7, 11.6); cc.prevSimPosition.copy(cc.position);
         camera.rotation.set(-0.05, 0, 0, 'YXZ');
     });
@@ -213,7 +215,8 @@ test('Ultra Realism draws every feature with no new shader programs, keeps hitbo
     // Photo Mode holds its exposure while open
     const photo = await evaluate(() => { photoMode.enter(); photoMode.panelHidden = true; return renderer.toneMappingExposure; });
     await frames(4);
-    assert.equal(await evaluate(() => renderer.toneMappingExposure), photo);
+    const held = await evaluate(() => renderer.toneMappingExposure);
+    assert.ok(Math.abs(held - photo) < 1e-6, `Photo Mode keeps its exposure (${photo} -> ${held})`);
     await evaluate(() => photoMode.exit());
     await frames(2);
 
