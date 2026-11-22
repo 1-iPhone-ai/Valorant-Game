@@ -12044,7 +12044,18 @@
         };
 
         const _enemyColScratch = [];
-        function resolveEnemyMapCollision(pos, radius = 0.68) {
+        // Index of the first map box (from a collisionIndex query) a bot of this radius
+        // overlaps at its height, or -1
+        const _enemyEscapeScratch = [];
+        function enemyInsideBox(pos, radius, boxes) {
+            for (let i = 0; i < boxes.length; i++) {
+                const b = boxes[i];
+                if (b.maxY <= pos.y + 0.15 || b.minY >= pos.y + 2.1) continue;
+                if (pos.x > b.minX - radius + 0.01 && pos.x < b.maxX + radius - 0.01 && pos.z > b.minZ - radius + 0.01 && pos.z < b.maxZ + radius - 0.01) return i;
+            }
+            return -1;
+        }
+        function resolveEnemyMapCollision(pos, radius = 0.68, testOnly) {
             let hitWall = false;
 
             // 1. Arena perimeter clamp
@@ -12082,6 +12093,25 @@
                     }
                     hitWall = true;
                 }
+            }
+            // V1.8: boxes that share a face (a platform and the stairs up to it) push a
+            // bot back and forth into each other, so it could stay wedged inside them.
+            // If it is still inside one, step it out to the nearest point that is clear
+            // of every box (rare: only reached when the pass above could not free it).
+            if (!testOnly && enemyInsideBox(pos, radius, nearby) >= 0) {
+                const wide = collisionIndex.query(pos.x - radius - 9, pos.z - radius - 9, pos.x + radius + 9, pos.z + radius + 9, _enemyEscapeScratch);
+                let best = Infinity, bx = pos.x, bz = pos.z;
+                const ox = pos.x, oz = pos.z;
+                for (let d = 0; d < 4; d++) {
+                    const dx = d === 0 ? 1 : d === 1 ? -1 : 0, dz = d === 2 ? 1 : d === 3 ? -1 : 0;
+                    for (let s = 0.1; s <= 8 && s < best; s += 0.1) {
+                        pos.x = ox + dx * s; pos.z = oz + dz * s;
+                        if (Math.abs(pos.x) > 48 || Math.abs(pos.z) > 48) break;
+                        if (enemyInsideBox(pos, radius, wide) < 0) { best = s; bx = pos.x; bz = pos.z; break; }
+                    }
+                }
+                pos.x = bx; pos.z = bz;
+                hitWall = true;
             }
 
             // 3. Push out of map cylinder pillars
@@ -12157,7 +12187,7 @@
                 for (let j = 0; j < N; j++) {
                     for (let i = 0; i < N; i++) {
                         p.set(i - this.EXT + 0.5, 0, j - this.EXT + 0.5);
-                        this.blocked[j * N + i] = resolveEnemyMapCollision(p, 0.75) ? 1 : 0;
+                        this.blocked[j * N + i] = resolveEnemyMapCollision(p, 0.75, true) ? 1 : 0;
                     }
                 }
                 this.builtFor = game.mapPreset;
@@ -12177,7 +12207,7 @@
                 for (let j = j0; j <= j1; j++) {
                     for (let i = i0; i <= i1; i++) {
                         p.set(i - this.EXT + 0.5, 0, j - this.EXT + 0.5);
-                        this.blocked[j * N + i] = resolveEnemyMapCollision(p, 0.75) ? 1 : 0;
+                        this.blocked[j * N + i] = resolveEnemyMapCollision(p, 0.75, true) ? 1 : 0;
                     }
                 }
             },
@@ -42431,7 +42461,7 @@
             for (let t = 0; t < 200; t++) {
                 p.set((Math.random() * 2 - 1) * span, 0, (Math.random() * 2 - 1) * span);
                 const q = p.clone();
-                if (resolveEnemyMapCollision(q, 0.8)) continue;
+                if (resolveEnemyMapCollision(q, 0.8, true)) continue;
                 if (Math.hypot(p.x - pl.x, p.z - pl.z) < (minFromPlayer || 0)) continue;
                 let ok = true;
                 for (const e of enemyObjects) {

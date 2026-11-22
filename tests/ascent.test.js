@@ -426,3 +426,25 @@ test('the six other maps are exactly as in V1.7: pieces, sites, spawns, ult orbs
     }
     assert.deepEqual(cur.errors, []);
 });
+
+// V1.8 Part 3 regression run: a bot pressed into the corner where a site's raised
+// platform meets the stairs up to it was pushed back and forth between the two boxes
+// and stayed wedged inside the platform (Spike Rush); it is now stepped out
+test('Ascent: a bot pushed into the platform and stairs corner of a site is freed, not wedged inside', { timeout: 300000 }, async () => {
+    const { errors, evaluate } = await boot({ quality: 'low' });
+    const r = await evaluate(() => {
+        const inside = (p, r) => mapPieces.some((pc) => { const b = pc.bounds; return b.max.y > p.y + 0.15 && b.min.y < p.y + 2.1 && p.x > b.min.x - r + 0.02 && p.x < b.max.x + r - 0.02 && p.z > b.min.z - r + 0.02 && p.z < b.max.z + r - 0.02; });
+        const out = [];
+        for (const [x, z] of [[8.76, -38.68], [8.76, 38.68], [9.5, -38.2], [10.5, 38.4]]) {
+            const p = new THREE.Vector3(x, 0, z);
+            for (let i = 0; i < 3; i++) resolveEnemyMapCollision(p, 0.68);
+            out.push({ at: [x, z], to: [+p.x.toFixed(2), +p.z.toFixed(2)], inside: inside(p, 0.68), moved: Math.hypot(p.x - x, p.z - z) });
+        }
+        return out;
+    });
+    for (const c of r) {
+        assert.equal(c.inside, false, `freed from ${c.at} (now at ${c.to})`);
+        assert.ok(c.moved < 6, `stepped out nearby (${c.moved.toFixed(2)} m)`);
+    }
+    assert.deepEqual(errors, []);
+});
