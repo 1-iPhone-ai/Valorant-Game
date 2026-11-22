@@ -275,19 +275,26 @@ test('Ascent bots: attacking bots run from their spawn to either site without st
             const cc = characterController;
             cc.position.set(46, cc.standHeight, 6); cc.prevSimPosition.copy(cc.position);
             const goal = matchMode.botGoal();
+            // On site: inside the site's room, or within 6 m of the plant spot (a bot
+            // that gets there second waits a few metres behind the first)
+            const room = MAP_PRESETS.ascent.plan[matchMode.plantSiteKey === 'A' ? 'aSite' : 'bSite'];
+            const onSite = (x, z) => (x > room[0] + 0.5 && x < room[1] - 0.5 && z > room[2] + 0.5 && z < room[3] - 0.5) || Math.hypot(x - goal.x, z - goal.z) < 6;
             const bots = enemyObjects.filter((e) => e.isActive && !e.hit);
             const start = bots.map((e) => Math.hypot(e.mesh.position.x - goal.x, e.mesh.position.z - goal.z));
-            const log = __sim(70, () => bots.every((e) => Math.hypot(e.mesh.position.x - goal.x, e.mesh.position.z - goal.z) < 6));
-            const out = { side: matchMode.side, n: bots.length, start, end: [], stuck: [], walls: 0, secs: 0 };
+            const log = __sim(70, () => bots.every((e) => onSite(e.mesh.position.x, e.mesh.position.z)));
+            const out = { side: matchMode.side, n: bots.length, start, end: [], on: [], stuck: [], walls: 0, secs: 0 };
             for (const e of bots) {
                 const tr = log.get(e) || [];
                 out.secs = Math.max(out.secs, tr.length);
-                out.end.push(+Math.hypot(e.mesh.position.x - goal.x, e.mesh.position.z - goal.z).toFixed(1));
+                out.end.push([+e.mesh.position.x.toFixed(1), +e.mesh.position.z.toFixed(1), +Math.hypot(e.mesh.position.x - goal.x, e.mesh.position.z - goal.z).toFixed(1)]);
+                out.on.push(onSite(e.mesh.position.x, e.mesh.position.z));
                 for (const p of tr) if (__inWall(p[0], p[1])) out.walls++;
-                // Stuck: under 1 m moved in 3 s while still more than 6 m out
+                // Stuck: under 1 m moved in 3 s while not yet on site
                 for (let i = 3; i < tr.length; i++) {
-                    const far = Math.hypot(tr[i][0] - goal.x, tr[i][1] - goal.z) > 6;
-                    if (far && Math.hypot(tr[i][0] - tr[i - 3][0], tr[i][1] - tr[i - 3][1]) < 1) { out.stuck.push([e.slot, i, tr[i][0].toFixed(1), tr[i][1].toFixed(1)]); break; }
+                    if (!onSite(tr[i][0], tr[i][1]) && Math.hypot(tr[i][0] - tr[i - 3][0], tr[i][1] - tr[i - 3][1]) < 1) {
+                        out.stuck.push([e.slot, e.archetype, i, tr[i][0].toFixed(1), tr[i][1].toFixed(1), tr.slice(Math.max(0, i - 6), i + 1).map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')]);
+                        break;
+                    }
                 }
             }
             return out;
@@ -298,8 +305,8 @@ test('Ascent bots: attacking bots run from their spawn to either site without st
         assert.equal(r.side, 'defend');
         assert.ok(r.n >= 2, `${r.n} attacking bots`);
         assert.ok(Math.min(...r.start) > 40, 'they start in their spawn');
-        assert.ok(r.end.every((d) => d < 6), `all reach site ${key} (${r.end} m left after ${r.secs} s)`);
-        assert.deepEqual(r.stuck, [], `site ${key}: no bot sticks`);
+        assert.ok(r.on.every(Boolean), `all reach site ${key} (bots at ${JSON.stringify(r.end)} after ${r.secs} s)`);
+        assert.deepEqual(r.stuck, [], `site ${key}: no bot sticks ${JSON.stringify(r.stuck)}`);
         assert.equal(r.walls, 0, 'never inside a wall');
     }
     await frames(2);
