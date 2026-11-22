@@ -3769,6 +3769,7 @@
                                     <button class="settings-pill-opt" data-quality="high">HIGH</button>
                                     <button class="settings-pill-opt" data-quality="ultra">ULTRA 4K</button>
                                     <button class="settings-pill-opt" data-quality="cinematic" title="Ambient occlusion, bloom, sun shafts, colour grading and FXAA, plus High Detail maps and characters">CINEMATIC (POST FX)</button>
+                                    <button class="settings-pill-opt" data-quality="ultraRealism" title="Ultra Realism: atmospheric sky, PBR materials, baked light, multisampled anti-aliasing and more (see the ULTRA REALISM box). Needs WebGL 2">ULTRA REALISM</button>
                                 </div>
                             </div>
 
@@ -3815,6 +3816,113 @@
                             </div>
                         </div>
 
+
+                        <div class="settings-section-box" id="settings-ultra-box">
+                            <div class="settings-section-title">
+                                <span>ULTRA REALISM</span>
+                                <span id="settings-ultra-status" style="color:#94a3b8;">OFF</span>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Ultra Realism (above Cinematic)</strong>
+                                    <small>A separate graphics tier for a grounded, physically plausible look, never picked by Auto. Aimed at 60 FPS at 1080p on a mid-range graphics card. Needs WebGL 2: without it, Cinematic is used. The switches below choose its features</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultra-pills">
+                                    <button class="settings-pill-opt active" data-ultra="off">OFF</button>
+                                    <button class="settings-pill-opt" data-ultra="on">ON</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Sky &amp; Fog</strong>
+                                    <small>Atmospheric scattering with a sun disc and clouds for each time of day; it lights the scene and adds height fog</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-sky-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Materials</strong>
+                                    <small>Generated PBR surfaces (concrete, plaster, stone, wood, metal, glass) mapped in world space</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-materials-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Ascent Detail</strong>
+                                    <small>Frames, trims, roof tiles, pipes, lamps and props on Ascent (decor only: no collision)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-detail-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Lighting</strong>
+                                    <small>Baked ambient occlusion and bounce light, a sharp near shadow cascade, light from lamps and glowing trims</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-lighting-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Post Processing</strong>
+                                    <small>4x multisampled anti-aliasing, full-resolution ambient occlusion and automatic exposure</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-post-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Reflections</strong>
+                                    <small>Sharper reflections on wet floors and the surroundings reflected in metal</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-reflections-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Guns &amp; Hands</strong>
+                                    <small>PBR metal and polymer, jointed fingers, brass casings and muzzle smoke</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-guns-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Characters</strong>
+                                    <small>Smooth jointed bodies in place of box figures (hitboxes unchanged)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-characters-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Effects</strong>
+                                    <small>Soft particles, lit smoke and impact debris that depends on the surface</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-ultrafx-effects-pills">
+                                    <button class="settings-pill-opt active" data-ufx="on">ON</button>
+                                    <button class="settings-pill-opt" data-ufx="off">OFF</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="settings-section-box">
                             <div class="settings-section-title">
                                 <span>CAMERA, RESOLUTION &amp; GRANULAR GRAPHICS</span>
@@ -5182,8 +5290,14 @@
             ultra:  { drawDistance: 135, maxParticles: 20, maxDecals: 40, shadows: true,  shadowResolution: 4096, fogDensity: 0.0035, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16 },
             // V1.7: above Ultra, manual only (Auto never picks it). Adds the postFX
             // pipeline and turns on High Detail Maps and Characters & Guns.
-            cinematic: { drawDistance: 150, maxParticles: 20, maxDecals: 40, shadows: true, shadowResolution: 4096, fogDensity: 0.003, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16, post: true }
+            cinematic: { drawDistance: 150, maxParticles: 20, maxDecals: 40, shadows: true, shadowResolution: 4096, fogDensity: 0.003, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16, post: true },
+            // V1.8: above Cinematic, manual only (Auto never picks it): everything Cinematic
+            // does plus the Ultra Realism tier (ultraRealism); its height fog replaces most
+            // of the distance fog. Needs WebGL 2, else Cinematic is used instead.
+            ultraRealism: { drawDistance: 160, maxParticles: 20, maxDecals: 40, shadows: true, shadowResolution: 4096, fogDensity: 0.0012, maxPixelRatio: Infinity, surfaceDetail: 1, haloBudget: 16, post: true, ultra: true }
         };
+        // V1.8: display name of a quality profile
+        function qualityLabel(q) { return q === 'ultraRealism' ? 'ULTRA REALISM' : String(q || '').toUpperCase(); }
         const QUALITY_ORDER = ['low', 'medium', 'high'];
         
         // Current visual budgets (written only by applyGraphicsProfile)
@@ -6712,11 +6826,14 @@
             const key = [skyHex, groundHex, accentA, accentB, look.env, sunHex].join(':');
             if (key !== envBuilder.key) {
                 envBuilder.key = key;
-                const old = scene.environment;
+                // (the previous standard environment: Ultra Realism may be showing its own)
+                const old = envBuilder.texture || scene.environment;
                 scene.environment = buildEnvironment(skyHex, groundHex, accentA, accentB, look.env, sunHex);
                 envBuilder.texture = scene.environment;
                 if (old) old.dispose();
             }
+            // V1.8: Ultra Realism's sky, sky light and exposure follow
+            if (typeof ultraRealism !== 'undefined') ultraRealism.onLighting(look);
         }
         // First called from initGame() (MAP_PRESETS is declared further down),
         // before the shader warm-up, so warmed programs include the env map.
@@ -7819,7 +7936,7 @@
             mapDetailUniform.value = detail;
             haloSystem.setBudget(halos);
             // High Detail Maps: player opt-in, and never on the Low profile
-            const cinematic = adaptiveSettings.currentQuality === 'cinematic';
+            const cinematic = adaptiveSettings.currentQuality === 'cinematic' || adaptiveSettings.currentQuality === 'ultraRealism';
             const hiDetail = (cfg.mapDetail === 'on' || cinematic) && adaptiveSettings.currentQuality !== 'low';
             adaptiveSettings.mapHiDetail = hiDetail;
             mapHiDetail.set(hiDetail);
@@ -7863,13 +7980,15 @@
             
             qualityController.applyPixelRatio();
             qualityController.resetSamples(performance.now(), qualityController.PROFILE_SETTLE_MS);
+            // V1.8: the Ultra Realism tier switches its features on or off
+            ultraRealism.onProfile(quality);
             updateQualityLabel();
             if (typeof settingsManager !== 'undefined' && settingsManager.syncFromEngineProfile) {
                 settingsManager.syncFromEngineProfile();
             }
             
             if (reason === 'manual') {
-                showNotification(`Quality set to ${quality.toUpperCase()}`);
+                showNotification(`Quality set to ${qualityLabel(quality)}`);
             } else if (reason === 'auto') {
                 showNotification(`Quality auto-adjusted to ${quality.toUpperCase()}`);
             }
@@ -7882,7 +8001,7 @@
         
         function updateQualityLabel() {
             const q = adaptiveSettings.currentQuality;
-            const name = q.charAt(0).toUpperCase() + q.slice(1);
+            const name = q === 'ultraRealism' ? 'Ultra Realism' : q.charAt(0).toUpperCase() + q.slice(1);
             qualityToggle.textContent = qualityController.auto ? `Quality: Auto (${name})` : `Quality: ${name}`;
         }
         
@@ -8184,6 +8303,12 @@
             },
             
             setManual: function(quality) {
+                // V1.8: Ultra Realism needs WebGL 2; without it, Cinematic (and say so)
+                if (quality === 'ultraRealism' && !ultraRealism.isSupported()) {
+                    quality = 'cinematic';
+                    ultraRealism.fellBack = true;
+                    showNotification(`ULTRA REALISM needs ${ultraRealism.reason}, which this browser does not have: using CINEMATIC`, 4000);
+                }
                 this.restoreShadowHz();
                 this.auto = false;
                 this.trial = null;
@@ -8201,7 +8326,7 @@
                 this.upgradeHoldUntil = 0;
                 this.upgradeBackoffMs = 20000;
                 const cq = adaptiveSettings.currentQuality;
-                const baseQuality = (cq === 'ultra' || cq === 'cinematic') ? 'high' : cq;
+                const baseQuality = (cq === 'ultra' || cq === 'cinematic' || cq === 'ultraRealism') ? 'high' : cq;
                 applyGraphicsProfile(baseQuality, 'auto-mode');
                 showNotification('Quality set to AUTO-ADAPTIVE');
             }
@@ -9736,6 +9861,7 @@
             breakables.build();
             navGrid.build();   // V1.8: bots route all the time now, so build it here, not mid-fight
             relocateBlockedTargets();
+            ultraRealism.onMapBuilt();
 
             // Ensure player & enemies are not embedded in newly spawned map geometry
             const L = mapLayout();
@@ -15330,6 +15456,8 @@
             setQuality: function () {
                 const q = (typeof adaptiveSettings !== 'undefined' && adaptiveSettings.currentQuality) || 'medium';
                 if (q === 'ultra' || q === 'cinematic') { this.scale = 0.5; this.every = 1; this.wetOnly = false; }
+                // V1.8: Ultra Realism draws it sharper with its Reflections feature on
+                else if (q === 'ultraRealism') { this.scale = ultraRefl.reflectionsOn() ? 0.75 : 0.5; this.every = 1; this.wetOnly = false; }
                 else if (q === 'high') { this.scale = 0.34; this.every = 2; this.wetOnly = true; }
                 else { this.scale = 0; }
                 if (!this.scale) reflectU.uReflect.value = 0;
@@ -38824,10 +38952,2277 @@
             shadowManager.markEvent();
             // V1.7: compile the Cinematic post-processing passes now as well
             postFX.warm();
+            // V1.8: and every Ultra Realism program
+            ultraRealism.warm();
             perfTelemetry.shaderWarmupMs = performance.now() - start;
             perfTelemetry.programWatermark = renderer.info.programs ? renderer.info.programs.length : 0;
         }
         
+        // =============================================
+        // V1.8 ULTRA REALISM: a graphics tier above Cinematic (manual only)
+        // =============================================
+        // A separate profile for a grounded, physically plausible look. Everything it
+        // adds lives in the modules below and is swapped in only while the tier is on:
+        // its own materials, geometry, decor and post passes go in, and the Cinematic
+        // ones come back when it is switched off, so Low to Cinematic keep their exact
+        // shader programs and cost. Every new program is compiled in the shader warm-up
+        // (ultraRealism.warm), and the slower preparation (surface textures, baked
+        // light, sky lighting) is done in small steps once the tier is first used, so
+        // switching tiers never stalls on a compile or a bake. Hitboxes, collision and
+        // timing never change. It needs WebGL 2 (multisampled targets with a depth
+        // texture, 3D and array textures); without it the tier falls back to Cinematic
+        // and says so.
+        const ULTRA_FEATURES = ['sky', 'materials', 'detail', 'lighting', 'post', 'reflections', 'guns', 'characters', 'effects'];
+        const ULTRA_FEATURE_INFO = {
+            sky: ['Sky & Fog', 'Atmospheric scattering with a sun disc and clouds for each time of day; it lights the scene and adds height fog'],
+            materials: ['Materials', 'Generated PBR surfaces (concrete, plaster, stone, wood, metal, glass) mapped in world space'],
+            detail: ['Ascent Detail', 'Frames, trims, roof tiles, pipes, lamps and props on Ascent (decor only: no collision)'],
+            lighting: ['Lighting', 'Baked ambient occlusion and bounce light, a sharp near shadow cascade, light from lamps and glowing trims'],
+            post: ['Post Processing', '4x multisampled anti-aliasing, full-resolution ambient occlusion and automatic exposure'],
+            reflections: ['Reflections', 'Sharper reflections on wet floors and the surroundings reflected in metal'],
+            guns: ['Guns & Hands', 'PBR metal and polymer, jointed fingers, brass casings and muzzle smoke'],
+            characters: ['Characters', 'Smooth jointed bodies in place of box figures (hitboxes unchanged)'],
+            effects: ['Effects', 'Soft particles, lit smoke and impact debris that depends on the surface']
+        };
+        const ultraRealism = {
+            active: false,           // the tier is on
+            applied: {},             // feature -> currently applied
+            built: false,
+            supportChecked: false,
+            supported: false,
+            reason: '',
+            forceUnsupported: false, // test hook: behave as if WebGL 2 were missing
+            fellBack: false,
+            baseExposure: 1.5,
+            lightingLook: null,
+
+            isSupported: function () {
+                if (this.forceUnsupported) { this.reason = 'WebGL 2'; return false; }
+                if (!this.supportChecked) {
+                    this.supportChecked = true;
+                    const caps = renderer.capabilities;
+                    this.supported = !!(caps && caps.isWebGL2);
+                    this.reason = this.supported ? '' : 'WebGL 2';
+                }
+                return this.supported;
+            },
+            wants: function (f) {
+                const fx = game.userSettings && game.userSettings.ultraFx;
+                return !fx || fx[f] !== false;
+            },
+            is: function (f) { return !!this.applied[f]; },
+            modules: function () {
+                return { sky: ultraSky, materials: ultraMats, detail: ultraDecor, lighting: ultraLight, post: ultraPost,
+                    reflections: ultraRefl, guns: ultraGuns, characters: ultraChars, effects: ultraFX };
+            },
+            build: function () {
+                if (this.built) return;
+                this.built = true;
+                const m = this.modules();
+                for (const f of ULTRA_FEATURES) if (m[f].build) m[f].build();
+            },
+            // From applyGraphicsProfile, after the profile's own settings
+            onProfile: function (quality) {
+                const on = quality === 'ultraRealism' && this.isSupported();
+                if (on) this.build();
+                this.active = on;
+                this.refresh();
+            },
+            // Applies each feature's switch; then the parts that depend on several
+            refresh: function () {
+                const m = this.modules();
+                for (const f of ULTRA_FEATURES) {
+                    const want = this.active && this.wants(f);
+                    if (!!this.applied[f] !== want) {
+                        this.applied[f] = want;
+                        m[f].set(want);
+                    }
+                }
+                if (this.built) {
+                    ultraMats.sync();
+                    ultraFX.sync();
+                    ultraRefl.sync();
+                }
+                if (this.active) ultraPrep.start();
+                this.syncUI();
+                if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
+            },
+            // From refreshSceneLighting: the tier's exposure and sky light follow the
+            // map and the atmosphere
+            onLighting: function (look) {
+                this.baseExposure = renderer.toneMappingExposure;
+                this.lightingLook = look;
+                if (this.is('sky')) ultraSky.applyLook(true);
+                if (this.is('post')) ultraPost.applyExposure();
+                if (this.built) ultraLight.onLook();
+            },
+            // From rebuildMapPreset / initGame once the map's pieces exist
+            onMapBuilt: function () {
+                if (!this.built) return;
+                ultraDecor.onMapBuilt();
+                ultraLight.onMapBuilt();
+                ultraRefl.onMapBuilt();
+                ultraMats.onMapBuilt();
+                if (this.active) ultraPrep.start();
+            },
+            // Per frame, before the render
+            update: function (dt, now) {
+                if (!this.active) return;
+                ultraPrep.step(now);
+                if (this.is('sky')) ultraSky.update(now);
+                if (this.is('lighting')) ultraLight.update(now);
+                if (this.is('effects')) ultraFX.update(dt, now);
+                if (this.is('detail')) ultraDecor.update(now);
+            },
+            // Shader warm-up: every Ultra program, with each light-count variant, is
+            // compiled and drawn once with everything switched on, then put back
+            warm: function () {
+                if (!this.isSupported()) return;
+                this.build();
+                this.onMapBuilt();
+                const was = Object.assign({}, this.applied), wasActive = this.active;
+                this.active = true;
+                for (const f of ULTRA_FEATURES) this.applied[f] = false;
+                const m = this.modules();
+                for (const f of ULTRA_FEATURES) { this.applied[f] = true; m[f].set(true); }
+                ultraMats.sync(); ultraFX.sync(); ultraRefl.sync();
+                for (const f of ULTRA_FEATURES) if (m[f].warm) m[f].warm();
+                ultraSky.buildEnv(true);
+                const shown = ultraDecor.group ? ultraDecor.group.visible : false;
+                if (ultraDecor.group) ultraDecor.group.visible = true;
+                // compile() builds every object's program (hidden ones and empty batches
+                // too); each light count is also drawn once, so drivers that finish a
+                // compile on first draw do it here
+                const wasVisible = enemyFlashLights.map(item => item.object.visible);
+                ultraLight.renderNear(performance.now(), true);
+                for (let active = 0; active <= enemyFlashLights.length; active++) {
+                    for (let i = 0; i < enemyFlashLights.length; i++) {
+                        enemyFlashLights[i].object.visible = i < active;
+                        enemyFlashLights[i].object.position.copy(camera.position);
+                    }
+                    renderer.compile(scene, camera);
+                    ultraPost.drawWorld();
+                }
+                for (let i = 0; i < enemyFlashLights.length; i++) enemyFlashLights[i].object.visible = wasVisible[i];
+                ultraPost.render(performance.now());
+                renderer.compile(viewmodelScene, viewmodelCamera);
+                ultraLight.pendingNear = false;
+                if (ultraDecor.group) ultraDecor.group.visible = shown;
+                for (const f of ULTRA_FEATURES) { this.applied[f] = false; m[f].set(false); }
+                this.active = wasActive;
+                for (const f of ULTRA_FEATURES) if (was[f]) { this.applied[f] = true; m[f].set(true); }
+                ultraMats.sync(); ultraFX.sync(); ultraRefl.sync();
+                renderer.setRenderTarget(null);
+            },
+            // Settings > Video: master switch, a switch per feature, status
+            syncUI: function () {
+                const st = document.getElementById('settings-ultra-status');
+                const sup = this.isSupported();
+                if (st) {
+                    st.textContent = !sup ? `NOT AVAILABLE (NEEDS ${this.reason}): USES CINEMATIC` : (this.active ? 'ON' : 'OFF');
+                    st.style.color = !sup ? '#ff8a8a' : (this.active ? '#7dffb2' : '#94a3b8');
+                }
+                const master = document.getElementById('setting-ultra-pills');
+                if (master) master.querySelectorAll('.settings-pill-opt').forEach((b) => b.classList.toggle('active', b.getAttribute('data-ultra') === (this.active ? 'on' : 'off')));
+                for (const f of ULTRA_FEATURES) {
+                    const g = document.getElementById('setting-ultrafx-' + f + '-pills');
+                    if (g) g.querySelectorAll('.settings-pill-opt').forEach((b) => b.classList.toggle('active', b.getAttribute('data-ufx') === (this.wants(f) ? 'on' : 'off')));
+                }
+            }
+        };
+        window.ultraRealism = ultraRealism;
+
+        // Background preparation for the tier, a little each frame (never a stall):
+        // surface textures (once), then this map's baked light, decor and reflections
+        const ultraPrep = {
+            queue: [],
+            running: false,
+            budgetMs: 4,
+            done: {},
+            start: function () {
+                if (!ultraRealism.built) return;
+                const jobs = [ultraMats.textureJob(), ultraLight.bakeJob(), ultraRefl.probeJob(), ultraSky.envJob()];
+                for (const j of jobs) if (j && !this.queue.includes(j)) this.queue.push(j);
+                this.running = this.queue.length > 0;
+            },
+            step: function () {
+                if (!this.queue.length) { this.running = false; return; }
+                const t0 = performance.now();
+                for (let i = 0; i < this.queue.length;) {
+                    const left = this.budgetMs - (performance.now() - t0);
+                    if (left <= 0) break;
+                    if (this.queue[i].step(left)) this.queue.splice(i, 1); else i++;
+                }
+                this.running = this.queue.length > 0;
+            },
+            // Finish everything now (tests and the warm-up for a saved Ultra choice)
+            finish: function () {
+                if (!ultraRealism.built) return;
+                this.start();
+                ultraTex.finishSync();
+                let guard = 0;
+                while (this.queue.length && guard++ < 1e6) { const job = this.queue[0]; if (job.step(Infinity)) this.queue.shift(); }
+                this.running = false;
+            },
+            ready: function () { return !this.queue.length; }
+        };
+
+        // ---- Ultra Realism: post processing (replaces the Cinematic chain) ----
+        // 1. The world draws into a 4x multisampled target whose resolve keeps a
+        //    depth texture (antialiased edges instead of FXAA); soft particles (layer
+        //    2) are drawn into the same samples afterwards, reading that depth.
+        // 2. Ambient occlusion at full resolution with a depth-aware blur.
+        // 3. World x AO, then analytic height fog (thicker low down, toward the sun it
+        //    takes the sun's colour), into a multisampled view target; the gun on top.
+        // 4. Bloom and sun shafts as in Cinematic (their passes are shared).
+        // 5. Automatic exposure: the frame's mean brightness is read back a few
+        //    frames late without stalling (pixel buffer + fence) and the tone-mapping
+        //    exposure eases toward a target, like an eye adapting.
+        // 6. Composite: bloom, shafts, a cleaner grade, light vignette and grain.
+        const ULTRA_POST_LOOK = {
+            daylight:    { fog: [0.0105, 0.12, 0.62, 0.0], col: 0x9fb0c2, sun: 0xf2dfc0, lum: 0.40 },
+            competitive: { fog: [0.0045, 0.14, 0.42, 0.0], col: 0xb4c1cf, sun: 0xf1e6d2, lum: 0.43 },
+            sunset:      { fog: [0.0140, 0.10, 0.66, 0.0], col: 0xb58e86, sun: 0xffb27a, lum: 0.38 },
+            dawn:        { fog: [0.0175, 0.20, 0.70, 0.0], col: 0xb7aebd, sun: 0xffcfa6, lum: 0.39 },
+            night:       { fog: [0.0120, 0.11, 0.66, 0.0], col: 0x1c2534, sun: 0x2c3850, lum: 0.24 }
+        };
+        const ultraPost = {
+            active: false,
+            ready: false,
+            w: 0, h: 0,
+            rt: {},
+            mats: {},
+            frame: 0,
+            adapt: 1,
+            lum: 0.4,
+            haveLum: false,
+            pbo: null,
+            fence: null,
+            pix: new Uint8Array(4),
+            softParticles: false,
+            _size: new THREE.Vector2(),
+            _invProj: new THREE.Matrix4(),
+            _sun: new THREE.Vector3(),
+            _sunDir: new THREE.Vector3(),
+            _col: new THREE.Color(),
+            _lastNow: 0,
+
+            build: function () {
+                if (this.ready) return;
+                postFX.init();
+                const samples = Math.max(0, Math.min(4, renderer.capabilities.maxSamples || 0));
+                const ms = (depthTex) => {
+                    const t = new THREE.WebGLMultisampleRenderTarget(4, 4, {
+                        minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: true, stencilBuffer: false
+                    });
+                    t.samples = samples;
+                    t.texture.generateMipmaps = false;
+                    t.texture.encoding = THREE.sRGBEncoding;   // the screen's own encoding: same material programs
+                    if (depthTex) { t.depthTexture = new THREE.DepthTexture(4, 4); t.depthTexture.type = THREE.UnsignedIntType; }
+                    return t;
+                };
+                const mk = (w, h) => {
+                    const t = new THREE.WebGLRenderTarget(w || 4, h || 4, {
+                        minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false
+                    });
+                    t.texture.generateMipmaps = false;
+                    return t;
+                };
+                this.rt.world = ms(true);
+                this.rt.view = ms(false);
+                this.rt.ao = mk(); this.rt.aoTmp = mk(); this.rt.aoBlur = mk();
+                this.rt.lum = [mk(64, 64), mk(16, 16), mk(4, 4), mk(1, 1)];
+                const vs = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+                const sm = (fs, uniforms) => new THREE.ShaderMaterial({
+                    vertexShader: vs, fragmentShader: fs, uniforms: uniforms, depthTest: false, depthWrite: false, toneMapped: false
+                });
+                // AO: the Cinematic AO shader (same program), its own uniforms
+                this.mats.ao = postFX.mats.ao.clone();
+                this.mats.ao.uniforms.uKernel.value = postFX.mats.ao.uniforms.uKernel.value;
+                this.mats.ao.uniforms.uRadius.value = 0.6;
+                this.mats.ao.uniforms.uStrength.value = 1.15;
+                this.mats.blurAO = sm(`
+                    varying vec2 vUv; uniform sampler2D tSrc; uniform sampler2D tDepth; uniform vec2 uDir; uniform float uNear; uniform float uFar;
+                    float lin(float d) { return (uNear * uFar) / (uFar - d * (uFar - uNear)); }
+                    void main() {
+                        float dc = lin(texture2D(tDepth, vUv).x);
+                        float sum = 0.0, wsum = 0.0;
+                        for (int i = -4; i <= 4; i++) {
+                            vec2 uv = vUv + uDir * float(i);
+                            float d = lin(texture2D(tDepth, uv).x);
+                            float w = exp(-float(i * i) / 12.0) * exp(-abs(d - dc) / (0.04 * dc + 0.08));
+                            sum += texture2D(tSrc, uv).r * w;
+                            wsum += w;
+                        }
+                        float v = sum / max(wsum, 1e-4);
+                        gl_FragColor = vec4(v, v, v, 1.0);
+                    }`, { tSrc: { value: null }, tDepth: { value: null }, uDir: { value: new THREE.Vector2() }, uNear: { value: 0.1 }, uFar: { value: 1000 } });
+                this.mats.applyAOFog = sm(`
+                    varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tAO; uniform sampler2D tDepth; uniform float uAO;
+                    uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec3 uCamPos;
+                    uniform vec4 uFog; uniform vec3 uFogCol; uniform vec3 uFogSun; uniform vec3 uSunDir; uniform float uFogOn;
+                    void main() {
+                        vec3 col = texture2D(tColor, vUv).rgb * mix(1.0, texture2D(tAO, vUv).r, uAO);
+                        if (uFogOn > 0.0) {
+                            float d = texture2D(tDepth, vUv).x;
+                            vec4 vp = uInvProj * vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+                            vp /= vp.w;
+                            vec3 wp = (uCamWorld * vec4(vp.xyz, 1.0)).xyz;
+                            vec3 ray = wp - uCamPos;
+                            float dist = length(ray);
+                            vec3 v = ray / max(dist, 1e-3);
+                            if (d >= 0.99999) dist = 900.0;
+                            // Exponential height fog, integrated along the ray
+                            float k = uFog.y;
+                            float h0 = uCamPos.y - uFog.w;
+                            float dh = v.y * dist;
+                            float hint = abs(dh) > 1e-3 ? (exp(-k * h0) - exp(-k * (h0 + dh))) / (k * dh) : exp(-k * h0);
+                            float fog = min(1.0 - exp(-uFog.x * dist * hint), uFog.z);
+                            float sunAmt = pow(max(dot(v, uSunDir), 0.0), 7.0);
+                            col = mix(col, mix(uFogCol, uFogSun, sunAmt), fog * uFogOn);
+                        }
+                        gl_FragColor = vec4(col, 1.0);
+                    }`, {
+                    tColor: { value: null }, tAO: { value: null }, tDepth: { value: null }, uAO: { value: 1 },
+                    uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uCamPos: { value: new THREE.Vector3() },
+                    uFog: { value: new THREE.Vector4(0.01, 0.12, 0.6, 0) }, uFogCol: { value: new THREE.Color() }, uFogSun: { value: new THREE.Color() },
+                    uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uFogOn: { value: 1 }
+                });
+                this.mats.lum = sm(`
+                    varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uTexel;
+                    void main() {
+                        vec3 c = texture2D(tSrc, vUv + vec2(-0.25, -0.25) * uTexel).rgb + texture2D(tSrc, vUv + vec2(0.25, -0.25) * uTexel).rgb
+                            + texture2D(tSrc, vUv + vec2(-0.25, 0.25) * uTexel).rgb + texture2D(tSrc, vUv + vec2(0.25, 0.25) * uTexel).rgb;
+                        float l = dot(c * 0.25, vec3(0.2126, 0.7152, 0.0722));
+                        gl_FragColor = vec4(l, l, l, 1.0);
+                    }`, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } });
+                this.mats.composite = sm(`
+                    varying vec2 vUv; uniform sampler2D tColor; uniform sampler2D tB0; uniform sampler2D tB1; uniform sampler2D tB2; uniform sampler2D tB3;
+                    uniform sampler2D tRays; uniform float uBloom; uniform vec3 uRayTint; uniform float uTime;
+                    uniform float uContrast; uniform float uSaturation; uniform vec3 uShadowTint; uniform vec3 uHighTint;
+                    uniform float uVignette; uniform float uGrain;
+                    float h12(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+                    void main() {
+                        vec2 c = vUv - 0.5;
+                        float r2 = dot(c, c);
+                        vec3 col = texture2D(tColor, vUv).rgb;
+                        vec3 bloom = texture2D(tB0, vUv).rgb * 0.42 + texture2D(tB1, vUv).rgb * 0.3 + texture2D(tB2, vUv).rgb * 0.2 + texture2D(tB3, vUv).rgb * 0.18;
+                        col += bloom * uBloom;
+                        col += texture2D(tRays, vUv).rgb * uRayTint;
+                        float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+                        col = mix(vec3(l), col, uSaturation);
+                        col = (col - 0.5) * uContrast + 0.5;
+                        col *= mix(uShadowTint, uHighTint, smoothstep(0.1, 0.8, l));
+                        col *= 1.0 - uVignette * smoothstep(0.2, 0.8, r2 * 1.6);
+                        col += (h12(vUv * 913.0 + uTime) - 0.5) * uGrain;
+                        gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+                    }`, {
+                    tColor: { value: null }, tB0: { value: null }, tB1: { value: null }, tB2: { value: null }, tB3: { value: null },
+                    tRays: { value: null }, uBloom: { value: 0.6 }, uRayTint: { value: new THREE.Color(1, 1, 1) }, uTime: { value: 0 },
+                    uContrast: { value: 1.03 }, uSaturation: { value: 1.02 },
+                    uShadowTint: { value: new THREE.Vector3(0.98, 0.995, 1.02) }, uHighTint: { value: new THREE.Vector3(1.02, 1.0, 0.98) },
+                    uVignette: { value: 0.16 }, uGrain: { value: 0.012 }
+                });
+                this.ready = true;
+            },
+
+            set: function (on) {
+                this.active = !!on;
+                if (on) {
+                    this.adapt = 1;
+                    this.haveLum = false;
+                } else {
+                    // Back to the exposure the atmosphere sets
+                    renderer.toneMappingExposure = ultraRealism.baseExposure;
+                }
+            },
+
+            applyExposure: function () {
+                if (this.active) renderer.toneMappingExposure = ultraRealism.baseExposure * this.adapt;
+            },
+
+            look: function () {
+                const m = (game.userSettings && game.userSettings.atmosphereMode) || 'daylight';
+                return ULTRA_POST_LOOK[m] || ULTRA_POST_LOOK.daylight;
+            },
+
+            resize: function () {
+                renderer.getDrawingBufferSize(this._size);
+                const w = Math.max(4, this._size.x | 0), h = Math.max(4, this._size.y | 0);
+                if (w === this.w && h === this.h) return;
+                this.w = w; this.h = h;
+                this.rt.world.setSize(w, h);
+                this.rt.view.setSize(w, h);
+                this.rt.ao.setSize(w, h);
+                this.rt.aoTmp.setSize(w, h);
+                this.rt.aoBlur.setSize(w, h);
+            },
+
+            // The world (layer 0) into the multisampled target, then the soft
+            // particles (layer 2) into the same samples
+            drawWorld: function () {
+                this.resize();
+                const R = this.rt;
+                renderer.setRenderTarget(R.world);
+                renderer.setClearColor(scene.background, 1);
+                renderer.clear();
+                renderer.render(scene, camera);
+                if (this.softParticles) {
+                    ultraFX.bindDepth(R.world.depthTexture, this.w, this.h);
+                    camera.layers.set(2);
+                    renderer.render(scene, camera);
+                    camera.layers.set(0);
+                }
+            },
+
+            render: function (now) {
+                const dt = Math.min(0.1, Math.max(0, (now - (this._lastNow || now)) * 0.001));
+                this._lastNow = now;
+                postFX.resize();
+                this.drawWorld();
+                const R = this.rt, P = postFX.rt, PM = postFX.mats, M = this.mats;
+                // AO (full res) from the resolved depth, blurred along x then y with depth weights
+                const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5);
+                const ao = M.ao.uniforms;
+                ao.tDepth.value = R.world.depthTexture;
+                ao.uTexel.value.set(1 / this.w, 1 / this.h);
+                ao.uProj.value.copy(camera.projectionMatrix);
+                ao.uNear.value = camera.near; ao.uFar.value = camera.far;
+                ao.uTanHalf.value.set(tanY * camera.aspect, tanY);
+                postFX._pass(M.ao, R.ao);
+                const bu = M.blurAO.uniforms;
+                bu.tDepth.value = R.world.depthTexture;
+                bu.uNear.value = camera.near; bu.uFar.value = camera.far;
+                bu.tSrc.value = R.ao.texture; bu.uDir.value.set(1 / this.w, 0);
+                postFX._pass(M.blurAO, R.aoTmp);
+                bu.tSrc.value = R.aoTmp.texture; bu.uDir.value.set(0, 1 / this.h);
+                postFX._pass(M.blurAO, R.aoBlur);
+                // World x AO + height fog, then the viewmodel on top
+                const L = this.look();
+                const fu = M.applyAOFog.uniforms;
+                fu.tColor.value = R.world.texture; fu.tAO.value = R.aoBlur.texture; fu.tDepth.value = R.world.depthTexture;
+                fu.uInvProj.value.copy(camera.projectionMatrixInverse);
+                fu.uCamWorld.value.copy(camera.matrixWorld);
+                fu.uCamPos.value.setFromMatrixPosition(camera.matrixWorld);
+                fu.uFogOn.value = ultraRealism.is('sky') ? 1 : 0;
+                fu.uFog.value.set(L.fog[0], L.fog[1], L.fog[2], L.fog[3]);
+                fu.uFogCol.value.setHex(L.col);
+                fu.uFogSun.value.setHex(L.sun);
+                fu.uSunDir.value.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
+                renderer.setRenderTarget(R.view);
+                renderer.clear();
+                postFX._pass(M.applyAOFog, R.view);
+                renderer.clearDepth();
+                viewmodelScene.environment = scene.environment;
+                syncViewmodelCamera();
+                renderer.render(viewmodelScene, viewmodelCamera);
+                // Bloom chain (the Cinematic passes and targets)
+                let src = R.view.texture, sw = this.w, sh = this.h;
+                for (let i = 0; i < 4; i++) {
+                    const dst = P.bloom[i], tmp = P.bloomTmp[i];
+                    if (i === 0) {
+                        PM.bright.uniforms.tSrc.value = src;
+                        PM.bright.uniforms.uTexel.value.set(1 / sw, 1 / sh);
+                        postFX._pass(PM.bright, dst);
+                    } else {
+                        PM.blur4.uniforms.tSrc.value = src;
+                        PM.blur4.uniforms.uTexel.value.set(1 / sw, 1 / sh);
+                        postFX._pass(PM.blur4, dst);
+                    }
+                    PM.blurDir.uniforms.tSrc.value = dst.texture;
+                    PM.blurDir.uniforms.uDir.value.set(1 / dst.width, 0);
+                    postFX._pass(PM.blurDir, tmp);
+                    PM.blurDir.uniforms.tSrc.value = tmp.texture;
+                    PM.blurDir.uniforms.uDir.value.set(0, 1 / dst.height);
+                    postFX._pass(PM.blurDir, dst);
+                    src = dst.texture; sw = dst.width; sh = dst.height;
+                }
+                // Sun shafts (the Cinematic pass) from this pipeline's world
+                const ru = PM.rays.uniforms;
+                const sunDir = this._sunDir.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
+                const sp = this._sun.copy(camera.position).addScaledVector(sunDir, 500).project(camera);
+                const facing = sp.z < 1 && Math.abs(sp.x) < 1.6 && Math.abs(sp.y) < 1.6;
+                const night = game.userSettings && game.userSettings.atmosphereMode === 'night';
+                ru.uSun.value.set(sp.x * 0.5 + 0.5, sp.y * 0.5 + 0.5);
+                ru.uStrength.value = facing ? (night ? 0.18 : 0.62) * (1 - Math.min(1, Math.hypot(sp.x, sp.y) / 1.6)) : 0;
+                ru.uAspect.value = camera.aspect;
+                ru.uSunTint.value.copy(directionalLight.color).lerp(this._col.setRGB(1, 0.92, 0.75), 0.5);
+                ru.uLight.value.w = 0;
+                const top = abilityLights.top;
+                if (top && top.intensity > 0.3) {
+                    const lp = this._sun.set(top.x, top.y, top.z).project(camera);
+                    if (lp.z < 1 && lp.z > -1 && Math.abs(lp.x) < 1.2 && Math.abs(lp.y) < 1.2) {
+                        const dist = camera.position.distanceTo(_muzzleLightPos.set(top.x, top.y, top.z));
+                        ru.uLight.value.set(lp.x * 0.5 + 0.5, lp.y * 0.5 + 0.5, Math.min(0.25, top.radius / Math.max(1, dist) * 0.35), Math.min(1.2, top.intensity * 0.45));
+                        ru.uLightCol.value.setRGB(top.r, top.g, top.b);
+                        ru.uLightDepth.value = lp.z * 0.5 + 0.5;
+                    }
+                }
+                ru.tColor.value = R.world.texture;
+                ru.tDepth.value = R.world.depthTexture;
+                postFX._pass(PM.rays, P.rays);
+                // Mean brightness for the automatic exposure (read back later, no stall)
+                const lu = M.lum.uniforms;
+                lu.tSrc.value = R.view.texture; lu.uTexel.value.set(1 / 64, 1 / 64);
+                postFX._pass(M.lum, R.lum[0]);
+                for (let i = 1; i < 4; i++) {
+                    PM.blur4.uniforms.tSrc.value = R.lum[i - 1].texture;
+                    PM.blur4.uniforms.uTexel.value.set(1 / R.lum[i - 1].width, 1 / R.lum[i - 1].height);
+                    postFX._pass(PM.blur4, R.lum[i]);
+                }
+                this._exposure(dt);
+                // Composite to the screen
+                const cu = M.composite.uniforms;
+                const mode = (game.userSettings && game.userSettings.atmosphereMode) || 'daylight';
+                cu.uSaturation.value = mode === 'night' ? 0.96 : (mode === 'sunset' || mode === 'dawn') ? 1.06 : 1.02;
+                cu.tColor.value = R.view.texture;
+                cu.tB0.value = P.bloom[0].texture; cu.tB1.value = P.bloom[1].texture;
+                cu.tB2.value = P.bloom[2].texture; cu.tB3.value = P.bloom[3].texture;
+                cu.tRays.value = P.rays.texture;
+                cu.uTime.value = (now * 0.001) % 100;
+                cu.uGrain.value = (game.userSettings && game.userSettings.reduceFlashes) ? 0 : 0.012;
+                postFX._pass(M.composite, null);
+                this.frame++;
+            },
+
+            // Automatic exposure: collect the read queued a few frames ago (if the GPU
+            // is done with it), queue the next one, ease toward the target brightness
+            _exposure: function (dt) {
+                const gl = renderer.getContext();
+                if (this.fence) {
+                    const st = gl.clientWaitSync(this.fence, 0, 0);
+                    if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) {
+                        gl.deleteSync(this.fence);
+                        this.fence = null;
+                        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+                        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.pix);
+                        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+                        this.lum = this.pix[0] / 255;
+                        this.haveLum = true;
+                    }
+                }
+                if (!this.fence && this.frame % 4 === 0) {
+                    renderer.setRenderTarget(this.rt.lum[3]);
+                    if (!this.pbo) {
+                        this.pbo = gl.createBuffer();
+                        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+                        gl.bufferData(gl.PIXEL_PACK_BUFFER, 4, gl.STREAM_READ);
+                    } else gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+                    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+                    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+                    this.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+                }
+                // (Photo Mode holds its own exposure while it is open)
+                if (photoMode.active) return;
+                if (this.haveLum && dt > 0) {
+                    const target = this.look().lum;
+                    const k = 1 - Math.exp(-dt * 1.5);
+                    this.adapt *= Math.pow(target / Math.max(0.03, this.lum), 0.6 * k);
+                    this.adapt = Math.max(0.62, Math.min(1.7, this.adapt));
+                }
+                renderer.toneMappingExposure = ultraRealism.baseExposure * this.adapt;
+            }
+        };
+
+        // ---- Ultra Realism: atmospheric sky, its lighting and fog ----
+        // A single-scattering sky (Rayleigh + Mie, after Preetham) lit from the real sun
+        // direction, with the sun's disc, two layers of drifting clouds lit toward the
+        // sun, and stars and a moon at night. A copy without the sun disc (the sun
+        // light already lights the scene) is rendered into a new PMREM, so every lit
+        // surface takes its sky light and reflections from this sky. The height fog
+        // is in the Ultra post chain (ULTRA_POST_LOOK).
+        const ULTRA_SKY_LOOK = {
+            // gain: the sky as seen; env: its share in the scene's sky light, set so a
+            // shaded wall gets about a seventh of the sunlit level (readable shadows)
+            daylight:    { tub: 2.8, ray: 1.45, mie: 0.0055, g: 0.8,  gain: 0.24, cover: 0.46, cloudA: 0.9,  tint: [1, 1, 1],          night: 0, ground: 0x47443f, env: 0.22 },
+            competitive: { tub: 2.0, ray: 1.15, mie: 0.0040, g: 0.78, gain: 0.26, cover: 0.24, cloudA: 0.75, tint: [1, 1, 1],          night: 0, ground: 0x4c4944, env: 0.27 },
+            sunset:      { tub: 7.0, ray: 2.6,  mie: 0.0120, g: 0.86, gain: 0.22, cover: 0.5,  cloudA: 0.92, tint: [1.28, 0.8, 0.6],   night: 0, ground: 0x4a3a32, env: 0.24 },
+            dawn:        { tub: 5.6, ray: 2.2,  mie: 0.0100, g: 0.84, gain: 0.23, cover: 0.38, cloudA: 0.85, tint: [1.12, 0.9, 0.9],   night: 0, ground: 0x46403e, env: 0.24 },
+            night:       { tub: 2.0, ray: 1.0,  mie: 0.0030, g: 0.76, gain: 1.0,  cover: 0.32, cloudA: 0.55, tint: [0.55, 0.7, 1.15], night: 1, ground: 0x0e1218, env: 1.4 }
+        };
+        const ULTRA_SKY_VS = `
+            uniform vec3 uSunDir; uniform float uRayleigh; uniform float uTurbidity; uniform float uMie;
+            varying vec3 vWorldPosition; varying vec3 vSunDirection; varying float vSunfade; varying vec3 vBetaR; varying vec3 vBetaM; varying float vSunE;
+            const vec3 totalRayleigh = vec3(5.804542996261093E-6, 1.3562911419845635E-5, 3.0265902468824876E-5);
+            const vec3 MieConst = vec3(1.8399918514433978E14, 2.7798023919660528E14, 4.0790479543861094E14);
+            float sunIntensity(float zenithAngleCos) {
+                zenithAngleCos = clamp(zenithAngleCos, -1.0, 1.0);
+                return 1000.0 * max(0.0, 1.0 - pow(2.718281828, -((1.6110731556870734 - acos(zenithAngleCos)) / 1.5)));
+            }
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPosition.xyz;
+                gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                vSunDirection = normalize(uSunDir);
+                vSunE = sunIntensity(vSunDirection.y);
+                vSunfade = 1.0 - clamp(1.0 - exp(vSunDirection.y * 1.6), 0.0, 1.0);
+                vBetaR = totalRayleigh * (uRayleigh - (1.0 - vSunfade));
+                vBetaM = 0.434 * (0.2 * uTurbidity) * 10E-18 * MieConst * uMie;
+            }`;
+        const ULTRA_SKY_FS = `
+            uniform float uMieG; uniform float uGain; uniform vec3 uTint; uniform float uDisc; uniform float uTime;
+            uniform float uCover; uniform float uCloudA; uniform float uNight; uniform vec3 uMoonDir; uniform vec3 uGround;
+            varying vec3 vWorldPosition; varying vec3 vSunDirection; varying float vSunfade; varying vec3 vBetaR; varying vec3 vBetaM; varying float vSunE;
+            const float pi = 3.141592653589793;
+            float rayleighPhase(float c) { return 0.05968310365946075 * (1.0 + c * c); }
+            float hgPhase(float c, float g) { float g2 = g * g; return 0.07957747154594767 * ((1.0 - g2) / pow(1.0 - 2.0 * g * c + g2, 1.5)); }
+            float sh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            float sn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+                return mix(mix(sh(i), sh(i + vec2(1.0, 0.0)), f.x), mix(sh(i + vec2(0.0, 1.0)), sh(i + vec2(1.0, 1.0)), f.x), f.y); }
+            float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += sn(p) * a; p = p * 2.03 + vec2(17.1, 9.3); a *= 0.5; } return s; }
+            void main() {
+                vec3 dir = normalize(vWorldPosition - cameraPosition);
+                vec3 up = vec3(0.0, 1.0, 0.0);
+                // Scattering (a little above the true horizon so the band under it is filled)
+                vec3 sd = normalize(vec3(dir.x, max(dir.y, 0.0) + 0.02, dir.z));
+                float zenithAngle = acos(max(0.0, dot(up, sd)));
+                float inv = 1.0 / (cos(zenithAngle) + 0.15 * pow(93.885 - ((zenithAngle * 180.0) / pi), -1.253));
+                vec3 Fex = exp(-(vBetaR * 8.4E3 * inv + vBetaM * 1.25E3 * inv));
+                float cosTheta = dot(sd, vSunDirection);
+                vec3 betaRTheta = vBetaR * rayleighPhase(cosTheta * 0.5 + 0.5);
+                vec3 betaMTheta = vBetaM * hgPhase(cosTheta, uMieG);
+                vec3 Lin = pow(vSunE * ((betaRTheta + betaMTheta) / (vBetaR + vBetaM)) * (1.0 - Fex), vec3(1.5));
+                Lin *= mix(vec3(1.0), pow(vSunE * ((betaRTheta + betaMTheta) / (vBetaR + vBetaM)) * Fex, vec3(0.5)), clamp(pow(1.0 - dot(up, vSunDirection), 5.0), 0.0, 1.0));
+                vec3 L0 = vec3(0.1) * Fex;
+                // Sun disc (left out of the lighting copy)
+                float disc = smoothstep(0.99994, 0.99997, dot(dir, vSunDirection)) * uDisc * (1.0 - uNight);
+                L0 += vSunE * 19000.0 * Fex * disc;
+                vec3 col = pow((Lin + L0) * 0.04 + vec3(0.0, 0.0003, 0.00075), vec3(1.0 / (1.2 + 1.2 * vSunfade))) * uTint;
+                // Night (absolute levels): deep blue, stars and the moon where the light comes from
+                if (uNight > 0.5) {
+                    col = mix(vec3(0.008, 0.012, 0.028), vec3(0.03, 0.045, 0.08), pow(1.0 - max(dir.y, 0.0), 3.0));
+                    vec2 sp = dir.xz / (abs(dir.y) + 0.35) * 160.0;
+                    float star = step(0.9975, sh(floor(sp))) * smoothstep(0.05, 0.25, dir.y);
+                    col += vec3(0.7, 0.75, 0.9) * star * (0.4 + 0.6 * sh(floor(sp) + 3.1));
+                    float m = dot(dir, normalize(uMoonDir));
+                    col += vec3(0.9, 0.92, 1.0) * (smoothstep(0.99955, 0.9997, m) * 2.4 * uDisc + pow(max(m, 0.0), 220.0) * 0.08);
+                }
+                col *= uGain;
+                float cg = uNight > 0.5 ? 1.0 : uGain;
+                // Clouds: two drifting layers on a dome, lit toward the sun, thinner at the horizon
+                if (dir.y > 0.0 && uCover > 0.0) {
+                    vec2 cuv = dir.xz / (dir.y + 0.1) * 0.55;
+                    float n = fbm(cuv * 1.4 + uTime * vec2(0.008, 0.003)) * 0.7 + fbm(cuv * 3.1 - uTime * vec2(0.004, 0.006)) * 0.3;
+                    float cov = smoothstep(1.0 - uCover, 1.0 - uCover + 0.32, n);
+                    float lit = pow(max(dot(dir, vSunDirection), 0.0), 5.0);
+                    vec3 sunCol = uNight > 0.5 ? vec3(0.08, 0.1, 0.14) : mix(vec3(1.0, 0.72, 0.5), vec3(1.0), clamp(vSunDirection.y * 2.0, 0.0, 1.0));
+                    vec3 base = uNight > 0.5 ? vec3(0.03, 0.04, 0.06) : mix(vec3(0.5, 0.52, 0.56), vec3(0.95), clamp(vSunDirection.y * 1.5 + 0.2, 0.0, 1.0));
+                    vec3 cc = (base * (0.55 + 0.45 * n) + sunCol * lit * 0.8) * uTint * cg * 1.6;
+                    col = mix(col, cc, cov * smoothstep(0.0, 0.16, dir.y) * uCloudA);
+                }
+                // Below the horizon: the ground, lit by the sky
+                col = mix(col, uGround * cg * (uNight > 0.5 ? 0.4 : 2.0), smoothstep(0.0, -0.06, dir.y));
+                gl_FragColor = vec4(col, 1.0);
+                #include <tonemapping_fragment>
+                #include <encodings_fragment>
+            }`;
+        const ultraSky = {
+            on: false,
+            mat: null,
+            envMat: null,
+            envScene: null,
+            envTex: null,
+            envKey: '',
+            stdMat: null,
+            stdEnv: null,
+            _job: null,
+            _dir: new THREE.Vector3(),
+            _c: new THREE.Color(),
+
+            build: function () {
+                if (this.mat) return;
+                const uniforms = {
+                    uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uRayleigh: { value: 1.5 }, uTurbidity: { value: 3 }, uMie: { value: 0.005 },
+                    uMieG: { value: 0.8 }, uGain: { value: 0.6 }, uTint: { value: new THREE.Vector3(1, 1, 1) }, uDisc: { value: 1 }, uTime: { value: 0 },
+                    uCover: { value: 0.45 }, uCloudA: { value: 0.9 }, uNight: { value: 0 }, uMoonDir: { value: new THREE.Vector3(0, 1, 0) },
+                    uGround: { value: new THREE.Color(0x47443f) }
+                };
+                this.mat = new THREE.ShaderMaterial({
+                    uniforms: uniforms, vertexShader: ULTRA_SKY_VS, fragmentShader: ULTRA_SKY_FS,
+                    side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: true
+                });
+                // The lighting copy: same program and uniforms objects, but no sun disc
+                this.envMat = this.mat.clone();
+                for (const k in uniforms) this.envMat.uniforms[k] = k === 'uDisc' ? { value: 0 } : uniforms[k];
+                this.envScene = new THREE.Scene();
+                const sphere = new THREE.Mesh(new THREE.SphereGeometry(20, 48, 24), this.envMat);
+                this.envScene.add(sphere);
+                this.stdMat = skyDome.material;
+            },
+
+            mode: function () { return (game.userSettings && game.userSettings.atmosphereMode) || 'daylight'; },
+
+            // Uniforms for the atmosphere; the sun comes from the real light
+            applyLook: function (rebuildEnv) {
+                if (!this.mat) return;
+                const L = ULTRA_SKY_LOOK[this.mode()] || ULTRA_SKY_LOOK.daylight;
+                const u = this.mat.uniforms;
+                const d = this._dir.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
+                if (L.night) {
+                    u.uMoonDir.value.copy(d);
+                    u.uSunDir.value.set(d.x, -0.18, d.z).normalize();
+                } else u.uSunDir.value.copy(d);
+                u.uRayleigh.value = L.ray; u.uTurbidity.value = L.tub; u.uMie.value = L.mie; u.uMieG.value = L.g;
+                u.uGain.value = L.gain; u.uTint.value.set(L.tint[0], L.tint[1], L.tint[2]);
+                u.uCover.value = L.cover; u.uCloudA.value = L.cloudA; u.uNight.value = L.night;
+                const preset = MAP_PRESETS[game.mapPreset] || MAP_PRESETS.ascent;
+                u.uGround.value.setHex(preset.floorColor || L.ground).convertSRGBToLinear().lerp(this._c.setHex(L.ground).convertSRGBToLinear(), 0.6);
+                if (rebuildEnv && this.on) { this.envKey = ''; this.buildEnv(); }
+            },
+
+            set: function (on) {
+                this.on = !!on;
+                if (on) {
+                    this.stdEnv = envBuilder.texture;
+                    skyDome.material = this.mat;
+                    this.applyLook(false);
+                    if (this.envTex) scene.environment = this.envTex;
+                } else {
+                    skyDome.material = this.stdMat;
+                    if (envBuilder.texture) scene.environment = envBuilder.texture;
+                }
+            },
+
+            // The sky's lighting: a PMREM of the disc-free sky (scaled to the old
+            // environment's overall level for this atmosphere)
+            buildEnv: function (force) {
+                if (!this.mat) return;
+                const mode = this.mode();
+                const key = mode + ':' + game.mapPreset + ':' + this._dir.toArray().map((v) => v.toFixed(3)).join(',');
+                if (!force && key === this.envKey && this.envTex) return;
+                this.envKey = key;
+                const L = ULTRA_SKY_LOOK[mode] || ULTRA_SKY_LOOK.daylight;
+                // (uGain is shared with the dome: scaled for this one render only)
+                const gu = this.envMat.uniforms.uGain, g = gu.value;
+                gu.value = g * L.env;
+                const pm = envBuilder.pmrem || (envBuilder.pmrem = new THREE.PMREMGenerator(renderer));
+                const rt = pm.fromScene(this.envScene, 0.0);
+                gu.value = g;
+                const old = this.envTex;
+                this.envTex = rt.texture;
+                if (this.on) scene.environment = this.envTex;
+                if (old && old !== this.envTex) old.dispose();
+            },
+
+            // Built in the background the first time the tier is used on a map/mode
+            envJob: function () {
+                if (!this.mat) return null;
+                if (!this._job) this._job = { step: () => { this.applyLook(false); this.buildEnv(false); return true; } };
+                return this._job;
+            },
+
+            update: function (now) {
+                this.mat.uniforms.uTime.value = (now * 0.001) % 10000;
+            },
+
+            warm: function () {
+                this.applyLook(false);
+            }
+        };
+
+        // ---- (features filled in below) ----
+        // ---- Ultra Realism: generated PBR surface sets ----
+        // Eight tileable 512 px layers, each 2 m across in the world: 0 concrete,
+        // 1 plaster, 2 stone, 3 wood, 4 metal, 5 glass, 6 floor pavers, 7 roof tiles.
+        // Per layer, texture A holds the albedo as a variation around the piece's own
+        // colour (so every map keeps its palette) plus ambient occlusion, and texture
+        // N holds the normal (x, y), roughness and metalness. Generated off the main
+        // thread in a worker (main thread in small steps if workers are unavailable),
+        // then uploaded one layer at a time into two texture arrays.
+        function ultraTexGenerate(SIZE, layer) {
+            const N = SIZE * SIZE, MASK = SIZE - 1;
+            let seed = 9173 + layer * 7919;
+            const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+            const tab = new Float32Array(65536);
+            for (let i = 0; i < tab.length; i++) tab[i] = rnd();
+            // Periodic value noise: px x py cells across the texture (tiles seamlessly)
+            const noise = (u, v, px, py) => {
+                const x = u * px, y = v * py, xi = Math.floor(x), yi = Math.floor(y);
+                let fx = x - xi, fy = y - yi;
+                fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+                const x0 = ((xi % px) + px) % px, x1 = (x0 + 1) % px, y0 = ((yi % py) + py) % py, y1 = (y0 + 1) % py;
+                const a = tab[((y0 & 255) << 8) | (x0 & 255)], b = tab[((y0 & 255) << 8) | (x1 & 255)];
+                const c = tab[((y1 & 255) << 8) | (x0 & 255)], d = tab[((y1 & 255) << 8) | (x1 & 255)];
+                const ab = a + (b - a) * fx;
+                return ab + (c + (d - c) * fx - ab) * fy;
+            };
+            const fbm = (u, v, px, py, oct) => {
+                let s = 0, amp = 0.5, norm = 0;
+                for (let o = 0; o < oct; o++) { s += noise(u, v, Math.min(256, px << o), Math.min(256, py << o)) * amp; norm += amp; amp *= 0.5; }
+                return s / norm;
+            };
+            const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+            const cuts = (minLen, maxLen) => {
+                const out = []; let x = rnd() * SIZE; const start = x;
+                for (;;) { out.push(Math.floor(x) & MASK); const len = minLen + rnd() * (maxLen - minLen); if (x + len > start + SIZE - minLen * 0.8) break; x += len; }
+                return out.sort((p, q) => p - q);
+            };
+            const cutAt = (list, x) => {
+                let dist = SIZE, id = list.length - 1;
+                for (let i = 0; i < list.length; i++) { const d = Math.abs(x - list[i]); dist = Math.min(dist, d, SIZE - d); if (x >= list[i]) id = i; }
+                return [dist, id];
+            };
+            let k = 1.0;
+            const H = new Float32Array(N), R = new Float32Array(N), Cr = new Float32Array(N), Cg = new Float32Array(N), Cb = new Float32Array(N), Mt = new Float32Array(N), AOx = new Float32Array(N);
+            const kk = layer === 7 ? 1.6 : layer === 4 ? 1.4 : layer === 5 ? 0.6 : 1.1;
+            const cl = (x) => Math.max(0, Math.min(255, Math.round(x)));
+            let mr = 0, mg = 0, mb = 0, m = 1, A = null, Nn = null;
+            // Pass 1, one row: height, colour, roughness, metalness, occlusion
+            const row1 = (y) => {
+                const v = y / SIZE;
+                for (let x = 0; x < SIZE; x++) {
+                    const u = x / SIZE, i = y * SIZE + x;
+                    let h = 0, r = 0.8, cr = 1, cg = 1, cb = 1, mt = 0, ao = 1;
+                    if (layer === 0) {            // concrete: 2 x 1 m cast panels, ties, pores, stains, streaks
+                        const lx = x, ly = y & 255;
+                        const sd = Math.min(lx, SIZE - lx, ly, 256 - ly);
+                        h = sm(0, 4, sd);
+                        const tx = ((x + 128) & 255) - 128, ty = ((ly + 64) & 127) - 64, td = Math.sqrt(tx * tx + ty * ty);
+                        const tie = td < 5 ? 1 - td / 5 : 0;
+                        const fine = fbm(u, v, 48, 48, 3), pore = noise(u, v, 160, 160);
+                        h += (fine - 0.5) * 0.3 - Math.max(0, pore - 0.86) * 3 - 0.6 * tie;
+                        const stain = fbm(u, v, 4, 4, 3), streak = noise(u, v, 40, 3);
+                        const tone = (noise(u, v, 2, 4) - 0.5) * 0.12;
+                        const g = (0.9 + 0.22 * stain + tone) * (1 - 0.16 * streak * streak) * (1 - 0.4 * tie);
+                        cr = g * (0.99 + 0.03 * stain); cg = g; cb = g * (1.02 - 0.04 * stain);
+                        r = 0.86 + (fine - 0.5) * 0.12 + (1 - h) * 0.06;
+                        ao = (1 - 0.5 * tie) * (sd < 2 ? 0.75 : 1);
+                    } else if (layer === 1) {     // plaster: warm mottled stucco, trowel marks, cracks, patches of brick
+                        const big = fbm(u, v, 3, 3, 4), mid = fbm(u, v, 12, 12, 3), trowel = noise(u, v, 6, 26);
+                        const crack = Math.abs(fbm(u + 0.31, v + 0.17, 5, 5, 4) - 0.5);
+                        const cr1 = (crack < 0.007 ? 1 - crack / 0.007 : 0) * sm(0.55, 0.7, fbm(u + 0.13, v + 0.71, 2, 2, 2));
+                        const patch = sm(0.735, 0.765, fbm(u + 0.5, v + 0.2, 3, 3, 3));
+                        h = 0.5 + (mid - 0.5) * 0.25 + (trowel - 0.5) * 0.12 - cr1 * 0.5 - patch * 0.45;
+                        let g = 0.88 + 0.24 * big + 0.08 * (mid - 0.5);
+                        cr = g * 1.03; cg = g; cb = g * 0.93;
+                        if (patch > 0) {          // brick showing through
+                            const by = Math.floor(v * 32), bx = (u * 16 + (by & 1) * 0.5) % 1 * 16;
+                            const mort = Math.min(Math.abs((v * 32) % 1 - 0.5) > 0.42 ? 0 : 1, Math.abs(bx % 1 - 0.5) > 0.44 ? 0 : 1);
+                            const bc = 0.75 + 0.3 * noise(Math.floor(u * 16) / 16, by / 32, 64, 64);
+                            cr = cr * (1 - patch) + patch * (mort ? 1.25 * bc : 0.95);
+                            cg = cg * (1 - patch) + patch * (mort ? 0.72 * bc : 0.9);
+                            cb = cb * (1 - patch) + patch * (mort ? 0.55 * bc : 0.82);
+                            h -= patch * (mort ? 0 : 0.2);
+                        }
+                        cr *= 1 - 0.35 * cr1; cg *= 1 - 0.35 * cr1; cb *= 1 - 0.35 * cr1;
+                        r = 0.88 - 0.06 * big + 0.05 * patch;
+                        ao = 1 - 0.4 * cr1 - 0.15 * patch;
+                    } else if (layer === 2) {     // stone: 0.5 m courses of staggered blocks, chipped arrises
+                        if (!H.rows) { H.rows = []; for (let q = 0; q < 4; q++) H.rows.push(cuts(160, 300)); H.tones = []; for (let q = 0; q < 64; q++) H.tones.push((rnd() - 0.5) * 0.24); }
+                        const row = y >> 7, ly = y & 127;
+                        const [cd, cid] = cutAt(H.rows[row], x);
+                        const sd = Math.min(cd, ly, 128 - ly);
+                        const mottle = fbm(u, v, 8, 8, 4), chip = fbm(u, v, 32, 32, 3);
+                        h = sm(1.5, 8, sd);
+                        if (sd < 12) h -= Math.max(0, chip - 0.58) * 2 * (1 - sd / 12);
+                        h += (fbm(u, v, 80, 80, 2) - 0.5) * 0.16;
+                        const tone = H.tones[(row * 8 + cid) & 63];
+                        const g = sd < 2.5 ? 0.62 : (1 + tone) * (0.84 + 0.3 * mottle);
+                        cr = g * (1.02 + tone * 0.2); cg = g; cb = g * (0.96 - tone * 0.2);
+                        r = sd < 2.5 ? 0.95 : 0.78 + (mottle - 0.5) * 0.2;
+                        ao = sd < 2.5 ? 0.6 : 1;
+                    } else if (layer === 3) {     // wood: 25 cm planks, grain, knots, nails
+                        if (!H.rows) { H.rows = []; for (let q = 0; q < 8; q++) H.rows.push(cuts(200, 380)); H.tones = []; for (let q = 0; q < 64; q++) H.tones.push((rnd() - 0.5) * 0.3); }
+                        const row = y >> 6, ly = y & 63;
+                        const [cd, cid] = cutAt(H.rows[row], x);
+                        const sd = Math.min(cd, ly, 64 - ly);
+                        h = sm(0, 3.5, sd);
+                        const warp = fbm(u, v, 3, 12, 3);
+                        const grain = 0.5 + 0.5 * Math.sin((y + warp * 40) * 0.9 + noise(u, v, 2, 64) * 6);
+                        const fibre = noise(u, v, 4, 256);
+                        const kx = (x - (H.rows[row][cid] + 90)) / 14, ky = (ly - 32) / 9, kn = Math.exp(-(kx * kx + ky * ky));
+                        h += (grain - 0.5) * 0.07 + (fibre - 0.5) * 0.05 - kn * 0.2;
+                        const tone = H.tones[(row * 8 + cid) & 63];
+                        const g = (1 + tone) * (0.8 + 0.22 * grain + 0.1 * fibre) * (1 - 0.45 * kn);
+                        cr = g * 1.06; cg = g * 0.98; cb = g * 0.88;
+                        r = 0.7 + (fibre - 0.5) * 0.12 + (sd < 2 ? 0.15 : 0);
+                        ao = sd < 2 ? 0.6 : 1 - 0.3 * kn;
+                    } else if (layer === 4) {     // metal: painted sheet, scratches to bare metal, rust in seams, rivets
+                        const ly = y & 255, seam = Math.min(ly, 256 - ly);
+                        const rx = (x & 63) - 31, ry = Math.min(Math.abs(ly - 12), Math.abs(ly - 244)), rd = Math.sqrt(rx * rx + ry * ry);
+                        const scr = Math.pow(Math.abs(noise(u, v, 3, 90) - 0.5) * 2, 18) * sm(0.45, 0.8, fbm(u, v, 5, 5, 3));
+                        const rust = sm(0.62, 0.82, fbm(u, v, 6, 6, 4)) * (seam < 18 ? 1 : 0.35) + sm(0.75, 0.9, fbm(u + 0.3, v, 10, 10, 3)) * 0.5;
+                        h = (seam < 3 ? -0.5 * (1 - seam / 3) : 0) + (rd < 4 ? 0.6 * (1 - rd / 4) : 0) - 0.06 * scr + (fbm(u, v, 64, 64, 2) - 0.5) * 0.06;
+                        const paint = 0.95 + 0.1 * fbm(u, v, 20, 20, 2);
+                        cr = paint; cg = paint; cb = paint;
+                        const rr = Math.min(1, rust);
+                        cr = cr * (1 - rr) + rr * 1.45; cg = cg * (1 - rr) + rr * 0.75; cb = cb * (1 - rr) + rr * 0.45;
+                        const bare = scr * (1 - rr);
+                        cr = cr * (1 - bare) + bare * 1.5; cg = cg * (1 - bare) + bare * 1.5; cb = cb * (1 - bare) + bare * 1.55;
+                        mt = Math.min(1, bare * 1.2);
+                        r = 0.55 + 0.35 * rr - 0.3 * bare;
+                        ao = seam < 3 ? 0.65 : 1 - 0.2 * rr;
+                    } else if (layer === 5) {     // glass: faint waviness, smudges and dust toward the bottom
+                        h = (fbm(u, v, 3, 12, 3) - 0.5) * 0.08;
+                        const dust = fbm(u, v, 6, 6, 4) * 0.6 + Math.max(0, 0.4 - v) * 0.8;
+                        const smudge = sm(0.6, 0.85, fbm(u + 0.7, v, 4, 4, 3));
+                        cr = 0.97; cg = 1.0; cb = 1.03;
+                        r = 0.05 + 0.25 * smudge + 0.2 * dust;
+                        ao = 1 - Math.min(0.8, dust * 0.5 + smudge * 0.5);   // the glass shader reads 1 - ao as dirt
+                    } else if (layer === 6) {     // floor pavers: 50 x 25 cm stones in running bond, grout, worn edges
+                        const row = y >> 6, ly = y & 63, off = (row & 1) * 64, lx = (x + off) & 127;
+                        const sd = Math.min(lx, 128 - lx, ly, 64 - ly);
+                        const id = ((row * 7 + ((x + off) >> 7)) * 13) & 255;
+                        const tone = (tab[id * 97 & 65535] - 0.5) * 0.3;
+                        const wear = fbm(u, v, 24, 24, 3);
+                        h = sm(0.5, 5, sd) * (0.9 + 0.1 * tab[(id * 31) & 65535]) + (wear - 0.5) * 0.1;
+                        const g = sd < 1.5 ? 0.55 : (1 + tone) * (0.86 + 0.24 * fbm(u, v, 10, 10, 3));
+                        cr = g * (1.01 + tone * 0.15); cg = g; cb = g * (0.97 - tone * 0.1);
+                        r = sd < 1.5 ? 0.95 : 0.72 + (wear - 0.5) * 0.2 - 0.12 * sm(4, 10, sd) * wear;
+                        ao = sd < 1.5 ? 0.55 : 1;
+                    } else {                      // roof tiles: barrel tile courses, terracotta, dark grooves
+                        const course = y >> 6, ly = y & 63, off = (course & 1) * 32, lx = (x + off) & 63;
+                        const prof = Math.sin((lx / 64) * Math.PI);
+                        const lap = sm(0, 10, ly) * (1 - 0.25 * sm(48, 64, ly));
+                        h = prof * 0.8 * lap + (fbm(u, v, 40, 40, 2) - 0.5) * 0.08;
+                        const id = ((course * 11 + ((x + off) >> 6)) * 7) & 255;
+                        const tone = (tab[(id * 53) & 65535] - 0.5) * 0.35;
+                        const g = (1 + tone) * (0.85 + 0.25 * fbm(u, v, 12, 12, 3)) * (0.55 + 0.45 * prof);
+                        cr = g * 1.25; cg = g * 0.78; cb = g * 0.62;
+                        const moss = sm(0.7, 0.85, fbm(u, v, 8, 8, 4)) * (1 - prof);
+                        cr = cr * (1 - moss) + moss * 0.55; cg = cg * (1 - moss) + moss * 0.65; cb = cb * (1 - moss) + moss * 0.4;
+                        r = 0.75 + 0.15 * moss;
+                        ao = 0.55 + 0.45 * prof;
+                        k = 1.6;
+                    }
+                    H[i] = h; R[i] = r; Cr[i] = cr; Cg[i] = cg; Cb[i] = cb; Mt[i] = mt; AOx[i] = ao;
+                    mr += cr; mg += cg; mb += cb;
+                }
+            };
+            // Pass 2, one row: normal from the height, cavity occlusion, mean-normalised
+            // albedo (each map keeps its colour), packed to bytes
+            const row2 = (y) => {
+                const yd = ((y - 1) & MASK) * SIZE, yu = ((y + 1) & MASK) * SIZE, yr = y * SIZE;
+                const yd3 = ((y - 3) & MASK) * SIZE, yu3 = ((y + 3) & MASK) * SIZE;
+                for (let x = 0; x < SIZE; x++) {
+                    const i = yr + x, o = i * 4;
+                    const nx = (H[yr + ((x - 1) & MASK)] - H[yr + ((x + 1) & MASK)]) * kk;
+                    const ny = (H[yd + x] - H[yu + x]) * kk;
+                    const inv = 1 / Math.sqrt(nx * nx + ny * ny + 1);
+                    const around = (H[yr + ((x - 3) & MASK)] + H[yr + ((x + 3) & MASK)] + H[yd3 + x] + H[yu3 + x]) * 0.25;
+                    const cav = Math.max(0, Math.min(1, 1 - (around - H[i]) * 0.9));
+                    A[o] = cl(Cr[i] / m * 127.5); A[o + 1] = cl(Cg[i] / m * 127.5); A[o + 2] = cl(Cb[i] / m * 127.5);
+                    A[o + 3] = cl(AOx[i] * cav * 255);
+                    Nn[o] = cl((nx * inv * 0.5 + 0.5) * 255); Nn[o + 1] = cl((ny * inv * 0.5 + 0.5) * 255);
+                    Nn[o + 2] = cl(R[i] * 255); Nn[o + 3] = cl(Mt[i] * 255);
+                }
+            };
+            // Resumable: step(rows) does that many rows and returns true when the
+            // layer is finished (out = { a, n })
+            const st = { phase: 0, y: 0, out: null };
+            st.step = (rows) => {
+                for (let n = 0; n < rows; n++) {
+                    if (st.phase === 0) {
+                        row1(st.y++);
+                        if (st.y >= SIZE) {
+                            st.phase = 1; st.y = 0;
+                            m = (mr + mg + mb) / (3 * N) || 1;
+                            A = new Uint8Array(N * 4); Nn = new Uint8Array(N * 4);
+                        }
+                    } else if (st.phase === 1) {
+                        row2(st.y++);
+                        if (st.y >= SIZE) { st.phase = 2; st.out = { a: A, n: Nn }; }
+                    }
+                    if (st.phase === 2) return true;
+                }
+                return false;
+            };
+            return st;
+        }
+
+        const ULTRA_TEX_SIZE = 512, ULTRA_TEX_LAYERS = 8, ULTRA_TEX_LEVELS = 10;
+        // Generated in a worker as soon as the game has loaded (machines with four or
+        // more threads; otherwise when the tier is first used), kept as bytes, and
+        // uploaded to the GPU one layer per frame only once the tier is switched on,
+        // so the lower tiers never hold these textures in video memory. Until every
+        // layer is in, the surfaces keep the High Detail look (uMatOn = 0).
+        const ultraTex = {
+            neutralA: null, neutralN: null,   // 1 px placeholders bound before the sets exist
+            albedo: null, normal: null,       // the full arrays (storage made on first upload)
+            ready: false,
+            started: false,
+            worker: null,
+            layers: [],                       // generated layers waiting for upload, by index
+            generated: 0,
+            uploaded: 0,
+            gen: null, genLayer: 0,           // main-thread generation without a worker
+            build: function () {
+                if (this.neutralA) return;
+                const mk = (px) => {
+                    const d = new Uint8Array(4 * ULTRA_TEX_LAYERS);
+                    for (let l = 0; l < ULTRA_TEX_LAYERS; l++) d.set(px, l * 4);
+                    const t = new THREE.DataTexture2DArray(d, 1, 1, ULTRA_TEX_LAYERS);
+                    t.format = THREE.RGBAFormat; t.type = THREE.UnsignedByteType;
+                    t.minFilter = t.magFilter = THREE.NearestFilter;
+                    t.needsUpdate = true;
+                    return t;
+                };
+                this.neutralA = mk([128, 128, 128, 255]);
+                this.neutralN = mk([128, 128, 191, 0]);
+            },
+            // Starts generating (worker if possible); safe to call repeatedly
+            start: function () {
+                if (this.started) return;
+                this.started = true;
+                try {
+                    if (typeof Worker === 'undefined' || typeof Blob === 'undefined') throw new Error('no workers');
+                    const src = 'const ultraTexGenerate = ' + ultraTexGenerate.toString() + ';\n' +
+                        'onmessage = (e) => { const g = ultraTexGenerate(e.data.size, e.data.layer); while (!g.step(1 << 20)); postMessage({ layer: e.data.layer, a: g.out.a, n: g.out.n }, [g.out.a.buffer, g.out.n.buffer]); };';
+                    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+                    const w = new Worker(url);
+                    URL.revokeObjectURL(url);
+                    w.onmessage = (e) => {
+                        if (this.layers[e.data.layer] || this.ready) return;
+                        this.layers[e.data.layer] = { a: e.data.a, n: e.data.n };
+                        this.generated++;
+                        if (this.generated >= ULTRA_TEX_LAYERS) this._stopWorker();
+                    };
+                    w.onerror = (ev) => { if (ev && ev.preventDefault) ev.preventDefault(); this._stopWorker(); };
+                    this.worker = w;
+                    for (let l = 0; l < ULTRA_TEX_LAYERS; l++) w.postMessage({ size: ULTRA_TEX_SIZE, layer: l });
+                } catch (err) {
+                    this.worker = null;
+                }
+            },
+            _stopWorker: function () {
+                if (this.worker) { this.worker.terminate(); this.worker = null; }
+            },
+            // Main thread, a few rows at a time (only when no worker is running)
+            _generateSome: function (budgetMs) {
+                const t0 = performance.now();
+                while (this.genLayer < ULTRA_TEX_LAYERS) {
+                    if (this.layers[this.genLayer]) { this.genLayer++; this.gen = null; continue; }
+                    if (!this.gen) this.gen = ultraTexGenerate(ULTRA_TEX_SIZE, this.genLayer);
+                    if (this.gen.step(4)) {
+                        this.layers[this.genLayer] = this.gen.out;
+                        this.generated++;
+                        this.gen = null; this.genLayer++;
+                    }
+                    if (budgetMs !== Infinity && performance.now() - t0 > budgetMs) return;
+                }
+            },
+            // GPU storage for both arrays, managed here (three only binds them)
+            _alloc: function () {
+                if (this.albedo) return;
+                const gl = renderer.getContext(), S = ULTRA_TEX_SIZE, L = ULTRA_TEX_LAYERS;
+                const aniso = renderer.extensions.get('EXT_texture_filter_anisotropic');
+                const mk = () => {
+                    const t = new THREE.DataTexture2DArray(null, S, S, L);
+                    t.format = THREE.RGBAFormat; t.type = THREE.UnsignedByteType;
+                    const glTex = gl.createTexture();
+                    renderer.state.activeTexture(gl.TEXTURE0);
+                    renderer.state.bindTexture(gl.TEXTURE_2D_ARRAY, glTex);
+                    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, ULTRA_TEX_LEVELS, gl.RGBA8, S, S, L);
+                    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+                    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+                    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+                    if (aniso) gl.texParameterf(gl.TEXTURE_2D_ARRAY, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, renderer.capabilities.getMaxAnisotropy()));
+                    const props = renderer.properties.get(t);
+                    props.__webglTexture = glTex;
+                    props.__webglInit = true;
+                    props.__version = t.version;   // three binds it as is and never re-uploads
+                    return t;
+                };
+                this.albedo = mk();
+                this.normal = mk();
+            },
+            _upload: function (l) {
+                const gl = renderer.getContext(), S = ULTRA_TEX_SIZE, d = this.layers[l];
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+                gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+                for (const [tex, data] of [[this.albedo, d.a], [this.normal, d.n]]) {
+                    renderer.state.activeTexture(gl.TEXTURE0);
+                    renderer.state.bindTexture(gl.TEXTURE_2D_ARRAY, renderer.properties.get(tex).__webglTexture);
+                    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, l, S, S, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
+                }
+                d.up = true;
+                this.uploaded++;
+            },
+            _finishUpload: function () {
+                const gl = renderer.getContext();
+                for (const tex of [this.albedo, this.normal]) {
+                    renderer.state.activeTexture(gl.TEXTURE0);
+                    renderer.state.bindTexture(gl.TEXTURE_2D_ARRAY, renderer.properties.get(tex).__webglTexture);
+                    gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+                }
+                this.layers = this.layers.map(() => ({ up: true }));   // drop the CPU copies
+                this.ready = true;
+                ultraMats.onTexturesReady();
+            },
+            // ultraPrep step while the tier is on: generate (fallback), then one layer up
+            step: function (budgetMs) {
+                if (this.ready) return true;
+                this.start();
+                if (!this.worker) this._generateSome(budgetMs);
+                for (let l = 0; l < ULTRA_TEX_LAYERS; l++) {
+                    const d = this.layers[l];
+                    if (d && !d.up) { this._alloc(); this._upload(l); break; }
+                }
+                if (this.uploaded >= ULTRA_TEX_LAYERS) this._finishUpload();
+                return this.ready;
+            },
+            // Everything now, on this thread (tests, or a saved Ultra choice at load)
+            finishSync: function () {
+                if (this.ready) return;
+                this._stopWorker();
+                this.started = true;
+                this._generateSome(Infinity);
+                while (!this.ready) this.step(Infinity);
+            },
+            job: function () {
+                if (!this._job) this._job = { step: () => this.step(2.5) };
+                return this._job;
+            }
+        };
+
+        // ---- Ultra Realism: PBR map, floor and glass materials ----
+        // Swapped onto the map batches, the High Detail decor, the floor and the glass
+        // panes while Materials or Lighting is on. Map pieces are boxes and cylinders;
+        // each face is mapped in world space along its own axis (planar per face, so
+        // the surface runs on across neighbouring pieces and render slices), cylinders
+        // wrap round their own axis (pipes may lie on their side). The shader keeps the
+        // High Detail touches (edges that catch the light, edge wear, contact shading)
+        // and the weather, and adds what the Lighting feature bakes: sky visibility and
+        // bounce/lamp light from a 3D texture over the map, and a sharper near shadow
+        // cascade blended into the sun's own shadow. Until the generated sets are on
+        // the GPU (and with Materials off) it shows the High Detail surfaces instead.
+        const ULTRA_SHADOW_LINE = 'directLight.color *= all( bvec2( directLight.visible, receiveShadow ) ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;';
+        const ULTRA_LIGHTS_BEGIN = THREE.ShaderChunk.lights_fragment_begin.replace(ULTRA_SHADOW_LINE,
+            'directLight.color *= all( bvec2( directLight.visible, receiveShadow ) ) ? ultraNearShadow( getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) ) : 1.0;');
+        const ULTRA_NEAR_OK = ULTRA_LIGHTS_BEGIN !== THREE.ShaderChunk.lights_fragment_begin;
+        const ultraU = {
+            tUA: { value: null }, tUN: { value: null }, uMatOn: { value: 0 }, uLightOn: { value: 0 },
+            tVol: { value: null }, uVolOn: { value: 0 }, uVolMin: { value: new THREE.Vector3(-50, 0, -50) },
+            uVolInvSize: { value: new THREE.Vector3(1 / 100, 1 / 12, 1 / 100) }, uVolGain: { value: 1 },
+            tNearShadow: { value: null }, uNearMatrix: { value: new THREE.Matrix4() }, uNearParams: { value: new THREE.Vector4(2048, -0.0003, 1, 0) },
+            uPlaster: { value: 1 }, uLampGlow: { value: 1 }, uFloorAlb: { value: new THREE.Color(0.2, 0.2, 0.2) },
+            tProbe: { value: null }, uProbeMix: { value: 0 }, uProbeGain: { value: 1.6 }
+        };
+        const ULTRA_GLSL_PARS = `
+            precision highp sampler2DArray; precision highp sampler3D;
+            uniform sampler2DArray tUA; uniform sampler2DArray tUN; uniform float uMatOn; uniform float uLightOn;
+            uniform sampler3D tVol; uniform float uVolOn; uniform vec3 uVolMin; uniform vec3 uVolInvSize; uniform float uVolGain;
+            uniform sampler2D tNearShadow; uniform mat4 uNearMatrix; uniform vec4 uNearParams; uniform float uPlaster; uniform float uLampGlow;
+            uniform sampler2D tProbe; uniform float uProbeMix; uniform float uProbeGain;
+            vec4 ultraVol(vec3 wp, vec3 wn) {
+                if (uVolOn < 0.5) return vec4(0.0, 0.0, 0.0, 1.0);
+                vec3 q = (wp + wn * 0.45 - uVolMin) * uVolInvSize;
+                return texture(tVol, clamp(q, vec3(0.002), vec3(0.998)));
+            }`;
+        // Near cascade: the same PCF lookup on a 2048 px map covering ~28 m around the
+        // player, blended out over its last 1.7 m into the sun's wide shadow map
+        const ULTRA_GLSL_NEAR = `
+            #ifdef USE_SHADOWMAP
+            float ultraNearShadow(float farShadow) {
+                if (uNearParams.w < 0.5) return farShadow;
+                vec3 gn = normalize((vec4(normalize(vNormal), 0.0) * viewMatrix).xyz);
+                vec4 sc = uNearMatrix * vec4(vWPos + gn * 0.025, 1.0);
+                vec3 p = sc.xyz / sc.w;
+                float edge = min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y));
+                if (edge <= 0.0 || p.z >= 1.0 || p.z <= 0.0) return farShadow;
+                float nearShadow = getShadow(tNearShadow, vec2(uNearParams.x), uNearParams.y, uNearParams.z, sc);
+                return mix(farShadow, nearShadow, smoothstep(0.0, 0.06, edge));
+            }
+            #else
+            float ultraNearShadow(float farShadow) { return farShadow; }
+            #endif`;
+        // Surface AO and the baked sky visibility darken indirect light (and occlude
+        // its reflections), then the baked bounce and lamp light is added
+        const ULTRA_GLSL_AO = `
+            {
+                float ultraAO = uAOt;
+                vec4 vol = ultraVol(vWPos, normalize((vec4(normal, 0.0) * viewMatrix).xyz));
+                if (uLightOn > 0.5) ultraAO *= mix(1.0, vol.a, 0.85);
+                reflectedLight.indirectDiffuse *= ultraAO;
+                #if defined( USE_ENVMAP ) && defined( STANDARD )
+                    float dotNVu = saturate(dot(geometry.normal, geometry.viewDir));
+                    reflectedLight.indirectSpecular *= computeSpecularOcclusion(dotNVu, ultraAO, material.specularRoughness);
+                #endif
+                if (uLightOn > 0.5) reflectedLight.indirectDiffuse += vol.rgb * uVolGain * material.diffuseColor;
+            }`;
+        const ultraMats = {
+            on: false,
+            mapMat: null, floorMat: null, glassMat: null,
+            usingUltra: false,
+            stdGlass: null,
+            holder: null,
+
+            build: function () {
+                if (this.mapMat) return;
+                ultraTex.build();
+                ultraU.tUA.value = ultraTex.neutralA;
+                ultraU.tUN.value = ultraTex.neutralN;
+                const vol = new THREE.DataTexture3D(new Uint8Array([0, 0, 0, 255]), 1, 1, 1);
+                vol.format = THREE.RGBAFormat; vol.type = THREE.UnsignedByteType;
+                vol.minFilter = vol.magFilter = THREE.LinearFilter; vol.unpackAlignment = 1; vol.needsUpdate = true;
+                ultraU.tVol.value = vol;
+                const ns = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
+                ns.needsUpdate = true;
+                ultraU.tNearShadow.value = ns;
+                this.mapMat = this._mapMaterial();
+                this.floorMat = this._floorMaterial();
+                this.glassMat = this._glassMaterial();
+                // The glass panes come and go with the map: this hidden pane keeps the
+                // Ultra glass program in every warm-up compile
+                this.holder = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.01), this.glassMat);
+                this.holder.visible = false;
+                this.holder.name = 'ultraGlassHolder';
+                scene.add(this.holder);
+            },
+
+            _mapMaterial: function () {
+                const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.3 });
+                m.onBeforeCompile = (s) => {
+                    Object.assign(s.uniforms, ultraU, weatherSurf, abilityLightU);
+                    s.uniforms.uDetail = mapDetailUniform;
+                    s.uniforms.uHiDetail = mapHiDetailUniform;
+                    const tx = surfaceTextureFactory.textures;
+                    s.uniforms.tSurf0 = { value: tx.concrete };
+                    s.uniforms.tSurf1 = { value: tx.stone };
+                    s.uniforms.tSurf2 = { value: tx.metal };
+                    s.uniforms.tSurf3 = { value: tx.wood };
+                    s.vertexShader = s.vertexShader
+                        .replace('#include <common>', `#include <common>
+                            varying vec3 vWPos; attribute vec4 aSurf; varying vec4 vSurf; varying vec3 vLocal; varying vec3 vScale;
+                            varying vec3 vAxis; varying vec3 vAxisX; varying vec3 vRadial;`)
+                        .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+                            vec4 wp4 = vec4(transformed, 1.0);
+                            vLocal = transformed;
+                            vScale = vec3(1.0);
+                            mat3 im = mat3(1.0);
+                            #ifdef USE_INSTANCING
+                                wp4 = instanceMatrix * wp4;
+                                im = mat3(instanceMatrix);
+                                vScale = vec3(length(im[0]), length(im[1]), length(im[2]));
+                            #endif
+                            vWPos = (modelMatrix * wp4).xyz;
+                            vAxis = normalize(im[1]);
+                            vAxisX = normalize(im[0]);
+                            vRadial = im * vec3(transformed.x, 0.0, transformed.z);
+                            vSurf = aSurf;`);
+                    s.fragmentShader = s.fragmentShader
+                        .replace('#include <common>', `#include <common>
+                            varying vec3 vWPos; varying vec4 vSurf; varying vec3 vLocal; varying vec3 vScale; varying vec3 vAxis; varying vec3 vAxisX; varying vec3 vRadial;
+                            uniform float uWet; uniform float uSnow; uniform float uSand;
+                            uniform float uDetail; uniform float uHiDetail;
+                            uniform sampler2D tSurf0; uniform sampler2D tSurf1; uniform sampler2D tSurf2; uniform sampler2D tSurf3;
+                            ${AL_GLSL}
+                            ${ULTRA_GLSL_PARS}
+                            float uh21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+                            float uvn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+                                return mix(mix(uh21(i), uh21(i+vec2(1.0,0.0)), f.x), mix(uh21(i+vec2(0.0,1.0)), uh21(i+vec2(1.0,1.0)), f.x), f.y); }`)
+                        .replace('#include <shadowmap_pars_fragment>', '#include <shadowmap_pars_fragment>\n' + ULTRA_GLSL_NEAR)
+                        .replace('#include <color_fragment>', `#include <color_fragment>
+                            vec3 uNw = vec3(0.0, 1.0, 0.0); float uRgh = -1.0; float uMtl = -1.0; float uAOt = 1.0; float uEmis = 0.0; float uHas = 0.0;
+                            float usid = vSurf.x;
+                            vec3 wN = normalize((vec4(normalize(vNormal), 0.0) * viewMatrix).xyz);
+                            if (uMatOn < 0.5 && uDetail > 0.0) {
+                                // High Detail grime and contact darkening (as the Cinematic map)
+                                float grime = uvn(vWPos.xz * 0.35 + vWPos.y * 0.5) * 0.6 + uvn(vWPos.xy * 1.9 + vWPos.zz) * 0.4;
+                                diffuseColor.rgb *= mix(1.0, (0.82 + 0.3 * grime) * mix(0.6, 1.0, smoothstep(0.0, 1.5, vWPos.y)), uDetail);
+                            }
+                            if (usid > 0.5 && (uMatOn > 0.5 || uHiDetail > 0.0)) {
+                                uHas = 1.0;
+                                float cyl = step(9.5, usid);
+                                float sid = usid - 10.0 * cyl;
+                                vec3 an = abs(wN);
+                                vec3 lp = vLocal, S = vScale;
+                                vec2 uv; vec3 tU; vec3 tV; vec3 tilt; float ed;
+                                bool side = cyl > 0.5 && abs(dot(wN, vAxis)) < 0.5;
+                                if (side) {
+                                    // Round a cylinder's own axis (upright columns, pipes on their side)
+                                    float r = S.x;
+                                    float ang = atan(lp.z, lp.x);
+                                    uv = vec2(ang * r, dot(vWPos, vAxis));
+                                    tV = vAxis; tU = normalize(cross(wN, vAxis));
+                                    ed = (0.5 - abs(lp.y)) * S.y;
+                                    tilt = vAxis * sign(lp.y) * (1.0 - smoothstep(0.0, clamp(0.05 * r, 0.02, 0.06), ed));
+                                } else {
+                                    // Planar in world space on the face's own axis
+                                    if (an.x > 0.5) { uv = vec2(vWPos.z, vWPos.y); tU = vec3(0.0, 0.0, 1.0); tV = vec3(0.0, 1.0, 0.0); }
+                                    else if (an.y > 0.5) { uv = vec2(vWPos.x, vWPos.z); tU = vec3(1.0, 0.0, 0.0); tV = vec3(0.0, 0.0, 1.0); }
+                                    else { uv = vec2(vWPos.x, vWPos.y); tU = vec3(1.0, 0.0, 0.0); tV = vec3(0.0, 1.0, 0.0); }
+                                    if (cyl < 0.5) {
+                                        vec3 e = (0.5 - abs(lp)) * S;
+                                        vec3 sg = sign(lp);
+                                        float R = clamp(0.035 * min(S.x, min(S.y, S.z)), 0.02, 0.07);
+                                        vec3 w = vec3(1.0) - smoothstep(vec3(0.0), vec3(R), e);
+                                        // Edges from the local box (pieces turned about y keep their bevels)
+                                        vec3 ln = vec3(dot(wN, vAxisX), dot(wN, vAxis), dot(wN, cross(vAxisX, vAxis)));
+                                        vec3 la = abs(ln);
+                                        if (la.x > 0.5) { ed = min(e.y, e.z); tilt = vec3(0.0, sg.y * w.y, sg.z * w.z); }
+                                        else if (la.y > 0.5) { ed = min(e.x, e.z); tilt = vec3(sg.x * w.x, 0.0, sg.z * w.z); }
+                                        else { ed = min(e.x, e.y); tilt = vec3(sg.x * w.x, sg.y * w.y, 0.0); }
+                                        tilt = vAxisX * tilt.x + vAxis * tilt.y + cross(vAxisX, vAxis) * tilt.z;
+                                    } else {
+                                        float r = S.x;
+                                        ed = (1.0 - length(lp.xz)) * r;
+                                        tilt = normalize(vRadial + 1e-4) * (1.0 - smoothstep(0.0, clamp(0.05 * r, 0.02, 0.06), ed));
+                                    }
+                                }
+                                float wear = (1.0 - smoothstep(0.0, 0.14, ed)) * smoothstep(0.42, 0.78, uvn(uv * 7.0 + vSurf.y * 31.0));
+                                vec3 tn = vec3(0.0, 0.0, 1.0);
+                                if (uMatOn > 0.5) {
+                                    // Surface id -> generated set (Ascent's tall stone is plaster over a stone plinth)
+                                    float layer = 2.0;
+                                    if (sid < 1.5) layer = 0.0;
+                                    else if (sid < 2.5) layer = (uPlaster > 0.5 && S.y > 3.0 && min(S.x, S.z) > 0.5 && vWPos.y > 0.9) ? 1.0 : 2.0;
+                                    else if (sid < 3.5) layer = 4.0;
+                                    else if (sid < 4.5) layer = 3.0;
+                                    else if (sid < 5.5) layer = wN.y > 0.3 ? 7.0 : 1.0;
+                                    else if (sid < 6.5) layer = 1.0;
+                                    else if (sid < 7.5) { layer = 5.0; uEmis = 1.0; }
+                                    else if (sid < 8.5) layer = 5.0;
+                                    // Roof courses run along the ridge
+                                    if (layer > 6.5 && abs(wN.x) > abs(wN.z)) { uv = vec2(vWPos.z, vWPos.x); tU = vec3(0.0, 0.0, 1.0); tV = vec3(1.0, 0.0, 0.0); }
+                                    vec2 tuv = uv * 0.5;
+                                    vec4 tA, tN;
+                                    if (layer > 0.5 && layer < 1.5) {
+                                        // Plaster: 4 m per tile, and a second, shifted copy mixed in
+                                        // by a world-space mask so no blotch repeats in a grid
+                                        tuv = uv * 0.25;
+                                        vec2 tuv2 = tuv * 0.83 + vec2(0.37, 0.61);
+                                        float bm = smoothstep(0.38, 0.62, uvn(uv * 0.29 + vec2(3.7, 1.3)));
+                                        tA = mix(texture(tUA, vec3(tuv, 1.0)), texture(tUA, vec3(tuv2, 1.0)), bm);
+                                        tN = mix(texture(tUN, vec3(tuv, 1.0)), texture(tUN, vec3(tuv2, 1.0)), bm);
+                                        // Lighter than the stone it covers; splash grime just above the
+                                        // plinth and streaks from the top
+                                        tA.rgb *= (sid < 2.5 ? 1.45 : 1.0) * mix(0.84, 1.0, smoothstep(0.9, 2.2, vWPos.y)) * (1.0 - 0.1 * smoothstep(0.55, 0.9, uvn(vec2(uv.x * 3.1, vWPos.y * 0.15))));
+                                    } else {
+                                        tA = texture(tUA, vec3(tuv, layer));
+                                        tN = texture(tUN, vec3(tuv, layer));
+                                    }
+                                    // Large-scale variation so the 2 m sets don't read as a repeat
+                                    float macro = uvn(vWPos.xz * 0.09 + vWPos.y * 0.05) * 0.6 + uvn((vWPos.xz + vWPos.yy) * 0.37) * 0.4;
+                                    diffuseColor.rgb *= tA.rgb * 2.0 * (0.88 + 0.24 * macro) * (1.0 + 0.22 * wear);
+                                    uAOt = tA.a;
+                                    vec2 nxy = tN.xy * 2.0 - 1.0;
+                                    tn = vec3(nxy, sqrt(max(0.0, 1.0 - dot(nxy, nxy))));
+                                    uRgh = tN.z * (0.92 + 0.16 * macro) * (1.0 - 0.3 * wear);
+                                    uMtl = layer > 3.5 && layer < 4.5 ? max(tN.w, wear * 0.85) : tN.w;
+                                } else {
+                                    // High Detail textures (Materials off, or while the sets upload)
+                                    float per = sid < 2.5 ? 4.0 : 2.0;
+                                    vec2 tuv = uv / per;
+                                    vec4 tex;
+                                    if (sid < 1.5) tex = texture2D(tSurf0, tuv);
+                                    else if (sid < 2.5) tex = texture2D(tSurf1, tuv);
+                                    else if (sid < 3.5) tex = texture2D(tSurf2, tuv);
+                                    else tex = texture2D(tSurf3, tuv);
+                                    vec2 txy = tex.xy * 2.0 - 1.0;
+                                    tn = vec3(txy, sqrt(max(0.0, 1.0 - dot(txy, txy))));
+                                    float alb = tex.z * 2.0;
+                                    float rgh = tex.w * 2.0;
+                                    if (sid > 3.5 && sid < 4.5) {
+                                        float frame = 1.0 - smoothstep(0.145, 0.155, ed);
+                                        float groove = smoothstep(0.13, 0.15, ed) * (1.0 - smoothstep(0.155, 0.18, ed));
+                                        alb *= mix(1.0, 0.8, frame) * (1.0 - 0.5 * groove) * (1.0 - 0.15 * wear);
+                                    } else if (sid > 2.5 && sid < 3.5) {
+                                        alb *= 1.0 + 0.45 * wear; rgh *= 1.0 - 0.5 * wear;
+                                    } else alb *= 1.0 + 0.25 * wear;
+                                    diffuseColor.rgb *= mix(1.0, alb, uHiDetail);
+                                    uRgh = clamp(0.7 * mix(1.0, rgh, uHiDetail), 0.04, 1.0);
+                                }
+                                uNw = normalize(wN * tn.z + tU * tn.x + tV * tn.y + tilt * 0.9);
+                                // Contact shading on the lower sides of pieces resting on others
+                                float lift = (lp.y + 0.5) * S.y;
+                                float raised = step(0.3, vWPos.y - lift) * (1.0 - an.y) * (1.0 - cyl) * step(1.0, S.y);
+                                uAOt *= mix(1.0, mix(0.68, 1.0, smoothstep(0.0, 0.6, lift)), raised);
+                            }
+                            // Without the baked light, a soft darkening near the floor (indirect only)
+                            if (uMatOn > 0.5 && (uLightOn < 0.5 || uVolOn < 0.5)) uAOt *= mix(0.62, 1.0, smoothstep(0.0, 1.4, vWPos.y));
+                            // Weather: wet walls with darker rain streaks, snow on tops, sand low down
+                            float wxRough = 1.0, wxAmt = 0.0;
+                            if (uWet + uSnow + uSand > 0.0) {
+                                float top = smoothstep(0.55, 0.85, wN.y);
+                                float streak = smoothstep(0.45, 0.85, uvn(vec2((vWPos.x + vWPos.z) * 2.3, vWPos.y * 0.18 + 3.0)));
+                                diffuseColor.rgb *= mix(1.0, 0.7 - 0.14 * streak * (1.0 - top), uWet);
+                                float sn = uvn(vWPos.xz * 1.7 + 4.0);
+                                float snowT = uSnow * top * mix(0.75, 1.0, sn);
+                                float snowB = uSnow * (1.0 - smoothstep(0.0, 0.35 + 0.3 * sn, vWPos.y)) * (1.0 - top) * 0.85;
+                                float snowC = max(snowT, snowB);
+                                diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.45, 0.52), snowC);
+                                float sandA = uSand * max(top * 0.65, (1.0 - smoothstep(0.0, 0.9, vWPos.y)) * 0.7);
+                                diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.4, 0.29, 0.16), sandA);
+                                wxRough = mix(0.34 - 0.16 * streak, 0.8, snowC);
+                                wxAmt = max(uWet, snowC);
+                                uMtl = mix(uMtl, 0.0, snowC);
+                            }`)
+                        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+                            if (uRgh >= 0.0) roughnessFactor = clamp(uRgh, 0.04, 1.0);
+                            roughnessFactor = mix(roughnessFactor, wxRough, wxAmt);`)
+                        .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+                            if (uMtl >= 0.0) metalnessFactor = uMtl;`)
+                        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+                            if (uHas > 0.5) normal = normalize((viewMatrix * vec4(uNw, 0.0)).xyz);`)
+                        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+                            totalEmissiveRadiance += diffuseColor.rgb * uLampGlow * uEmis;`)
+                        .replace('#include <lights_fragment_begin>', ULTRA_LIGHTS_BEGIN)
+                        .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+                            #if defined( RE_IndirectSpecular ) && defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
+                                if (uProbeMix > 0.0) {
+                                    // Metal and soaked surfaces reflect the map's probe, not just the sky
+                                    float pm = uProbeMix * clamp(metalnessFactor * 1.25 + wxAmt * 0.6, 0.0, 1.0);
+                                    if (pm > 0.0) {
+                                        vec3 rv = reflect(-geometry.viewDir, geometry.normal);
+                                        rv = inverseTransformDirection(normalize(mix(rv, geometry.normal, material.specularRoughness * material.specularRoughness)), viewMatrix);
+                                        radiance = mix(radiance, textureCubeUV(tProbe, rv, material.specularRoughness).rgb * uProbeGain, pm);
+                                    }
+                                }
+                            #endif`)
+                        .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+                            if (uALOn > 0.5) { vec3 al = abilityLight(vWPos, normalize((vec4(normal, 0.0) * viewMatrix).xyz)); reflectedLight.directDiffuse += (diffuseColor.rgb * 2.2 + 0.03) * al; }`)
+                        .replace('#include <aomap_fragment>', ULTRA_GLSL_AO);
+                };
+                m.customProgramCacheKey = () => 'mapUltra';
+                return m;
+            },
+
+            _floorMaterial: function () {
+                const m = new THREE.MeshStandardMaterial({ color: 0x1f2833, roughness: 0.8, metalness: 0.2, map: floorTextures.map });
+                m.color = floorMaterial.color;            // follows the map's floor tint
+                m.envMapIntensity = floorMaterial.envMapIntensity;
+                m.onBeforeCompile = (s) => {
+                    Object.assign(s.uniforms, ultraU, weatherSurf, reflectU, abilityLightU);
+                    s.uniforms.tFloorAO = { value: floorAOTexture };
+                    s.uniforms.tFloorN = { value: surfaceTextureFactory.textures.floor };
+                    s.uniforms.uFloorHD = floorHDUniform;
+                    s.vertexShader = s.vertexShader
+                        .replace('#include <common>', '#include <common>\nvarying vec3 vWPos; varying vec4 vReflCoord; uniform mat4 uReflMatrix;')
+                        .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+                            vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+                            vReflCoord = uReflMatrix * modelMatrix * vec4(transformed, 1.0);`);
+                    s.fragmentShader = s.fragmentShader
+                        .replace('#include <common>', `#include <common>
+                            varying vec3 vWPos; uniform float uFloorHD;
+                            uniform float uWet; uniform float uSnow; uniform float uSand; uniform float uRain; uniform float uWTime;
+                            varying vec4 vReflCoord; uniform sampler2D tReflect; uniform float uReflect; uniform vec2 uReflTexel; uniform float uReflGain;
+                            ${AL_GLSL}
+                            ${ULTRA_GLSL_PARS}
+                            uniform sampler2D tFloorAO; uniform sampler2D tFloorN; uniform vec3 uFloorAlb;
+                            float fh21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+                            float fnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+                                return mix(mix(fh21(i), fh21(i+vec2(1.0,0.0)), f.x), mix(fh21(i+vec2(0.0,1.0)), fh21(i+vec2(1.0,1.0)), f.x), f.y); }`)
+                        .replace('#include <shadowmap_pars_fragment>', '#include <shadowmap_pars_fragment>\n' + ULTRA_GLSL_NEAR)
+                        // The tile texture only without the generated pavers
+                        .replace('#include <map_fragment>', `
+                            #ifdef USE_MAP
+                                if (uMatOn < 0.5) { vec4 texelColor = texture2D(map, vUv); texelColor = mapTexelToLinear(texelColor); diffuseColor *= texelColor; }
+                            #endif`)
+                        .replace('#include <color_fragment>', `#include <color_fragment>
+                            vec2 vFloorW = vWPos.xz;
+                            vec3 fN = vec3(0.0, 1.0, 0.0); float fRough = -1.0; float uAOt = 1.0;
+                            float stain = fnoise(vFloorW * 0.13) * 0.7 + fnoise(vFloorW * 0.37 + 7.0) * 0.3;
+                            float bakedAO = texture2D(tFloorAO, (vFloorW + ${FLOOR_AO_EXTENT.toFixed(1)}) / ${(FLOOR_AO_EXTENT * 2).toFixed(1)}).r;
+                            if (uMatOn > 0.5) {
+                                // Pavers in world space (u along +x, v along -z), in the
+                                // map's paving colour (ultraMats.floorAlbedo)
+                                vec2 tuv = vec2(vFloorW.x, -vFloorW.y) * 0.5;
+                                vec4 tA = texture(tUA, vec3(tuv, 6.0));
+                                vec4 tN = texture(tUN, vec3(tuv, 6.0));
+                                diffuseColor.rgb = uFloorAlb * tA.rgb * 2.0 * (0.9 + 0.2 * stain);
+                                uAOt = tA.a * mix(1.0, bakedAO, 0.85);
+                                vec2 nxy = tN.xy * 2.0 - 1.0;
+                                fN = normalize(vec3(nxy.x, sqrt(max(0.0, 1.0 - dot(nxy, nxy))), -nxy.y));
+                                fRough = tN.z * (0.92 + 0.16 * stain);
+                            } else if (uFloorHD > 0.0) {
+                                vec4 fn = texture2D(tFloorN, vUv);
+                                diffuseColor.rgb *= mix(1.0, bakedAO * (0.88 + 0.22 * stain) * fn.z * 2.0, uFloorHD);
+                                fRough = 0.8 * mix(1.0, fn.w * 2.0 * (0.9 + 0.2 * stain), uFloorHD);
+                                vec2 fxy = fn.xy * 2.0 - 1.0;
+                                fN = normalize(mix(vec3(0.0, 1.0, 0.0), normalize(vec3(fxy.x, sqrt(max(0.0, 1.0 - dot(fxy, fxy))), -fxy.y)), uFloorHD));
+                            }
+                            float wPud = 0.0, wSnowC = 0.0;
+                            vec2 wRip = vec2(0.0);
+                            if (uWet + uSnow + uSand > 0.0) {
+                                float pn = fnoise(vFloorW * 0.12 + 5.0) * 0.65 + fnoise(vFloorW * 0.43 + 2.0) * 0.35;
+                                wPud = smoothstep(0.58, 0.64, pn) * uWet;
+                                diffuseColor.rgb *= mix(1.0, 0.62, uWet) * mix(1.0, 0.5, wPud);
+                                if (uRain > 0.0 && wPud > 0.0) {
+                                    vec2 rq = vFloorW * 1.7;
+                                    vec2 cell = floor(rq);
+                                    vec2 dv = fract(rq) - 0.5 - (vec2(fh21(cell + 1.7), fh21(cell + 4.3)) - 0.5) * 0.5;
+                                    float t = fract(uWTime * 0.8 + fh21(cell));
+                                    float d = length(dv), R = t * 0.45;
+                                    float band = 1.0 - smoothstep(0.0, 0.07, abs(d - R));
+                                    wRip = dv / max(d, 1e-3) * sin((d - R) * 60.0) * band * (1.0 - t) * 0.45 * wPud * uRain;
+                                }
+                                float sn = fnoise(vFloorW * 0.23 + 11.0) * 0.7 + fnoise(vFloorW * 1.4) * 0.3;
+                                wSnowC = uSnow * mix(0.35, 0.9, smoothstep(0.3, 0.7, sn));
+                                diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.36, 0.39, 0.45), wSnowC);
+                                float sd = fnoise(vec2(vFloorW.x * 0.09 + vFloorW.y * 0.04, vFloorW.y * 0.3));
+                                diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.21, 0.11), uSand * mix(0.25, 0.75, smoothstep(0.35, 0.75, sd)));
+                            }`)
+                        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+                            if (fRough >= 0.0) roughnessFactor = clamp(fRough, 0.04, 1.0);
+                            roughnessFactor = mix(roughnessFactor, 0.3, uWet * 0.8);
+                            roughnessFactor = mix(roughnessFactor, 0.03, wPud);
+                            roughnessFactor = mix(roughnessFactor, 0.75, wSnowC);`)
+                        .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+                            if (uMatOn > 0.5) metalnessFactor = 0.0;`)
+                        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+                            normal = normalize((viewMatrix * vec4(normalize(mix(fN, vec3(0.0, 1.0, 0.0), wPud)), 0.0)).xyz);
+                            if (wPud > 0.0) normal = normalize(normal + (viewMatrix * vec4(wRip.x, 0.0, wRip.y, 0.0)).xyz);`)
+                        .replace('#include <lights_fragment_begin>', ULTRA_LIGHTS_BEGIN)
+                        .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+                            if (uALOn > 0.5) { vec3 al = abilityLight(vec3(vFloorW.x, 0.0, vFloorW.y), vec3(0.0, 1.0, 0.0)); reflectedLight.directDiffuse += (diffuseColor.rgb * 2.2 + 0.03) * al; }`)
+                        .replace('#include <aomap_fragment>', ULTRA_GLSL_AO)
+                        .replace('#include <tonemapping_fragment>', `
+                            if (uReflect > 0.0) {
+                                vec3 vw = normalize(cameraPosition - vec3(vFloorW.x, 0.0, vFloorW.y));
+                                float fres = 0.04 + 0.96 * pow(1.0 - clamp(vw.y, 0.0, 1.0), 5.0);
+                                float rgh = clamp(roughnessFactor, 0.0, 1.0);
+                                float gloss = pow(1.0 - rgh, 1.6);
+                                vec2 ruv = vReflCoord.xy / vReflCoord.w + wRip * 0.05 + fN.xz * 0.012;
+                                vec2 bl = uReflTexel * (1.0 + rgh * 7.0);
+                                vec3 rc = texture2D(tReflect, ruv).rgb * 0.4
+                                    + (texture2D(tReflect, ruv + vec2(bl.x, 0.0)).rgb + texture2D(tReflect, ruv - vec2(bl.x, 0.0)).rgb
+                                    + texture2D(tReflect, ruv + vec2(0.0, bl.y)).rgb + texture2D(tReflect, ruv - vec2(0.0, bl.y)).rgb) * 0.15;
+                                rc = pow(rc, vec3(2.2)) * uReflGain;
+                                gl_FragColor.rgb = mix(gl_FragColor.rgb, rc, clamp(fres * gloss * uReflect * (0.3 + 0.7 * max(uWet, wPud)), 0.0, 1.0));
+                            }
+                            #include <tonemapping_fragment>`);
+                };
+                m.customProgramCacheKey = () => 'floorUltra';
+                return m;
+            },
+
+            // Glass panes: clear and reflective, dust and smudges in world space,
+            // more reflection and less see-through at grazing angles
+            _glassMaterial: function () {
+                const m = new THREE.MeshStandardMaterial({ color: 0xa9c2d0, roughness: 0.05, metalness: 0.0, transparent: true, opacity: 0.2, envMapIntensity: 1.8, depthWrite: false });
+                m.onBeforeCompile = (s) => {
+                    Object.assign(s.uniforms, ultraU);
+                    s.vertexShader = s.vertexShader
+                        .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+                        .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+                            vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+                    s.fragmentShader = s.fragmentShader
+                        .replace('#include <common>', `#include <common>
+                            varying vec3 vWPos;
+                            ${ULTRA_GLSL_PARS}`)
+                        .replace('#include <color_fragment>', `#include <color_fragment>
+                            vec3 gq = vec3((vWPos.x + vWPos.z) * 0.5, vWPos.y * 0.5, 5.0);
+                            vec4 gA = texture(tUA, gq);
+                            vec4 gN = texture(tUN, gq);
+                            float dirt = (1.0 - gA.a) * uMatOn;
+                            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.55, 0.52, 0.48), dirt * 0.6);
+                            diffuseColor.a = clamp(diffuseColor.a + dirt * 0.35, 0.0, 0.85);`)
+                        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+                            roughnessFactor = mix(roughnessFactor, max(0.03, gN.z), uMatOn);`)
+                        .replace('gl_FragColor = vec4( outgoingLight, diffuseColor.a );', `
+                            vec3 gv = normalize(cameraPosition - vWPos);
+                            float gf = pow(1.0 - abs(dot(gv, normalize((vec4(normal, 0.0) * viewMatrix).xyz))), 4.0);
+                            gl_FragColor = vec4(outgoingLight, clamp(diffuseColor.a + gf * 0.45, 0.0, 0.9));`);
+                };
+                m.customProgramCacheKey = () => 'glassUltra';
+                return m;
+            },
+
+            set: function (on) { this.on = !!on; },
+
+            floorAlbedo: function () {
+                const c = this._fa || (this._fa = new THREE.Color());
+                if (game.mapPreset === 'ascent') return c.setHex(0x8a8274).convertSRGBToLinear();
+                c.copy(floorMaterial.color).multiplyScalar(0.6);
+                const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+                if (l < 0.08) c.multiplyScalar(0.08 / Math.max(l, 1e-3));
+                return c;
+            },
+
+            onTexturesReady: function () {
+                ultraU.tUA.value = ultraTex.albedo;
+                ultraU.tUN.value = ultraTex.normal;
+                if (this.mapMat) this.sync();
+            },
+
+            // Ultra surfaces while Materials or Lighting is on (each part by uniform)
+            sync: function () {
+                if (!this.mapMat) return;
+                const want = ultraRealism.is('materials') || ultraRealism.is('lighting');
+                ultraU.uMatOn.value = ultraRealism.is('materials') && ultraTex.ready ? 1 : 0;
+                ultraU.uLightOn.value = ultraRealism.is('lighting') ? 1 : 0;
+                ultraU.uPlaster.value = game.mapPreset === 'ascent' ? 1 : 0;
+                ultraU.uFloorAlb.value.copy(this.floorAlbedo());
+                const mm = want ? this.mapMat : mapMaterial;
+                for (const b of mapBatches) b.mesh.material = mm;
+                for (const b of mapDecor.batches) b.material = mm;
+                floor.material = want ? this.floorMat : floorMaterial;
+                if (breakables.mats && breakables.mats.glass) {
+                    const g = ultraRealism.is('materials') ? this.glassMat : breakables.mats.glass;
+                    for (const p of breakables.glass) if (p.pane) p.pane.material = g;
+                }
+                this.usingUltra = want;
+            },
+
+            onMapBuilt: function () { this.sync(); },
+
+            textureJob: function () { return ultraTex.ready ? null : ultraTex.job(); },
+
+            // Shader warm-up: the generated sets themselves are not needed to compile
+            warm: function () {
+                if ((navigator.hardwareConcurrency || 2) >= 4) ultraTex.start();
+            }
+        };
+        // ---- Ultra Realism: Ascent detail (decor only, no colliders) ----
+        // Pitched terracotta roofs on the buildings and tile copings on the walls,
+        // stone quoins on the corners, upper-floor windows with stone surrounds,
+        // shutters and flower boxes, stone door frames on the passages, gutters and a
+        // downpipe per roof, and wall lanterns whose light the Lighting feature bakes.
+        // Built from Ascent's own pieces when the map loads and drawn with the Ultra
+        // map material (each part carries a surface id), so it adds no shader
+        // program. No colliders, nav or hit data, and everything sits flush on a wall
+        // or above 3 m: shots, movement and sight lines at player height never change.
+        const ULTRA_DECOR_COLORS = {
+            quoin: 0x9c8a74, frame: 0xa8977d, shutter: 0x2f5c61, glass: 0x26303a,
+            box: 0x6b4f2a, plant: 0x40703a, metal: 0x59616a, lamp: 0x25282c, lampGlass: 0xffd394
+        };
+        const ULTRA_SURF = { stone: 2, metal: 3, wood: 4, roof: 5, plaster: 6, lamp: 7, window: 8 };
+        const ultraDecor = {
+            group: null, meshes: [], lamps: [], roofs: [], count: 0, on: false,
+            prismGeo: null,
+            _m: new THREE.Matrix4(), _p: new THREE.Vector3(), _s: new THREE.Vector3(), _c: new THREE.Color(),
+            build: function () {
+                if (this.group) return;
+                this.group = new THREE.Group();
+                this.group.name = 'ultraDecor';
+                this.group.visible = false;
+                scene.add(this.group);
+                // Unit triangular prism (roofs): base y = -0.5 across x, ridge at y = 0.5, along z
+                const P = [], N = [];
+                const s1 = new THREE.Vector3(-1, 0.5, 0).normalize(), s2 = new THREE.Vector3(1, 0.5, 0).normalize();
+                const tri = (a, b, c, n) => { P.push(...a, ...b, ...c); N.push(n.x, n.y, n.z, n.x, n.y, n.z, n.x, n.y, n.z); };
+                const quad = (a, b, c, d, n) => { tri(a, b, c, n); tri(a, c, d, n); };
+                quad([-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [0, 0.5, 0.5], [0, 0.5, -0.5], s1);
+                quad([0.5, -0.5, 0.5], [0.5, -0.5, -0.5], [0, 0.5, -0.5], [0, 0.5, 0.5], s2);
+                tri([-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0, 0.5, 0.5], new THREE.Vector3(0, 0, 1));
+                tri([0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [0, 0.5, -0.5], new THREE.Vector3(0, 0, -1));
+                quad([-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, 0.5], new THREE.Vector3(0, -1, 0));
+                const g = new THREE.BufferGeometry();
+                g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+                g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+                this.prismGeo = g;
+            },
+            set: function (on) { this.on = !!on; this._vis(); },
+            _vis: function () { if (this.group) this.group.visible = this.on && this.meshes.length > 0; },
+            clear: function () {
+                for (const m of this.meshes) { this.group.remove(m); m.geometry.dispose(); if (m.dispose) m.dispose(); }
+                this.meshes.length = 0; this.lamps.length = 0; this.roofs.length = 0; this.count = 0;
+            },
+            onMapBuilt: function () {
+                if (!this.group) return;
+                this.clear();
+                if (game.mapPreset === 'ascent') this._buildAscent();
+                this._vis();
+            },
+            update: function () {},
+
+            _buildAscent: function () {
+                const C = ULTRA_DECOR_COLORS, S = ULTRA_SURF;
+                const L = { box: [], boxCast: [], cyl: [], prism: [] };
+                const q0 = new THREE.Quaternion();
+                const qY = new THREE.Quaternion().setFromAxisAngle(_yAxisDecor, Math.PI / 2);
+                const qXp = new THREE.Quaternion().setFromAxisAngle(_xAxisDecor, Math.PI / 2);
+                const qZp = new THREE.Quaternion().setFromAxisAngle(_zAxisDecor, Math.PI / 2);
+                const add = (list, x, y, z, sx, sy, sz, hex, surf, rot, gain) => list.push({ x, y, z, sx, sy, sz, hex, surf: surf || 0, rot: rot || q0, gain: gain || 1 });
+                const inside = (x, y, z, pad) => {
+                    for (const p of mapPieces) {
+                        const b = p.bounds;
+                        if (x > b.min.x - pad && x < b.max.x + pad && y > b.min.y - pad && y < b.max.y + pad && z > b.min.z - pad && z < b.max.z + pad) return true;
+                    }
+                    return false;
+                };
+                const tall = [];
+                for (const p of mapPieces) {
+                    if (p.shape !== 'box') continue;
+                    const b = p.bounds, sx = b.max.x - b.min.x, sy = b.max.y - b.min.y, sz = b.max.z - b.min.z;
+                    if (b.min.y > 0.05 || sy < 6 || Math.max(sx, sz) >= 90) continue;
+                    tall.push({ b, sx, sy, sz, w: Math.min(sx, sz), len: Math.max(sx, sz), alongX: sx >= sz, color: p.color });
+                }
+                // Faces of a block: outward normal (nx, nz), the face plane and its span
+                const faces = (T) => {
+                    const b = T.b;
+                    return [
+                        { nx: 1, nz: 0, at: b.max.x, a0: b.min.z, a1: b.max.z },
+                        { nx: -1, nz: 0, at: b.min.x, a0: b.min.z, a1: b.max.z },
+                        { nx: 0, nz: 1, at: b.max.z, a0: b.min.x, a1: b.max.x },
+                        { nx: 0, nz: -1, at: b.min.z, a0: b.min.x, a1: b.max.x }
+                    ];
+                };
+                // A box on a face: along = position along the face, out = centre distance
+                // from the face, t/h/d = size along the face, height, depth
+                const onFace = (list, f, along, y, out, t, h, d, hex, surf) => {
+                    if (f.nx !== 0) add(list, f.at + f.nx * out, y, along, d, h, t, hex, surf);
+                    else add(list, along, y, f.at + f.nz * out, t, h, d, hex, surf);
+                };
+                const pt = (f, along, out) => f.nx !== 0 ? [f.at + f.nx * out, along] : [along, f.at + f.nz * out];
+                const lampAt = (f, along, y) => {
+                    if (this.lamps.length >= 30) return;
+                    onFace(L.boxCast, f, along, y + 0.24, 0.17, 0.05, 0.05, 0.34, C.lamp, S.metal);
+                    onFace(L.boxCast, f, along, y + 0.19, 0.32, 0.27, 0.05, 0.27, C.lamp, S.metal);
+                    onFace(L.box, f, along, y, 0.32, 0.17, 0.3, 0.17, C.lampGlass, S.lamp);
+                    onFace(L.boxCast, f, along, y - 0.17, 0.32, 0.21, 0.04, 0.21, C.lamp, S.metal);
+                    const [x, z] = pt(f, along, 0.32);
+                    this.lamps.push([x, y, z]);
+                };
+                let windows = 0;
+                for (const T of tall) {
+                    const b = T.b;
+                    const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    const building = T.w >= 3.5;
+                    // Roof (24 degree pitch, 35 cm eaves) or a tile coping on a wall top
+                    const ov = building ? 0.35 : 0.1;
+                    const h = building ? (T.w / 2 + ov) * Math.tan(24 * Math.PI / 180) : 0.32;
+                    add(L.prism, cx, b.max.y + h / 2, cz, T.w + ov * 2, h, T.len + ov * 2, T.color, S.roof, T.alongX ? qY : q0, building ? 1.45 : 1.2);
+                    this.roofs.push({ cx, cz, y0: b.max.y, w: T.w + ov * 2, h, len: T.len + ov * 2, alongX: T.alongX });
+                    if (!building) continue;
+                    // Quoins: alternating long and short stones up each free corner
+                    for (const ex of [-1, 1]) for (const ez of [-1, 1]) {
+                        const X = ex > 0 ? b.max.x : b.min.x, Z = ez > 0 ? b.max.z : b.min.z;
+                        if (inside(X + ex * 0.3, 3, Z + ez * 0.3, 0) || inside(X + ex * 0.3, 3, Z - ez * 0.5, 0) || inside(X - ex * 0.5, 3, Z + ez * 0.3, 0)) continue;
+                        for (let y = 0.95, i = 0; y + 0.46 < b.max.y - 0.45; y += 0.5, i++) {
+                            const lx = i % 2 ? 0.34 : 0.62, lz = i % 2 ? 0.62 : 0.34;
+                            add(L.box, X + ex * (0.04 - lx) / 2, y + 0.23, Z + ez * (0.04 - lz) / 2, lx + 0.04, 0.46, lz + 0.04, C.quoin, S.stone);
+                        }
+                    }
+                    // Gutters under both long eaves and one downpipe
+                    const eaveY = b.max.y - 0.07;
+                    let pipeDone = false;
+                    for (const f of faces(T)) {
+                        const flen = f.a1 - f.a0;
+                        const longSide = T.alongX ? f.nz !== 0 : f.nx !== 0;
+                        if (longSide) {
+                            const [gx, gz] = pt(f, (f.a0 + f.a1) / 2, 0.3);
+                            add(L.cyl, gx, eaveY, gz, 0.075, flen + 0.6, 0.075, C.metal, S.metal, f.nz !== 0 ? qZp : qXp);
+                            const pa = f.a1 - 0.45;
+                            const [px, pz] = pt(f, pa, 0.12);
+                            if (!pipeDone && !inside(px, 2, pz, 0.15)) {
+                                pipeDone = true;
+                                add(L.cyl, px, (0.1 + eaveY) / 2, pz, 0.055, eaveY - 0.1, 0.055, C.metal, S.metal);
+                                const [sx2, sz2] = pt(f, pa, 0.21);
+                                add(L.cyl, sx2, eaveY - 0.05, sz2, 0.05, 0.2, 0.05, C.metal, S.metal, f.nz !== 0 ? qXp : qZp);
+                                for (let y = 1.2; y < eaveY - 0.5; y += 2.2) onFace(L.boxCast, f, pa, y, 0.06, 0.09, 0.04, 0.12, C.metal, S.metal);
+                                const [shx, shz] = pt(f, pa, 0.2);
+                                add(L.cyl, shx, 0.12, shz, 0.055, 0.22, 0.055, C.metal, S.metal, f.nz !== 0 ? qXp : qZp);
+                            }
+                        }
+                    }
+                    // Upper-floor windows (bottom above 4.5 m), lanterns between some of them
+                    for (const f of faces(T)) {
+                        const flen = f.a1 - f.a0;
+                        if (flen < 5) continue;
+                        const wy = Math.min(b.max.y - 2.4, 5.6);
+                        if (wy - 0.75 < 4.5) continue;
+                        const n = Math.floor((flen - 3.2) / 3.8) + 1;
+                        const start = (f.a0 + f.a1) / 2 - (n - 1) * 1.9;
+                        let lampsHere = 0;
+                        for (let i = 0; i < n; i++) {
+                            const a = start + i * 3.8;
+                            const [ox, oz] = pt(f, a, 0.8);
+                            if (inside(ox, wy, oz, 0.2)) continue;
+                            windows++;
+                            onFace(L.box, f, a, wy, 0.015, 1.0, 1.4, 0.03, C.glass, S.window);
+                            onFace(L.boxCast, f, a, wy + 0.81, 0.06, 1.5, 0.22, 0.12, C.frame, S.stone);
+                            onFace(L.boxCast, f, a, wy - 0.76, 0.1, 1.4, 0.1, 0.2, C.frame, S.stone);
+                            onFace(L.box, f, a - 0.58, wy, 0.05, 0.16, 1.4, 0.1, C.frame, S.stone);
+                            onFace(L.box, f, a + 0.58, wy, 0.05, 0.16, 1.4, 0.1, C.frame, S.stone);
+                            onFace(L.box, f, a - 0.96, wy, 0.025, 0.58, 1.42, 0.05, C.shutter, S.wood);
+                            onFace(L.box, f, a + 0.96, wy, 0.025, 0.58, 1.42, 0.05, C.shutter, S.wood);
+                            if ((windows % 2) === 0) {
+                                onFace(L.boxCast, f, a, wy - 0.95, 0.14, 1.1, 0.22, 0.24, C.box, S.wood);
+                                onFace(L.boxCast, f, a, wy - 0.76, 0.15, 1.0, 0.16, 0.2, C.plant, 0);
+                            }
+                            // A lantern under every second gap between windows (3.2 m up)
+                            if (i < n - 1 && lampsHere < 2 && (i % 2) === 0 && flen >= 8) {
+                                const la = a + 1.9;
+                                const [lx, lz] = pt(f, la, 0.6);
+                                if (!inside(lx, 3.2, lz, 0.2)) { lampAt(f, la, 3.2); lampsHere++; }
+                            }
+                        }
+                    }
+                }
+                // Door frames on the passages between buildings: stone jambs on both
+                // sides and a lintel with a keystone 3.3 m up across the opening
+                for (const A of tall) for (const B of tall) {
+                    if (A === B) continue;
+                    for (const ax of ['x', 'z']) {
+                        const oth = ax === 'x' ? 'z' : 'x';
+                        const gap = B.b.min[ax] - A.b.max[ax];
+                        if (gap < 1.5 || gap > 4.6) continue;
+                        const o0 = Math.max(A.b.min[oth], B.b.min[oth]), o1 = Math.min(A.b.max[oth], B.b.max[oth]);
+                        if (o1 - o0 < 0.8) continue;
+                        const mid = (A.b.max[ax] + B.b.min[ax]) / 2;
+                        const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                        const [mx, mz] = P2(mid, (o0 + o1) / 2);
+                        if (inside(mx, 1.0, mz, 0)) continue;
+                        for (const [oe, sgn] of [[o0, 1], [o1, -1]]) {
+                            const oc = oe + sgn * 0.16;
+                            for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                                const [jx, jz] = P2(u + us * 0.03, oc);
+                                const [sx, sz] = P2(0.06, 0.32);
+                                add(L.box, jx, 1.65, jz, sx, 3.3, sz, C.frame, S.stone);
+                            }
+                            const [lx, lz] = P2(mid, oc);
+                            const [w1, w2] = P2(gap + 0.12, 0.34);
+                            add(L.boxCast, lx, 3.46, lz, w1, 0.32, w2, C.frame, S.stone);
+                            const [k1, k2] = P2(0.3, 0.4);
+                            add(L.boxCast, lx, 3.44, lz, k1, 0.42, k2, C.quoin, S.stone);
+                        }
+                    }
+                }
+                // Build the instanced meshes
+                const mk = (geo, list, cast, cyl) => {
+                    if (!list.length) return;
+                    const surf = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 4), 4);
+                    geo.setAttribute('aSurf', surf);
+                    const mesh = new THREE.InstancedMesh(geo, ultraMats.mapMat, list.length);
+                    list.forEach((it, i) => {
+                        this._m.compose(this._p.set(it.x, it.y, it.z), it.rot, this._s.set(it.sx, it.sy, it.sz));
+                        mesh.setMatrixAt(i, this._m);
+                        mesh.setColorAt(i, this._c.copy(linearColorFromHex(it.hex)).multiplyScalar(it.gain));
+                        surf.setXYZW(i, it.surf + (cyl && it.surf ? 10 : 0), mapSurfaceSeed(it.x, it.y, it.z), 0, 0);
+                    });
+                    mesh.castShadow = cast;
+                    mesh.receiveShadow = true;
+                    mesh.frustumCulled = false;
+                    mesh.matrixAutoUpdate = false;
+                    mesh.updateMatrix();
+                    this.group.add(mesh);
+                    this.meshes.push(mesh);
+                    this.count += list.length;
+                };
+                mk(new THREE.BoxGeometry(1, 1, 1), L.box, false, false);
+                mk(new THREE.BoxGeometry(1, 1, 1), L.boxCast, true, false);
+                mk(new THREE.CylinderGeometry(1, 1, 1, 14, 1), L.cyl, true, true);
+                mk(this.prismGeo.clone(), L.prism, true, false);
+            }
+        };
+        // ---- Ultra Realism: baked light and a near shadow cascade ----
+        // 1. A 100 x 12 x 100 volume (1 m cells over the arena) baked per map and time
+        //    of day: how much sky each point sees (it scales the sky light, so alleys
+        //    and wall bases darken), sunlight bounced off sunlit walls and paving, and
+        //    the warm light of the wall lanterns. Rays march a 0.5 m occupancy grid of
+        //    the map pieces and roofs; runs in a worker (in small steps on the main
+        //    thread without one), so it never stalls a frame.
+        // 2. A second, near shadow cascade: 2048 px over ~28 m around where you look,
+        //    re-rendered before each frame and snapped to its texels so edges don't
+        //    crawl; the shaders blend it into the sun's wide map (2 cascades in all).
+        const ULTRA_VOL = { nx: 100, ny: 12, nz: 100, x0: -50, y0: 0, z0: -50, scale: 2.0 };
+        function ultraBake(P) {
+            const OC = 0.5, OX = 212, OY = 44, OZ = 212, OX0 = -53, OZ0 = -53;
+            const NX = P.nx, NY = P.ny, NZ = P.nz, VX0 = P.x0, VY0 = P.y0, VZ0 = P.z0;
+            const occ = new Uint8Array(OX * OY * OZ), lit = new Uint8Array(OX * OY * OZ);
+            const vol = new Float32Array(NX * NY * NZ * 4), solid = new Uint8Array(NX * NY * NZ);
+            const pal = P.pal, sun = P.sun, sunCol = P.sunCol, flo = P.floor;
+            const oi = (x, y, z) => (z * OY + y) * OX + x;
+            // Ray directions: 16 cosine-spread over the sky, 8 below the horizon
+            const dirs = [], GA = Math.PI * (3 - Math.sqrt(5));
+            for (let i = 0; i < 16; i++) { const u = (i + 0.5) / 16, r = Math.sqrt(u), y = Math.sqrt(1 - u), a = i * GA; dirs.push([r * Math.cos(a), y, r * Math.sin(a)]); }
+            for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + 0.3, y = -0.3 - 0.4 * (i & 1), r = Math.sqrt(1 - y * y); dirs.push([r * Math.cos(a), y, r * Math.sin(a)]); }
+            const K = dirs.length;
+            // Is this (empty) voxel in sunlight? Memoised march toward the sun
+            const sunLit = (ix, iy, iz) => {
+                const i = oi(ix, iy, iz);
+                if (lit[i]) return lit[i] === 1;
+                let x = OX0 + (ix + 0.5) * OC, y = (iy + 0.5) * OC, z = OZ0 + (iz + 0.5) * OC, res = 1;
+                for (let s = 0; s < 90; s++) {
+                    x += sun[0] * OC; y += sun[1] * OC; z += sun[2] * OC;
+                    const jx = Math.floor((x - OX0) / OC), jy = Math.floor(y / OC), jz = Math.floor((z - OZ0) / OC);
+                    if (jy >= OY || jy < 0 || jx < 0 || jx >= OX || jz < 0 || jz >= OZ) break;
+                    if (occ[oi(jx, jy, jz)]) { res = 2; break; }
+                }
+                lit[i] = res;
+                return res === 1;
+            };
+            const fill = (x0, y0, z0, x1, y1, z1, c, test) => {
+                const ix0 = Math.max(0, Math.ceil((x0 - OX0) / OC - 0.5)), ix1 = Math.min(OX - 1, Math.floor((x1 - OX0) / OC - 0.5));
+                const iy0 = Math.max(0, Math.ceil(y0 / OC - 0.5)), iy1 = Math.min(OY - 1, Math.floor(y1 / OC - 0.5));
+                const iz0 = Math.max(0, Math.ceil((z0 - OZ0) / OC - 0.5)), iz1 = Math.min(OZ - 1, Math.floor((z1 - OZ0) / OC - 0.5));
+                for (let z = iz0; z <= iz1; z++) for (let y = iy0; y <= iy1; y++) for (let x = ix0; x <= ix1; x++) {
+                    if (test && !test(OX0 + (x + 0.5) * OC, (y + 0.5) * OC, OZ0 + (z + 0.5) * OC)) continue;
+                    occ[oi(x, y, z)] = c;
+                }
+            };
+            const st = { phase: 0, i: 0, out: null };
+            st.step = (units) => {
+                for (let u = 0; u < units; u++) {
+                    if (st.phase === 0) {
+                        // Occupancy: boxes, cylinders, roofs
+                        for (const b of P.boxes) {
+                            if (b[7] === 1) { const cx = (b[0] + b[3]) / 2, cz = (b[2] + b[5]) / 2, r2 = Math.pow((b[3] - b[0]) / 2, 2); fill(b[0], b[1], b[2], b[3], b[4], b[5], b[6], (x, y, z) => (x - cx) * (x - cx) + (z - cz) * (z - cz) <= r2); }
+                            else fill(b[0], b[1], b[2], b[3], b[4], b[5], b[6]);
+                        }
+                        for (const r of P.roofs) {
+                            const hw = r.w / 2, hl = r.len / 2;
+                            const ax = r.alongX;
+                            fill(r.cx - (ax ? hl : hw), r.y0, r.cz - (ax ? hw : hl), r.cx + (ax ? hl : hw), r.y0 + r.h, r.cz + (ax ? hw : hl), r.pal,
+                                (x, y, z) => Math.abs(ax ? z - r.cz : x - r.cx) <= hw * (1 - (y - r.y0) / r.h));
+                        }
+                        st.phase = 1; st.i = 0;
+                    } else if (st.phase === 1) {
+                        // One z slice of cells: sky visibility and one bounce of sunlight
+                        const vz = st.i;
+                        for (let vy = 0; vy < NY; vy++) for (let vx = 0; vx < NX; vx++) {
+                            const ci = (vz * NY + vy) * NX + vx;
+                            const cx = VX0 + vx + 0.5, cy = VY0 + vy + 0.5, cz = VZ0 + vz + 0.5;
+                            const c0x = Math.floor((cx - OX0) / OC), c0y = Math.floor(cy / OC), c0z = Math.floor((cz - OZ0) / OC);
+                            if (occ[oi(c0x, c0y, c0z)]) { solid[ci] = 1; continue; }
+                            let vis = 0, r = 0, g = 0, bl = 0;
+                            for (let k = 0; k < K; k++) {
+                                const d = dirs[k];
+                                let x = cx, y = cy, z = cz, px = c0x, py = c0y, pz = c0z, done = false;
+                                for (let s = 0; s < 36; s++) {
+                                    x += d[0] * OC; y += d[1] * OC; z += d[2] * OC;
+                                    if (y < 0) {
+                                        // Paving: bounced sunlight where it is lit (half: the sky's ground term has the rest)
+                                        if (sunLit(px, 0, pz)) { const k2 = 0.5 * Math.max(0, sun[1]); r += flo[0] * sunCol[0] * k2; g += flo[1] * sunCol[1] * k2; bl += flo[2] * sunCol[2] * k2; }
+                                        done = true; break;
+                                    }
+                                    const ix = Math.floor((x - OX0) / OC), iy = Math.floor(y / OC), iz = Math.floor((z - OZ0) / OC);
+                                    if (iy >= OY || ix < 0 || ix >= OX || iz < 0 || iz >= OZ) { if (d[1] > 0) vis++; done = true; break; }
+                                    const o = occ[oi(ix, iy, iz)];
+                                    if (o) {
+                                        let nx = 0, ny = 0, nz = 0;
+                                        if (ix !== px) nx = d[0] > 0 ? -1 : 1; else if (iy !== py) ny = d[1] > 0 ? -1 : 1; else nz = d[2] > 0 ? -1 : 1;
+                                        const ndl = nx * sun[0] + ny * sun[1] + nz * sun[2];
+                                        if (ndl > 0 && sunLit(px, py, pz)) { r += pal[o * 3] * sunCol[0] * ndl; g += pal[o * 3 + 1] * sunCol[1] * ndl; bl += pal[o * 3 + 2] * sunCol[2] * ndl; }
+                                        done = true; break;
+                                    }
+                                    px = ix; py = iy; pz = iz;
+                                }
+                                if (!done && d[1] > 0) vis++;
+                            }
+                            vol[ci * 4] = r / K; vol[ci * 4 + 1] = g / K; vol[ci * 4 + 2] = bl / K; vol[ci * 4 + 3] = vis / 16;
+                        }
+                        if (++st.i >= NZ) { st.phase = 2; st.i = 0; }
+                    } else if (st.phase === 2) {
+                        // One lantern: warm light into the cells it can see (8 m reach)
+                        if (st.i < P.lamps.length) {
+                            const L = P.lamps[st.i];
+                            const R = 8;
+                            for (let vz = Math.max(0, Math.floor(L[2] - R - VZ0)); vz < Math.min(NZ, Math.ceil(L[2] + R - VZ0)); vz++)
+                            for (let vy = 0; vy < NY; vy++)
+                            for (let vx = Math.max(0, Math.floor(L[0] - R - VX0)); vx < Math.min(NX, Math.ceil(L[0] + R - VX0)); vx++) {
+                                const ci = (vz * NY + vy) * NX + vx;
+                                if (solid[ci]) continue;
+                                const cx = VX0 + vx + 0.5, cy = VY0 + vy + 0.5, cz = VZ0 + vz + 0.5;
+                                const dx = L[0] - cx, dy = L[1] - cy, dz = L[2] - cz, dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                                if (dist > R) continue;
+                                const n = Math.ceil(dist / OC);
+                                let blocked = false;
+                                for (let s = 1; s < n; s++) {
+                                    const t = s / n, ix = Math.floor((cx + dx * t - OX0) / OC), iy = Math.floor((cy + dy * t) / OC), iz = Math.floor((cz + dz * t - OZ0) / OC);
+                                    if (iy >= 0 && iy < OY && occ[oi(ix, iy, iz)]) { blocked = true; break; }
+                                }
+                                if (blocked) continue;
+                                const f = (1 - dist / R) * (1 - dist / R) / (1 + 0.45 * dist * dist);
+                                vol[ci * 4] += P.lampCol[0] * f; vol[ci * 4 + 1] += P.lampCol[1] * f; vol[ci * 4 + 2] += P.lampCol[2] * f;
+                            }
+                            st.i++;
+                        }
+                        if (st.i >= P.lamps.length) { st.phase = 3; st.i = 0; }
+                    } else if (st.phase === 3) {
+                        // Cells inside solids take their open neighbours' light (no dark seams
+                        // where the filter reaches into a wall), then pack to bytes
+                        for (let pass = 0; pass < 3; pass++) {
+                            const next = solid.slice();
+                            for (let vz = 0; vz < NZ; vz++) for (let vy = 0; vy < NY; vy++) for (let vx = 0; vx < NX; vx++) {
+                                const ci = (vz * NY + vy) * NX + vx;
+                                if (!solid[ci]) continue;
+                                let n = 0, a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+                                const nb = (x, y, z) => {
+                                    if (x < 0 || y < 0 || z < 0 || x >= NX || y >= NY || z >= NZ) return;
+                                    const j = (z * NY + y) * NX + x;
+                                    if (solid[j]) return;
+                                    a0 += vol[j * 4]; a1 += vol[j * 4 + 1]; a2 += vol[j * 4 + 2]; a3 += vol[j * 4 + 3]; n++;
+                                };
+                                nb(vx - 1, vy, vz); nb(vx + 1, vy, vz); nb(vx, vy - 1, vz); nb(vx, vy + 1, vz); nb(vx, vy, vz - 1); nb(vx, vy, vz + 1);
+                                if (n) { vol[ci * 4] = a0 / n; vol[ci * 4 + 1] = a1 / n; vol[ci * 4 + 2] = a2 / n; vol[ci * 4 + 3] = a3 / n; next[ci] = 0; }
+                            }
+                            solid.set(next);
+                        }
+                        const out = new Uint8Array(NX * NY * NZ * 4), k = 255 / P.scale;
+                        for (let i = 0; i < NX * NY * NZ; i++) {
+                            out[i * 4] = Math.min(255, Math.round(vol[i * 4] * k));
+                            out[i * 4 + 1] = Math.min(255, Math.round(vol[i * 4 + 1] * k));
+                            out[i * 4 + 2] = Math.min(255, Math.round(vol[i * 4 + 2] * k));
+                            out[i * 4 + 3] = solid[i] ? 160 : Math.min(255, Math.round(vol[i * 4 + 3] * 255));
+                        }
+                        st.out = out;
+                        st.phase = 4;
+                    }
+                    if (st.phase === 4) return true;
+                }
+                return false;
+            };
+            return st;
+        }
+
+        // Lantern glow and baked lantern light by time of day
+        const ULTRA_LAMP_LOOK = { daylight: [0.45, 0.25], competitive: [0.35, 0.2], sunset: [1.8, 1.1], dawn: [1.4, 0.8], night: [3.4, 2.2] };
+        const ultraLight = {
+            on: false, nearLight: null, vol: null, bakedKey: '', job: null, worker: null,
+            _c: new THREE.Vector3(), _d: new THREE.Vector3(), _f: new THREE.Vector3(), _u: new THREE.Vector3(), _v: new THREE.Vector3(), _up: new THREE.Vector3(0, 1, 0),
+            build: function () {
+                if (this.nearLight) return;
+                const L = new THREE.DirectionalLight(0xffffff, 1);
+                L.name = 'ultraNearCascade';
+                L.castShadow = true;
+                L.shadow.mapSize.set(2048, 2048);
+                const c = L.shadow.camera;
+                c.left = -14; c.right = 14; c.top = 14; c.bottom = -14; c.near = 1; c.far = 110;
+                c.updateProjectionMatrix();
+                L.shadow.bias = -0.00035;
+                this.nearLight = L;
+                // Draws nothing (no vertices) with the floor's own Cinematic material, so
+                // it uses an existing program; only its onBeforeRender matters
+                const hook = new THREE.Mesh(new THREE.BufferGeometry(), floorMaterial);
+                hook.name = 'ultraNearHook';
+                hook.frustumCulled = false;
+                hook.renderOrder = -1e6;
+                hook.visible = false;
+                hook.onBeforeRender = (r, s, cam) => this._hookRender(cam);
+                scene.add(hook);
+                this.hook = hook;
+            },
+            set: function (on) {
+                this.on = !!on;
+                ultraU.uVolOn.value = this.on && this.vol ? 1 : 0;
+                if (!this.on) { ultraU.uNearParams.value.w = 0; this.pendingNear = false; }
+                if (this.hook) this.hook.visible = this.on;
+            },
+            look: function () {
+                const m = (game.userSettings && game.userSettings.atmosphereMode) || 'daylight';
+                return ULTRA_LAMP_LOOK[m] || ULTRA_LAMP_LOOK.daylight;
+            },
+            key: function () {
+                const p = directionalLight.position;
+                return [game.mapPreset, (game.userSettings && game.userSettings.atmosphereMode) || 'daylight', ultraDecor.lamps.length, ultraDecor.roofs.length,
+                    p.x.toFixed(1), p.y.toFixed(1), p.z.toFixed(1), directionalLight.intensity.toFixed(2)].join('|');
+            },
+            onMapBuilt: function () {
+                // The old volume belongs to the old map
+                this.bakedKey = '';
+                ultraU.uVolOn.value = 0;
+            },
+            // A lighting change (map, time of day) asks for a new bake
+            onLook: function () {
+                ultraU.uLampGlow.value = this.look()[0];
+                if (ultraRealism.active && this.key() !== this.bakedKey) ultraPrep.start();
+            },
+            _params: function () {
+                const palette = new Float32Array(256 * 3), map = new Map();
+                const palOf = (hex, gain) => {
+                    const k = hex + ':' + gain;
+                    if (map.has(k)) return map.get(k);
+                    const i = Math.min(255, map.size + 1);
+                    const c = linearColorFromHex(hex);
+                    palette[i * 3] = c.r * gain; palette[i * 3 + 1] = c.g * gain; palette[i * 3 + 2] = c.b * gain;
+                    map.set(k, i);
+                    return i;
+                };
+                const boxes = [];
+                for (const p of mapPieces) {
+                    const b = p.bounds;
+                    // Ascent's tall walls are lighter plaster above the plinth
+                    const gain = (game.mapPreset === 'ascent' && b.max.y - b.min.y > 3) ? 1.3 : 1;
+                    boxes.push([b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z, palOf(p.color, gain), p.shape === 'cylinder' ? 1 : 0]);
+                }
+                const decorOn = ultraRealism.is('detail');
+                const roofs = decorOn ? ultraDecor.roofs.map((r) => Object.assign({ pal: palOf(0xb4583c, 1) }, r)) : [];
+                const lamps = decorOn ? ultraDecor.lamps.slice() : [];
+                const sd = this._d.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
+                const sc = directionalLight.color, si = directionalLight.intensity;
+                const fc = ultraMats.floorAlbedo();
+                const lk = this.look()[1];
+                return Object.assign({}, ULTRA_VOL, {
+                    pal: palette, boxes, roofs, lamps, sun: [sd.x, sd.y, sd.z], sunCol: [sc.r * si, sc.g * si, sc.b * si],
+                    floor: [fc.r, fc.g, fc.b], lampCol: [1.0 * lk, 0.68 * lk, 0.38 * lk]
+                });
+            },
+            bakeJob: function () {
+                if (!ultraRealism.built) return null;
+                const key = this.key();
+                if (key === this.bakedKey) return null;
+                if (this.job && this.job.key === key) return this.job;
+                this._stopWorker();
+                const job = { key: key, params: null, gen: null, result: null, failed: false };
+                job.step = (left) => this._step(job, left);
+                this.job = job;
+                return job;
+            },
+            _stopWorker: function () { if (this.worker) { this.worker.terminate(); this.worker = null; } },
+            _step: function (job, left) {
+                if (job !== this.job) return true;   // superseded
+                if (!job.params) {
+                    job.params = this._params();
+                    if (left !== Infinity) {
+                        try {
+                            if (typeof Worker === 'undefined') throw new Error('no workers');
+                            const src = 'const ultraBake = ' + ultraBake.toString() + ';\n' +
+                                'onmessage = (e) => { const g = ultraBake(e.data); while (!g.step(1 << 20)); postMessage(g.out, [g.out.buffer]); };';
+                            const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+                            const w = new Worker(url);
+                            URL.revokeObjectURL(url);
+                            w.onmessage = (e) => { if (this.job === job) job.result = e.data; this._stopWorker(); };
+                            w.onerror = (ev) => { if (ev && ev.preventDefault) ev.preventDefault(); job.failed = true; this._stopWorker(); };
+                            this.worker = w;
+                            w.postMessage(job.params);
+                            return false;
+                        } catch (err) { job.failed = true; }
+                    }
+                }
+                if (!job.result) {
+                    if (this.worker && left !== Infinity) return false;   // waiting for the worker
+                    if (this.worker) this._stopWorker();
+                    if (!job.gen) job.gen = ultraBake(job.params);
+                    const t0 = performance.now();
+                    while (!job.gen.step(1)) { if (left !== Infinity && performance.now() - t0 > left) return false; }
+                    job.result = job.gen.out;
+                }
+                this._apply(job.result);
+                this.bakedKey = job.key;
+                this.job = null;
+                return true;
+            },
+            _apply: function (data) {
+                const V = ULTRA_VOL;
+                const t = new THREE.DataTexture3D(data, V.nx, V.ny, V.nz);
+                t.format = THREE.RGBAFormat; t.type = THREE.UnsignedByteType;
+                t.minFilter = t.magFilter = THREE.LinearFilter;
+                t.unpackAlignment = 1;
+                t.needsUpdate = true;
+                const old = this.vol;
+                this.vol = t;
+                ultraU.tVol.value = t;
+                ultraU.uVolMin.value.set(V.x0, V.y0, V.z0);
+                ultraU.uVolInvSize.value.set(1 / V.nx, 1 / V.ny, 1 / V.nz);
+                ultraU.uVolGain.value = V.scale;
+                ultraU.uVolOn.value = this.on ? 1 : 0;
+                if (old) old.dispose();
+            },
+            update: function (now) { this.renderNear(now, false); },
+            // The near cascade: centred 8 m ahead of the camera, snapped to its texels.
+            // three r128 can only draw a shadow map inside renderer.render(), so this
+            // places the light and the hook mesh (first in the opaque pass) draws it.
+            renderNear: function (now, force) {
+                const L = this.nearLight;
+                if (!L) return;
+                if (!force && (!this.on || !renderer.shadowMap.enabled || shadowManager.suspended || !ULTRA_NEAR_OK)) { ultraU.uNearParams.value.w = 0; this.pendingNear = false; return; }
+                const dir = this._d.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
+                const f = camera.getWorldDirection(this._f);
+                f.y = 0;
+                if (f.lengthSq() < 1e-4) f.set(0, 0, -1);
+                f.normalize();
+                const c = this._c.copy(camera.position).addScaledVector(f, 8);
+                c.y = 2;
+                const u = this._u.crossVectors(this._up, dir).normalize(), v = this._v.crossVectors(dir, u);
+                const texel = 28 / 2048;
+                const cu = c.dot(u), cv = c.dot(v);
+                c.addScaledVector(u, Math.round(cu / texel) * texel - cu).addScaledVector(v, Math.round(cv / texel) * texel - cv);
+                L.position.copy(c).addScaledVector(dir, 60);
+                L.target.position.copy(c);
+                L.updateMatrixWorld();
+                L.target.updateMatrixWorld();
+                this.pendingNear = true;
+            },
+            pendingNear: false,
+            hook: null,
+            _clear: new THREE.Color(),
+            // Inside the world render, before any opaque draw (main camera, once a frame)
+            _hookRender: function (cam) {
+                if (!this.pendingNear || cam !== camera) return;
+                this.pendingNear = false;
+                const L = this.nearLight, sm = renderer.shadowMap, prev = sm.needsUpdate;
+                renderer.getClearColor(this._clear);
+                const alpha = renderer.getClearAlpha();
+                sm.needsUpdate = true;
+                sm.render([L], scene, camera);
+                sm.needsUpdate = prev;
+                renderer.setClearColor(this._clear, alpha);
+                if (L.shadow.map) {
+                    ultraU.tNearShadow.value = L.shadow.map.texture;
+                    ultraU.uNearMatrix.value.copy(L.shadow.matrix);
+                    ultraU.uNearParams.value.set(2048, L.shadow.bias, 1, this.on ? 1 : 0);
+                }
+            },
+            warm: function () {}
+        };
+        // ---- Ultra Realism: reflections ----
+        // Wet floors: the planar floor reflection at a sharper 0.75 scale (it is 0.5 in
+        // Cinematic). Metal: a reflection probe of the map (a cube view from the
+        // middle of the map at head height, one face per frame, then filtered like the
+        // sky light) replaces the sky in the reflections of metal and soaked surfaces,
+        // so pipes, vents, lamp housings and bare metal show the buildings around them.
+        const ultraRefl = {
+            on: false, cubeRT: null, cubeCam: null, probe: null, probeKey: '', job: null,
+            pos: new THREE.Vector3(0, 2.2, 0),
+            build: function () {
+                if (this.cubeRT) return;
+                this.cubeRT = new THREE.WebGLCubeRenderTarget(128, { format: THREE.RGBAFormat, generateMipmaps: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, encoding: THREE.sRGBEncoding });
+                this.cubeCam = new THREE.CubeCamera(0.2, 300, this.cubeRT);
+            },
+            reflectionsOn: function () { return this.on; },
+            set: function (on) {
+                this.on = !!on;
+                ultraU.uProbeMix.value = this.on && this.probe ? 1 : 0;
+            },
+            sync: function () {
+                if (typeof reflectFX !== 'undefined' && reflectFX.setQuality) reflectFX.setQuality();
+            },
+            onMapBuilt: function () { this.probeKey = ''; ultraU.uProbeMix.value = 0; },
+            key: function () {
+                return [game.mapPreset, (game.userSettings && game.userSettings.atmosphereMode) || 'daylight', ultraRealism.is('detail') ? 1 : 0, ultraRealism.is('materials') ? 1 : 0, ultraTex.ready ? 1 : 0].join('|');
+            },
+            probeJob: function () {
+                if (!this.cubeRT || !this.on) return null;
+                const key = this.key();
+                if (key === this.probeKey) return null;
+                if (this.job && this.job.key === key) return this.job;
+                const job = { key: key, face: 0 };
+                job.step = (left) => this._step(job, left);
+                this.job = job;
+                return job;
+            },
+            // One cube face per call, then the filtering
+            _step: function (job, left) {
+                if (job !== this.job) return true;
+                const prev = renderer.getRenderTarget();
+                do {
+                    if (job.face < 6) {
+                        this.cubeCam.position.copy(this.pos);
+                        this.cubeCam.updateMatrixWorld(true);
+                        renderer.setRenderTarget(this.cubeRT, job.face);
+                        renderer.render(scene, this.cubeCam.children[job.face]);
+                        job.face++;
+                    } else {
+                        const pm = envBuilder.pmrem || (envBuilder.pmrem = new THREE.PMREMGenerator(renderer));
+                        const rt = pm.fromCubemap(this.cubeRT.texture);
+                        const old = this.probe;
+                        this.probe = rt;
+                        ultraU.tProbe.value = rt.texture;
+                        ultraU.uProbeMix.value = this.on ? 1 : 0;
+                        if (old) old.dispose();
+                        this.probeKey = job.key;
+                        this.job = null;
+                        renderer.setRenderTarget(prev);
+                        return true;
+                    }
+                } while (left === Infinity);
+                renderer.setRenderTarget(prev);
+                return false;
+            },
+            warm: function () {
+                const pm = envBuilder.pmrem || (envBuilder.pmrem = new THREE.PMREMGenerator(renderer));
+                pm.compileCubemapShader();
+            }
+        };
+        const ultraGuns = { build: function () {}, set: function () {} };
+        const ultraChars = { build: function () {}, set: function () {} };
+        const ultraFX = { build: function () {}, set: function () {}, sync: function () {}, update: function () {}, bindDepth: function () {} };
+
         // Initialize the optimized game
         // Debug populations. Not used by normal play. Counts are the totals to reach,
         // placed on a 12-unit grid so many actors fall outside the activity radius.
@@ -38943,6 +41338,8 @@
         // =============================================
         const DEFAULT_USER_SETTINGS = {
             qualityMode: 'auto',
+            // V1.8: Ultra Realism feature switches (used while that tier is on)
+            ultraFx: { sky: true, materials: true, detail: true, lighting: true, post: true, reflections: true, guns: true, characters: true, effects: true },
             enemyHighlightColor: 'red',
             atmosphereMode: 'daylight',
             fov: 75,
@@ -42569,6 +44966,34 @@
                     this.saveToStorage();
                 });
 
+                // V1.8 Ultra Realism: the master switch picks the tier (off goes back to
+                // Cinematic); each feature switch applies at once while the tier is on
+                this.bindPillGroup('setting-ultra-pills', 'data-ultra', (val) => {
+                    if (val === 'on') {
+                        game.userSettings.qualityMode = 'ultraRealism';
+                        qualityController.setManual('ultraRealism');
+                    } else if (adaptiveSettings.currentQuality === 'ultraRealism' || game.userSettings.qualityMode === 'ultraRealism') {
+                        game.userSettings.qualityMode = 'cinematic';
+                        qualityController.setManual('cinematic');
+                    }
+                    const p = GRAPHICS_PROFILES[adaptiveSettings.currentQuality] || GRAPHICS_PROFILES.medium;
+                    game.userSettings.shadowResolution = p.shadows ? p.shadowResolution : 0;
+                    game.userSettings.drawDistance = p.drawDistance;
+                    game.userSettings.maxDecals = p.maxDecals;
+                    this.applyAtmosphereTheme();
+                    this.syncAllUI();
+                    this.saveToStorage();
+                });
+                for (const f of ULTRA_FEATURES) {
+                    this.bindPillGroup('setting-ultrafx-' + f + '-pills', 'data-ufx', (val) => {
+                        const fx = Object.assign({}, game.userSettings.ultraFx || {});
+                        fx[f] = val !== 'off';
+                        game.userSettings.ultraFx = fx;
+                        ultraRealism.refresh();
+                        this.saveToStorage();
+                    });
+                }
+
                 this.bindPillGroup('setting-showbody-pills', 'data-showbody', (val) => {
                     game.userSettings.showBody = val !== 'off';
                     this.saveToStorage();
@@ -43811,6 +46236,7 @@
                 };
 
                 setActivePill('settings-quality-pills', 'data-quality', qualityController.auto ? 'auto' : adaptiveSettings.currentQuality);
+                ultraRealism.syncUI();
                 setActivePill('setting-enemy-color-pills', 'data-enemycol', cfg.enemyHighlightColor || 'red');
                 setActivePill('setting-atmosphere-pills', 'data-atmos', cfg.atmosphereMode || 'daylight');
                 setActivePill('setting-shadow-res-pills', 'data-shadow', !shadowManager.suspended ? adaptiveSettings.shadowResolution : 0);
@@ -45625,7 +48051,9 @@
                         `sim ${s.simStepsMean.toFixed(2)}/f drop ${s.droppedSimMs.toFixed(1)}ms shot ${s.outsideShotCpuMs.toFixed(2)}ms up ${(s.requestedUploadBytes / 1024).toFixed(1)}/${(s.glUploadBytes / 1024).toFixed(1)}kB`;
                 } else if (dispMode === 'compact') {
                     const capSuffix = (game.userSettings && game.userSettings.fpsCap > 0) ? `/${game.userSettings.fpsCap}` : '';
-                    fpsDisplay.textContent = `FPS: ${fps}${capSuffix} | Quality: ${adaptiveSettings.currentQuality.toUpperCase()}`;
+                    // V1.8: with the frame time (mean of the last frames)
+                    const frameMs = perfTelemetry.summary.frameMsMean > 0 ? perfTelemetry.summary.frameMsMean : (fps > 0 ? 1000 / fps : 0);
+                    fpsDisplay.textContent = `FPS: ${fps}${capSuffix} (${frameMs.toFixed(1)} ms) | Quality: ${qualityLabel(adaptiveSettings.currentQuality)}`;
                 }
             }
             
@@ -45716,7 +48144,12 @@
             reflectFX.render();
             // With autoClear off, r128's background pass only sets the clear colour,
             // so set it before the single manual clear (the sky dome covers it anyway)
-            if (postFX.enabled) {
+            // V1.8: Ultra Realism's per-frame work (sky, near shadow cascade, effects)
+            // and, with its post feature on, its own pipeline
+            ultraRealism.update(Math.min(0.05, delta), now);
+            if (ultraPost.active) {
+                ultraPost.render(now);
+            } else if (postFX.enabled) {
                 postFX.render(now);
             } else {
                 renderer.setClearColor(scene.background, 1);
