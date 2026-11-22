@@ -5,14 +5,16 @@ const { boot, closeBrowser, programState } = require('./harness');
 
 after(closeBrowser);
 
-// An open lane on Ascent: from (-36, 1.7, 44) looking down -Z nothing is in the way for 90 m.
+// An open lane on Ascent (V1.8 layout): from (-47, 1.7, -37) looking east down A Main, through
+// its chokepoint and the A site door, nothing is in the way for 45 m (props are switched off).
 // __spray fires n bullets of a gun as a held trigger (each shot exactly one fire interval after
 // the last, the mouse untouched) and returns where each bullet went, in degrees right of and
 // above the first one, read from the real shot rays. __hits stands still or moves at a share of
 // run speed and counts single first shots that hit a bot 20 m away.
 const HELPERS = `
-    window.__lane = { x: -36, z: 44 };
+    window.__lane = { x: -47, z: -37, dx: 1, dz: 0 };
     window.updateEnemies = () => {};
+    game.userSettings.breakables = false; breakables.applyEnabled();
     window.__deg = 180 / Math.PI;
     window.__reset = (yaw) => {
         const cc = characterController;
@@ -39,7 +41,8 @@ const HELPERS = `
     window.__hitCount = 0;
     window.__placeBot = (dist) => {
         const e = enemyObjects.find((x) => x.isActive && !x.hit);
-        e.mesh.position.set(__lane.x, 0, __lane.z - dist); e.mesh.rotation.y = 0; e.poseDirty = true;
+        e.mesh.position.set(__lane.x + __lane.dx * dist, 0, __lane.z + __lane.dz * dist);
+        e.mesh.rotation.y = Math.atan2(-__lane.dx, -__lane.dz); e.poseDirty = true;
         e.health = 9999; e.armor = 0; syncEnemyBroadphase(e); packEnemyBatches();
         __bot = e;
         return e;
@@ -56,8 +59,8 @@ const HELPERS = `
         const n = opts.n || 60;
         for (let i = 0; i < n; i++) {
             __reset(0);
-            camera.lookAt(__lane.x, 1.2, __bot.mesh.position.z); camera.updateMatrixWorld();
-            cc.velocity.set(runTop * frac, 0, 0);
+            camera.lookAt(__bot.mesh.position.x, 1.2, __bot.mesh.position.z); camera.updateMatrixWorld();
+            cc.velocity.set(-__lane.dz * runTop * frac, 0, __lane.dx * runTop * frac);   // strafing across the lane
             cc.grounded = !opts.air;
             cc.crouchBlend = opts.crouch ? 1 : 0;
             w.ammo = w.maxAmmo;
@@ -240,7 +243,7 @@ test('new guns: Ghost, Bandit, Stinger, Spectre, Bucky, Guardian, Ares and Odin 
             kit.slideGroup.traverse((o) => { if (o.isMesh && !mats.has(o.material)) kitShares = false; });
             // Fire one shot and kill a bot with it
             __placeBot(6);
-            __reset(0); camera.lookAt(__lane.x, 1.25, __bot.mesh.position.z); camera.updateMatrixWorld();
+            __reset(0); camera.lookAt(__bot.mesh.position.x, 1.25, __bot.mesh.position.z); camera.updateMatrixWorld();
             __bot.health = 1; __bot.armor = 0;
             w.ammo = w.maxAmmo;
             const feed = document.getElementById('kill-feed');

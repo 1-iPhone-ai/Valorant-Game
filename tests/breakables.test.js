@@ -53,10 +53,11 @@ test('material penetration: bullets go through a wood crate but not the same thi
         game.activeWeapon = 'rifle';
         game.userSettings.headshotOnly = false;
         const out = {};
-        // A 1.4 m thick block at x = 0, z = -20 with a bot behind it: wood, then metal
-        const piece = createBox(0, 1.2, -20, 3, 2.4, 1.4, 0x6b4f2a);
+        // A 1.4 m thick block in A Main (V1.8 Ascent) with a bot behind it: wood, then metal
+        game.userSettings.breakables = false; breakables.applyEnabled();
+        const piece = createBox(-28, 1.2, -37, 1.4, 2.4, 3, 0x6b4f2a);
         const e = enemyObjects.find((x) => x.isActive && !x.hit);
-        const place = () => { e.health = e.maxHealth || 150; e.armor = 0; e.mesh.position.set(0, 0, -23); e.poseDirty = true; syncEnemyBroadphase(e); };
+        const place = () => { e.health = e.maxHealth || 150; e.armor = 0; e.mesh.position.set(-25, 0, -37); e.poseDirty = true; syncEnemyBroadphase(e); };
         for (const [name, surf] of [['wood', MAP_SURF.wood], ['metal', MAP_SURF.metal]]) {
             piece.surf = surf;
             place();
@@ -65,7 +66,7 @@ test('material penetration: bullets go through a wood crate but not the same thi
             let decals = 0;
             const orig = window.createBulletImpact;
             window.createBulletImpact = (pos, n) => { decals++; return orig(pos, n); };
-            __fireAt([0, 1.4, -8], [0, 1.25, -23]);
+            __fireAt([-40, 1.4, -37], [-25, 1.25, -37]);
             window.createBulletImpact = orig;
             out[name] = { dealt: h0 - e.health, decals: decals };
         }

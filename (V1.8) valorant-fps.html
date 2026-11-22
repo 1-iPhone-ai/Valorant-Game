@@ -9130,41 +9130,182 @@
             ascent: {
                 id: 'ascent',
                 name: 'ASCENT',
-                subtitle: 'Venetian Mid Courtyard & Market Plaza',
+                subtitle: 'Venetian Courtyard • Three Lanes, Enclosed Sites',
                 skyColor: 0x1a2530,
                 // V1.7 lighting mood: neutral daylight, Valorant red/blue accents
                 sunColor: 0xfff1e0,
                 sunIntensity: 1.5,
                 accentA: 0xff4655,
                 accentB: 0x4672ff,
-                floorColor: 0x1f2833,
-                wallColor: 0x1f2833,
+                floorColor: 0x2a2f36,
+                wallColor: 0x3a3430,
+                // V1.8 Ascent: attackers spawn west, defenders east, A site north (-Z),
+                // B site south (+Z). Three lanes (A Main, Mid, B Main) run between solid
+                // buildings; every lane has a 3.5 m chokepoint. The open floor is this
+                // list of rectangles [x0, x1, z0, z1]; everything else inside the arena
+                // is building (8-10 m, never thinner than 3 m between two open areas),
+                // so lanes only meet at the spawns, the sites and mid's links.
+                plan: {
+                    atkSpawn: [-49.5, -36, -11, 11],
+                    aMainW: [-48, -41.5, -41, -11],
+                    aMainE: [-48, -7, -41, -33],
+                    aDoorW: [-7, -4, -39.5, -35.5],
+                    aSite: [-4, 12, -42, -26],
+                    aLinkN: [-3, 3, -26, -18],
+                    aLinkS: [3, 9, -22, -14],
+                    court: [-14, 14, -14, 14],
+                    midBotW: [-36, -27, -11, -5],
+                    midBotV: [-31, -25, -11, 7],
+                    midBotE: [-27, -14, 1, 7],
+                    midTopW: [14, 27, -7, -1],
+                    midTopV: [25, 31, -7, 11],
+                    midTopE: [27, 36, 5, 11],
+                    defSpawn: [36, 49.5, -11, 11],
+                    aRearN: [43, 49.5, -34, -11],
+                    aRear: [15, 49.5, -34, -27],
+                    aDoorE: [12, 15, -33, -29],
+                    bMainW: [-42, -36, 11, 41],
+                    bMainE: [-42, -7, 33, 41],
+                    bDoorW: [-7, -4, 35.5, 39.5],
+                    bSite: [-4, 12, 26, 42],
+                    bLinkN: [-3, 3, 18, 26],
+                    bLinkS: [3, 9, 14, 22],
+                    bRearS: [36, 42, 11, 34],
+                    bRear: [15, 42, 27, 34],
+                    bDoorE: [12, 15, 29, 33]
+                },
                 build: function() {
-                    // Central Venetian Mid Plaza Tower
-                    createBox(0, 5, 0, 20, 10, 20, 0x2c3e50);
-                    createBox(0, 11, 0, 15, 2, 15, 0x2c3e50);
-                    // Side Platforms & Ramps
-                    createBox(-20, 2.5, -20, 10, 5, 10, 0x3c4e5d);
-                    createBox(20, 2.5, -20, 10, 5, 10, 0x3c4e5d);
-                    createBox(-10, 1.25, -10, 10, 2.5, 5, 0x2c3e50);
-                    createBox(10, 1.25, -10, 10, 2.5, 5, 0x2c3e50);
-                    // Courtyard Pillars
-                    createCylinder(-15, 5, 15, 1, 10, 0x1f2833);
-                    createCylinder(15, 5, 15, 1, 10, 0x1f2833);
-                    createCylinder(-15, 5, -15, 1, 10, 0x1f2833);
-                    createCylinder(15, 5, -15, 1, 10, 0x1f2833);
-                    // Radianite Crates
-                    createBox(-25, 1, -25, 2, 2, 2, 0x3c4e5d);
-                    createBox(-23, 1, -25, 2, 2, 2, 0x3c4e5d);
-                    createBox(-25, 3, -25, 2, 2, 2, 0x3c4e5d);
-                    createBox(25, 1, -25, 2, 2, 2, 0x3c4e5d);
-                    createBox(23, 1, -25, 2, 2, 2, 0x3c4e5d);
-                    createBox(25, 3, -25, 2, 2, 2, 0x3c4e5d);
-                    createBox(-25, 1, 25, 2, 2, 2, 0x3c4e5d);
-                    createBox(25, 1, 25, 2, 2, 2, 0x3c4e5d);
-                    // Wing Accent Dividers
-                    createBox(-30, 0.5, 0, 5, 1, 30, 0xff4655);
-                    createBox(30, 0.5, 0, 5, 1, 30, 0x4672ff);
+                    const P = this.plan;
+                    const box = (x0, x1, z0, z1, y0, y1, col) => createBox((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, x1 - x0, y1 - y0, z1 - z0, col);
+                    // Buildings: every 0.5 m cell outside the plan is solid; merged into rectangles
+                    const G = 0.5, MIN = -49.5, N = 198;
+                    const solid = new Uint8Array(N * N).fill(1);
+                    for (const k in P) {
+                        const r = P[k];
+                        const i0 = Math.round((r[0] - MIN) / G), i1 = Math.round((r[1] - MIN) / G);
+                        const j0 = Math.round((r[2] - MIN) / G), j1 = Math.round((r[3] - MIN) / G);
+                        for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) solid[j * N + i] = 0;
+                    }
+                    const used = new Uint8Array(N * N);
+                    const blocks = [];
+                    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+                        const k = j * N + i;
+                        if (!solid[k] || used[k]) continue;
+                        let w = 1;
+                        while (i + w < N && solid[k + w] && !used[k + w]) w++;
+                        let h = 1;
+                        grow: while (j + h < N) {
+                            for (let t = 0; t < w; t++) { const kk = (j + h) * N + i + t; if (!solid[kk] || used[kk]) break grow; }
+                            h++;
+                        }
+                        for (let jj = j; jj < j + h; jj++) for (let ii = i; ii < i + w; ii++) used[jj * N + ii] = 1;
+                        blocks.push([MIN + i * G, MIN + (i + w) * G, MIN + j * G, MIN + (j + h) * G]);
+                    }
+                    const WALLS = [0x6f5d4b, 0x7a6551, 0x655446, 0x806a56];
+                    for (let b = 0; b < blocks.length; b++) {
+                        const r = blocks[b];
+                        const big = (r[1] - r[0]) * (r[3] - r[2]) > 60;
+                        const top = big ? (b % 3 === 0 ? 10 : 9) : 8;
+                        box(r[0], r[1], r[2], r[3], 0, top, WALLS[b % WALLS.length]);
+                        // Roof parapet on the larger blocks (silhouette detail)
+                        if (big && b % 2 === 0) box(r[0] + 0.3, r[1] - 0.3, r[2] + 0.3, r[3] - 0.3, top, top + 0.5, 0x4d4036);
+                    }
+                    // Chokepoints: 3.5 m gaps in each lane
+                    const CH = 0x5e4e42;
+                    box(-22, -18, -41, -38.75, 0, 8, CH); box(-22, -18, -35.25, -33, 0, 8, CH);       // A Main
+                    box(-21, -18, 1, 2.25, 0, 8, CH); box(-21, -18, 5.75, 7, 0, 8, CH);              // Mid
+                    box(-22, -18, 33, 35.25, 0, 8, CH); box(-22, -18, 38.75, 41, 0, 8, CH);           // B Main
+                    // ...each under an arch (above head height)
+                    box(-22, -18, -38.75, -35.25, 5, 8, CH); box(-21, -18, 2.25, 5.75, 5, 8, CH); box(-22, -18, 35.25, 38.75, 5, 8, CH);
+                    // Spawn walls just north of both spawn points, with 2.5 m ways round at
+                    // each end: no long north-south line through a spawn, and both teams
+                    // walk the same few metres extra toward A
+                    const SB = 0x4f4540;
+                    box(-47, -38.5, -3, -1, 0, 6, SB);
+                    box(38.5, 47, -3, -1, 0, 6, SB);
+                    // Crate stacks past each way round: no line from a lane runs on through a
+                    // spawn (and none in the bots' way out of it)
+                    box(-49.5, -46, 4, 6, 0, 3, 0x6b4f2a); box(-39.5, -36, 4, 6, 0, 3, 0x6b4f2a);
+                    box(46, 49.5, -6, -4, 0, 3, 0x6b4f2a); box(36, 39, 5, 7, 0, 3, 0x6b4f2a);
+                    // Door lintels (archways) over the site doors and the link mouths
+                    const LT = 0x4a3f36;
+                    for (const k of ['aDoorW', 'aDoorE', 'bDoorW', 'bDoorE']) { const r = P[k]; box(r[0], r[1], r[2], r[3], 4.5, 8, LT); }
+                    box(3, 9, -15, -14, 5, 8, LT); box(3, 9, 14, 15, 5, 8, LT);
+                    box(-15, -14, 1, 7, 5, 8, LT); box(14, 15, -7, -1, 5, 8, LT);
+                    // Both sites: enclosed 16 x 16 (x -4..12), three entrances, cover, a
+                    // raised platform up a flight of 0.5 m steps, a thin (wallbangable)
+                    // partition toward the link, and the site colour as a trim band
+                    for (const s of [-1, 1]) {
+                        const A = s < 0;
+                        const zr = (z0, z1) => s < 0 ? [z0, z1] : [-z1, -z0];   // mirror north (A) to south (B)
+                        const bx = (x0, x1, z0, z1, y0, y1, col) => { const r = zr(z0, z1); box(x0, x1, r[0], r[1], y0, y1, col); };
+                        const ACC = A ? 0xff4655 : 0x4672ff;
+                        const WOOD = 0x6b4f2a, METAL = 0x4a5563, STONE = 0x7d6a58;
+                        // Thin partition between the site and its link: a 3.5 m door and a thin wall
+                        bx(0.5, 3, -26.3, -25.7, 0, 6, STONE);
+                        bx(-3, 0.5, -26.3, -25.7, 4.2, 6, LT);
+                        // Default box: blocks the long line in through the west door
+                        bx(-1.5, 1, -40.5, -34.5, 0, 2.6, WOOD);
+                        // Raised platform (heaven) in the far corner, steps up from the south
+                        bx(7, 12, -42, -38, 0, 2.5, STONE);
+                        for (let k = 1; k <= 5; k++) bx(8, 11, -33 - k, -32 - k, 0, k * 0.5, 0x8a7560);
+                        bx(7, 7.25, -42, -38.25, 2.5, 3.6, 0x5e4e42);              // platform rail (chest cover, facing the site)
+                        // Cover, spread out so every way through stays at least 2.5 m wide
+                        bx(3, 5.5, -34.5, -30.5, 0, 2.4, WOOD);                    // tall crates: break the line in through the east door
+                        bx(-1.5, 0.5, -31, -29, 0, 2.2, METAL);                    // stand-up cover in front of the link door
+                        bx(8.5, 11, -29.5, -28.9, 0, 1.1, STONE);
+                        bx(3, 5, -42, -41, 0, 1.2, METAL); bx(3.2, 4.8, -42, -41.2, 1.2, 2.2, WOOD);
+                        // Site trim band in the site colour
+                        bx(-4, 12, -42, -41.8, 3, 3.3, ACC);
+                        bx(-4, -3.8, -34, -26.5, 3, 3.3, ACC);
+                        bx(11.8, 12, -42, -38.5, 3, 3.3, ACC);
+                        // Lane cover and a crate stack by each main
+                        bx(-34, -32, -40.5, -38.5, 0, 1.2, WOOD);
+                        bx(-14, -12, -34.5, -33, 0, 1.0, METAL);
+                        const legX = A ? -48 : -38;                             // the B legs sit further east
+                        bx(legX, legX + 2, -30, -28, 0, 1.2, WOOD); bx(legX + 0.3, legX + 1.7, -29.7, -28.3, 1.2, 2.3, WOOD);
+                        // Rear corridor (defender side) cover, against the walls
+                        bx(30, 32, -34, -32.5, 0, 1.1, METAL);
+                        // Crates part-way down the rear corridor: no 50 m line from its far end into the site
+                        bx(19, 21, -31.5, -27, 0, 2.6, WOOD); bx(19.3, 20.7, -30.5, -27.6, 2.6, 3.6, WOOD);
+                        const rearX = A ? 48 : 40.5;
+                        bx(rearX, rearX + 1.5, -20, -18, 0, 1.2, WOOD);
+                        // Balconies and awnings jutting out of the lane walls (above head height)
+                        bx(-30, -26, -41, -40.2, 4.2, 4.6, 0x5a4a3e);
+                        bx(-18, -14, -33.8, -33, 3.8, 4.1, ACC);
+                        bx(24, 28, -34, -33.2, 4.2, 4.6, 0x5a4a3e);
+                        bx(0, 4, -42, -41.2, 5.2, 5.6, 0x5a4a3e);
+                        // Shuttered windows on the lane and rear-corridor walls (above head height)
+                        for (const w of [[-39, -41, 1], [-11, -41, 1], [38, -34, 1]]) {
+                            const wx = w[0], wz = w[1], d = w[2] * 0.3;
+                            bx(wx - 1.4, wx + 1.4, wz, wz + d, 2.9, 3.05, 0x8a7560);          // sill
+                            bx(wx - 1.4, wx + 1.4, wz, wz + d * 0.8, 4.45, 4.6, 0x8a7560);    // head
+                            bx(wx - 1.2, wx + 1.2, wz, wz + 0.08, 3.05, 4.45, 0x2b2620);      // shutters
+                        }
+                        // A hand cart against the lane wall short of the choke (low cover)
+                        bx(-29, -26.5, -34.2, -33, 0, 1.0, WOOD);
+                    }
+                    // Mid courtyard: the fountain (breaks the long mid lines), cover, planters
+                    box(-3, 3, -8, 8, 0, 0.6, 0x7d6a58);
+                    box(-1.5, 1.5, -7, 7, 0.6, 4.5, 0x8a7560);
+                    box(-1, 1, -5, 5, 4.5, 5.4, 0x9a8670);
+                    box(-10, -8, -4.5, -2.5, 0, 1.8, 0x6b4f2a);   // crate stacks tall enough to hide behind
+                    box(8, 10, -4.5, -2.5, 0, 1.8, 0x6b4f2a);
+                    box(-13, -12.4, -11, -7, 0, 1.1, 0x7d6a58);
+                    box(12.4, 13, -13, -9, 0, 1.1, 0x7d6a58);
+                    // A statue east of the fountain: no line from one link through mid to the other
+                    // (the west side stays open for the aim trainer's targets)
+                    box(3, 6.5, -1, 1, 0, 2.6, 0x8a7560);
+                    box(-13.5, -12, -13.5, -12, 0, 0.9, 0x3f6b3a);
+                    box(-13.4, -12.8, -5, -2, 0, 0.5, 0x6b4f2a); box(-10, -7, -13.4, -12.8, 0, 0.5, 0x6b4f2a);   // benches
+                    box(12, 13.5, 12, 13.5, 0, 0.9, 0x3f6b3a);
+                    box(12, 13.5, -13.5, -12, 0, 0.9, 0x3f6b3a);
+                    box(-13.5, -12, 12, 13.5, 0, 0.9, 0x3f6b3a);
+                    // Mid corridors: cover and a balcony
+                    box(-30, -28, -11, -9.5, 0, 1.1, 0x4a5563);
+                    box(28, 30, 9.5, 11, 0, 1.1, 0x4a5563);
+                    box(-35, -29, -11, -10.2, 4.2, 4.6, 0x5a4a3e);
+                    box(29, 35, 10.2, 11, 4.2, 4.6, 0x5a4a3e);
                 }
             },
             bind: {
@@ -9416,6 +9557,116 @@
             }
         };
 
+        // =============================================
+        // V1.8 Per-map data: spike sites, spawns, callout zones, bot spawn points,
+        // ult-orb spots and the spots each mode uses. Everything that used to be
+        // hardcoded for every map reads mapLayout() now. The six original maps share
+        // LEGACY_LAYOUT, which holds exactly the values that were hardcoded, so they
+        // play as before; Ascent has its own (ASCENT_LAYOUT, below its build).
+        // =============================================
+        // The callouts every map used before V1.8 (Ascent's old open layout)
+        function legacyZoneName(x, y, z) {
+            const distSiteA = Math.hypot(x - 0, z - (-22));
+            if (distSiteA <= 7.5) return 'A SITE (NORTH)';
+            const distSiteB = Math.hypot(x - 0, z - 22);
+            if (distSiteB <= 7.5) return 'B SITE (SOUTH)';
+            if (Math.abs(x) <= 11 && Math.abs(z) <= 11) {
+                return y >= 9 ? 'CENTRAL ROOFTOP' : (y >= 4 ? 'CENTRAL DECK' : 'MID TOWER');
+            }
+            if (z < -14 && x < -12) return 'A LONG (WEST)';
+            if (z < -14 && x > 12) return 'A LINK (EAST)';
+            if (x < -22) return 'RED CORRIDOR';
+            if (x > 22) return 'BLUE CORRIDOR';
+            if (z > 15) return 'B MAIN (SOUTH)';
+            return 'MID COURTYARD';
+        }
+        const LEGACY_LAYOUT = {
+            sites: { A: { x: 0, z: -22 }, B: { x: 0, z: 22 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } },
+            start: { x: 0, z: 15 },                        // where a map change puts you
+            bootStart: null,                               // where you start at load (null: the controller's 0, 0)
+            // Wave-mode bots: [x, z, archetype]; the low-content set when only two bots exist
+            botSpawns: [[-32, -28, 'rusher'], [34, -34, 'sniper'], [-28, 28, 'armored'], [32, 28, 'standard'], [0, -36, 'rusher'], [-36, 0, 'armored']],
+            botSpawnsLow: [[-32, -32, 'rusher'], [32, 32, 'armored']],
+            respawnSpots: null,                            // null: a random ring 30-45 m from the centre
+            orbs: [{ x: -18, z: 0, name: 'WEST MID ORB' }, { x: 18, z: 0, name: 'EAST MID ORB' }],
+            zoneName: legacyZoneName,
+            // Match: defenders (when you attack) around the sites, attackers stacked at their spawn
+            matchDefend: (a, b) => [[a.x - 4, a.z + 3], [b.x + 4, b.z - 3], [a.x + 4, a.z - 2], [b.x - 4, b.z + 2], [8, 0]],
+            matchAttack: (o) => [[o.x, o.z - 3], [o.x, o.z + 3], [o.x + 2, o.z], [o.x - 2, o.z - 5], [o.x - 2, o.z + 5]],
+            // Retake: where you start and where the six defenders hold, per planted site
+            retake: {
+                A: { player: { x: 0, z: 6, yaw: 0 }, guards: [[-5.5, -25.5, 'armored'], [5.5, -25.5, 'standard'], [-8.5, -18, 'rusher'], [8.5, -18, 'sniper'], [0, -27, 'armored'], [-3, -19.5, 'standard']] },
+                B: { player: { x: 0, z: -6, yaw: Math.PI }, guards: [[-5.5, 25.5, 'armored'], [5.5, 25.5, 'standard'], [-8.5, 18, 'rusher'], [8.5, 18, 'sniper'], [0, 27, 'armored'], [-3, 19.5, 'standard']] }
+            },
+            // 30-bot Range: you stand here facing -Z; bots pop up on these lanes
+            range: { player: { x: 0, z: 27 }, lanesX: [-11, -8.5, -6, -3.5, -1.2, 1.2, 3.5, 6, 8.5, 11], lanesZ: [11.5, 13.5, 15.5, 17.5, 19.0] },
+            aim: { x: 0, z: 30 },                          // aim trainer start (targets 8-14 m ahead, -Z)
+            openSpan: 42,                                  // findOpenSpot picks within +-this
+            clampSpan: 44,                                 // wingmen stay within +-this
+            propMargin: 1.3,                               // glass panes keep this clear of colliders
+            checkTargets: false                            // practice targets: re-roll spots inside walls
+        };
+        // V1.8 Ascent's callouts (by the open areas of its plan)
+        function _inPlanRect(r, x, z) { return x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]; }
+        function ascentZoneName(x, y, z) {
+            const P = MAP_PRESETS.ascent.plan;
+            if (_inPlanRect(P.aSite, x, z)) return (y > 3.6 && x >= 7 && z <= -38) ? 'A HEAVEN' : 'A SITE';
+            if (_inPlanRect(P.bSite, x, z)) return (y > 3.6 && x >= 7 && z >= 38) ? 'B HEAVEN' : 'B SITE';
+            if (_inPlanRect(P.aLinkN, x, z) || _inPlanRect(P.aLinkS, x, z)) return 'A LINK';
+            if (_inPlanRect(P.bLinkN, x, z) || _inPlanRect(P.bLinkS, x, z)) return 'B LINK';
+            if (_inPlanRect(P.court, x, z)) return 'MID COURTYARD';
+            if (_inPlanRect(P.aDoorW, x, z)) return 'A DOOR';
+            if (_inPlanRect(P.bDoorW, x, z)) return 'B DOOR';
+            if (_inPlanRect(P.aMainE, x, z) || _inPlanRect(P.aMainW, x, z)) return 'A MAIN';
+            if (_inPlanRect(P.bMainE, x, z) || _inPlanRect(P.bMainW, x, z)) return 'B MAIN';
+            if (_inPlanRect(P.midBotW, x, z) || _inPlanRect(P.midBotV, x, z) || _inPlanRect(P.midBotE, x, z)) return 'MID BOTTOM';
+            if (_inPlanRect(P.midTopW, x, z) || _inPlanRect(P.midTopV, x, z) || _inPlanRect(P.midTopE, x, z)) return 'MID TOP';
+            if (_inPlanRect(P.aDoorE, x, z) || _inPlanRect(P.aRear, x, z) || _inPlanRect(P.aRearN, x, z)) return 'A REAR';
+            if (_inPlanRect(P.bDoorE, x, z) || _inPlanRect(P.bRear, x, z) || _inPlanRect(P.bRearS, x, z)) return 'B REAR';
+            if (_inPlanRect(P.atkSpawn, x, z)) return 'ATTACKER SPAWN';
+            if (_inPlanRect(P.defSpawn, x, z)) return 'DEFENDER SPAWN';
+            return 'ASCENT';
+        }
+        const ASCENT_LAYOUT = {
+            sites: { A: { x: 2, z: -32.5 }, B: { x: 2, z: 32.5 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } },
+            start: { x: -8, z: 11, yaw: 0 },
+            bootStart: { x: -8, z: 11, yaw: 0 },
+            botSpawns: [[-30, -37, 'rusher'], [6, -28.5, 'sniper'], [-30, 37, 'armored'], [6, 28.5, 'standard'], [28, 2, 'rusher'], [46, -22, 'armored']],
+            botSpawnsLow: [[-30, -37, 'rusher'], [6, 28.5, 'armored']],
+            // Open spots all over the map (lanes, sites, links, rears, mid)
+            respawnSpots: [[-30, -37], [-46, -22], [-10, -37], [6, -28.5], [0, -22], [6, -17], [30, -30], [46, -22],
+                [-30, 37], [-39, 22], [-10, 37], [6, 28.5], [0, 22], [6, 17], [30, 30], [39, 22],
+                [-32, -8], [-24, 4], [20, -4], [32, 8], [-11, -12], [11, -12]],
+            orbs: [{ x: -33, z: -8, name: 'MID BOTTOM ORB' }, { x: 33, z: 8, name: 'MID TOP ORB' }],
+            zoneName: ascentZoneName,
+            matchDefend: () => [[1.5, -33.5], [8, -31], [1.5, 33.5], [8, 31], [20, -4]],
+            // Attacking bots stack south of the spawn wall, clear of it and the crates
+            matchAttack: (o) => [[o.x, o.z + 3], [o.x + 3, o.z + 1.5], [o.x - 3, o.z + 1.5], [o.x + 2, o.z + 8.5], [o.x - 3, o.z + 8.5]],
+            retake: {
+                A: { player: { x: 6, z: -11, yaw: 0 }, guards: [[1.5, -33.5, 'armored'], [8, -31, 'standard'], [2.5, -38, 'rusher'], [5.5, -36, 'sniper'], [-1, -27.5, 'armored'], [-2.5, -33, 'standard']] },
+                B: { player: { x: 6, z: 11, yaw: Math.PI }, guards: [[1.5, 33.5, 'armored'], [8, 31, 'standard'], [2.5, 38, 'rusher'], [5.5, 36, 'sniper'], [-1, 27.5, 'armored'], [-2.5, 33, 'standard']] }
+            },
+            // The courtyard's south half is kept clear for the range and the aim trainer
+            range: { player: { x: 0, z: 13 }, lanesX: [-12, -10, -8, -6, 6, 8, 10, 12], lanesZ: [2.5, 4, 5.5] },
+            aim: { x: -8, z: 13 },
+            propKeepOut: [[-14, 14, 1.5, 14]],
+            // Practice targets: open air with 10 m clear either side (a moving target's sweep)
+            targetSpots: [[0, 6, -11], [-30, 3.6, -37], [0, 7.5, 0], [-26, 3.4, 37], [34, 4, -30.5], [0, 8, 6], [-35, 3.6, -37]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.2,
+            checkTargets: true
+        };
+
+        function mapLayout() {
+            const p = (typeof game !== 'undefined' && MAP_PRESETS[game.mapPreset]) || MAP_PRESETS.ascent;
+            return p.layout || LEGACY_LAYOUT;
+        }
+        MAP_PRESETS.ascent.layout = ASCENT_LAYOUT;
+        for (const id of ['bind', 'haven', 'icebox', 'lotus', 'split', 'skyline']) MAP_PRESETS[id].layout = LEGACY_LAYOUT;
+
         // Create map elements from active MAP_PRESETS entry
         function createMap() {
             const presetId = (typeof game !== 'undefined' && game.mapPreset && MAP_PRESETS[game.mapPreset]) ? game.mapPreset : 'ascent';
@@ -9480,10 +9731,15 @@
                     collisionIndex.insert(c);
                 }
             }
+            // V1.8: this map's sites and ult orbs (props keep clear of them)
+            if (typeof tacticalDirector !== 'undefined' && tacticalDirector.applyMapLayout) tacticalDirector.applyMapLayout();
             breakables.build();
+            navGrid.build();   // V1.8: bots route all the time now, so build it here, not mid-fight
+            relocateBlockedTargets();
 
             // Ensure player & enemies are not embedded in newly spawned map geometry
-            characterController.position.set(0, characterController.height || 1.7, 15);
+            const L = mapLayout();
+            characterController.position.set(L.start.x, characterController.height || 1.7, L.start.z);
             characterController.prevSimPosition.copy(characterController.position);
             for (let i = 0; i < enemyObjects.length; i++) {
                 const e = enemyObjects[i];
@@ -11760,18 +12016,44 @@
             EXT: 50,
             blocked: null,
             builtFor: null,
+            // V1.8: every plan reuses these buffers (no allocation per route).
+            // A cell's g / came values count only when its stamp is this search's.
+            _buf: null, _g: null, _came: null, _stamp: null, _closed: null, _gen: 0,
+            _heapF: null, _heapC: null, _heapN: 0, _cells: null,
+            _tmp: [], _probe: null, _live: { x: 0, z: 0 },
 
             build: function () {
                 const N = this.N;
-                this.blocked = new Uint8Array(N * N);
-                const p = new THREE.Vector3();
+                if (!this._buf) this._buf = new Uint8Array(N * N);
+                if (!this._probe) this._probe = new THREE.Vector3();
+                this.blocked = this._buf;
+                const p = this._probe;
                 for (let j = 0; j < N; j++) {
                     for (let i = 0; i < N; i++) {
                         p.set(i - this.EXT + 0.5, 0, j - this.EXT + 0.5);
-                        if (resolveEnemyMapCollision(p, 0.75)) this.blocked[j * N + i] = 1;
+                        this.blocked[j * N + i] = resolveEnemyMapCollision(p, 0.75) ? 1 : 0;
                     }
                 }
                 this.builtFor = game.mapPreset;
+            },
+
+            ensure: function () {
+                if (!this.blocked || this.builtFor !== game.mapPreset) this.build();
+            },
+
+            // V1.8: re-check just the cells round one area (a prop that broke or came
+            // back) instead of rebuilding the whole grid mid-fight
+            refreshArea: function (x0, z0, x1, z1) {
+                if (!this.blocked || this.builtFor !== game.mapPreset) return;
+                const N = this.N, p = this._probe;
+                const i0 = Math.max(0, Math.floor(x0 - 1 + this.EXT)), i1 = Math.min(N - 1, Math.floor(x1 + 1 + this.EXT));
+                const j0 = Math.max(0, Math.floor(z0 - 1 + this.EXT)), j1 = Math.min(N - 1, Math.floor(z1 + 1 + this.EXT));
+                for (let j = j0; j <= j1; j++) {
+                    for (let i = i0; i <= i1; i++) {
+                        p.set(i - this.EXT + 0.5, 0, j - this.EXT + 0.5);
+                        this.blocked[j * N + i] = resolveEnemyMapCollision(p, 0.75) ? 1 : 0;
+                    }
+                }
             },
 
             _cell: function (x, z) {
@@ -11780,16 +12062,25 @@
                 return j * this.N + i;
             },
 
-            // Nearest open cell (start or goal may sit on a blocked one)
-            _open: function (c) {
+            // Nearest open cell (start or goal may sit on a blocked one). V1.8: the one
+            // nearest the point itself, so a bot against a thin wall starts on its own
+            // side of it, not the first open cell found on the far side
+            _open: function (c, x, z) {
                 if (!this.blocked[c]) return c;
                 const N = this.N, ci = c % N, cj = (c / N) | 0;
+                if (x === undefined) { x = ci - this.EXT + 0.5; z = cj - this.EXT + 0.5; }
                 for (let r = 1; r < 6; r++) {
+                    let best = -1, bestD = Infinity;
                     for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
+                        if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
                         const i = ci + di, j = cj + dj;
                         if (i < 0 || j < 0 || i >= N || j >= N) continue;
-                        if (!this.blocked[j * N + i]) return j * N + i;
+                        if (this.blocked[j * N + i]) continue;
+                        const ex = i - this.EXT + 0.5 - x, ez = j - this.EXT + 0.5 - z;
+                        const d = ex * ex + ez * ez;
+                        if (d < bestD) { bestD = d; best = j * N + i; }
                     }
+                    if (best >= 0) return best;
                 }
                 return -1;
             },
@@ -11804,94 +12095,239 @@
                 return true;
             },
 
-            // A* (8-way, octile heuristic). Returns smoothed waypoints or null.
-            findPath: function (sx, sz, tx, tz) {
-                if (!this.blocked || this.builtFor !== game.mapPreset) this.build();
-                const N = this.N, total = N * N;
-                const start = this._open(this._cell(sx, sz)), goal = this._open(this._cell(tx, tz));
-                if (start < 0 || goal < 0) return null;
-                const g = new Float32Array(total).fill(Infinity);
-                const came = new Int32Array(total).fill(-1);
-                const closed = new Uint8Array(total);
-                const heap = [];   // [f, cell], binary min-heap
-                const push = (f, c) => {
-                    heap.push([f, c]);
-                    let i = heap.length - 1;
-                    while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; }
-                };
-                const pop = () => {
-                    const top = heap[0], last = heap.pop();
-                    if (heap.length) {
-                        heap[0] = last;
-                        let i = 0;
-                        for (;;) {
-                            const l = 2 * i + 1, r = l + 1;
-                            let m = i;
-                            if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
-                            if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
-                            if (m === i) break;
-                            [heap[m], heap[i]] = [heap[i], heap[m]];
-                            i = m;
-                        }
+            // V1.8: can a bot walk straight from a to b? Tested against the same
+            // colliders bots bump into, each grown by 0.6 m, so a gap a bot cannot
+            // fit through counts as shut while a run that starts or ends against a
+            // wall (a cover spot) still counts as open
+            _runScratch: [],
+            clearRun: function (ax, az, bx, bz, radius) {
+                const r = radius || 0.6, dx = bx - ax, dz = bz - az;
+                const near = collisionIndex.query(Math.min(ax, bx) - r - 1, Math.min(az, bz) - r - 1,
+                    Math.max(ax, bx) + r + 1, Math.max(az, bz) + r + 1, this._runScratch);
+                for (let i = 0; i < near.length; i++) {
+                    const b = near[i];
+                    if (b.maxY <= 0.15 || b.minY >= 2.1) continue;
+                    let t0 = 0, t1 = 1;
+                    if (Math.abs(dx) < 1e-9) {
+                        if (ax <= b.minX - r || ax >= b.maxX + r) continue;
+                    } else {
+                        let ta = (b.minX - r - ax) / dx, tb = (b.maxX + r - ax) / dx;
+                        if (ta > tb) { const t = ta; ta = tb; tb = t; }
+                        if (ta > t0) t0 = ta;
+                        if (tb < t1) t1 = tb;
+                        if (t0 >= t1) continue;
                     }
-                    return top;
-                };
+                    if (Math.abs(dz) < 1e-9) {
+                        if (az <= b.minZ - r || az >= b.maxZ + r) continue;
+                    } else {
+                        let ta = (b.minZ - r - az) / dz, tb = (b.maxZ + r - az) / dz;
+                        if (ta > tb) { const t = ta; ta = tb; tb = t; }
+                        if (ta > t0) t0 = ta;
+                        if (tb < t1) t1 = tb;
+                        if (t0 >= t1) continue;
+                    }
+                    return false;
+                }
+                return true;
+            },
+
+            _alloc: function () {
+                const T = this.N * this.N;
+                this._g = new Float32Array(T);
+                this._came = new Int32Array(T);
+                this._stamp = new Uint32Array(T);
+                this._closed = new Uint32Array(T);
+                // Each cell is pushed at most once per neighbour (lazy deletion)
+                this._heapF = new Float64Array(T * 8 + 8);
+                this._heapC = new Int32Array(T * 8 + 8);
+                this._cells = new Int32Array(T);
+            },
+
+            _push: function (f, c) {
+                const F = this._heapF, C = this._heapC;
+                let i = this._heapN++;
+                while (i > 0) {
+                    const p = (i - 1) >> 1;
+                    if (F[p] <= f) break;
+                    F[i] = F[p]; C[i] = C[p];
+                    i = p;
+                }
+                F[i] = f; C[i] = c;
+            },
+
+            _pop: function () {
+                const F = this._heapF, C = this._heapC;
+                const top = C[0];
+                const n = --this._heapN;
+                if (n > 0) {
+                    const f = F[n], c = C[n];
+                    let i = 0;
+                    for (;;) {
+                        const l = 2 * i + 1;
+                        if (l >= n) break;
+                        const r = l + 1;
+                        const m = (r < n && F[r] < F[l]) ? r : l;
+                        if (F[m] >= f) break;
+                        F[i] = F[m]; C[i] = C[m];
+                        i = m;
+                    }
+                    F[i] = f; C[i] = c;
+                }
+                return top;
+            },
+
+            _h: function (c, gi, gj) {
+                const N = this.N;
+                const dx = Math.abs(c % N - gi), dz = Math.abs(((c / N) | 0) - gj);
+                return Math.max(dx, dz) + 0.414 * Math.min(dx, dz);
+            },
+
+            // A* (8-way, octile heuristic, no corner cutting) from cell to cell
+            _search: function (start, goal) {
+                if (!this._g) this._alloc();
+                const N = this.N, bl = this.blocked;
+                let gen = ++this._gen;
+                if (gen >= 0xfffffff0) { this._stamp.fill(0); this._closed.fill(0); this._gen = gen = 1; }
+                const G = this._g, came = this._came, stamp = this._stamp, closed = this._closed;
                 const gi = goal % N, gj = (goal / N) | 0;
-                const h = (c) => { const dx = Math.abs(c % N - gi), dz = Math.abs(((c / N) | 0) - gj); return Math.max(dx, dz) + 0.414 * Math.min(dx, dz); };
-                g[start] = 0;
-                push(h(start), start);
-                let found = false;
-                while (heap.length) {
-                    const [, c] = pop();
-                    if (closed[c]) continue;
-                    if (c === goal) { found = true; break; }
-                    closed[c] = 1;
+                this._heapN = 0;
+                G[start] = 0; came[start] = -1; stamp[start] = gen;
+                this._push(this._h(start, gi, gj), start);
+                while (this._heapN > 0) {
+                    const c = this._pop();
+                    if (closed[c] === gen) continue;
+                    if (c === goal) return true;
+                    closed[c] = gen;
                     const ci = c % N, cj = (c / N) | 0;
+                    const gc = G[c];
                     for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
                         if (!di && !dj) continue;
                         const i = ci + di, j = cj + dj;
                         if (i < 0 || j < 0 || i >= N || j >= N) continue;
                         const n = j * N + i;
-                        if (this.blocked[n] || closed[n]) continue;
+                        if (bl[n] || closed[n] === gen) continue;
                         // No corner cutting
-                        if (di && dj && (this.blocked[cj * N + i] || this.blocked[j * N + ci])) continue;
-                        const ng = g[c] + (di && dj ? 1.414 : 1);
-                        if (ng < g[n]) { g[n] = ng; came[n] = c; push(ng + h(n), n); }
+                        if (di && dj && (bl[cj * N + i] || bl[j * N + ci])) continue;
+                        const ng = gc + (di && dj ? 1.414 : 1);
+                        if (stamp[n] !== gen || ng < G[n]) {
+                            G[n] = ng; came[n] = c; stamp[n] = gen;
+                            this._push(ng + this._h(n, gi, gj), n);
+                        }
                     }
                 }
-                if (!found) return null;
-                const cells = [];
-                for (let c = goal; c >= 0; c = came[c]) cells.push(c);
-                cells.reverse();
-                const pts = cells.map((c) => ({ x: c % N - this.EXT + 0.5, z: ((c / N) | 0) - this.EXT + 0.5 }));
-                pts[pts.length - 1] = { x: tx, z: tz };
-                // Smooth: keep only the points where a straight run would hit a wall
-                const out = [];
-                let a = { x: sx, z: sz };
-                let k = 0;
-                while (k < pts.length) {
-                    let far = k;
-                    for (let m = pts.length - 1; m > k; m--) {
-                        if (this._clearLine(a.x, a.z, pts[m].x, pts[m].z)) { far = m; break; }
+                return false;
+            },
+
+            // Route from (sx, sz) to (tx, tz) as smoothed waypoints written into out
+            // (its point objects are reused); returns the count, or -1 for no route
+            _plan: function (sx, sz, tx, tz, out) {
+                this.ensure();
+                let n = 0;
+                // Nothing in the way of a bot's whole width: one straight run. (The grid is
+                // judged at cell centres; the first run starts from wherever the bot really
+                // is, perhaps closer to a wall corner, so it is also checked full width.)
+                if (this._clearLine(sx, sz, tx, tz) && this.clearRun(sx, sz, tx, tz, 0.7)) n = 1;
+                else {
+                    const start = this._open(this._cell(sx, sz), sx, sz), goal = this._open(this._cell(tx, tz), tx, tz);
+                    if (start < 0 || goal < 0 || !this._search(start, goal)) return -1;
+                    const N = this.N, cells = this._cells, came = this._came;
+                    let len = 0;
+                    for (let c = goal; c >= 0; c = came[c]) cells[len++] = c;
+                    for (let a = 0, b = len - 1; a < b; a++, b--) { const t = cells[a]; cells[a] = cells[b]; cells[b] = t; }
+                    // Smooth: keep only the points where a straight run would hit a wall
+                    // (cell centres; the last point is the exact goal)
+                    let ax = sx, az = sz, k = 0;
+                    while (k < len) {
+                        let far = k;
+                        for (let m = len - 1; m > k; m--) {
+                            const mx = m === len - 1 ? tx : cells[m] % N - this.EXT + 0.5;
+                            const mz = m === len - 1 ? tz : ((cells[m] / N) | 0) - this.EXT + 0.5;
+                            if (this._clearLine(ax, az, mx, mz) && (n > 0 || this.clearRun(ax, az, mx, mz, 0.7))) { far = m; break; }
+                        }
+                        const fx = far === len - 1 ? tx : cells[far] % N - this.EXT + 0.5;
+                        const fz = far === len - 1 ? tz : ((cells[far] / N) | 0) - this.EXT + 0.5;
+                        let w = out[n];
+                        if (!w) { w = { x: 0, z: 0 }; out[n] = w; }
+                        w.x = fx; w.z = fz; n++;
+                        ax = fx; az = fz;
+                        k = far + 1;
                     }
-                    out.push(pts[far]);
-                    a = pts[far];
-                    k = far + 1;
+                    return n;
                 }
+                let w = out[0];
+                if (!w) { w = { x: 0, z: 0 }; out[0] = w; }
+                w.x = tx; w.z = tz;
+                return n;
+            },
+
+            // V1.8: walking distance from (sx, sz) to (tx, tz) along the route, or -1
+            routeLength: function (sx, sz, tx, tz) {
+                const n = this._plan(sx, sz, tx, tz, this._tmp);
+                if (n < 0) return -1;
+                let len = 0, ax = sx, az = sz;
+                for (let k = 0; k < n; k++) { len += Math.hypot(this._tmp[k].x - ax, this._tmp[k].z - az); ax = this._tmp[k].x; az = this._tmp[k].z; }
+                return len;
+            },
+
+            // Smoothed waypoints from (sx, sz) to (tx, tz) as a new array, or null
+            findPath: function (sx, sz, tx, tz) {
+                const n = this._plan(sx, sz, tx, tz, this._tmp);
+                if (n < 0) return null;
+                const out = new Array(n);
+                for (let k = 0; k < n; k++) out[k] = { x: this._tmp[k].x, z: this._tmp[k].z };
                 return out;
             },
 
-            // Point to steer at this tick on the way to goal (re-planned every 2 s)
-            steer: function (enemy, pos, goal, now) {
-                if (!enemy.navPath || enemy.navGoalX !== goal.x || enemy.navGoalZ !== goal.z || now >= (enemy.navReplanAt || 0)) {
-                    enemy.navPath = this.findPath(pos.x, pos.z, goal.x, goal.z) || [{ x: goal.x, z: goal.z }];
-                    enemy.navGoalX = goal.x;
-                    enemy.navGoalZ = goal.z;
-                    enemy.navReplanAt = now + 2000 + (enemy.slot % 4) * 150;
+            // Point to steer at this tick on the way to (gx, gz). A fixed goal (tol 0)
+            // is re-planned when it changes and every 2 s. V1.8: a moving goal (tol > 0,
+            // a player being hunted) is re-planned when it has moved more than tol from
+            // where the route was planned to, at most every 0.35 s, and the last leg
+            // runs at where it is now. The route lives on the bot (no allocation).
+            steerTo: function (enemy, pos, gx, gz, now, tol) {
+                let path = enemy.navPts;
+                if (!path) { path = enemy.navPts = []; enemy.navLen = 0; enemy.navIdx = 0; }
+                let replan = !enemy.navLen || now >= (enemy.navReplanAt || 0);
+                if (!replan) {
+                    if (tol > 0) replan = now >= (enemy.navMinAt || 0) && Math.hypot(gx - enemy.navGoalX, gz - enemy.navGoalZ) > tol;
+                    else replan = enemy.navGoalX !== gx || enemy.navGoalZ !== gz;
                 }
-                const path = enemy.navPath;
-                while (path.length > 1 && Math.hypot(path[0].x - pos.x, path[0].z - pos.z) < 1.2) path.shift();
-                return path[0];
+                if (replan) {
+                    let n = this._plan(pos.x, pos.z, gx, gz, path);
+                    if (n < 0) {
+                        if (!path[0]) path[0] = { x: 0, z: 0 };
+                        path[0].x = gx; path[0].z = gz;
+                        n = 1;
+                    }
+                    enemy.navLen = n;
+                    enemy.navIdx = 0;
+                    enemy.navGoalX = gx;
+                    enemy.navGoalZ = gz;
+                    enemy.navReplanAt = now + 2000 + ((enemy.slot || 0) % 4) * 150;
+                    enemy.navMinAt = now + 350 + ((enemy.slot || 0) % 4) * 40;
+                }
+                // Next waypoint once this one is reached, or once it is close and a bot's
+                // whole width can run on to the next one from where it actually is (pushed
+                // off the line, it would otherwise snag a wall corner)
+                while (enemy.navIdx < enemy.navLen - 1) {
+                    const w = path[enemy.navIdx], d = Math.hypot(w.x - pos.x, w.z - pos.z);
+                    if (d >= 1.2) break;
+                    if (d >= 0.4 && !this.clearRun(pos.x, pos.z, path[enemy.navIdx + 1].x, path[enemy.navIdx + 1].z, 0.7)) break;
+                    enemy.navIdx++;
+                }
+                if (tol > 0 && enemy.navIdx === enemy.navLen - 1) {
+                    this._live.x = gx; this._live.z = gz;
+                    return this._live;
+                }
+                return path[enemy.navIdx];
+            },
+
+            // On the final straight run to the goal (nothing left to go round)?
+            onLastLeg: function (enemy) {
+                return !enemy.navLen || enemy.navIdx >= enemy.navLen - 1;
+            },
+
+            steer: function (enemy, pos, goal, now) {
+                return this.steerTo(enemy, pos, goal.x, goal.z, now, 0);
             }
         };
 
@@ -11969,6 +12405,7 @@
                 enemy.recentHits = 0;
                 enemy.lastHitAt = 0;
                 enemy.forceCover = false;
+                enemy.navLen = 0;   // V1.8: no route left over from a past life
                 const now = performance.now();
                 const L = this.level();
                 enemy.nextCoverAllowed = now + 1500;
@@ -11994,7 +12431,9 @@
                     if (de > 12) continue;
                     const px = player.x - c.x, pz = player.z - c.z;
                     const dp = Math.hypot(px, pz);
-                    if (dp < 6 || dp > 26) continue;
+                    // V1.8: within the bot's fighting range (22 m, a sniper's 28 m): a spot
+                    // further out made it drop out of the fight on the way and come back
+                    if (dp < 6 || dp > (enemy.archetype === 'sniper' ? 26 : 21)) continue;
                     // The piece must sit between this spot and the player
                     if ((px * c.nx + pz * c.nz) / dp > -0.35) continue;
                     // Do not run toward the player to reach it
@@ -12003,9 +12442,18 @@
                     cands.push({ i, score: de + Math.abs(dp - 13) * 0.35 });
                 }
                 cands.sort((a, b) => a.score - b.score);
-                for (let k = 0; k < Math.min(4, cands.length); k++) {
+                // V1.8: only a spot the bot can reach straight or by a short way round
+                // (not one on the far side of a lane wall, which it would run into
+                // until the timer ran out)
+                for (let k = 0, tried = 0; k < cands.length && tried < 4 && k < 10; k++) {
                     const c = this.covers[cands[k].i];
-                    if (this._hidden(c.x, c.z, player, scaleY)) return cands[k].i;
+                    tried++;
+                    if (!this._hidden(c.x, c.z, player, scaleY)) continue;
+                    if (!navGrid.clearRun(pos.x, pos.z, c.x, c.z)) {
+                        const len = navGrid.routeLength(pos.x, pos.z, c.x, c.z);
+                        if (len < 0 || len > 1.6 * Math.hypot(c.x - pos.x, c.z - pos.z) + 4) { tried--; continue; }
+                    }
+                    return cands[k].i;
                 }
                 return -1;
             },
@@ -12079,21 +12527,36 @@
                         const pAng = Math.atan2(partner.mesh.position.x - player.x, partner.mesh.position.z - player.z);
                         let side = Math.sin(base - pAng) >= 0 ? 1 : -1;
                         const r = Math.min(13, Math.max(8, dist));
-                        let tx = player.x + Math.sin(base + side * 1.22) * r, tz = player.z + Math.cos(base + side * 1.22) * r;
-                        tx = Math.max(-46, Math.min(46, tx));
-                        tz = Math.max(-46, Math.min(46, tz));
-                        enemy.flankX = tx;
-                        enemy.flankZ = tz;
-                        enemy.aiState = 'flank';
-                        enemy.aiUntil = perfNow + 4000;
-                        return true;
+                        // V1.8: the spot must be open floor the bot can reach straight or by a
+                        // short way round (not through a lane wall); failing that the other
+                        // side, failing that no flank
+                        for (let attempt = 0; attempt < 2; attempt++, side = -side) {
+                            let tx = player.x + Math.sin(base + side * 1.22) * r, tz = player.z + Math.cos(base + side * 1.22) * r;
+                            tx = Math.max(-46, Math.min(46, tx));
+                            tz = Math.max(-46, Math.min(46, tz));
+                            navGrid.ensure();
+                            if (navGrid.blocked[navGrid._cell(tx, tz)]) continue;
+                            if (!navGrid.clearRun(pos.x, pos.z, tx, tz)) {
+                                const len = navGrid.routeLength(pos.x, pos.z, tx, tz);
+                                if (len < 0 || len > 1.6 * Math.hypot(tx - pos.x, tz - pos.z) + 4) continue;
+                            }
+                            enemy.flankX = tx;
+                            enemy.flankZ = tz;
+                            enemy.aiState = 'flank';
+                            enemy.aiUntil = perfNow + 4000;
+                            return true;
+                        }
+                        enemy.nextFlankAt = perfNow + 1500;
                     }
                     return false;
                 }
                 if (st === 'toCover') {
                     const c = this.covers[enemy.coverIdx];
                     if (!c || perfNow > enemy.aiUntil) { this.release(enemy); enemy.aiState = 'engage'; enemy.nextCoverAllowed = perfNow + 3000; return false; }
-                    if (this._moveToward(pos, c.x, c.z, 0.065 * speedMult) < 0.3) {
+                    // V1.8: round the piece by route when it stands in the way
+                    const wp = navGrid.steerTo(enemy, pos, c.x, c.z, perfNow, 0);
+                    this._moveToward(pos, wp.x, wp.z, 0.065 * speedMult);
+                    if (Math.hypot(c.x - pos.x, c.z - pos.z) < 0.3) {
                         enemy.aiState = 'cover';
                         enemy.aiUntil = perfNow + _tacRand(L.coverWaitMs);
                     }
@@ -12134,7 +12597,10 @@
                     return true;
                 }
                 if (st === 'flank') {
-                    if (this._moveToward(pos, enemy.flankX, enemy.flankZ, 0.068 * speedMult) < 0.5 || perfNow > enemy.aiUntil) {
+                    // V1.8: by route when something stands in the way
+                    const wp = navGrid.steerTo(enemy, pos, enemy.flankX, enemy.flankZ, perfNow, 0);
+                    this._moveToward(pos, wp.x, wp.z, 0.068 * speedMult);
+                    if (Math.hypot(enemy.flankX - pos.x, enemy.flankZ - pos.z) < 0.5 || perfNow > enemy.aiUntil) {
                         enemy.aiState = 'engage';
                         enemy.nextFlankAt = perfNow + _tacRand(L.flankGapMs);
                         return false;
@@ -12724,12 +13190,16 @@
         
         // Create a moving target
         function createMovingTarget() {
-            // Random start position
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 20 + Math.random() * 20;
-            const x = Math.sin(angle) * distance;
-            const z = Math.cos(angle) * distance;
-            const y = 3 + Math.random() * 5;
+            // Random start position (V1.8: re-rolled out of buildings on a walled map)
+            let angle = Math.random() * Math.PI * 2;
+            let distance = 20 + Math.random() * 20;
+            let x = Math.sin(angle) * distance;
+            let z = Math.cos(angle) * distance;
+            let y = 3 + Math.random() * 5;
+            for (let tries = 0; tries < 30 && mapLayout().checkTargets && targetSpotBlocked(x, y, z); tries++) {
+                angle = Math.random() * Math.PI * 2; distance = 20 + Math.random() * 20;
+                x = Math.sin(angle) * distance; z = Math.cos(angle) * distance; y = 3 + Math.random() * 5;
+            }
             
             const actor = createTargetActor('standard');
             activateTarget(actor, x, y, z, randomMoveData(x, y, z));
@@ -12738,17 +13208,10 @@
         
         // Spawn enemies (mix of Tactical Riflers, Duelist Rushers, Operator Snipers, and Heavy Armored bots)
         function spawnEnemies() {
-            if (CONTENT.enemies >= 4) {
-                activateEnemy(createEnemyActor('rusher'), -32, 0, -28, 'rusher');
-                activateEnemy(createEnemyActor('sniper'), 34, 0, -34, 'sniper');
-                activateEnemy(createEnemyActor('armored'), -28, 0, 28, 'armored');
-                activateEnemy(createEnemyActor('standard'), 32, 0, 28, 'standard');
-                activateEnemy(createEnemyActor('rusher'), 0, 0, -36, 'rusher');
-                activateEnemy(createEnemyActor('armored'), -36, 0, 0, 'armored');
-            } else {
-                activateEnemy(createEnemyActor('rusher'), -32, 0, -32, 'rusher');
-                activateEnemy(createEnemyActor('armored'), 32, 0, 32, 'armored');
-            }
+            // V1.8: the map's bot spawn points (the old maps keep their fixed six / two)
+            const L = mapLayout();
+            const list = CONTENT.enemies >= 4 ? L.botSpawns : L.botSpawnsLow;
+            for (const s of list) activateEnemy(createEnemyActor(s[2]), s[0], 0, s[1], s[2]);
         }
         
         function countShootables() {
@@ -32242,19 +32705,8 @@
 
             getZoneName: function(x, y, z) {
                 if (game.gameMode === 'range') return 'PRACTICE RANGE';
-                const distSiteA = Math.hypot(x - 0, z - (-22));
-                if (distSiteA <= 7.5) return 'A SITE (NORTH)';
-                const distSiteB = Math.hypot(x - 0, z - 22);
-                if (distSiteB <= 7.5) return 'B SITE (SOUTH)';
-                if (Math.abs(x) <= 11 && Math.abs(z) <= 11) {
-                    return y >= 9 ? 'CENTRAL ROOFTOP' : (y >= 4 ? 'CENTRAL DECK' : 'MID TOWER');
-                }
-                if (z < -14 && x < -12) return 'A LONG (WEST)';
-                if (z < -14 && x > 12) return 'A LINK (EAST)';
-                if (x < -22) return 'RED CORRIDOR';
-                if (x > 22) return 'BLUE CORRIDOR';
-                if (z > 15) return 'B MAIN (SOUTH)';
-                return 'MID COURTYARD';
+                // V1.8: each map's own callouts
+                return mapLayout().zoneName(x, y, z);
             },
 
             update: function(now) {
@@ -32379,10 +32831,11 @@
 
                 // 4. Draw Spike Sites A (0, -22) & B (0, 22) + Ultimate Orbs
                 if (game.gameMode !== 'range' && typeof tacticalDirector !== 'undefined') {
-                    const sites = [
-                        { key: 'A', x: 0, z: -22 },
-                        { key: 'B', x: 0, z: 22 }
-                    ];
+                    // V1.8: wherever this map's sites are
+                    const sp = tacticalDirector.spikeSites;
+                    const sites = this._sites || (this._sites = [{ key: 'A', x: 0, z: -22 }, { key: 'B', x: 0, z: 22 }]);
+                    if (sp.A) { sites[0].x = sp.A.pos.x; sites[0].z = sp.A.pos.z; }
+                    if (sp.B) { sites[1].x = sp.B.pos.x; sites[1].z = sp.B.pos.z; }
                     for (let sIdx = 0; sIdx < sites.length; sIdx++) {
                         const st = sites[sIdx];
                         const siteX = (st.x - px) * scale;
@@ -33573,6 +34026,11 @@
             _projVec: new THREE.Vector3(),
 
             init: function() {
+                // V1.8: this map's sites before the beacons are built
+                const L = mapLayout();
+                this.spikeSitePos.set(L.sites.A.x, 0, L.sites.A.z);
+                this.spikeSiteBPos.set(L.sites.B.x, 0, L.sites.B.z);
+                this.activeSpikeSitePos.copy(this.spikeSitePos);
                 this.buildSpikeSite3D();
                 this.buildUltOrbs3D();
                 this.buildBindTeleporters3D();
@@ -33765,10 +34223,8 @@
             // 2 Collectible 3D Map Ultimate Orbs ((-18, 0, 0) & (18, 0, 0))
             // =============================================
             buildUltOrbs3D: function() {
-                const coords = [
-                    { x: -18, z: 0, name: 'WEST MID ORB' },
-                    { x: 18, z: 0, name: 'EAST MID ORB' }
-                ];
+                // V1.8: this map's ult-orb spots
+                const coords = mapLayout().orbs;
                 this.ultOrbs = [];
 
                 for (let i = 0; i < coords.length; i++) {
@@ -34101,6 +34557,30 @@
                 }
             },
 
+            // V1.8: a map change moves the spike sites, their beacons, the spike and the
+            // ult orbs to where the new map has them (no rebuild, same meshes)
+            applyMapLayout: function() {
+                const L = mapLayout();
+                this.spikeSitePos.set(L.sites.A.x, 0, L.sites.A.z);
+                this.spikeSiteBPos.set(L.sites.B.x, 0, L.sites.B.z);
+                if (this.spikeState !== 'planted' && this.spikeState !== 'planting') {
+                    this.activeSpikeSitePos.copy(this.spikeSitePos);
+                    if (this.spikeCanister) this.spikeCanister.position.set(this.spikeSitePos.x, this.spikeCanister.position.y, this.spikeSitePos.z);
+                }
+                if (this.siteBeaconA) this.siteBeaconA.position.copy(this.spikeSitePos);
+                if (this.siteBeaconB) this.siteBeaconB.position.copy(this.spikeSiteBPos);
+                const orbs = this.ultOrbs || [];
+                for (let i = 0; i < orbs.length && i < L.orbs.length; i++) {
+                    const o = orbs[i], c = L.orbs[i];
+                    o.name = c.name;
+                    o.pos.set(c.x, 0, c.z);
+                    if (o.group) o.group.position.set(c.x, 0, c.z);
+                }
+                for (const obj of [this.siteBeaconA, this.siteBeaconB, this.spikeCanister]) if (obj) obj.updateMatrixWorld(true);
+                for (const o of orbs) if (o.group) o.group.updateMatrixWorld(true);
+                if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
+            },
+
             buildSpikeSite3D: function() {
                 const container = new THREE.Group();
                 const createSiteBeacon = (pos, ringColor, pylonColor) => {
@@ -34150,6 +34630,8 @@
                 const siteB = createSiteBeacon(this.spikeSiteBPos, 0x38f6ff, 0x38f6ff);
                 this.spikeBeaconRing = siteA.ring;
                 this.spikeBeaconRingB = siteB.ring;
+                this.siteBeaconA = siteA.group;   // V1.8: moved by applyMapLayout()
+                this.siteBeaconB = siteB.group;
                 this.spikeSites = {
                     A: { key: 'A', pos: this.spikeSitePos, ring: siteA.ring, baseColor: 0xffd166 },
                     B: { key: 'B', pos: this.spikeSiteBPos, ring: siteB.ring, baseColor: 0x38f6ff }
@@ -34784,28 +35266,21 @@
                     this.spikeCanister.visible = true;
                 }
 
-                // Position player at Mid Courtyard facing the planted site
+                // Position player at the map's retake start, facing the planted site (V1.8: per map)
+                const retakeL = mapLayout().retake[siteKey];
                 characterController.setCrouching(false);
-                characterController.position.set(0, characterController.standHeight, siteKey === 'A' ? 6 : -6);
+                characterController.position.set(retakeL.player.x, characterController.standHeight, retakeL.player.z);
                 characterController.prevSimPosition.copy(characterController.position);
                 characterController.velocity.set(0, 0, 0);
-                camera.rotation.set(0, siteKey === 'A' ? 0 : Math.PI, 0);
+                camera.rotation.set(0, retakeL.player.yaw, 0);
 
                 // Top up player health & light shield
                 game.health = 100;
                 game.shield = Math.max(game.shield || 0, 25);
                 this.updateVitalsHUD();
 
-                // Spawn 6 tactical defender bots guarding the planted site
-                const sz = siteInfo.pos.z;
-                const guardOffsets = [
-                    [-5.5, sz + (siteKey === 'A' ? -3.5 : 3.5), 'armored'],
-                    [5.5, sz + (siteKey === 'A' ? -3.5 : 3.5), 'standard'],
-                    [-8.5, sz + (siteKey === 'A' ? 4.0 : -4.0), 'rusher'],
-                    [8.5, sz + (siteKey === 'A' ? 4.0 : -4.0), 'sniper'],
-                    [0.0, sz + (siteKey === 'A' ? -5.0 : 5.0), 'armored'],
-                    [-3.0, sz + (siteKey === 'A' ? 2.5 : -2.5), 'standard']
-                ];
+                // Spawn 6 tactical defender bots guarding the planted site (V1.8: the map's spots)
+                const guardOffsets = retakeL.guards;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
                     e.rangeStrafeAmp = 0;
@@ -35199,7 +35674,8 @@
                 this.activeRangeBot = null;
 
                 characterController.setCrouching(false);
-                characterController.position.set(0, characterController.standHeight, 27);
+                const rangeL = mapLayout().range;
+                characterController.position.set(rangeL.player.x, characterController.standHeight, rangeL.player.z);
                 characterController.prevSimPosition.copy(characterController.position);
                 characterController.velocity.set(0, 0, 0);
                 camera.rotation.set(0, 0, 0);
@@ -35246,13 +35722,17 @@
                 if (enemyObjects.length === 0) return;
                 const bot = enemyObjects[this.rangeKills % enemyObjects.length];
 
-                const lanesX = [-11, -8.5, -6, -3.5, -1.2, 1.2, 3.5, 6, 8.5, 11];
-                const lanesZ = [11.5, 13.5, 15.5, 17.5, 19.0];
+                // V1.8: the map's range lanes
+                const rangeL = mapLayout().range;
+                const lanesX = rangeL.lanesX;
+                const lanesZ = rangeL.lanesZ;
                 let bx = lanesX[Math.floor(Math.random() * lanesX.length)] + (Math.random() - 0.5) * 1.2;
                 let bz = lanesZ[Math.floor(Math.random() * lanesZ.length)] + (Math.random() - 0.5) * 0.8;
 
                 if (this.activeRangeBot && Math.abs(bx - this.activeRangeBot.position.x) < 2.2) {
-                    bx = -bx || 5.0;
+                    // Mirror across the lane centre (the old maps' lanes centre on x = 0)
+                    const mid = (lanesX[0] + lanesX[lanesX.length - 1]) / 2;
+                    bx = (2 * mid - bx) || (mid + 5.0);
                 }
 
                 bot.rangeStrafeAmp = (this.rangeKills % 3 === 2) ? 1.35 : 0;
@@ -36972,17 +37452,71 @@
         
         // Respawn target: same record, new random position (same random sequence)
         function respawnTarget(target) {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 20 + Math.random() * 20;
-            const x = Math.sin(angle) * distance;
-            const z = Math.cos(angle) * distance;
-            const y = 3 + Math.random() * 5;
+            const spots = mapLayout().targetSpots;
+            if (spots) {
+                const s = spots[Math.floor(Math.random() * spots.length)];
+                activateTarget(target, s[0], s[1], s[2], target.moveData ? randomMoveData(s[0], s[1], s[2]) : null);
+                target.onSpot = true;
+                return;
+            }
+            target.onSpot = false;
+            let angle = Math.random() * Math.PI * 2;
+            let distance = 20 + Math.random() * 20;
+            let x = Math.sin(angle) * distance;
+            let z = Math.cos(angle) * distance;
+            let y = 3 + Math.random() * 5;
+            // V1.8: on a walled map (Ascent) re-roll spots inside buildings
+            for (let tries = 0; tries < 30 && mapLayout().checkTargets && targetSpotBlocked(x, y, z); tries++) {
+                angle = Math.random() * Math.PI * 2; distance = 20 + Math.random() * 20;
+                x = Math.sin(angle) * distance; z = Math.cos(angle) * distance; y = 3 + Math.random() * 5;
+            }
             
             activateTarget(target, x, y, z, target.moveData ? randomMoveData(x, y, z) : null);
+        }
+        // V1.8: a map with its own practice-target spots (Ascent: open air in the lanes and
+        // the courtyard, clear of every wall along a moving target's sweep) spreads the
+        // targets over them; on the other maps a target moved that way goes back to where
+        // it stood before, so they keep their targets exactly as in V1.7
+        function relocateBlockedTargets() {
+            const spots = mapLayout().targetSpots;
+            for (let i = 0, k = 0; i < targetObjects.length; i++) {
+                const t = targetObjects[i];
+                if (!t.active || t.hit) continue;
+                if (spots) {
+                    if (!t.onSpot) t.home = { x: t.initialPosition.x, y: t.initialPosition.y, z: t.initialPosition.z };
+                    const s = spots[k++ % spots.length];
+                    activateTarget(t, s[0], s[1], s[2], t.moveData ? randomMoveData(s[0], s[1], s[2]) : null);
+                    t.onSpot = true;
+                } else if (t.onSpot && t.home) {
+                    const h = t.home;
+                    activateTarget(t, h.x, h.y, h.z, t.moveData ? randomMoveData(h.x, h.y, h.z) : null);
+                    t.onSpot = false;
+                }
+            }
+        }
+
+        // A practice target there (and along its horizontal sweep) would be inside a map piece
+        function targetSpotBlocked(x, y, z) {
+            const r = 1.2, sweep = 10;
+            for (let i = 0; i < mapPieces.length; i++) {
+                const b = mapPieces[i].bounds;
+                if (b.max.y < y - r || b.min.y > y + r) continue;
+                if (b.max.x > x - sweep - r && b.min.x < x + sweep + r && b.max.z > z - r && b.min.z < z + r) return true;
+            }
+            return false;
         }
         
         // Respawn enemy: same record, new random position
         function respawnEnemy(enemy) {
+            // V1.8: a map with respawn spots (Ascent) uses one of them, a little jittered
+            const spots = mapLayout().respawnSpots;
+            if (spots && spots.length) {
+                const s = spots[Math.floor(Math.random() * spots.length)];
+                _respawnPos.set(s[0] + (Math.random() - 0.5) * 3, 0, s[1] + (Math.random() - 0.5) * 3);
+                resolveEnemyMapCollision(_respawnPos, 0.75);
+                activateEnemy(enemy, _respawnPos.x, 0, _respawnPos.z);
+                return;
+            }
             const angle = Math.random() * Math.PI * 2;
             const distance = 30 + Math.random() * 15;
             const x = Math.sin(angle) * distance;
@@ -36990,6 +37524,7 @@
             
             activateEnemy(enemy, x, 0, z);
         }
+        const _respawnPos = new THREE.Vector3();
         
         // Reload function (or Tactical Knife Flourish Spin on R)
         // V1.8: stop a reload in progress (a gun bought or handed out mid-reload, a new
@@ -37400,11 +37935,21 @@
                             pos.z += (wdz / wd) * 0.065 * speedMult + perpZ * strafeStep * 0.25;
                         }
                     } else {
-                        // Sight occluded by wall or smoke: flank laterally + advance to peek around cover
-                        const flankLateral = strafeStep * 1.15;
-                        const flankForward = 0.042 * speedMult;
-                        pos.x += perpX * flankLateral + nx * flankForward;
-                        pos.z += perpZ * flankLateral + nz * flankForward;
+                        // Sight occluded by wall or smoke: flank laterally + advance to peek around cover.
+                        // V1.8: with a wall in the way the bot goes round it by route (straight
+                        // on it jammed against the wall); in the open it advances as before
+                        const wp = navGrid.steerTo(enemy, pos, playerPosition.x, playerPosition.z, perfNow, 3);
+                        if (navGrid.onLastLeg(enemy)) {
+                            const flankLateral = strafeStep * 1.15;
+                            const flankForward = 0.042 * speedMult;
+                            pos.x += perpX * flankLateral + nx * flankForward;
+                            pos.z += perpZ * flankLateral + nz * flankForward;
+                        } else {
+                            const wdx = wp.x - pos.x, wdz = wp.z - pos.z;
+                            const wd = Math.hypot(wdx, wdz) || 1;
+                            pos.x += (wdx / wd) * 0.05 * speedMult;
+                            pos.z += (wdz / wd) * 0.05 * speedMult;
+                        }
                     }
                 } else if (distanceToPlayerSq < 1024 || postPlantDefuseGoal) {
                     const goalX = postPlantDefuseGoal ? postPlantDefuseGoal.x : playerPosition.x;
@@ -37419,16 +37964,19 @@
                         enemy.nextDecisionAt = time - (enemy.slot % 4) * (ENEMY_MEDIUM_DECISION_MS / 4);
                     }
                     if (time >= enemy.nextDecisionAt) {
-                        // V1.7: a fixed goal (site / planted spike) is reached by route, not straight line
-                        let sx = gdx, sz = gdz, sd = distToGoal;
-                        if (postPlantDefuseGoal) {
-                            const wp = navGrid.steer(enemy, pos, postPlantDefuseGoal, perfNow);
-                            sx = wp.x - pos.x; sz = wp.z - pos.z; sd = Math.hypot(sx, sz) || 0.001;
-                        }
+                        // V1.7: a fixed goal (site / planted spike) is reached by route, not straight line.
+                        // V1.8: so is a player being hunted (re-planned as they move)
+                        const wp = postPlantDefuseGoal
+                            ? navGrid.steer(enemy, pos, postPlantDefuseGoal, perfNow)
+                            : navGrid.steerTo(enemy, pos, goalX, goalZ, perfNow, 3);
+                        const sx = wp.x - pos.x, sz = wp.z - pos.z, sd = Math.hypot(sx, sz) || 0.001;
                         const nx = sx / sd;
                         const nz = sz / sd;
-                        const perpX = -nz * (enemy.strafeDir || 1) * 0.35;
-                        const perpZ = nx * (enemy.strafeDir || 1) * 0.35;
+                        // V1.8: no sideways weave while following a route round walls (it drove
+                        // bots into corridor walls and corners); the open run still weaves
+                        const weave = navGrid.onLastLeg(enemy) ? 0.35 : 0;
+                        const perpX = -nz * (enemy.strafeDir || 1) * weave;
+                        const perpZ = nx * (enemy.strafeDir || 1) * weave;
                         enemy.turnTarget = Math.atan2(gdx, gdz);
                         // Rushing a planted spike: a bit faster; carrying it to a site in a Match: running
                         const goalSpeed = postPlantDefuseGoal ? (matchMode.botGoal() ? 3.0 : 1.25) : 1.0;
@@ -38630,7 +39178,9 @@
         // spike. One life per round. Economy: 800 at the start of each half, +3000
         // per round won, 1900/2400/2900 for consecutive losses, kills as usual.
         const MATCH = { winTarget: 7, halfRounds: 6, buyMs: 15000, roundMs: 100000, spikeMs: 45000, postMs: 4500, startCreds: 800 };
+        // V1.8: spawns come from the map (mapLayout().spawns); this was the fixed pair
         const MATCH_SPAWN = { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } };
+        function matchSpawn(side) { const s = mapLayout().spawns; return (s && s[side]) || MATCH_SPAWN[side]; }
         const matchMode = {
             active: false,
             variant: 'match',   // 'match' | 'spikerush'
@@ -38743,7 +39293,7 @@
                     loadout.onRoundStart(diedLastRound, newHalf);
                 }
                 game.health = 100;
-                const sp = MATCH_SPAWN[this.side];
+                const sp = matchSpawn(this.side);
                 characterController.setCrouching(false);
                 characterController.position.set(sp.x, characterController.standHeight, sp.z);
                 characterController.prevSimPosition.copy(characterController.position);
@@ -38755,14 +39305,11 @@
 
                 // Bots: defenders split across both sites, or attackers stacked at their spawn
                 const count = Math.min(5, enemyObjects.length);
-                const spots = [];
-                if (this.side === 'attack') {
-                    const a = td.spikeSites.A.pos, b = td.spikeSites.B.pos;
-                    spots.push([a.x - 4, a.z + 3], [b.x + 4, b.z - 3], [a.x + 4, a.z - 2], [b.x - 4, b.z + 2], [8, 0]);
-                } else {
-                    const o = MATCH_SPAWN.attack;
-                    spots.push([o.x, o.z - 3], [o.x, o.z + 3], [o.x + 2, o.z], [o.x - 2, o.z - 5], [o.x - 2, o.z + 5]);
-                }
+                // V1.8: the map says where defenders hold and where attackers stack
+                const L = mapLayout();
+                const spots = this.side === 'attack'
+                    ? L.matchDefend(td.spikeSites.A.pos, td.spikeSites.B.pos)
+                    : L.matchAttack(matchSpawn('attack'));
                 const order = ['standard', 'rusher', 'armored', 'sniper', 'standard'];
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -39036,8 +39583,9 @@
         function findOpenSpot(minFromPlayer, minFromBots) {
             const p = new THREE.Vector3();
             const pl = characterController.position;
+            const span = mapLayout().openSpan;   // V1.8: per map
             for (let t = 0; t < 200; t++) {
-                p.set((Math.random() * 2 - 1) * 42, 0, (Math.random() * 2 - 1) * 42);
+                p.set((Math.random() * 2 - 1) * span, 0, (Math.random() * 2 - 1) * span);
                 const q = p.clone();
                 if (resolveEnemyMapCollision(q, 0.8)) continue;
                 if (Math.hypot(p.x - pl.x, p.z - pl.z) < (minFromPlayer || 0)) continue;
@@ -39899,9 +40447,13 @@
                 return true;
             },
             _awayFromKeySpots: function (x, z) {
-                if (Math.hypot(x - 42, z) < 11 || Math.hypot(x + 42, z) < 11 || Math.hypot(x, z - 15) < 6) return false;
-                const sites = (typeof tacticalDirector !== 'undefined' && tacticalDirector.spikeSites) || {};
-                for (const k in sites) { const p = sites[k] && sites[k].pos; if (p && Math.hypot(x - p.x, z - p.z) < 6) return false; }
+                // V1.8: this map's spawns, start spot and sites
+                const L = mapLayout();
+                const at = L.spawns.attack, df = L.spawns.defend, st = L.start;
+                if (Math.hypot(x - df.x, z - df.z) < 11 || Math.hypot(x - at.x, z - at.z) < 11 || Math.hypot(x - st.x, z - st.z) < 6) return false;
+                for (const k in L.sites) { const p = L.sites[k]; if (Math.hypot(x - p.x, z - p.z) < 6) return false; }
+                // ...and out of any area the map keeps clear (Ascent: the range lanes and aim trainer)
+                if (L.propKeepOut) for (const r of L.propKeepOut) if (x > r[0] - 1.8 && x < r[1] + 1.8 && z > r[2] - 1.8 && z < r[3] + 1.8) return false;
                 return true;
             },
 
@@ -39913,7 +40465,8 @@
             _setSolid: function (p, on) {
                 if (on && !p.rec.indexed) collisionIndex.insert(p.rec);
                 else if (!on && p.rec.indexed) collisionIndex.remove(p.rec);
-                if (typeof navGrid !== 'undefined') navGrid.builtFor = null;
+                // V1.8: only the cells round the prop (a full rebuild mid-fight hitched)
+                if (typeof navGrid !== 'undefined') navGrid.refreshArea(p.box.min.x, p.box.min.z, p.box.max.x, p.box.max.z);
             },
 
             // After the map's colliders are indexed: place this map's props
@@ -39932,7 +40485,7 @@
                     const x = (rnd() * 2 - 1) * 38, z = (rnd() * 2 - 1) * 38;
                     const hw = 1.6, ht = 0.08;
                     const minX = x - (alongX ? hw : ht), maxX = x + (alongX ? hw : ht), minZ = z - (alongX ? ht : hw), maxZ = z + (alongX ? ht : hw);
-                    if (!this._awayFromKeySpots(x, z) || !this._clear(minX, minZ, maxX, maxZ, 1.3)) continue;
+                    if (!this._awayFromKeySpots(x, z) || !this._clear(minX, minZ, maxX, maxZ, mapLayout().propMargin)) continue;
                     this._makeGlass(x, z, alongX);
                 }
                 for (let tries = 0; tries < 400 && this.barrels.length < 6; tries++) {
@@ -41125,10 +41678,11 @@
                 }
                 const cc = characterController;
                 cc.reset();
-                cc.position.set(0, cc.standHeight, 30);
+                const aimL = mapLayout().aim;   // V1.8: the map's open spot for the drills
+                cc.position.set(aimL.x, cc.standHeight, aimL.z);
                 cc.prevSimPosition.copy(cc.position);
                 camera.rotation.set(0, 0, 0, 'YXZ');
-                this.origin.set(0, 0, 30);
+                this.origin.set(aimL.x, 0, aimL.z);
                 game.health = 100;
                 if (tacticalDirector.spikeGroup) tacticalDirector.spikeGroup.visible = false;
                 if (spikePlantWidget) spikePlantWidget.classList.remove('visible');
@@ -44345,6 +44899,8 @@
             // =============================================
             // 4. Friendly AI Teammate Wingman Bots ([F6] Toggle)
             // =============================================
+            _wingFrom: new THREE.Vector3(),
+            _wingTo: new THREE.Vector3(),
             buildWingmanBots3D: function() {
                 this.wingmanGroup = new THREE.Group();
                 this.wingmanBots = [];
@@ -44466,16 +45022,25 @@
                             anchorZ = site.pos.z + bot.offsetZ * 0.9 + Math.sin(bot.patrolPhase) * 2.5;
                         }
                     }
-                    anchorX = Math.max(-44, Math.min(44, anchorX));
-                    anchorZ = Math.max(-44, Math.min(44, anchorZ));
+                    const span = mapLayout().clampSpan;   // V1.8: per map
+                    anchorX = Math.max(-span, Math.min(span, anchorX));
+                    anchorZ = Math.max(-span, Math.min(span, anchorZ));
 
-                    const dx = anchorX - bot.group.position.x;
-                    const dz = anchorZ - bot.group.position.z;
+                    const wpos = bot.group.position;
+                    const dx = anchorX - wpos.x;
+                    const dz = anchorZ - wpos.z;
                     const distToAnchor = Math.hypot(dx, dz);
                     if (distToAnchor > 0.35) {
-                        const step = Math.min(distToAnchor, delta * 7.2);
-                        bot.group.position.x += (dx / distToAnchor) * step;
-                        bot.group.position.z += (dz / distToAnchor) * step;
+                        // V1.8: round walls by route and never through them
+                        let mx = dx, mz = dz, md = distToAnchor;
+                        if (!navGrid.clearRun(wpos.x, wpos.z, anchorX, anchorZ)) {
+                            const wp = navGrid.steerTo(bot, wpos, anchorX, anchorZ, now, 3);
+                            mx = wp.x - wpos.x; mz = wp.z - wpos.z; md = Math.hypot(mx, mz) || 0.001;
+                        }
+                        const step = Math.min(md, delta * 7.2);
+                        wpos.x += (mx / md) * step;
+                        wpos.z += (mz / md) * step;
+                        resolveEnemyMapCollision(wpos, 0.6);
                     }
 
                     // 2. Find Nearest Active Enemy within 28m and Engage!
@@ -44500,8 +45065,16 @@
                         );
                         bot.group.rotation.y = targetAngle + Math.PI;
 
-                        // Fire supportive burst every ~1.25s
+                        // V1.8: not through a wall (on Ascent the next lane is often within 28 m)
+                        let wallBlocked = false;
                         if (now - bot.lastFireAt > 1250) {
+                            this._wingFrom.set(wpos.x, 1.25, wpos.z);
+                            this._wingTo.set(bestEnemy.mesh.position.x, 1.25, bestEnemy.mesh.position.z);
+                            wallBlocked = !agentSystem.hasWallLineOfSight(this._wingFrom, this._wingTo, this._wingFrom.distanceTo(this._wingTo));
+                            if (wallBlocked) bot.lastFireAt = now - 1000;   // look again in 0.25 s
+                        }
+                        // Fire supportive burst every ~1.25s
+                        if (!wallBlocked && now - bot.lastFireAt > 1250) {
                             bot.lastFireAt = now + (i * 180);
                             const startVec = new THREE.Vector3(bot.group.position.x, 1.25, bot.group.position.z);
                             const endVec = new THREE.Vector3(bestEnemy.mesh.position.x, 1.25, bestEnemy.mesh.position.z);
@@ -44878,6 +45451,7 @@
             buildActorTemplates();
             initEnemyBatches();
             spawnTargets();
+            relocateBlockedTargets();   // V1.8: none left inside Ascent's buildings
 
             // Static map colliders inserted before spawnEnemies() so initial enemy placement resolves map walls
             for (const collider of staticColliders) {
@@ -44885,11 +45459,20 @@
             }
             // Glass panes and explosive barrels for this map
             breakables.build();
+            navGrid.build();   // V1.8: the bots' walk grid, from the colliders above
 
             spawnEnemies();
             
             // Initialize character, camera, Agent Abilities, Tactical Radar, Tactical Director, Settings Center, and Tactical Enhancements
             initializeControllers();
+            // V1.8: a map with its own start spot (Ascent) starts you there
+            const bootL = mapLayout();
+            if (bootL.bootStart) {
+                characterController.position.set(bootL.bootStart.x, characterController.standHeight, bootL.bootStart.z);
+                characterController.prevSimPosition.copy(characterController.position);
+                camera.position.copy(characterController.position);
+                if (bootL.bootStart.yaw !== undefined) camera.rotation.set(0, bootL.bootStart.yaw, 0, 'YXZ');
+            }
             agentSystem.init();
             tacticalRadar.init();
             tacticalDirector.init();

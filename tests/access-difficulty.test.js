@@ -61,12 +61,12 @@ test('bot tactics follow Bot Skill: Iron never flanks or repositions; Radiant fl
         tacticalEnhancements.toggleWingmanAI(false);
         const bots = enemyObjects.filter((e) => e.isActive && !e.hit).sort((a, b) => a.slot - b.slot);
         const [a, b] = bots;
-        const player = new THREE.Vector3(0, 1.7, 22);
+        const player = new THREE.Vector3(0, 1.7, 12.5);   // V1.8 Ascent: the mid courtyard
         const tryFlank = (diff) => {
             game.userSettings.botDifficulty = diff;
             enemyTactics.reset(b);
             a.hasSight = true;
-            b.mesh.position.set(7, 0, 11);
+            b.mesh.position.set(9, 0, -0.5);
             b.nextFlankAt = 0;
             b.nextCoverAllowed = 1e15; // isolate the flank decision
             const now = performance.now();
@@ -78,7 +78,7 @@ test('bot tactics follow Bot Skill: Iron never flanks or repositions; Radiant fl
         const radiant = tryFlank('radiant');
         // Peeking on Radiant clears the shot timer so the first sight fires at once
         enemyTactics.reset(a);
-        a.mesh.position.set(-7, 0, 11);
+        a.mesh.position.set(-9, 0, -0.5);
         a.coverIdx = enemyTactics._pickCover(a, a.mesh.position, player, 1);
         a.aiState = 'cover'; a.aiUntil = 0; a.hasSight = true; a.lastShot = Date.now();
         enemyTactics.step(a, a.mesh.position, player, 13, performance.now(), 1, 1);

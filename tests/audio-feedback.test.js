@@ -31,20 +31,21 @@ test('3D audio: panner routing, wall occlusion, listener tracking, enemy gunfire
 
     // A sound in the open: one panner at the source position, no occlusion filter
     const open = await evaluate(() => {
-        characterController.position.set(0, 1.7, 30); characterController.prevSimPosition.copy(characterController.position);
-        camera.position.set(0, 1.7, 30); camera.updateMatrixWorld();
+        // V1.8 Ascent: the south half of the mid courtyard
+        characterController.position.set(0, 1.7, 12.5); characterController.prevSimPosition.copy(characterController.position);
+        camera.position.set(0, 1.7, 12.5); camera.updateMatrixWorld();
         __panners.length = 0;
-        soundFX.at(6, 1.5, 24, () => soundFX.enemyGunshot());
+        soundFX.at(6, 1.5, 6.5, () => soundFX.enemyGunshot());
         const p = __panners[0];
         return { panners: __panners.length, x: p && p.positionX.value, z: p && p.positionZ.value, model: p && p.panningModel };
     });
     await page.waitForTimeout(50);
     assert.ok(open.panners >= 1, 'positional sound goes through a PannerNode');
-    assert.equal(open.x, 6); assert.equal(open.z, 24);
+    assert.equal(open.x, 6); assert.equal(open.z, 6.5);
     assert.equal(open.model, 'HRTF');
     assert.equal(await evaluate(() => __occlusionFilters), 0, 'no muffling with clear line of sight');
 
-    // Behind the central tower (z -10..10 on Ascent): muffled
+    // Behind the fountain and the courtyard wall (the A link): muffled
     await evaluate(() => { soundFX.at(0, 1.5, -20, () => soundFX.enemyGunshot()); });
     await page.waitForTimeout(50);
     assert.ok((await evaluate(() => __occlusionFilters)) >= 1, 'sound behind a wall is low-passed');
@@ -53,7 +54,7 @@ test('3D audio: panner routing, wall occlusion, listener tracking, enemy gunfire
     const off = await evaluate(() => {
         game.userSettings.positionalAudio = false;
         __panners.length = 0;
-        soundFX.at(6, 1.5, 24, () => soundFX.enemyGunshot());
+        soundFX.at(6, 1.5, 6.5, () => soundFX.enemyGunshot());
         game.userSettings.positionalAudio = true;
         return __panners.length;
     });
@@ -72,7 +73,7 @@ test('3D audio: panner routing, wall occlusion, listener tracking, enemy gunfire
         const e = enemyObjects.find((x) => x.isActive && !x.hit);
         game.gameMode = 'wave';
         for (let i = 0; i < 12 && window.__shots === 0; i++) {
-            e.mesh.position.set(0, 0, 20);
+            e.mesh.position.set(6, 0, 4);
             e.blindedUntil = 0;
             enemyShoot(e);
         }
@@ -98,7 +99,7 @@ test('3D audio: panner routing, wall occlusion, listener tracking, enemy gunfire
         }
         return evaluate(() => window.__steps);
     };
-    assert.ok((await walk(18)) >= 1, 'nearby enemies make footsteps');
+    assert.ok((await walk(9.5)) >= 1, 'nearby enemies make footsteps');
     assert.equal(await walk(-45), 0, 'enemies beyond 22 m are silent');
 
     const [programs, watermark] = await programState(page);

@@ -40,6 +40,7 @@ async function closeBrowser() {
  * options.initScript: function run in the page before any game script.
  * options.quality: graphics profile to force (default 'medium'); pass null to keep Auto.
  * options.menu: true to keep the start screen (it is skipped by default).
+ * options.file: path (from the repository root) of another build to load.
  * Returns { page, errors, frames, evaluate }.
  */
 // Only one game runs at a time: a page left open keeps its render loop going
@@ -59,7 +60,8 @@ async function boot(options = {}) {
     if (options.initScript) await page.addInitScript(options.initScript, options.initArg);
     await page.route('https://cdnjs.cloudflare.com/**', (r) => r.fulfill({ body: THREE_JS, contentType: 'application/javascript' }));
     await page.route((url) => !url.href.startsWith('file:') && !url.href.startsWith('https://cdnjs.cloudflare.com'), (r) => r.abort());
-    await page.goto('file://' + GAME_FILE);
+    // options.file: another build to load instead (e.g. V1.7, to compare against)
+    await page.goto('file://' + (options.file ? path.resolve(__dirname, '..', options.file) : GAME_FILE));
     await page.waitForFunction(() => window.perfTelemetry && perfTelemetry.programWatermark > 0, null, { timeout: 180000 });
 
     const frames = async (n = 1) => {
