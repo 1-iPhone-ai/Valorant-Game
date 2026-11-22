@@ -39578,7 +39578,7 @@
                     const target = this.look().lum;
                     const k = 1 - Math.exp(-dt * 1.5);
                     this.adapt *= Math.pow(target / Math.max(0.03, this.lum), 0.6 * k);
-                    this.adapt = Math.max(0.62, Math.min(1.7, this.adapt));
+                    this.adapt = Math.max(0.7, Math.min(1.4, this.adapt));
                 }
                 renderer.toneMappingExposure = ultraRealism.baseExposure * this.adapt;
             }
@@ -40156,7 +40156,7 @@
             tUA: { value: null }, tUN: { value: null }, uMatOn: { value: 0 }, uLightOn: { value: 0 },
             tVol: { value: null }, uVolOn: { value: 0 }, uVolMin: { value: new THREE.Vector3(-50, 0, -50) },
             uVolInvSize: { value: new THREE.Vector3(1 / 100, 1 / 12, 1 / 100) }, uVolGain: { value: 1 },
-            tNearShadow: { value: null }, uNearMatrix: { value: new THREE.Matrix4() }, uNearParams: { value: new THREE.Vector4(2048, -0.0003, 1, 0) },
+            tNearShadow: { value: null }, uNearMatrix: { value: new THREE.Matrix4() }, uNearParams: { value: new THREE.Vector4(2048, -0.0003, 1, 0) }, uNearDir: { value: new THREE.Vector3(0, 1, 0) },
             uPlaster: { value: 1 }, uLampGlow: { value: 1 }, uFloorAlb: { value: new THREE.Color(0.2, 0.2, 0.2) },
             tProbe: { value: null }, uProbeMix: { value: 0 }, uProbeGain: { value: 1.6 }
         };
@@ -40164,7 +40164,7 @@
             precision highp sampler2DArray; precision highp sampler3D;
             uniform sampler2DArray tUA; uniform sampler2DArray tUN; uniform float uMatOn; uniform float uLightOn;
             uniform sampler3D tVol; uniform float uVolOn; uniform vec3 uVolMin; uniform vec3 uVolInvSize; uniform float uVolGain;
-            uniform sampler2D tNearShadow; uniform mat4 uNearMatrix; uniform vec4 uNearParams; uniform float uPlaster; uniform float uLampGlow;
+            uniform sampler2D tNearShadow; uniform mat4 uNearMatrix; uniform vec4 uNearParams; uniform vec3 uNearDir; uniform float uPlaster; uniform float uLampGlow;
             uniform sampler2D tProbe; uniform float uProbeMix; uniform float uProbeGain;
             vec4 ultraVol(vec3 wp, vec3 wn) {
                 if (uVolOn < 0.5) return vec4(0.0, 0.0, 0.0, 1.0);
@@ -40178,7 +40178,8 @@
             float ultraNearShadow(float farShadow) {
                 if (uNearParams.w < 0.5) return farShadow;
                 vec3 gn = normalize((vec4(normalize(vNormal), 0.0) * viewMatrix).xyz);
-                vec4 sc = uNearMatrix * vec4(vWPos + gn * 0.025, 1.0);
+                float ndl = clamp(dot(gn, uNearDir), 0.0, 1.0);
+                vec4 sc = uNearMatrix * vec4(vWPos + gn * (0.02 + 0.07 * (1.0 - ndl)), 1.0);
                 vec3 p = sc.xyz / sc.w;
                 float edge = min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y));
                 if (edge <= 0.0 || p.z >= 1.0 || p.z <= 0.0) return farShadow;
@@ -41185,6 +41186,7 @@
                 c.addScaledVector(u, Math.round(cu / texel) * texel - cu).addScaledVector(v, Math.round(cv / texel) * texel - cv);
                 L.position.copy(c).addScaledVector(dir, 60);
                 L.target.position.copy(c);
+                ultraU.uNearDir.value.copy(dir);
                 L.updateMatrixWorld();
                 L.target.updateMatrixWorld();
                 this.pendingNear = true;
