@@ -3865,7 +3865,7 @@
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>Lighting</strong>
-                                    <small>Baked ambient occlusion and bounce light, a sharp near shadow cascade, light from lamps and glowing trims</small>
+                                    <small>Baked ambient occlusion and bounce light, a sharp near shadow cascade, and the light of the glowing wall lanterns</small>
                                 </div>
                                 <div class="settings-pill-group" id="setting-ultrafx-lighting-pills">
                                     <button class="settings-pill-opt active" data-ufx="on">ON</button>
@@ -13205,6 +13205,9 @@
                     w.kit.visible = on;
                     w.gun.geometry = on ? w.detailed : w.simple;
                 }
+                // V1.8 Ultra Realism: its hands, casings and bodies stay on top
+                if (typeof ultraGuns !== 'undefined' && ultraGuns.on) ultraGuns.apply();
+                if (typeof ultraChars !== 'undefined' && ultraChars.on) ultraChars.apply();
                 if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
             }
         };
@@ -36922,6 +36925,7 @@
                         if (weapon.muzzleHalo) weapon.muzzleHalo.visible = false;
                     }, 50);
                     muzzleStar.flash(game.activeWeapon, !!weapon.stealthTracers);
+                    if (ultraGuns.on) ultraGuns.onShot();   // V1.8 Ultra: muzzle smoke
                     // V1.7: each shot briefly lights the walls and floor around you
                     _muzzleLightPos.set(0, -0.15, -1.1).applyQuaternion(camera.quaternion).add(camera.position);
                     abilityLights.flash(_muzzleLightPos.x, _muzzleLightPos.y, _muzzleLightPos.z, 0xffb45a,
@@ -38977,7 +38981,7 @@
             sky: ['Sky & Fog', 'Atmospheric scattering with a sun disc and clouds for each time of day; it lights the scene and adds height fog'],
             materials: ['Materials', 'Generated PBR surfaces (concrete, plaster, stone, wood, metal, glass) mapped in world space'],
             detail: ['Ascent Detail', 'Frames, trims, roof tiles, pipes, lamps and props on Ascent (decor only: no collision)'],
-            lighting: ['Lighting', 'Baked ambient occlusion and bounce light, a sharp near shadow cascade, light from lamps and glowing trims'],
+            lighting: ['Lighting', 'Baked ambient occlusion and bounce light, a sharp near shadow cascade, and the light of the glowing wall lanterns'],
             post: ['Post Processing', '4x multisampled anti-aliasing, full-resolution ambient occlusion and automatic exposure'],
             reflections: ['Reflections', 'Sharper reflections on wet floors and the surroundings reflected in metal'],
             guns: ['Guns & Hands', 'PBR metal and polymer, jointed fingers, brass casings and muzzle smoke'],
@@ -39025,8 +39029,10 @@
             onProfile: function (quality) {
                 const on = quality === 'ultraRealism' && this.isSupported();
                 if (on) this.build();
+                const was = this.active;
                 this.active = on;
                 this.refresh();
+                if (was && !on) this.release();
             },
             // Applies each feature's switch; then the parts that depend on several
             refresh: function () {
@@ -39090,6 +39096,9 @@
                 ultraSky.buildEnv(true);
                 const shown = ultraDecor.group ? ultraDecor.group.visible : false;
                 if (ultraDecor.group) ultraDecor.group.visible = true;
+                // one tiny debris chip out of sight, so its program is drawn once too
+                const deb = ultraFX.debris;
+                if (deb) { deb.setMatrixAt(0, ultraFX._m.makeScale(0.001, 0.001, 0.001).setPosition(0, -50, 0)); deb.instanceMatrix.needsUpdate = true; deb.count = 1; deb.visible = true; }
                 // compile() builds every object's program (hidden ones and empty batches
                 // too); each light count is also drawn once, so drivers that finish a
                 // compile on first draw do it here
@@ -39108,11 +39117,21 @@
                 renderer.compile(viewmodelScene, viewmodelCamera);
                 ultraLight.pendingNear = false;
                 if (ultraDecor.group) ultraDecor.group.visible = shown;
+                if (deb) { deb.count = 0; deb.visible = false; }
                 for (const f of ULTRA_FEATURES) { this.applied[f] = false; m[f].set(false); }
                 this.active = wasActive;
                 for (const f of ULTRA_FEATURES) if (was[f]) { this.applied[f] = true; m[f].set(true); }
                 ultraMats.sync(); ultraFX.sync(); ultraRefl.sync();
                 renderer.setRenderTarget(null);
+                // Lower tiers keep their own memory use: the full-size Ultra targets and
+                // the near shadow map go until the tier is switched on
+                if (!this.active) this.release();
+            },
+            release: function () {
+                ultraPost.shrink();
+                const L = ultraLight.nearLight;
+                if (L && L.shadow.map) { L.shadow.map.dispose(); L.shadow.map = null; }
+                if (ultraMats.nearPlaceholder) ultraU.tNearShadow.value = ultraMats.nearPlaceholder;
             },
             // Settings > Video: master switch, a switch per feature, status
             syncUI: function () {
@@ -39357,6 +39376,13 @@
                 this.rt.aoTmp.setSize(w, h);
                 this.rt.aoBlur.setSize(w, h);
             },
+            // Video memory back when the tier is not in use (the targets are made
+            // again, full size, the next time it draws)
+            shrink: function () {
+                if (!this.rt) return;
+                this.w = this.h = 0;
+                for (const k of ['world', 'view', 'ao', 'aoTmp', 'aoBlur']) this.rt[k].setSize(4, 4);
+            },
 
             // The world (layer 0) into the multisampled target, then the soft
             // particles (layer 2) into the same samples
@@ -39368,10 +39394,14 @@
                 renderer.clear();
                 renderer.render(scene, camera);
                 if (this.softParticles) {
+                    // (a colour background makes r128 clear on every render: none for this pass)
                     ultraFX.bindDepth(R.world.depthTexture, this.w, this.h);
+                    const bg = scene.background;
+                    scene.background = null;
                     camera.layers.set(2);
                     renderer.render(scene, camera);
                     camera.layers.set(0);
+                    scene.background = bg;
                 }
             },
 
@@ -40161,6 +40191,7 @@
                 const ns = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
                 ns.needsUpdate = true;
                 ultraU.tNearShadow.value = ns;
+                this.nearPlaceholder = ns;
                 this.mapMat = this._mapMaterial();
                 this.floorMat = this._floorMaterial();
                 this.glassMat = this._glassMaterial();
@@ -41139,7 +41170,7 @@
                 renderer.getClearColor(this._clear);
                 const alpha = renderer.getClearAlpha();
                 sm.needsUpdate = true;
-                sm.render([L], scene, camera);
+                sm.render(this._lights || (this._lights = [L]), scene, camera);
                 sm.needsUpdate = prev;
                 renderer.setClearColor(this._clear, alpha);
                 if (L.shadow.map) {
@@ -41161,7 +41192,12 @@
             pos: new THREE.Vector3(0, 2.2, 0),
             build: function () {
                 if (this.cubeRT) return;
-                this.cubeRT = new THREE.WebGLCubeRenderTarget(128, { format: THREE.RGBAFormat, generateMipmaps: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, encoding: THREE.sRGBEncoding });
+                // Half float, so the filtered probe comes out in the same (RGBE) encoding as
+                // the sky light the shaders decode (an 8-bit capture would stay sRGB); its
+                // faces still render with the world's own programs (same output encoding)
+                this.ok = renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float');
+                if (!this.ok) return;
+                this.cubeRT = new THREE.WebGLCubeRenderTarget(128, { format: THREE.RGBAFormat, type: THREE.HalfFloatType, generateMipmaps: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, encoding: THREE.sRGBEncoding });
                 this.cubeCam = new THREE.CubeCamera(0.2, 300, this.cubeRT);
             },
             reflectionsOn: function () { return this.on; },
@@ -41219,9 +41255,420 @@
                 pm.compileCubemapShader();
             }
         };
-        const ultraGuns = { build: function () {}, set: function () {} };
-        const ultraChars = { build: function () {}, set: function () {} };
-        const ultraFX = { build: function () {}, set: function () {}, sync: function () {}, update: function () {}, bindDepth: function () {} };
+        // ---- Ultra Realism: guns and hands ----
+        // Hands with three jointed segments per finger (rounded knuckles, a two-part
+        // thumb, a glove cuff) curled round the grip in the same place as before;
+        // PBR metal (near-full metalness, a fine brushed grain) and polymer (a
+        // dielectric with a stippled grip texture) on every gun part, both reflecting
+        // the Ultra sky light; detailed brass casings (rim, extractor groove, neck);
+        // and a little smoke from the muzzle on each shot.
+        function createUltraHandsGeometry(handZ) {
+            const palm = roundedBoxGeometry(0.044, 0.082, 0.064, 0.016, 3);
+            const seg = [roundedBoxGeometry(0.019, 0.03, 0.02, 0.0085, 2), roundedBoxGeometry(0.0175, 0.024, 0.0185, 0.008, 2), roundedBoxGeometry(0.016, 0.02, 0.017, 0.0075, 2)];
+            const joint = new THREE.SphereGeometry(0.0098, 10, 8);
+            const thumbSeg = [roundedBoxGeometry(0.022, 0.03, 0.022, 0.009, 2), roundedBoxGeometry(0.02, 0.026, 0.02, 0.0085, 2)];
+            const cuff = new THREE.CylinderGeometry(0.034, 0.032, 0.045, 18);
+            const parts = [];
+            const sc = (s) => new THREE.Matrix4().makeScale(s, s, s);
+            for (const hand of [partMatrix(0.08, -0.05, handZ, 0, 0, 0), partMatrix(-0.08, -0.05, handZ, 0, Math.PI, 0)]) {
+                parts.push({ geometry: palm, matrix: hand.clone() });
+                parts.push({ geometry: cuff, matrix: hand.clone().multiply(partMatrix(0, -0.058, 0.004, 0, 0, 0)) });
+                for (let i = 0; i < 4; i++) {
+                    const len = [0.96, 1.0, 0.97, 0.86][i];
+                    let m = hand.clone().multiply(partMatrix((i - 1.5) * 0.0215, 0.043, -0.024, -0.35, 0, 0));
+                    parts.push({ geometry: joint, matrix: m.clone() });
+                    for (let k = 0; k < 3; k++) {
+                        const h = [0.03, 0.024, 0.02][k] * len;
+                        parts.push({ geometry: seg[k], matrix: m.clone().multiply(partMatrix(0, h / 2, 0, 0, 0, 0)).multiply(new THREE.Matrix4().makeScale(1, len, 1)) });
+                        m = m.clone().multiply(partMatrix(0, h, 0, k < 2 ? -0.55 : 0, 0, 0));
+                        if (k < 2) parts.push({ geometry: joint, matrix: m.clone().multiply(sc(0.92 - k * 0.06)) });
+                    }
+                }
+                let t = hand.clone().multiply(partMatrix(0.026, 0.012, -0.012, -0.2, 0, Math.PI / 4));
+                parts.push({ geometry: joint, matrix: t.clone().multiply(sc(1.1)) });
+                for (let k = 0; k < 2; k++) {
+                    const h = [0.03, 0.026][k];
+                    parts.push({ geometry: thumbSeg[k], matrix: t.clone().multiply(partMatrix(0, h / 2, 0, 0, 0, 0)) });
+                    t = t.clone().multiply(partMatrix(0, h, 0, -0.3, 0, 0));
+                    if (k === 0) parts.push({ geometry: joint, matrix: t.clone() });
+                }
+            }
+            const merged = mergeGeometryParts(parts);
+            for (const g of [palm, joint, cuff].concat(seg, thumbSeg)) g.dispose();
+            return merged;
+        }
+        // A rifle case: base rim, extractor groove, body, shoulder, neck (open mouth)
+        function ultraCasingGeometry() {
+            const pts = [[0, -0.013], [0.0066, -0.013], [0.0069, -0.0121], [0.0057, -0.0112], [0.0057, -0.0103], [0.0066, -0.0097],
+                [0.0064, 0.0058], [0.0049, 0.0091], [0.0047, 0.013], [0.0041, 0.013]].map((p) => new THREE.Vector2(p[0], p[1]));
+            const g = new THREE.LatheGeometry(pts, 16);
+            g.rotateZ(Math.PI / 2);
+            return g;
+        }
+        // Fine surface relief from object-space noise (bump via screen derivatives, so
+        // no UVs are needed): a brushed grain on metal, a stipple on polymer
+        const ULTRA_GUN_GLSL = `
+            float ugh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            float ugn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+                return mix(mix(ugh(i), ugh(i+vec2(1.0,0.0)), f.x), mix(ugh(i+vec2(0.0,1.0)), ugh(i+vec2(1.0,1.0)), f.x), f.y); }`;
+        // The material's own values stay as they are (skins set them); the shader reads
+        // them: metallic parts (metalness >= 0.45) become near-full metal with a brushed
+        // grain, the rest a dielectric polymer with a stipple
+        function ULTRA_GUN_COMPILE(s) {
+            s.vertexShader = s.vertexShader
+                .replace('#include <common>', '#include <common>\nvarying vec3 vUGObj;')
+                .replace('#include <begin_vertex>', '#include <begin_vertex>\nvUGObj = position;');
+            s.fragmentShader = s.fragmentShader
+                .replace('#include <common>', '#include <common>\nvarying vec3 vUGObj;\n' + ULTRA_GUN_GLSL)
+                .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+                    float ugMetal = step(0.45, metalnessFactor);
+                    if (ugMetal > 0.5) { metalnessFactor = max(metalnessFactor, 0.92); roughnessFactor = clamp(roughnessFactor * 0.8, 0.22, 0.5); }
+                    else { metalnessFactor = min(metalnessFactor, 0.04); roughnessFactor = clamp(0.55 + (roughnessFactor - 0.5) * 0.3, 0.46, 0.72); }
+                    roughnessFactor = clamp(roughnessFactor * (0.9 + 0.2 * ugn(vUGObj.xz * 60.0 + vUGObj.yy * 40.0)), 0.04, 1.0);`)
+                .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+                    {
+                        float h = ugMetal > 0.5
+                            ? ugn(vec2(vUGObj.x * 320.0 + vUGObj.y * 140.0, vUGObj.z * 9.0)) * 0.7 + ugn(vUGObj.xy * 900.0 + vUGObj.zz * 400.0) * 0.08
+                            : ugn(vUGObj.xy * 260.0 + vUGObj.z * 190.0) * 0.55 + ugn(vUGObj.yz * 410.0 + vUGObj.x * 170.0) * 0.45;
+                        vec3 ugDpx = dFdx(-vViewPosition), ugDpy = dFdy(-vViewPosition);
+                        float ugDhx = dFdx(h), ugDhy = dFdy(h);
+                        vec3 ugR1 = cross(ugDpy, normal), ugR2 = cross(normal, ugDpx);
+                        float ugDet = dot(ugDpx, ugR1);
+                        vec3 ugGrad = sign(ugDet) * (ugDhx * ugR1 + ugDhy * ugR2);
+                        normal = normalize(abs(ugDet) * normal - ugGrad * mix(0.0024, 0.0016, ugMetal));
+                    }`);
+        }
+        const ULTRA_GUN_KEY = () => 'ultraGun';
+        const ultraGuns = {
+            on: false, built: false, hands: [], mats: [], shellGeo: null, shellStd: null,
+            _v: new THREE.Vector3(), _f: new THREE.Vector3(),
+            build: function () {
+                if (this.built) return;
+                this.built = true;
+                const byZ = {}, seen = new Set(), seenHands = new Set();
+                for (const key of Object.keys(game.weapons)) {
+                    const w = game.weapons[key];
+                    if (!w || !w.model) continue;
+                    w.model.traverse((o) => {
+                        if (!o.isMesh) return;
+                        if (o.userData.isHands) {
+                            if (seenHands.has(o)) return;
+                            seenHands.add(o);
+                            const z = o.userData.handZ;
+                            if (!byZ[z]) byZ[z] = createUltraHandsGeometry(z);
+                            this.hands.push({ mesh: o, ultra: byZ[z], prev: null });
+                            return;
+                        }
+                        const m = o.material;
+                        if (!m || !m.isMeshStandardMaterial || m.transparent || seen.has(m) || o === w.muzzleFlash) return;
+                        seen.add(m);
+                        this.mats.push({ mat: m, obc: m.onBeforeCompile, key: m.customProgramCacheKey });
+                    });
+                }
+                this.shellGeo = ultraCasingGeometry();
+            },
+            set: function (on) {
+                this.on = !!on;
+                if (this.on) this.build();
+                this.apply();
+            },
+            // (also after High Detail swaps the guns' geometry back)
+            apply: function () {
+                if (!this.built) return;
+                const cd = characterDetail;
+                for (const h of this.hands) {
+                    if (this.on) {
+                        if (h.mesh.geometry !== h.ultra) { h.prev = h.mesh.geometry; h.mesh.geometry = h.ultra; }
+                    } else if (h.mesh.geometry === h.ultra) {
+                        const s = cd.gunSwaps.find((g) => g.mesh === h.mesh);
+                        h.mesh.geometry = s ? (cd.enabled ? s.detailed : s.simple) : (h.prev || h.mesh.geometry);
+                    }
+                }
+                for (const e of this.mats) {
+                    const m = e.mat;
+                    const want = this.on ? ULTRA_GUN_COMPILE : e.obc;
+                    if (m.onBeforeCompile === want) continue;
+                    m.onBeforeCompile = want;
+                    m.customProgramCacheKey = this.on ? ULTRA_GUN_KEY : e.key;
+                    m.needsUpdate = true;
+                }
+                if (shellFX.mesh) {
+                    if (!this.shellStd) this.shellStd = shellFX.mesh.geometry;
+                    shellFX.mesh.geometry = this.on ? this.shellGeo : this.shellStd;
+                }
+            },
+            // From shoot(), after the muzzle flash: a puff of smoke drifting off the muzzle
+            onShot: function () {
+                if (!this.on || !fxKit.enabled()) return;
+                const w = game.weapons[game.activeWeapon];
+                if (!w || !w.muzzleFlash || !w.model || !w.model.visible) return;
+                const p = w.muzzleFlash.getWorldPosition(this._v);
+                const f = camera.getWorldDirection(this._f);
+                const r = Math.random();
+                fxKit._emit(fxKit.smokes, FX_KIND.smoke, p.x + f.x * 0.22, p.y + f.y * 0.22 + 0.02, p.z + f.z * 0.22,
+                    f.x * 0.55 + (r - 0.5) * 0.25, 0.22 + r * 0.2, f.z * 0.55 + (0.5 - r) * 0.25,
+                    0xc4c7cc, 0.75 + r * 0.45, 0.05, 0.36, 0.12, 2.4, -0.35);
+            }
+        };
+
+        // ---- Ultra Realism: characters ----
+        // Smooth jointed bodies for the enemies in place of the box figures:
+        // ellipsoid pelvis, abdomen and chest, capsule limbs with ball joints at the
+        // shoulders, elbows, hips and knees, a domed helmet, rounded gear and rifle.
+        // Same proportions and the same hip (0.92 m) and knee (0.5 m) pivots, so the
+        // walk, flinch and recoil animation is unchanged; hitboxes are separate data
+        // and never change.
+        function buildUltraEnemyGeometry(hasGearPart) {
+            const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+            const sphere = new THREE.SphereGeometry(1, 18, 12);
+            const ell = (rx, ry, rz, x, y, z, ex, ey, ez) => ({ geometry: sphere, matrix: new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(ex || 0, ey || 0, ez || 0)), new THREE.Vector3(rx, ry, rz)) });
+            const capGeo = (r, len) => {
+                const pts = [];
+                for (let i = 0; i <= 6; i++) { const a = -Math.PI / 2 + i / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(1e-4, Math.cos(a) * r), -len / 2 + Math.sin(a) * r)); }
+                for (let i = 0; i <= 6; i++) { const a = i / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(1e-4, Math.cos(a) * r), len / 2 + Math.sin(a) * r)); }
+                return new THREE.LatheGeometry(pts, 16);
+            };
+            const own = [];
+            const limb = (r, a, b) => {
+                const A = V(a), B = V(b), d = B.clone().sub(A), len = d.length();
+                const g = capGeo(r, len);
+                own.push(g);
+                return { geometry: g, matrix: new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()), new THREE.Vector3(1, 1, 1)) };
+            };
+            const rb = (w, h, d, r, x, y, z, ex) => { const g = roundedBoxGeometry(w, h, d, r, 3); own.push(g); return { geometry: g, matrix: partMatrix(x, y, z, ex || 0, 0, 0) }; };
+            const cyl = (r0, r1, h, x, y, z, ex, ez) => { const g = new THREE.CylinderGeometry(r0, r1, h, 20); own.push(g); return { geometry: g, matrix: partMatrix(x, y, z, ex || 0, 0, ez || 0) }; };
+            const X = Math.PI / 2;
+            const SR = [0.41, 1.54, 0.01], ER = [0.38, 1.22, -0.15], WR = [0.27, 1.18, -0.38];
+            const SL = [-0.42, 1.53, 0.02], EL = [-0.33, 1.23, -0.24], WL = [0.1, 1.22, -0.68];
+            const torso = [
+                ell(0.27, 0.12, 0.165, 0, 0.98, 0),               // pelvis
+                ell(0.24, 0.17, 0.15, 0, 1.18, 0),                // abdomen
+                ell(0.36, 0.215, 0.2, 0, 1.43, 0),                // chest
+                rb(0.62, 0.3, 0.08, 0.035, 0, 1.43, -0.16),       // chest plate
+                rb(0.48, 0.5, 0.17, 0.06, 0, 1.36, 0.22),         // backpack
+                cyl(0.085, 0.095, 0.14, 0, 1.67, 0),              // neck
+                ell(0.13, 0.075, 0.16, -0.42, 1.6, 0, 0, 0, 0.25), // shoulder pads
+                ell(0.13, 0.075, 0.16, 0.42, 1.6, 0, 0, 0, -0.25),
+                ell(0.1, 0.1, 0.1, SR[0], SR[1], SR[2]), limb(0.07, SR, ER), ell(0.068, 0.068, 0.068, ER[0], ER[1], ER[2]), limb(0.06, ER, WR),
+                ell(0.1, 0.1, 0.1, SL[0], SL[1], SL[2]), limb(0.07, SL, EL), ell(0.066, 0.066, 0.066, EL[0], EL[1], EL[2]), limb(0.058, EL, WL)
+            ];
+            const head = [
+                ell(0.25, 0.235, 0.265, 0, 1.93, 0),              // helmet
+                ell(0.16, 0.1, 0.16, 0, 1.76, -0.03),             // jaw
+                cyl(0.07, 0.07, 0.08, -0.27, 1.9, 0, 0, X),       // ear pieces
+                cyl(0.07, 0.07, 0.08, 0.27, 1.9, 0, 0, X)
+            ];
+            const legs = [];
+            for (const s of [-1, 1]) {
+                const x = s * 0.17;
+                legs.push(ell(0.115, 0.11, 0.12, x, 0.9, 0), limb(0.108, [x, 0.9, 0], [x, 0.52, -0.01]));
+                legs.push(ell(0.092, 0.092, 0.092, x, 0.5, -0.01), ell(0.08, 0.06, 0.035, x, 0.5, -0.12));   // knee, knee pad
+                legs.push(limb(0.088, [x, 0.5, -0.01], [x, 0.14, 0.01]));
+            }
+            const gearUpper = [
+                rb(0.6, 0.08, 0.36, 0.035, 0, 0.92, 0),           // belt
+                rb(0.17, 0.13, 0.08, 0.03, -0.2, 1.3, -0.23),     // chest pouches
+                rb(0.17, 0.13, 0.08, 0.03, 0.0, 1.3, -0.23),
+                rb(0.17, 0.13, 0.08, 0.03, 0.2, 1.3, -0.23),
+                rb(0.1, 0.16, 0.55, 0.02, 0.2, 1.25, -0.5),       // rifle receiver
+                cyl(0.025, 0.025, 0.36, 0.2, 1.27, -0.95, X),     // barrel
+                rb(0.08, 0.13, 0.26, 0.025, 0.2, 1.3, -0.1),      // stock
+                rb(0.07, 0.2, 0.1, 0.02, 0.2, 1.08, -0.45, 0.25), // magazine
+                cyl(0.03, 0.03, 0.18, 0.2, 1.37, -0.48, X),       // scope
+                ell(0.065, 0.06, 0.07, 0.24, 1.17, -0.38),        // right glove (grip)
+                ell(0.062, 0.058, 0.068, 0.17, 1.24, -0.72)       // left glove (handguard)
+            ];
+            const gearHead = [rb(0.44, 0.12, 0.06, 0.028, 0, 1.93, -0.27)];   // visor
+            const gearLegs = [];
+            for (const s of [-1, 1]) gearLegs.push(rb(0.22, 0.13, 0.36, 0.05, s * 0.17, 0.065, -0.05));   // boots
+            const merge = (parts) => mergeGeometryParts(parts);
+            const out = hasGearPart
+                ? { torso: merge(torso), head: merge(head), legs: merge(legs), weapon: merge(gearUpper.concat(gearHead, gearLegs)) }
+                : { torso: merge(torso.concat(gearUpper)), head: merge(head.concat(gearHead)), legs: merge(legs.concat(gearLegs)), weapon: null };
+            sphere.dispose();
+            for (const g of own) g.dispose();
+            return out;
+        }
+        const ultraChars = {
+            on: false, geo: null, prev: {},
+            build: function () {
+                if (this.geo || !enemyPartSpecs.length) return;
+                this.geo = buildUltraEnemyGeometry(!!actorTemplates.enemyWeapon);
+            },
+            set: function (on) {
+                this.on = !!on;
+                if (this.on) this.build();
+                this.apply();
+            },
+            // (also after High Detail swaps the enemies' geometry)
+            apply: function () {
+                if (!this.geo) return;
+                const cd = characterDetail;
+                for (let p = 0; p < enemyPartSpecs.length; p++) {
+                    const spec = enemyPartSpecs[p], name = spec.name, ultra = this.geo[name];
+                    if (!ultra) continue;
+                    let src;
+                    if (this.on) {
+                        if (spec.geometry !== ultra) this.prev[name] = spec.geometry;
+                        src = ultra;
+                    } else {
+                        if (spec.geometry !== ultra) continue;
+                        src = cd.built ? (cd.enabled ? cd.detailed[name] : cd.simple[name]) : this.prev[name];
+                        if (!src) continue;
+                    }
+                    if (spec.geometry === src) continue;
+                    spec.geometry = src;
+                    const swap = (mesh) => {
+                        const geom = mesh.geometry;
+                        geom.setIndex(src.index);
+                        for (const n of ['position', 'normal', 'uv']) geom.setAttribute(n, src.attributes[n]);
+                    };
+                    for (const chunk of enemyChunks.values()) for (const page of chunk.pages) if (page.meshes[p]) swap(page.meshes[p]);
+                    for (const page of enemyPageFree) if (page.meshes[p]) swap(page.meshes[p]);
+                }
+                syncEnemyAnimUniforms();
+                if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
+            }
+        };
+
+        // ---- Ultra Realism: effects ----
+        // Soft particles: with the Ultra post chain on, sparks, glows, smoke and dust
+        // are drawn in a second pass (layer 2) that reads the resolved depth and fades
+        // them out where they meet walls and the floor (no hard intersection lines).
+        // Lit smoke: smoke and dust take the sun's colour on the side facing it and
+        // the sky's on the other. Impact debris: chips of concrete or stone, wood
+        // splinters and bright metal flakes, by surface, that fall, bounce and fade.
+        const ULTRA_FX_PARS = `
+            uniform sampler2D tDepth; uniform vec2 uRes; uniform float uNear; uniform float uFar; uniform float uSoft;
+            uniform vec3 uSunV; uniform vec3 uSunTint; uniform vec3 uSkyTint; uniform float uLit;
+            float ufxLin(float d) { float z = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }`;
+        const ultraFX = {
+            on: false, built: false, addMat: null, smokeMat: null, stdAdd: null, stdSmoke: null, U: null,
+            debris: null, chips: [], nextChip: 0, CAP: 120, _m: new THREE.Matrix4(), _q: new THREE.Quaternion(), _e: new THREE.Euler(), _p: new THREE.Vector3(), _s: new THREE.Vector3(), _c: new THREE.Color(), _d: new THREE.Vector3(),
+            build: function () {
+                if (this.built) return;
+                this.built = true;
+                fxKit.init();
+                this.stdAdd = fxKit.add.material;
+                this.stdSmoke = fxKit.smoke.material;
+                this.U = {
+                    tDepth: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uNear: { value: 0.1 }, uFar: { value: 1000 }, uSoft: { value: 0 },
+                    uSunV: { value: new THREE.Vector3(0, 1, 0) }, uSunTint: { value: new THREE.Color(1, 1, 1) }, uSkyTint: { value: new THREE.Color(0.6, 0.65, 0.75) }, uLit: { value: 1 }
+                };
+                const mk = (std, lit) => {
+                    const m = std.clone();
+                    m.uniforms = Object.assign({}, std.uniforms, this.U, { uLit: { value: lit ? 1 : 0 } });
+                    m.uniforms.uTime = std.uniforms.uTime;   // the batch's own clock
+                    m.fragmentShader = std.fragmentShader
+                        .replace('uniform float uTime;', 'uniform float uTime;\n' + ULTRA_FX_PARS)
+                        .replace('gl_FragColor = vec4(col, a * vAlpha);', `
+                            if (uLit > 0.5 && vKind > 1.5 && (vKind < 2.5 || vKind > 3.5)) {
+                                // a puff lit like a ball: sun colour toward the sun, sky colour away
+                                vec3 n = normalize(vec3(p * 0.9, sqrt(max(0.0, 1.0 - dot(p, p) * 0.81))));
+                                float w = clamp(dot(n, uSunV) * 0.5 + 0.5, 0.0, 1.0);
+                                col *= mix(uSkyTint, uSunTint * 1.25, w);
+                            }
+                            if (uSoft > 0.5) {
+                                float sd = ufxLin(texture2D(tDepth, gl_FragCoord.xy / uRes).x);
+                                a *= clamp((sd - ufxLin(gl_FragCoord.z)) / 0.35, 0.0, 1.0);
+                            }
+                            gl_FragColor = vec4(col, a * vAlpha);`);
+                    return m;
+                };
+                this.addMat = mk(this.stdAdd, false);
+                this.smokeMat = mk(this.stdSmoke, true);
+                // Debris pool
+                const geo = new THREE.DodecahedronGeometry(1, 0);
+                const mat = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0.0 });
+                const mesh = new THREE.InstancedMesh(geo, mat, this.CAP);
+                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                for (let i = 0; i < this.CAP; i++) mesh.setColorAt(i, this._c.setRGB(0.5, 0.5, 0.5));
+                mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+                mesh.count = 0;
+                mesh.frustumCulled = false;
+                mesh.castShadow = false;
+                mesh.receiveShadow = true;
+                mesh.name = 'ultraDebris';
+                mesh.visible = false;
+                scene.add(mesh);
+                this.debris = mesh;
+                for (let i = 0; i < this.CAP; i++) this.chips.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), s: new THREE.Vector3(), c: new THREE.Color(), t: 0, life: 1, floor: 0 });
+            },
+            set: function (on) {
+                this.on = !!on;
+                if (!this.on && this.debris) { for (const c of this.chips) c.alive = false; this.debris.count = 0; this.debris.visible = false; }
+            },
+            // Ultra materials on the particle batches; the soft pass needs the Ultra post chain
+            sync: function () {
+                if (!this.built) return;
+                const soft = this.on && ultraRealism.is('post');
+                fxKit.add.material = this.on ? this.addMat : this.stdAdd;
+                fxKit.smoke.material = this.on ? this.smokeMat : this.stdSmoke;
+                this.U.uSoft.value = soft ? 1 : 0;
+                fxKit.add.layers.set(soft ? 2 : 0);
+                fxKit.smoke.layers.set(soft ? 2 : 0);
+                ultraPost.softParticles = soft;
+            },
+            bindDepth: function (tex, w, h) {
+                if (!this.U) return;
+                this.U.tDepth.value = tex;
+                this.U.uRes.value.set(w, h);
+                this.U.uNear.value = camera.near;
+                this.U.uFar.value = camera.far;
+            },
+            // From materialImpact: a few pieces of the surface that was hit
+            spawn: function (point, nx, ny, nz, surf) {
+                if (!this.on || !this.debris) return;
+                const metal = surf === MAP_SURF.metal, wood = surf === MAP_SURF.wood;
+                const n = metal ? 3 : wood ? 4 : 5;
+                const base = metal ? 0xb8bcc2 : wood ? 0x8a6238 : surf === MAP_SURF.stone ? 0x9a8a74 : 0x8f8f8a;
+                for (let i = 0; i < n; i++) {
+                    const c = this.chips[this.nextChip];
+                    this.nextChip = (this.nextChip + 1) % this.CAP;
+                    const sp = 1.6 + Math.random() * 2.4;
+                    c.alive = true; c.t = 0; c.life = 0.9 + Math.random() * 0.8;
+                    c.p.set(point.x + nx * 0.03, point.y + ny * 0.03, point.z + nz * 0.03);
+                    c.v.set((nx + (Math.random() - 0.5) * 1.3) * sp, (ny + 0.4 + Math.random() * 0.8) * sp, (nz + (Math.random() - 0.5) * 1.3) * sp);
+                    c.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+                    c.w.set((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+                    const k = 0.006 + Math.random() * 0.012;
+                    if (wood) c.s.set(k * 0.5, k * 0.5, k * 3.2); else if (metal) c.s.set(k * 0.7, k * 0.15, k * 0.7); else c.s.set(k, k * 0.8, k * 0.9);
+                    c.c.copy(linearColorFromHex(base)).multiplyScalar(0.75 + Math.random() * 0.5);
+                    c.floor = ny > 0.7 ? point.y : 0;
+                }
+            },
+            update: function (dt, now) {
+                if (!this.U) return;
+                // Smoke lighting follows the sun (view space) and the sky
+                const sd = this._d.copy(directionalLight.position).sub(directionalLight.target.position).normalize().transformDirection(camera.matrixWorldInverse);
+                this.U.uSunV.value.copy(sd);
+                this.U.uSunTint.value.copy(directionalLight.color).multiplyScalar(Math.min(1.2, 0.35 + directionalLight.intensity * 0.3));
+                this.U.uSkyTint.value.copy(scene.background && scene.background.isColor ? scene.background : this._c.setRGB(0.5, 0.55, 0.65)).multiplyScalar(0.6).addScalar(0.32);
+                if (!this.debris) return;
+                let n = 0;
+                for (const c of this.chips) {
+                    if (!c.alive) continue;
+                    c.t += dt;
+                    if (c.t >= c.life) { c.alive = false; continue; }
+                    c.v.y -= 9.8 * dt;
+                    c.p.addScaledVector(c.v, dt);
+                    if (c.p.y < c.floor + c.s.y) {
+                        c.p.y = c.floor + c.s.y;
+                        if (c.v.y < 0) { c.v.y *= -0.32; c.v.x *= 0.55; c.v.z *= 0.55; c.w.multiplyScalar(0.5); }
+                    }
+                    c.r.addScaledVector(c.w, dt);
+                    const fade = Math.min(1, (c.life - c.t) / 0.3);
+                    this._q.setFromEuler(this._e.set(c.r.x, c.r.y, c.r.z));
+                    this._m.compose(c.p, this._q, this._s.copy(c.s).multiplyScalar(fade));
+                    this.debris.setMatrixAt(n, this._m);
+                    this.debris.setColorAt(n, c.c);
+                    n++;
+                }
+                this.debris.count = n;
+                this.debris.visible = n > 0;
+                if (n) { this.debris.instanceMatrix.needsUpdate = true; this.debris.instanceColor.needsUpdate = true; }
+            }
+        };
 
         // Initialize the optimized game
         // Debug populations. Not used by normal play. Counts are the totals to reach,
@@ -42772,6 +43219,7 @@
         function materialImpact(point, normal, surf) {
             if (!fxKit.enabled()) return;
             const nx = normal ? normal.x : 0, ny = normal ? normal.y : 1, nz = normal ? normal.z : 0;
+            if (ultraFX.on) ultraFX.spawn(point, nx, ny, nz, surf);   // V1.8 Ultra: debris by surface
             const out = (s) => [(nx + (Math.random() - 0.5) * 1.2) * s, (ny + Math.random() * 0.8) * s, (nz + (Math.random() - 0.5) * 1.2) * s];
             if (surf === MAP_SURF.metal) {
                 for (let i = 0; i < 9; i++) {
