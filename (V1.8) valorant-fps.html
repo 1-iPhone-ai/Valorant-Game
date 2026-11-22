@@ -5692,8 +5692,10 @@
                 for (const id in GUN_DEFS) {
                     const d = GUN_DEFS[id];
                     d.id = id;
-                    const n = Math.max(d.mag || 1, 12) + 6;
+                    // Long enough for a held Odin with infinite ammo (~16 s); the sway carries on
+                    const n = Math.max((d.mag || 1) + 6, 240);
                     const out = new Float32Array(n * 2);
+                    d.hudUpper = d.hud.toUpperCase();
                     if (d.pattern) {
                         const P = d.pattern, N = P.length;
                         const sw = d.sway || [1, 8, 0.03, P[N - 1][1]];
@@ -5747,6 +5749,19 @@
                 }
                 if (airborne) e = Math.max(e, M.air);
                 return e;
+            },
+            // The movement error a shot would get right now: ADS keeps its class share,
+            // crouching halves it (as in shoot()). Also refreshes frac, for any weapon.
+            appliedMoveError: function (def) {
+                const cc = characterController;
+                if (!def) {
+                    const runTop = cc.terminalSpeed(cc.walkSpeed);
+                    this.frac = runTop > 0 ? Math.sqrt(cc.velocity.x * cc.velocity.x + cc.velocity.z * cc.velocity.z) / runTop : 0;
+                    return 0;
+                }
+                const M = GUN_MOVE_ERR[def.cls] || GUN_MOVE_ERR.rifle;
+                const ads = game.adsProgress || 0;
+                return this.moveError(def) * (1 - ads * (1 - M.ads)) * (1 - (cc.crouchBlend || 0) * 0.5);
             },
             // Damage multiplier at a distance (bands: [[up to m, mult], ...])
             falloff: function (def, dist) {
@@ -5906,6 +5921,8 @@
             sprayShotCount: 0,
             recoilAccumPitch: 0,
             recoilAccumYaw: 0,
+            recoilAtShotPitch: 0,   // V1.8: recoil right after the last shot (recovery winds it to 0)
+            recoilAtShotYaw: 0,
             crosshairGap: 14,
             activeWeapon: 'rifle',
             activeAgent: 'jett',
@@ -10485,10 +10502,13 @@
         // no shader program is added). Only the equipped gun's kit is shown; a kit
         // can hide base parts it replaces and resize the magazine. Positions are in
         // the gun's local space (as createWeapons); 'slide' parts ride the pistol slide.
+        // muzzle: z of the muzzle (flash, halo and star move there); hd: High Detail kit
+        // parts (child indices, see characterDetail._gunKits) this gun replaces.
         // =============================================
         const viewmodelKits = {
             groups: {},        // kit id -> { group, slideGroup, def }
             shown: { rifle: null, sniper: null, pistol: null },
+            baseMuzzle: {},    // slot -> the slot gun's own muzzle z
             // Materials by role -> child index of the slot model
             ROLES: {
                 rifle: { body: 0, dark: 1, stock: 2, grip: 3, mag: 4, black: 5, accent: 6 },
@@ -10497,20 +10517,20 @@
             DEFS: (() => {
                 const X = Math.PI / 2;
                 return {
-                    spectre: { slot: 'rifle', hide: [2], mag: [0.8, 1.45, 0.9], parts: [
+                    spectre: { slot: 'rifle', hide: [2], mag: [0.8, 1.45, 0.9], muzzle: -0.9, hd: [7, 8, 19], parts: [
                         { cyl: [0.032, 0.032, 0.2], at: [0, 0, -0.78], rot: [X, 0, 0], mat: 'black' },      // suppressor
                         { cyl: [0.035, 0.035, 0.02], at: [0, 0, -0.69], rot: [X, 0, 0], mat: 'accent' },
                         { box: [0.012, 0.012, 0.28], at: [0, 0.028, 0.44], mat: 'dark' },                    // wire stock
                         { box: [0.012, 0.012, 0.28], at: [0, -0.028, 0.44], mat: 'dark' },
                         { box: [0.06, 0.085, 0.016], at: [0, 0, 0.58], mat: 'grip' }
                     ] },
-                    stinger: { slot: 'rifle', mag: [0.85, 1.3, 0.9], parts: [
+                    stinger: { slot: 'rifle', mag: [0.85, 1.3, 0.9], hd: [0, 1, 2, 3, 4, 5, 6], parts: [
                         { box: [0.075, 0.07, 0.18], at: [0, -0.005, -0.39], mat: 'body' },                   // barrel shroud
                         { box: [0.03, 0.1, 0.032], at: [0, -0.09, -0.33], rot: [0.25, 0, 0], mat: 'grip' },   // front grip
                         { box: [0.036, 0.034, 0.06], at: [0, 0.075, -0.07], mat: 'black' },                  // red dot
                         { box: [0.03, 0.022, 0.004], at: [0, 0.078, -0.102], mat: 'accent' }
                     ] },
-                    bucky: { slot: 'rifle', mag: [0.9, 0.45, 1.2], parts: [
+                    bucky: { slot: 'rifle', mag: [0.9, 0.45, 1.2], muzzle: -0.74, hd: [0, 1, 2, 3, 4, 5, 6, 7, 8], parts: [
                         { cyl: [0.026, 0.026, 0.44], at: [0, 0.008, -0.5], rot: [X, 0, 0], mat: 'dark' },    // heavy barrel
                         { cyl: [0.021, 0.021, 0.4], at: [0, -0.04, -0.46], rot: [X, 0, 0], mat: 'black' },   // tube magazine
                         { box: [0.07, 0.055, 0.15], at: [0, -0.042, -0.38], mat: 'stock' },                  // pump
@@ -10519,7 +10539,7 @@
                         { box: [0.072, 0.008, 0.012], at: [0, -0.012, -0.43], mat: 'black' },
                         { box: [0.01, 0.012, 0.012], at: [0, 0.04, -0.7], mat: 'accent' }                    // bead sight
                     ] },
-                    guardian: { slot: 'rifle', hide: [5], mag: [1.0, 0.7, 1.2], parts: [
+                    guardian: { slot: 'rifle', hide: [5], mag: [1.0, 0.7, 1.2], muzzle: -0.97, hd: [7, 8], parts: [
                         { cyl: [0.017, 0.017, 0.24], at: [0, 0, -0.8], rot: [X, 0, 0], mat: 'dark' },        // long barrel
                         { box: [0.05, 0.035, 0.05], at: [0, 0, -0.93], mat: 'black' },                      // muzzle brake
                         { cyl: [0.024, 0.024, 0.22], at: [0, 0.098, 0.02], rot: [X, 0, 0], mat: 'black' },  // scope
@@ -10529,7 +10549,7 @@
                         { box: [0.05, 0.03, 0.02], at: [0, 0.07, 0.09], mat: 'dark' },
                         { box: [0.06, 0.03, 0.14], at: [0, 0.04, 0.42], mat: 'stock' }                      // cheek riser
                     ] },
-                    ares: { slot: 'rifle', mag: [1.5, 1.05, 2.4], parts: [
+                    ares: { slot: 'rifle', mag: [1.5, 1.05, 2.4], hd: [0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14], parts: [
                         { box: [0.105, 0.09, 0.3], at: [0, 0, -0.42], mat: 'body' },                        // barrel shroud
                         { box: [0.11, 0.02, 0.04], at: [0, 0, -0.34], mat: 'black' },
                         { box: [0.11, 0.02, 0.04], at: [0, 0, -0.42], mat: 'black' },
@@ -10541,7 +10561,7 @@
                         { box: [0.02, 0.04, 0.02], at: [0, 0.07, 0.07], mat: 'black' },
                         { box: [0.1, 0.02, 0.16], at: [0, 0.055, 0.12], mat: 'dark' }                       // feed cover
                     ] },
-                    odin: { slot: 'rifle', mag: [1.9, 1.3, 3.0], parts: [
+                    odin: { slot: 'rifle', mag: [1.9, 1.3, 3.0], muzzle: -0.79, hd: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], parts: [
                         { cyl: [0.042, 0.042, 0.42], at: [0, 0, -0.48], rot: [X, 0, 0], mat: 'body' },      // barrel jacket
                         { cyl: [0.044, 0.044, 0.012], at: [0, 0, -0.34], rot: [X, 0, 0], mat: 'black' },
                         { cyl: [0.044, 0.044, 0.012], at: [0, 0, -0.44], rot: [X, 0, 0], mat: 'black' },
@@ -10552,11 +10572,11 @@
                         { box: [0.03, 0.11, 0.04], at: [0, -0.1, -0.28], rot: [0.2, 0, 0], mat: 'grip' },    // front handle
                         { box: [0.106, 0.008, 0.2], at: [0, -0.035, -0.08], mat: 'accent' }
                     ] },
-                    ghost: { slot: 'pistol', mag: [1, 1.12, 1], parts: [
+                    ghost: { slot: 'pistol', mag: [1, 1.12, 1], muzzle: -0.5, parts: [
                         { cyl: [0.021, 0.021, 0.18], at: [0, 0.03, -0.39], rot: [X, 0, 0], mat: 'black' },  // suppressor
                         { cyl: [0.023, 0.023, 0.012], at: [0, 0.03, -0.31], rot: [X, 0, 0], mat: 'accent' }
                     ] },
-                    bandit: { slot: 'pistol', mag: [1.05, 1, 1.05], parts: [
+                    bandit: { slot: 'pistol', mag: [1.05, 1, 1.05], hd: [4], parts: [
                         { box: [0.07, 0.045, 0.06], at: [0, 0.003, -0.205], mat: 'slide', slide: true },     // compensator
                         { box: [0.074, 0.008, 0.01], at: [0, 0.02, -0.19], mat: 'black', slide: true },
                         { box: [0.074, 0.008, 0.01], at: [0, 0.02, -0.215], mat: 'black', slide: true },
@@ -10567,6 +10587,10 @@
             })(),
 
             build: function () {
+                for (const slot of ['rifle', 'sniper', 'pistol']) {
+                    const w = game.weapons[slot];
+                    if (w && w.muzzleFlash) this.baseMuzzle[slot] = w.muzzleFlash.position.z;
+                }
                 for (const id in this.DEFS) {
                     const def = this.DEFS[id];
                     const w = game.weapons[def.slot];
@@ -10618,7 +10642,32 @@
                     const s = kit && kit.def.mag ? kit.def.mag : null;
                     w.magazine.scale.set(s ? s[0] : 1, s ? s[1] : 1, s ? s[2] : 1);
                 }
+                // The flash, halo and star sit at this gun's muzzle (past a suppressor or a long barrel)
+                if (w.muzzleFlash && this.baseMuzzle[slot] !== undefined) {
+                    const mz = kit && kit.def.muzzle !== undefined ? kit.def.muzzle : this.baseMuzzle[slot];
+                    if (w.muzzleFlash.position.z !== mz) {
+                        w.muzzleFlash.position.z = mz;
+                        w.muzzleFlash.updateMatrix();
+                    }
+                    const card = muzzleStar.cards[slot];
+                    if (card) card.position.z = mz;
+                }
+                // High Detail: its parts this gun replaces stay hidden (they would poke through)
+                const hdKit = this.detailKit(w, slot);
+                if (hdKit) {
+                    const hdHide = kit && kit.def.hd ? kit.def.hd : null;
+                    for (let i = 0; i < hdKit.children.length; i++) hdKit.children[i].visible = !(hdHide && hdHide.indexOf(i) !== -1);
+                }
                 this.shown[slot] = kit ? kitId : null;
+            },
+            detailKit: function (w, slot) {
+                const kids = w.model.children;
+                for (let i = 0; i < kids.length; i++) if (kids[i].name === slot + 'DetailKit') return kids[i];
+                return null;
+            },
+            // After High Detail builds its kits: apply the hides for the guns in hand
+            refreshDetail: function () {
+                for (const slot of ['rifle', 'pistol']) this.show(slot, this.shown[slot]);
             }
         };
         
@@ -12412,6 +12461,8 @@
                         this.kits.push(group);
                     }
                 }
+                // V1.8: the new guns hide the detail parts they replace
+                viewmodelKits.refreshDetail();
             },
 
             // Positions are in each gun's local space (same as createWeapons)
@@ -15669,23 +15720,31 @@
                 const coolRate = delta * 4.2;
                 game.recoilHeat = Math.max(0, game.recoilHeat - coolRate);
             }
-            // V1.8: recovery starts once the next shot of a held trigger is overdue (the
-            // same moment the spray index starts going back in shoot()), so a spray is
-            // never pulled down halfway through
+            // V1.8: recovery starts once the next shot of the gun's cadence is overdue (never
+            // while an automatic gun's trigger is held), and winds the recoil back in a
+            // straight line that ends at the gun's reset time, the moment shoot() is back
+            // at the first bullet of the pattern. So a spray is never pulled down halfway,
+            // and the first shot after a reset leaves exactly from the crosshair.
+            // (ADS bursts recover between bursts: each burst starts its pattern fresh)
+            const burstMode = !!(weapon.def && weapon.def.adsBurst && game.adsActive);
+            const holdingAuto = game.mouseDown && weapon.automatic && !weapon.isMelee && !burstMode && weapon.ammo > 0 && !game.reloading;
             const recoverAfter = (weapon.automatic && !weapon.isMelee) ? Math.max(120, weapon.fireRate + 75) : 120;
-            if (timeSinceShot > recoverAfter) {
-                if (game.recoilAccumPitch > 0.0002 || Math.abs(game.recoilAccumYaw) > 0.0002) {
-                    const recovStep = Math.min(1, delta * 7.5);
-                    const dPitch = game.recoilAccumPitch * recovStep;
-                    const dYaw = game.recoilAccumYaw * recovStep;
-                    camera.rotation.x = Math.max(
-                        mouseLookController.maxLookDown,
-                        Math.min(mouseLookController.maxLookUp, camera.rotation.x - dPitch)
-                    );
-                    camera.rotation.y -= dYaw;
-                    game.recoilAccumPitch -= dPitch;
-                    game.recoilAccumYaw -= dYaw;
-                }
+            const recoverEnd = Math.max(recoverAfter + 80, (weapon.def && weapon.def.reset) || 400);
+            if (!holdingAuto && timeSinceShot > recoverAfter && (game.recoilAccumPitch > 0.00001 || Math.abs(game.recoilAccumYaw) > 0.00001)) {
+                const remain = 1 - Math.min(1, (timeSinceShot - recoverAfter) / (recoverEnd - recoverAfter));
+                let wantP = (game.recoilAtShotPitch || 0) * remain, wantY = (game.recoilAtShotYaw || 0) * remain;
+                // Only ever back toward zero
+                if (Math.abs(wantP) > Math.abs(game.recoilAccumPitch)) wantP = game.recoilAccumPitch;
+                if (Math.abs(wantY) > Math.abs(game.recoilAccumYaw) || wantY * game.recoilAccumYaw < 0) wantY = remain > 0 ? game.recoilAccumYaw * Math.min(1, remain) : 0;
+                const dPitch = game.recoilAccumPitch - wantP;
+                const dYaw = game.recoilAccumYaw - wantY;
+                camera.rotation.x = Math.max(
+                    mouseLookController.maxLookDown,
+                    Math.min(mouseLookController.maxLookUp, camera.rotation.x - dPitch)
+                );
+                camera.rotation.y -= dYaw;
+                game.recoilAccumPitch = wantP || 0;   // (no -0)
+                game.recoilAccumYaw = wantY || 0;
             }
 
             // 5. Dynamic Crosshair Line Expansion (movement + airborne + recoil heat + ADS & Crouch 50% tightening)
@@ -15761,8 +15820,9 @@
                 if (w && w.model) w.model.visible = false;
             }
             
-            // Show the selected weapon
+            // Show the selected weapon (V1.8: a gun taken out starts a fresh spray)
             game.activeWeapon = weaponName;
+            game.sprayShotCount = 0;
             const selected = game.weapons[weaponName];
             if (selected.model) selected.model.visible = true;
             if (typeof settingsManager !== 'undefined' && settingsManager.applyWeaponSkin && game.userSettings && game.userSettings.weaponSkin !== 'standard') {
@@ -15920,7 +15980,7 @@
                 this.primary = null;
                 this.sidearm = 'classic';
                 game.shield = 0;
-                game.reloading = false;
+                cancelReload();
                 this.bought = {};
                 this.atPhaseStart.primary = null;
                 this.atPhaseStart.sidearm = 'classic';
@@ -15935,7 +15995,7 @@
                     this.reset();
                 } else {
                     this.bought = {};
-                    game.reloading = false;
+                    cancelReload();
                     this.atPhaseStart.primary = this.primary;
                     this.atPhaseStart.sidearm = this.sidearm;
                     if (this.sidearm) applyGunDef(this.sidearm);
@@ -16613,7 +16673,7 @@
                 if (weaponType === 'pistol_burst') key = 'classic';
                 if (weaponType === 'bulldog_burst') key = 'bulldog';
                 const P = this.GUN_SOUNDS[key] || this.GUN_SOUNDS.rifle;
-                const bursts = rounds > 1 ? rounds : (weaponType === 'pistol_burst' || weaponType === 'bulldog_burst' ? 3 : 1);
+                const bursts = rounds >= 1 ? rounds : (weaponType === 'pistol_burst' || weaponType === 'bulldog_burst' ? 3 : 1);
                 this.gunsFired++;
                 this.lastGun = key;
                 for (let b = 0; b < bursts; b++) {
@@ -17246,7 +17306,8 @@
                 game.score += awardedPoints;
                 scoreValue.textContent = game.score;
                 if (typeof tacticalDirector !== 'undefined') {
-                    tacticalDirector.awardCreds(Math.round(awardedPoints * 0.75));
+                    // V1.8: not in Match/Ranked, where only the round economy pays
+                    if (loadout.mode() !== 'economy') tacticalDirector.awardCreds(Math.round(awardedPoints * 0.75));
                 }
                 showHitMarker(hitMarkerKind);
                 addCustomKillFeedMessage(`${badgeHtml}You destroyed ${target.type} Target (+${awardedPoints}) with ${sourceLabel}`);
@@ -34304,7 +34365,7 @@
                     return;
                 }
                 if (m === 'free') {
-                    game.reloading = false;
+                    cancelReload();
                     equipGun(id);
                     soundFX.buySuccess();
                     showNotification(`${def.name} — free in this mode`, 1300);
@@ -34328,7 +34389,7 @@
                     const refund = loadout.bought[id];
                     delete loadout.bought[id];
                     game.creds += refund;
-                    game.reloading = false;
+                    cancelReload();
                     loadout[slotKey] = loadout.atPhaseStart[slotKey];
                     if (loadout[slotKey]) equipGun(loadout[slotKey]);
                     else switchWeapon('pistol');
@@ -34349,7 +34410,7 @@
                 game.creds = game.creds + refund - def.price;
                 loadout.bought[id] = def.price;
                 loadout[slotKey] = id;
-                game.reloading = false;
+                cancelReload();
                 equipGun(id);
                 soundFX.buySuccess();
                 showNotification(`Bought ${def.name}${refund ? ` (the ${GUN_DEFS[cur].hud} sold back)` : ''}`, 1600);
@@ -34403,7 +34464,7 @@
                     banner.classList.toggle('closed', !buyOpen || gunMode === 'locked');
                 }
                 const upCol = this._upColEl || (this._upColEl = document.getElementById('buy-col-upgrades'));
-                if (upCol) upCol.classList.toggle('hidden-in-match', gunMode === 'economy');
+                if (upCol) upCol.classList.toggle('hidden-in-match', gunMode !== 'free');
 
                 const s = (agentSystem && agentSystem.stateByAgent) ? agentSystem.stateByAgent[game.activeAgent] : null;
                 const cards = buyMenuOverlay.querySelectorAll('.buy-card');
@@ -34424,7 +34485,7 @@
                     else if (id === 'equip_frenzy' && game.pistolVariant === 'frenzy') owned = true;
                     else if ((id === 'upgrade_rifle' || id === 'vandal-overclock') && game.weaponUpgrades.vandalOverclock && game.primaryVariant === 'vandal') owned = true;
                     else if ((id === 'upgrade_sniper' || id === 'operator-overclock') && game.weaponUpgrades.operatorOverclock && game.sniperVariant === 'operator') owned = true;
-                    else if ((id === 'upgrade_pistol' || id === 'sheriff-overclock') && game.weaponUpgrades.sheriffOverclock && game.pistolVariant !== 'frenzy') owned = true;
+                    else if ((id === 'upgrade_pistol' || id === 'sheriff-overclock') && game.weaponUpgrades.sheriffOverclock && (game.pistolVariant === 'sheriff' || game.pistolVariant === 'classic')) owned = true;
                     else if (id === 'combat-stim' && game.weaponUpgrades.combatStim) owned = true;
                     else if ((id === 'ability_c' || id === 'ability-c') && s && s.c.charges >= s.c.maxCharges) owned = true;
                     else if ((id === 'ability_q' || id === 'ability-q') && s && s.q.charges >= s.q.maxCharges) owned = true;
@@ -34464,6 +34525,11 @@
                 const legacyGun = { equip_phantom: 'phantom', equip_bulldog: 'bulldog', equip_judge: 'judge', equip_outlaw: 'outlaw', equip_marshal: 'marshal', equip_frenzy: 'frenzy' };
                 if (itemId.indexOf('gun:') === 0 || legacyGun[itemId]) {
                     this.buyGun(legacyGun[itemId] || itemId.slice(4));
+                    return;
+                }
+                if (loadout.mode() === 'locked' && /^(upgrade_|vandal-overclock|operator-overclock|sheriff-overclock)/.test(itemId)) {
+                    soundFX.buyDeny();
+                    showNotification('Spike Rush: everyone has the same gun this round', 1600);
                     return;
                 }
                 if (loadout.mode() === 'economy') {
@@ -36085,6 +36151,8 @@
         // Phantom Stealth Tracers, Single-Bullet Per-Actor Deduplication & Recoil Spray Pattern
         // =============================================
         const _actorHitCandidates = new Map();
+        // V1.8: Classic right-click and ADS bursts are fired one burst per trigger cadence
+        function isMultiRoundShot(isPistolBurst, adsBurst) { return !!(isPistolBurst || adsBurst); }
         const _baseRayDir = new THREE.Vector3();
         const _shotRight = new THREE.Vector3(), _shotUp = new THREE.Vector3();
         function shoot(isAltBurst = false) {
@@ -36184,9 +36252,13 @@
                 const elapsed = now - prevShotAt;
                 const burstCd = isPistolBurst ? 420 : (adsBurst ? adsBurst.cooldown : 0);
                 // V1.8 spray index: holding the trigger walks along the pattern; a pause
-                // brings it back toward the first bullet, fully after the gun's reset time
-                const contMs = (burstCd || weapon.fireRate) * fireRateMult + 75;
-                let sprayCount = game.sprayShotCount;
+                // brings it back toward the first bullet, fully after the gun's reset time.
+                // A shot within the gun's own cadence (+75 ms of timer slack) continues the
+                // spray; an automatic gun with the trigger held stays one spray even if the
+                // page hitches; bursts more than the reset time apart start fresh.
+                const heldAuto = game.mouseDown && weapon.automatic && !isMultiRoundShot(isPistolBurst, adsBurst);
+                const contMs = heldAuto ? def.reset : Math.min(weapon.fireRate * fireRateMult + 75, def.reset);
+                let sprayCount = Math.min(game.sprayShotCount, def.sprayLen - 1);
                 if (elapsed > contMs) {
                     const rec = def.reset > contMs ? Math.min(1, (elapsed - contMs) / (def.reset - contMs)) : 1;
                     sprayCount = Math.round(sprayCount * (1 - rec));
@@ -36210,7 +36282,7 @@
 
                 // Track the spray index & firing recoil heat (crosshair bloom)
                 const sprayIdx0 = sprayCount;
-                game.sprayShotCount = sprayCount + (isMultiRound ? burstRounds : 1);
+                game.sprayShotCount = Math.min(def.sprayLen - 1, sprayCount + (isMultiRound ? burstRounds : 1));
                 const heatAdd = isPistolBurst ? 2.2 : (adsBurst ? def.heat * 1.9 : def.heat);
                 game.recoilHeat = Math.min(6.0, game.recoilHeat + heatAdd);
 
@@ -36223,7 +36295,7 @@
                     ammoValue.textContent = weapon.ammo;
                 }
                 if (isPistolBurst) {
-                    soundFX.gunshot('pistol_burst');
+                    soundFX.gunshot('pistol_burst', burstRounds);
                 } else if (adsBurst) {
                     soundFX.gunshot(def.id === 'bulldog' ? 'bulldog_burst' : def.sound, burstRounds);
                 } else {
@@ -36575,6 +36647,8 @@
                 camera.rotation.y += yawKick;
                 game.recoilAccumPitch = Math.max(0, Math.min(0.28, game.recoilAccumPitch + (camera.rotation.x - pitch0)));
                 game.recoilAccumYaw = Math.max(-0.18, Math.min(0.18, game.recoilAccumYaw + yawKick));
+                game.recoilAtShotPitch = game.recoilAccumPitch;
+                game.recoilAtShotYaw = game.recoilAccumYaw;
 
                 if (typeof tacticalDirector !== 'undefined') {
                     tacticalDirector.recordShot(hitActorThisShot, hitHeadThisShot);
@@ -36918,6 +36992,16 @@
         }
         
         // Reload function (or Tactical Knife Flourish Spin on R)
+        // V1.8: stop a reload in progress (a gun bought or handed out mid-reload, a new
+        // round): its timer is ignored, the bar hides and the magazine goes back
+        function cancelReload() {
+            if (!game.reloading) return;
+            game.reloadSeq = (game.reloadSeq || 0) + 1;
+            game.reloading = false;
+            if (reloadIndicator) reloadIndicator.style.opacity = '0';
+            if (vmAnim.clip && vmAnim.clip.kind === 'reload') vmAnim.finishClip(game.weapons[game.activeWeapon]);
+        }
+
         function reload() {
             const weapon = game.weapons[game.activeWeapon];
             if (!weapon) return;
@@ -36962,9 +37046,12 @@
             // handle) is a smooth timeline on the viewmodel animator
             vmAnim.play('reload', weapon.reloadTime * 1000);
             if (game.activeWeapon === 'sniper') setTimeout(() => { if (game.activeWeapon === 'sniper') shellFX.eject(); }, weapon.reloadTime * 780);
+            // V1.8: a reload cancelled by a purchase or a new round never finishes later
+            const reloadSeq = game.reloadSeq = (game.reloadSeq || 0) + 1;
             
             // Complete reload after specified time
             setTimeout(() => {
+                if (reloadSeq !== game.reloadSeq) return;
                 reloadIndicator.style.opacity = "0";
                 weapon.ammo = weapon.maxAmmo;
                 if (game.weapons[game.activeWeapon] === weapon) {
@@ -38694,6 +38781,8 @@
 
                 this.phase = 'buy';
                 this.phaseEndsAt = now + this.cfg.buyMs;
+                // V1.8: a buy menu left open from the last round shows buying is open again
+                if (game.buyMenuOpen) td.updateBuyMenuUI();
                 const what = this.side === 'attack'
                     ? 'ATTACK — plant the spike or eliminate the defenders'
                     : `DEFEND — stop the bots planting (they are heading for a site)`;
@@ -42867,18 +42956,18 @@
             // rebuilt when the shown numbers change.
             _strafePillEl: null,
             _strafePillState: null,
-            _pillPct: -1, _pillErr: -1, _pillAir: null,
+            _pillPct: -1, _pillErr: -1, _pillAir: null, _pillGun: null,
             updateRecoilTrainerMovement: function() {
                 const pill = this._strafePillEl || (this._strafePillEl = document.getElementById('recoil-strafe-pill'));
                 if (!pill) return;
                 const w = game.weapons[game.activeWeapon];
-                const def = w && w.def;
-                const err = def ? gunplay.moveError(def) : 0;
+                const def = w && !w.isMelee ? w.def : null;
+                const err = gunplay.appliedMoveError(def);   // with ADS and crouch, as a shot gets it
                 const pct = Math.min(250, Math.round(gunplay.frac * 20) * 5);   // 5% steps
                 const errTenths = Math.round(err * 1800 / Math.PI);   // tenths of a degree
                 const air = !characterController.grounded;
-                if (pct === this._pillPct && errTenths === this._pillErr && air === this._pillAir) return;
-                this._pillPct = pct; this._pillErr = errTenths; this._pillAir = air;
+                if (pct === this._pillPct && errTenths === this._pillErr && air === this._pillAir && def === this._pillGun) return;
+                this._pillPct = pct; this._pillErr = errTenths; this._pillAir = air; this._pillGun = def;
                 const accurate = err === 0;
                 this._strafePillState = accurate;
                 pill.textContent = accurate ? `ACCURATE ${pct}%`
@@ -42967,16 +43056,18 @@
                         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
                     }
                     ctx.stroke();
-                    // Current random error around the crosshair (movement + the gun's own)
-                    const err = (wpn.def.first || 0) + gunplay.moveError(def);
+                    // Current random error around the crosshair (movement, with ADS and
+                    // crouch as a shot gets it, + the gun's own first-shot error)
+                    const moveErr = gunplay.appliedMoveError(def);
+                    const err = (def.first || 0) + moveErr;
                     const r = Math.min(52, Math.max(1.5, err * S));
-                    ctx.strokeStyle = err > (wpn.def.first || 0) + 1e-6 ? 'rgba(255, 70, 85, 0.6)' : 'rgba(43, 240, 165, 0.55)';
+                    ctx.strokeStyle = moveErr > 1e-6 ? 'rgba(255, 70, 85, 0.6)' : 'rgba(43, 240, 165, 0.55)';
                     ctx.beginPath();
                     ctx.arc(cx, cy, r, 0, Math.PI * 2);
                     ctx.stroke();
                     ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
                     ctx.font = '8px monospace';
-                    ctx.fillText(def.hud.toUpperCase(), 4, 10);
+                    ctx.fillText(def.hudUpper || def.hud, 4, 10);
                 }
 
                 // Plot the bullets of the current spray

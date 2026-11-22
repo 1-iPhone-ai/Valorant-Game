@@ -323,6 +323,14 @@ test('Match and Ranked: one primary + one sidearm + knife on the credit ladder; 
     assert.deepEqual(start.swap, [350, null, 'frenzy', 'pistol'], 'a sidearm replaces the sidearm (the one bought this round is sold back)');
     assert.deepEqual(start.sold, [800, null, 'classic', 'pistol'], 'selling it back returns the money and the Classic');
     assert.deepEqual(start.noOverclock, [800, false], 'no overclocks in a Match');
+    const targetCreds = await evaluate(() => {
+        const t = targetObjects.find((x) => x.active && !x.hit);
+        if (!t) return null;
+        const c0 = game.creds;
+        damageTargetActor(t, 9999, performance.now(), Date.now(), 'Test', t.leaves[0]);
+        return game.creds - c0;
+    });
+    assert.ok(targetCreds === null || targetCreds === 0, `practice targets pay no creds in a Match (${targetCreds})`);
 
     // Live: no buying. Kill 4 of the 5 defenders, then die: the pistol round is lost
     await skipPhase();
@@ -349,16 +357,21 @@ test('Match and Ranked: one primary + one sidearm + knife on the credit ladder; 
     // Even the best lost pistol round (no buys, 4 of 5 killed) stays under rifle + heavy armour
     assert.ok(800 + 4 * 200 + 1900 < 2900 + 1000);
     assert.ok(lost.dead);
+    // A buy menu opened during the post-round pause shows buying open again in the next buy phase
+    await evaluate(() => tacticalDirector.toggleBuyMenu(true));
     await skipPhase();
     await frames(3);
     const r2 = await evaluate(() => {
         const out = { round: matchMode.round, phase: matchMode.phase, creds: game.creds };
+        out.banner = document.getElementById('buy-menu-mode').textContent;
+        tacticalDirector.toggleBuyMenu(false);
         tacticalDirector.purchaseItem('gun:vandal');
         tacticalDirector.purchaseItem('heavy_shield');
         out.after = [game.creds, loadout.primary, game.shield];
         return out;
     });
     assert.deepEqual([r2.round, r2.phase], [2, 'buy']);
+    assert.match(r2.banner, /BUY PHASE/, 'the open buy menu refreshed for the new buy phase');
     assert.equal(r2.creds, 800 + lost.killed * 200 + 1900, 'loss bonus 1900');
     assert.ok(r2.creds < 2900 + 1000, 'after losing the pistol round a rifle and heavy armour are out of reach');
     assert.ok(r2.after[1] !== 'vandal' || r2.after[2] < 50, `not both (${r2.after})`);
@@ -444,12 +457,133 @@ test('Match and Ranked: one primary + one sidearm + knife on the credit ladder; 
     await frames(3);
     const rush = await evaluate(() => {
         const g = spikeRush.gun;
+        game.creds = 9000;
         tacticalDirector.purchaseItem(g[1] === 'vandal' ? 'gun:odin' : 'gun:vandal');
         cycleWeaponVariant();
+        for (const up of ['upgrade_rifle', 'upgrade_sniper', 'upgrade_pistol']) tacticalDirector.purchaseItem(up);
+        tacticalDirector.toggleBuyMenu(true);
+        const hidden = document.getElementById('buy-col-upgrades').classList.contains('hidden-in-match');
+        tacticalDirector.toggleBuyMenu(false);
         const w = game.weapons[g[0]];
-        return { mode: loadout.mode(), kept: w.gunId === g[1] };
+        return { mode: loadout.mode(), kept: w.gunId === g[1] && game.activeWeapon === g[0], creds: game.creds, hidden };
     });
-    assert.deepEqual(rush, { mode: 'locked', kept: true });
+    assert.deepEqual(rush, { mode: 'locked', kept: true, creds: 9000, hidden: true }, 'Spike Rush: no gun changes, overclocks included');
+    const [programs, watermark] = await programState(page);
+    assert.equal(programs, watermark);
+    assert.deepEqual(errors, []);
+});
+
+test('gunplay details: held ADS bursts start fresh, a new gun starts a new spray, the first shot after a reset leaves from the crosshair, long sprays keep swaying, a cancelled reload never refills later, High Detail hides what a gun replaces, muzzles sit at the barrel end', { timeout: 400000 }, async () => {
+    const { page, errors, frames, evaluate } = await boot({ quality: 'medium' });
+    await page.addScriptTag({ content: HELPERS });
+    const r = await evaluate(() => {
+        const out = {};
+        // Bulldog ADS bursts at their cadence: every burst starts at the first bullet and kicks
+        equipGun('bulldog'); __reset(0);
+        const bd = game.weapons.rifle;
+        game.adsActive = true; game.adsProgress = 1;
+        out.bursts = [];
+        for (let b = 0; b < 5; b++) {
+            bd.ammo = bd.maxAmmo;
+            const p0 = camera.rotation.x;
+            game.lastShot = b === 0 ? 0 : Date.now() - 400;
+            const seq = gunplay.traceSeq;
+            shoot();
+            out.bursts.push([gunplay.lastShots(gunplay.traceSeq - seq)[0].idx, +((camera.rotation.x - p0) * __deg).toFixed(2)]);
+        }
+        game.adsActive = false; game.adsProgress = 0;
+        // Switching guns: the Sheriff's first shot after a Vandal spray is its own first shot
+        __spray('vandal', 12, 0);
+        equipGun('vandal'); __reset(0);
+        const v = game.weapons.rifle;
+        for (let i = 0; i < 12; i++) { v.ammo = v.maxAmmo; game.lastShot = i === 0 ? 0 : Date.now() - v.fireRate; shoot(); }
+        switchWeapon('pistol');
+        // Past the Sheriff's 225 ms cadence but well inside a continuing spray's window
+        game.lastShot = Date.now() - 260;
+        game.weapons.pistol.ammo = game.weapons.pistol.maxAmmo;
+        shoot();
+        out.switchIdx = gunplay.lastShots(1)[0].idx;
+        out.switchErr = gunplay.lastErr * __deg;
+        // Infinite ammo: a long held spray keeps swaying
+        game.userSettings.infiniteAmmo = true;
+        // 60 bullets (the shot trace keeps 64): well past the magazine and the old table end
+        const long = __spray('vandal', 60, 0);
+        game.userSettings.infiniteAmmo = false;
+        const tail = long.slice(36).map((p) => p[0]);
+        out.longSway = Math.max(...tail) - Math.min(...tail);
+        // Muzzles: at the end of the suppressor / long barrel; back for the plain gun
+        equipGun('spectre'); out.spectreMuzzle = game.weapons.rifle.muzzleFlash.position.z;
+        equipGun('guardian'); out.guardianMuzzle = game.weapons.rifle.muzzleFlash.position.z;
+        equipGun('ghost'); out.ghostMuzzle = game.weapons.pistol.muzzleFlash.position.z;
+        equipGun('vandal'); out.vandalMuzzle = game.weapons.rifle.muzzleFlash.position.z;
+        out.star = muzzleStar.cards.rifle ? muzzleStar.cards.rifle.position.z : null;
+        return out;
+    });
+    for (const [idx, kick] of r.bursts) {
+        assert.equal(idx, 0, `each ADS burst starts at the first bullet (${JSON.stringify(r.bursts)})`);
+        assert.ok(kick > 1, `and kicks like the first one (${kick}°)`);
+    }
+    assert.equal(r.switchIdx, 0, 'a gun taken out starts a fresh spray');
+    assert.ok(r.switchErr < 0.11, `with its first-shot accuracy (${r.switchErr.toFixed(3)}°)`);
+    assert.ok(r.longSway > 1.5, `a long infinite-ammo spray still sways (${r.longSway.toFixed(2)}°)`);
+    assert.deepEqual([r.spectreMuzzle, r.guardianMuzzle, r.ghostMuzzle, r.vandalMuzzle, r.star], [-0.9, -0.97, -0.5, -0.7, -0.7]);
+
+    // The first shot after the reset time leaves exactly from the crosshair (recovery is done)
+    await evaluate(() => {
+        equipGun('vandal'); __reset(0);
+        const v = game.weapons.rifle;
+        for (let i = 0; i < 10; i++) { v.ammo = v.maxAmmo; game.lastShot = i === 0 ? 0 : Date.now() - v.fireRate; shoot(); }
+        game.lastShot = Date.now() - GUN_DEFS.vandal.reset - 20;
+    });
+    await frames(3);
+    const clean = await evaluate(() => {
+        const out = { accum: [game.recoilAccumPitch, game.recoilAccumYaw] };
+        camera.updateMatrixWorld();
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const fy = Math.atan2(-fwd.x, -fwd.z), fp = Math.asin(fwd.y);
+        const v = game.weapons.rifle; v.ammo = v.maxAmmo;
+        shoot();
+        const s = gunplay.lastShots(1)[0];
+        out.idx = s.idx;
+        out.off = Math.hypot(s.yaw - fy, s.pitch - fp) * __deg;
+        return out;
+    });
+    assert.ok(Math.abs(clean.accum[0]) < 1e-9 && Math.abs(clean.accum[1]) < 1e-9, `the recoil is fully back by the reset time (${clean.accum})`);
+    assert.equal(clean.idx, 0);
+    assert.ok(clean.off < 0.06, `the first shot after a reset leaves from the crosshair (${clean.off.toFixed(3)}°)`);
+
+    // A reload cancelled by taking another gun never refills that gun later
+    await evaluate(() => {
+        __reset(0);
+        equipGun('odin');
+        game.weapons.rifle.ammo = 10;
+        reload();
+        tacticalDirector.purchaseItem('gun:stinger');
+        game.weapons.rifle.ammo = 3;
+    });
+    await page.waitForTimeout(5400);
+    assert.deepEqual(await evaluate(() => [game.weapons.rifle.gunId, game.weapons.rifle.ammo, game.reloading]), ['stinger', 3, false], 'the Odin reload timer did not refill the Stinger');
+
+    // High Detail: the detail parts a new gun replaces are hidden while it is out
+    await evaluate(() => { setQualitySettings('high'); document.querySelector('#setting-char-detail-pills [data-chardetail="on"]').click(); });
+    await frames(4);
+    const hd = await evaluate(() => {
+        const out = {};
+        const kitOf = (slot) => viewmodelKits.detailKit(game.weapons[slot], slot);
+        equipGun('spectre'); out.spectre = [kitOf('rifle').children[19].visible, kitOf('rifle').children[7].visible, kitOf('rifle').children[0].visible];
+        equipGun('odin'); out.odin = kitOf('rifle').children.slice(0, 15).every((c) => !c.visible) && kitOf('rifle').children[19].visible;
+        equipGun('vandal'); out.vandal = kitOf('rifle').children.every((c) => c.visible);
+        equipGun('bandit'); out.bandit = [kitOf('pistol').children[4].visible, kitOf('pistol').children[0].visible];
+        equipGun('sheriff'); out.sheriff = kitOf('pistol').children.every((c) => c.visible);
+        out.enabled = characterDetail.enabled;
+        return out;
+    });
+    assert.ok(hd.enabled, 'High Detail is on');
+    assert.deepEqual(hd.spectre, [false, false, true], 'Spectre: no detail butt pad or muzzle brake, handguard kept');
+    assert.ok(hd.odin, 'Odin: its jacket and cover replace the handguard, vents, brake and rail');
+    assert.ok(hd.vandal, 'the plain Vandal shows every detail part');
+    assert.deepEqual(hd.bandit, [false, true], 'Bandit: its grip panel replaces the detail one');
+    assert.ok(hd.sheriff);
     const [programs, watermark] = await programState(page);
     assert.equal(programs, watermark);
     assert.deepEqual(errors, []);
