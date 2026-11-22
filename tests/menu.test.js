@@ -91,7 +91,9 @@ test('start screen: game paused under an orbiting camera; keyboard menus; agent 
 
 test('controller drives the menu (Start pauses, D-pad and A select, B backs out); Skip Menu On Start is remembered', { timeout: 400000 }, async () => {
     const { page, errors, frames, evaluate } = await boot({ quality: 'low', menu: true, initScript: fakePad });
-    const press = async (i) => { await evaluate((i) => __press(i, true), i); await frames(2); await evaluate((i) => __press(i, false), i); await frames(2); };
+    // Held for one frame: a D-pad held past 380 ms auto-repeats, and on a slow software-rendered
+    // frame (the walled Ascent behind the menu) a two-frame hold could pass that
+    const press = async (i) => { await evaluate((i) => __press(i, true), i); await frames(1); await evaluate((i) => __press(i, false), i); await frames(2); };
     assert.equal(await evaluate(() => mainMenu.open), true);
     // D-pad to MODES, then A (start screen: PLAY, MODES, SETTINGS, CONTROLS; AGENT SELECT is hidden).
     // Steer from either side: a held D-pad auto-repeats, so a slow frame can move twice.

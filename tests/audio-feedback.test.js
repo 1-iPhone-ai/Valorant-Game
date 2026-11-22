@@ -28,6 +28,9 @@ async function instrumentAudio(evaluate) {
 test('3D audio: panner routing, wall occlusion, listener tracking, enemy gunfire and footsteps', { timeout: 300000 }, async () => {
     const { page, errors, frames, evaluate } = await boot();
     assert.ok(await instrumentAudio(evaluate), 'AudioContext available');
+    // The player cannot die during the test: a respawn would move the listener (bots hunt the
+    // player round the walls of V1.8 Ascent and reach the courtyard while it runs)
+    await evaluate(() => { window.__keepAlive = setInterval(() => { game.health = 100; game.shield = 50; }, 20); });
 
     // A sound in the open: one panner at the source position, no occlusion filter
     const open = await evaluate(() => {
@@ -99,8 +102,12 @@ test('3D audio: panner routing, wall occlusion, listener tracking, enemy gunfire
         }
         return evaluate(() => window.__steps);
     };
+    // The walks place the enemies themselves: their AI is paused meanwhile (a bot far from the
+    // player patrols round its own spawn, which on V1.8 Ascent can be within 22 m of here)
+    await evaluate(() => { window.__ue = window.updateEnemies; window.updateEnemies = () => {}; });
     assert.ok((await walk(9.5)) >= 1, 'nearby enemies make footsteps');
     assert.equal(await walk(-45), 0, 'enemies beyond 22 m are silent');
+    await evaluate(() => { window.updateEnemies = window.__ue; clearInterval(__keepAlive); });
 
     const [programs, watermark] = await programState(page);
     assert.equal(programs, watermark);
