@@ -4,6 +4,11 @@ name: Game regression tests
 # "(V1.x) valorant-fps.html" and checks: clean load, no shader compiles after
 # warm-up, every agent ability and ultimate, all maps and atmosphere modes,
 # quality switching, and controller input (simulated gamepad).
+#
+# The suite takes over an hour in one go, so it runs as four parallel shards
+# (Node's --test-shard deals the test files out in turn, 9 each); each shard
+# keeps the 45 minute limit. The "test" job reports the combined result under
+# the same check name as before.
 on:
   pull_request:
   push:
@@ -11,9 +16,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  shard:
+    name: shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     defaults:
       run:
         working-directory: tests
@@ -26,4 +36,14 @@ jobs:
           cache-dependency-path: tests/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm test
+      - run: npm test -- --test-shard=${{ matrix.shard }}/4
+
+  test:
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: All shards passed
+        run: |
+          echo "shards: ${{ needs.shard.result }}"
+          test "${{ needs.shard.result }}" = "success"
