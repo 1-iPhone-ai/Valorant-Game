@@ -108,6 +108,9 @@ test('daily challenges: three a day, the same all day, new ones the next day; fi
         out.repeatable = progression.daily.list.map((c) => c.id).join() === day1.join();
         // A slide challenge: real slides count, the tenth completes it and pays 400 XP
         progression.daily.list = [{ id: 'slide10', progress: 0, done: false }, { id: 'kills15', progress: 0, done: false }, { id: 'defuse1', progress: 0, done: false }];
+        // Sprint-and-slide runs need a long straight: Bind's open band at z = 32 (props off)
+        tacticalDirector.cycleMapPreset('bind');
+        game.userSettings.breakables = false; breakables.applyEnabled();
         const cc = characterController;
         const before = progression.totalXp;
         for (let i = 0; i < 10; i++) {

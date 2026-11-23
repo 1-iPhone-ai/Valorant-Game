@@ -39,11 +39,12 @@ test('Wave mode: kills advance the wave; plant, enemy defuse and detonation work
     }
     assert.ok((await evaluate(() => game.roundNumber)) > r0, 'clearing the quota starts the next wave');
 
-    await evaluate(() => { __standAt(0, -22); game.keys.f = true; });
-    assert.ok(await until(() => { __standAt(0, -22); return tacticalDirector.spikeState === 'planted'; }), 'holding F on Site A plants the spike');
+    // (the map's own site A: V1.8 Ascent has it in the north building)
+    await evaluate(() => { const a = tacticalDirector.spikeSites.A.pos; __standAt(a.x, a.z); game.keys.f = true; });
+    assert.ok(await until(() => { const a = tacticalDirector.spikeSites.A.pos; __standAt(a.x, a.z); return tacticalDirector.spikeState === 'planted'; }), 'holding F on Site A plants the spike');
     await evaluate(() => { game.keys.f = false; });
 
-    await evaluate(() => { const e = enemyObjects.find((x) => x.isActive && !x.hit); e.mesh.position.set(1, 0, -22); e.blindedUntil = 0; });
+    await evaluate(() => { const a = tacticalDirector.spikeSites.A.pos, e = enemyObjects.find((x) => x.isActive && !x.hit); e.mesh.position.set(a.x + 1, 0, a.z); e.blindedUntil = 0; });
     assert.ok(await until(() => tacticalDirector.enemyDefuseProgress > 0, null, 120), 'an enemy on site starts defusing');
 
     const r1 = await evaluate(() => game.roundNumber);
@@ -66,7 +67,7 @@ test('Retake mode: defuse wins and moves sites, 50% checkpoint holds, detonation
 
     await evaluate(() => { __killAll(); const p = tacticalDirector.activeSpikeSitePos; __standAt(p.x, p.z); game.keys.f = true; });
     await until(() => { const p = tacticalDirector.activeSpikeSitePos; __standAt(p.x, p.z); return tacticalDirector.spikeDefuseProgress >= 0.55; });
-    await evaluate(() => { game.keys.f = false; __standAt(0, 0); });
+    await evaluate(() => { game.keys.f = false; __standAt(-8, 11); });   // off the site (the mid courtyard)
     await frames(10);
     assert.ok((await evaluate(() => tacticalDirector.spikeDefuseProgress)) >= 0.5, 'progress past 50% is kept after letting go');
 

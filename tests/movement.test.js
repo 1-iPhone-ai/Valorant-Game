@@ -10,6 +10,12 @@ after(closeBrowser);
 const HELPERS = () => {
     window.updateEnemies = () => {};
     const cc = characterController;
+    // A sprint and slide cover 50-100 m: the open band at z = 32 on Bind is clear for 96 m
+    // (V1.8 Ascent is walled lanes, nothing that long and straight); props off
+    window.__openBand = () => {
+        tacticalDirector.cycleMapPreset('bind');
+        game.userSettings.breakables = false; breakables.applyEnabled();
+    };
     window.__mv = {
         place(x, z, yaw) {
             cc.reset();
@@ -29,6 +35,7 @@ const HELPERS = () => {
 test('slide: crouch while sprinting slides low and fast, ends on its own, has a cooldown, keeps speed into a jump, tilts the view and can be turned off', { timeout: 300000 }, async () => {
     const { page, errors, evaluate } = await boot({ quality: 'medium' });
     await evaluate(HELPERS);
+    await evaluate(() => __openBand());
     const r = await evaluate(() => {
         const cc = characterController, mv = __mv, out = {};
         const sprintTop = cc.terminalSpeed(cc.sprintSpeed);
@@ -167,6 +174,7 @@ test('mantle: jumping into a chest-high ledge climbs onto it; too high or Mantle
 test('air movement: momentum carries further in the air than on the ground, you can steer, and you never gain speed', { timeout: 300000 }, async () => {
     const { errors, evaluate } = await boot({ quality: 'medium' });
     await evaluate(HELPERS);
+    await evaluate(() => __openBand());
     const r = await evaluate(() => {
         const cc = characterController, mv = __mv, out = {};
         // Coast on the ground: release W at full sprint

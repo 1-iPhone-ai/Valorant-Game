@@ -5,7 +5,8 @@ const { boot, closeBrowser, programState } = require('./harness');
 
 after(closeBrowser);
 
-// Close-combat setup on Ascent: player south of the mid tower, two bots in front.
+// Close-combat setup on Ascent: player at the south edge of the mid courtyard, two
+// bots in front of it by the crate stacks (V1.8 layout).
 // The player cannot die, and every enemy shot is logged with the shooter's state.
 async function setup() {
     const ctx = await boot({ quality: 'low' });
@@ -15,10 +16,10 @@ async function setup() {
         window.__shots = [];
         const realShoot = enemyShoot;
         window.enemyShoot = (e) => { window.__shots.push({ slot: e.slot, state: e.aiState }); return realShoot(e); };
-        window.__god = setInterval(() => { game.health = 100; game.shield = 50; characterController.position.set(0, 1.7, 22); }, 50);
+        window.__god = setInterval(() => { game.health = 100; game.shield = 50; characterController.position.set(0, 1.7, 12.5); }, 50);
         window.__bots = enemyObjects.filter((e) => e.isActive && !e.hit).sort((a, b) => a.slot - b.slot);
         __bots.forEach((e, i) => {
-            e.mesh.position.set(i ? 7 : -7, 0, 11);
+            e.mesh.position.set(i ? 9 : -9, 0, -0.5);
             e.position.x = e.mesh.position.x; e.position.z = e.mesh.position.z;
             e.health = e.maxHealth; e.poseDirty = true;
             enemyTactics.reset(e);
@@ -66,11 +67,11 @@ test('a hurt bot takes cover out of sight, peeks to shoot, and never fires while
 
 test('pairs: the second bot flanks while its partner engages, and takes cover when the partner dies', { timeout: 300000 }, async () => {
     const { page, errors, evaluate } = await setup();
-    const start = await evaluate(() => { const p = __bots[1].mesh.position; return Math.atan2(p.x, p.z - 22); });
+    const start = await evaluate(() => { const p = __bots[1].mesh.position; return Math.atan2(p.x, p.z - 12.5); });
     await page.waitForFunction(() => __bots[1].aiState === 'flank', null, { timeout: 90000, polling: 50 });
     const flank = await evaluate(() => ({ x: __bots[1].flankX, z: __bots[1].flankZ, odd: (__bots[1].slot & 1) === 1 }));
     assert.ok(flank.odd, 'the flanker is the odd slot of its pair');
-    let turn = Math.abs(Math.atan2(flank.x, flank.z - 22) - start);
+    let turn = Math.abs(Math.atan2(flank.x, flank.z - 12.5) - start);
     if (turn > Math.PI) turn = 2 * Math.PI - turn;
     assert.ok(turn > 0.8, `the flank target swings round the player (${(turn * 57.3).toFixed(0)} degrees)`);
 

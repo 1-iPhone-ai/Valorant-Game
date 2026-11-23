@@ -33,7 +33,7 @@ test('Cinematic: above Ultra, never picked by Auto, post passes compiled in the 
         auto: qualityController.auto, quality: adaptiveSettings.currentQuality, post: postFX.enabled,
         passesReady: postFX.ready, pill: !!document.querySelector('#settings-quality-pills [data-quality="cinematic"]')
     }));
-    assert.deepEqual(s.levels, ['low', 'medium', 'high', 'ultra', 'cinematic']);
+    assert.deepEqual(s.levels, ['low', 'medium', 'high', 'ultra', 'cinematic', 'ultraRealism']);   // V1.8: Ultra Realism above it
     assert.equal(s.auto, true);
     assert.notEqual(s.quality, 'cinematic');
     assert.equal(s.post, false, 'post-processing is off unless Cinematic is chosen');

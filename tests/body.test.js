@@ -44,8 +44,9 @@ test('walk, stand, jump and crouch poses; the body casts a shadow; no new shader
         const out = {};
         const cc = characterController;
         const step = (dx, n) => { for (let i = 0; i < n; i++) { camera.position.x += dx; playerBody.update(1 / 60); } };
-        camera.position.set(0, 1.7, 22); camera.rotation.set(0, 0, 0, 'YXZ');
-        playerBody.lastX = 0; playerBody.lastZ = 22;
+        // V1.8 Ascent: a sunlit patch of the mid courtyard (the 8 m walls shade its edges)
+        camera.position.set(-11, 1.7, 4); camera.rotation.set(0, 0, 0, 'YXZ');
+        playerBody.lastX = -11; playerBody.lastZ = 4;
         cc.grounded = true; cc.height = 1.7;
         // Walking (6 m/s): legs swing in opposite directions
         let maxSwing = 0, opposite = true;

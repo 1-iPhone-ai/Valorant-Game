@@ -35,20 +35,33 @@ test('PlayStation pad: detection, analog movement, look, fire, ADS, menus', { ti
     const { page, errors, frames, evaluate, press } = await bootWithPad('DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)');
     assert.equal(await evaluate(() => gamepadController.family), 'playstation');
 
-    // Analog speed: half tilt (after deadzone rescale) moves at half speed. Open lane, facing +X.
+    // Analog speed: half tilt (after deadzone rescale) moves at half speed. Open lane (V1.8 Ascent:
+    // A Main, through its chokepoint; props off), facing +X.
+    await evaluate(() => {
+        game.userSettings.breakables = false; breakables.applyEnabled();
+        // The bots wait in the defender spawn, out of the lane, until the speed check is done
+        window.__updateEnemies = window.updateEnemies; window.updateEnemies = () => {};
+        for (const e of enemyObjects) if (e.isActive && !e.hit) { e.mesh.position.set(44, 0, 4 + e.slot * 1.5); e.poseDirty = true; syncEnemyBroadphase(e); }
+    });
+    // The lane is 45 m and slow software frames can carry the run further than that before
+    // it is measured, so the player steps back 20 m whenever it nears the far end and the
+    // steady running speed is read from the controller
     const speed = async (axis) => {
-        await evaluate(() => { characterController.position.set(-40, 1.7, 40); characterController.prevSimPosition.copy(characterController.position); characterController.velocity.set(0, 0, 0); camera.rotation.set(0, -Math.PI / 2, 0); });
+        await evaluate(() => {
+            characterController.position.set(-40, 1.7, -37); characterController.prevSimPosition.copy(characterController.position); characterController.velocity.set(0, 0, 0); camera.rotation.set(0, -Math.PI / 2, 0);
+            window.__hold = setInterval(() => { const cc = characterController; if (cc.position.x > -22) { cc.position.x -= 20; cc.prevSimPosition.x -= 20; } }, 4);
+        });
         await frames(3);
         await evaluate((a) => { __pad.axes[1] = a; }, axis);
         await frames(6);
-        const a0 = await evaluate(() => ({ x: characterController.position.x, t: simClock }));
-        await frames(10);
-        const a1 = await evaluate(() => ({ x: characterController.position.x, t: simClock }));
-        await evaluate(() => { __pad.axes[1] = 0; });
+        const v = [];
+        for (let i = 0; i < 5; i++) { await frames(2); v.push(await evaluate(() => Math.hypot(characterController.velocity.x, characterController.velocity.z))); }
+        await evaluate(() => { __pad.axes[1] = 0; clearInterval(__hold); });
         await frames(4);
-        return Math.abs(a1.x - a0.x) / (a1.t - a0.t);
+        return v.reduce((a, b) => a + b, 0) / v.length;
     };
     const ratio = (await speed(-0.56)) / (await speed(-1));
+    await evaluate(() => { window.updateEnemies = window.__updateEnemies; });
     assert.ok(Math.abs(ratio - 0.5) < 0.08, `half tilt should be ~half speed (got ${ratio.toFixed(2)})`);
     assert.equal(await evaluate(() => game.keys.w), false, 'stick release clears movement keys');
     assert.deepEqual(await evaluate(() => Array.from(document.querySelectorAll('#ability-bar .ability-key')).map((e) => e.textContent)), ['D←', 'L1', 'R1', 'D↑']);
@@ -62,7 +75,7 @@ test('PlayStation pad: detection, analog movement, look, fire, ADS, menus', { ti
     assert.ok((await evaluate(() => camera.rotation.y)) < yaw0 - 0.1, 'right stick turns right');
 
     // Fire (automatic) and release
-    await evaluate(() => { characterController.position.set(0, 1.7, 30); characterController.prevSimPosition.copy(characterController.position); camera.rotation.set(0, 0, 0); switchWeapon('rifle'); });
+    await evaluate(() => { characterController.position.set(0, 1.7, 12.5); characterController.prevSimPosition.copy(characterController.position); camera.rotation.set(0, 0, 0); switchWeapon('rifle'); });
     await frames(4);
     const ammo0 = await evaluate(() => game.weapons.rifle.ammo);
     await evaluate(() => __press(7, true));
@@ -135,11 +148,11 @@ test('Xbox pad is detected as Xbox (not PlayStation) and aim assist only slows',
     const r = await evaluate(() => {
         const e = enemyObjects.find((x) => x.isActive && !x.hit);
         const place = (yaw) => {
-            characterController.position.set(0, 1.7, 30);
-            camera.position.set(0, 1.7, 30);
+            characterController.position.set(8, 1.7, 12.5);   // the mid courtyard, nothing in between
+            camera.position.set(8, 1.7, 12.5);
             camera.rotation.set(0, yaw, 0);
             camera.updateMatrixWorld();
-            e.mesh.position.set(0, 0, 18);
+            e.mesh.position.set(8, 0, 2.5);
             e.mesh.updateMatrixWorld();
         };
         const turn = (assist) => {
