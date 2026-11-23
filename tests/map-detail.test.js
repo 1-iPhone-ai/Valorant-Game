@@ -5,21 +5,35 @@ const { boot, closeBrowser, programState } = require('./harness');
 
 after(closeBrowser);
 
-// Mean luminance of one fixed view, rendered on demand
-const meanLuma = (evaluate, view) => evaluate((v) => {
+// Mean luminance of one fixed view with High Detail Maps on, then off: [on, off].
+// Both frames are rendered in one call, so nothing in the running game (bots
+// moving or shooting, gunfire lights, the player dying or respawning) can change
+// between them, and the shadow map is redrawn for each so the props' shadows
+// match the setting. Sampled in two calls, the game ran in between and the pair
+// differed by up to 20% on CI (a different map each run) while the setting itself
+// changes brightness by only 1-4%.
+const lumaOnOff = (evaluate, view) => evaluate((v) => {
     const [x, y, z, yaw, pitch] = v;
-    camera.position.set(x, y, z);
-    camera.rotation.set(pitch, yaw, 0);
-    camera.updateMatrixWorld();
-    renderer.clear();
-    renderer.render(scene, camera);
-    const gl = renderer.getContext();
-    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
-    const px = new Uint8Array(w * h * 4);
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    let sum = 0;
-    for (let i = 0; i < px.length; i += 4) sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
-    return sum / (w * h);
+    const meanLuma = () => {
+        camera.position.set(x, y, z);
+        camera.rotation.set(pitch, yaw, 0);
+        camera.updateMatrixWorld();
+        if (renderer.shadowMap.enabled && !shadowManager.suspended) renderer.shadowMap.needsUpdate = true;
+        renderer.clear();
+        renderer.render(scene, camera);
+        const gl = renderer.getContext();
+        const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+        const px = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        let sum = 0;
+        for (let i = 0; i < px.length; i += 4) sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+        return sum / (w * h);
+    };
+    const on = meanLuma();
+    mapHiDetail.set(false);
+    const off = meanLuma();
+    mapHiDetail.set(true);
+    return [on, off];
 }, view);
 
 test('High Detail Maps is off by default and costs nothing until enabled', { timeout: 240000 }, async () => {
@@ -63,10 +77,7 @@ test('High Detail Maps on every map: props and textures, no shader compiles, sam
         assert.equal(m.surfaced, m.pieces, `${map}: every map piece has a surface`);
         // Textures add detail, not an overall brightness shift
         const view = [0, 1.7, 30, 0, 0.05];
-        const lumOn = await meanLuma(evaluate, view);
-        await evaluate(() => mapHiDetail.set(false));
-        const lumOff = await meanLuma(evaluate, view);
-        await evaluate(() => mapHiDetail.set(true));
+        const [lumOn, lumOff] = await lumaOnOff(evaluate, view);
         assert.ok(Math.abs(lumOn - lumOff) / lumOff < 0.15, `${map}: brightness ${lumOff.toFixed(1)} -> ${lumOn.toFixed(1)}`);
         const [programs, watermark, stalls] = await programState(page);
         assert.equal(programs, watermark, `${map}: no new shader programs`);
