@@ -62,6 +62,11 @@ test('settings are remembered across reloads by default, and the opt-out sticks'
     await page.evaluate(() => localStorage.clear());
     await reload();
     assert.equal(await page.evaluate(() => game.userSettings.localStorageEnabled), true, 'saving is on by default');
+    // V1.9: the FPS graph is off for a new player, and a saved choice still loads
+    assert.equal(await page.evaluate(() => game.userSettings.showSparkline), false, 'FPS graph off by default');
+    await page.evaluate(() => { game.userSettings.showSparkline = true; settingsManager.saveToStorage(); });
+    await reload();
+    assert.equal(await page.evaluate(() => game.userSettings.showSparkline), true, 'a saved FPS graph setting is kept');
     await page.evaluate(() => {
         game.userSettings.atmosphereMode = 'night';
         game.userSettings.brightness = 125;
@@ -83,8 +88,9 @@ test('settings are remembered across reloads by default, and the opt-out sticks'
 
 // V1.7 HUD Size: every panel scales together, nothing overlaps or leaves the
 // window at any size, and the size is capped on small windows
+// V1.9: the weapon list (now at the right edge) is checked too
 const PANELS = ['#minimap-container', '#tactical-top-bar', '#fps-display', '#quality-toggle', '#fps-sparkline-widget',
-    '#controls-hint-box', '#ability-bar', '#agent-switcher-bar', '.vitals-panel', '.ammo-display', '.score', '#kill-feed'];
+    '#controls-hint-box', '#ability-bar', '#agent-switcher-bar', '.vitals-panel', '.ammo-display', '#weapon-selector', '.score', '#kill-feed'];
 test('HUD Size 80-130%: panels scale together with no overlaps at 1280x720, 1920x1080 and 1024x600', { timeout: 600000 }, async () => {
     for (const [w, h] of [[1280, 720], [1920, 1080], [1024, 600]]) {
         const { page, errors, evaluate } = await boot({ viewport: { width: w, height: h } });
@@ -111,8 +117,18 @@ test('HUD Size 80-130%: panels scale together with no overlaps at 1280x720, 1920
                     if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) overlaps.push(`${keys[i]} x ${keys[j]}`);
                 }
                 const offscreen = keys.filter((k) => rects[k].left < -1 || rects[k].top < -1 || rects[k].right > innerWidth + 1 || rects[k].bottom > innerHeight + 1);
+                // V1.9 clear zone: nothing permanent between the left and right columns from 20%
+                // to 85% of the height (the help panel, agent strip and kill feed come and go)
+                const left = ['#minimap-container', '.vitals-panel', '#fps-display', '#quality-toggle', '#fps-sparkline-widget'].filter((k) => rects[k]).map((k) => rects[k].right);
+                const right = ['#weapon-selector', '.score'].filter((k) => rects[k]).map((k) => rects[k].left);
+                const zone = { left: Math.max(...left), right: Math.min(...right), top: innerHeight * 0.2, bottom: innerHeight * 0.85 };
+                const inZone = keys.filter((k) => !['#controls-hint-box', '#agent-switcher-bar', '#kill-feed'].includes(k))
+                    .filter((k) => rects[k].left < zone.right && zone.left < rects[k].right && rects[k].top < zone.bottom && zone.top < rects[k].bottom);
+                const rowTop = document.querySelector('.center-hud-column').getBoundingClientRect().top;
+                // every weapon name fits its row
+                const cutNames = Array.from(document.querySelectorAll('#weapon-selector .weapon-name')).filter((n) => n.scrollWidth > n.clientWidth + 0.5).map((n) => n.textContent);
                 return {
-                    overlaps, offscreen, scale: hudScale.value(),
+                    overlaps, offscreen, inZone, cutNames, rowTall: innerHeight - rowTop, scale: hudScale.value(),
                     minimap: document.getElementById('minimap-container').getBoundingClientRect().width,
                     saved: JSON.parse(localStorage.getItem('valorant_v16_user_settings') || '{}').hudScale
                 };
@@ -120,10 +136,82 @@ test('HUD Size 80-130%: panels scale together with no overlaps at 1280x720, 1920
             const tag = `${w}x${h} @ ${pct}%`;
             assert.deepEqual(r.overlaps, [], `${tag}: no overlapping panels`);
             assert.deepEqual(r.offscreen, [], `${tag}: everything on screen`);
+            assert.deepEqual(r.inZone, [], `${tag}: nothing permanent in the middle of the screen`);
+            assert.deepEqual(r.cutNames, [], `${tag}: weapon names fit`);
+            // V1.9: one bottom row, at most 96 px tall with its margin at the reference size
+            assert.ok(r.rowTall <= 96 * r.scale + 0.5, `${tag}: bottom row ${r.rowTall.toFixed(1)} px tall`);
             assert.ok(Math.abs(r.minimap - 186 * r.scale) < 2, `${tag}: minimap scaled to ${r.scale}`);
             assert.ok(r.scale <= pct / 100 + 1e-9 && r.scale >= 0.8, `${tag}: scale ${r.scale} within the chosen size`);
             assert.equal(r.saved, pct, `${tag}: saved`);
         }
         assert.deepEqual(errors, []);
     }
+});
+
+// V1.9 HUD layout: one bottom row of 56 px ability slots and the ammo, a short-lived
+// agent strip, the weapons listed at the right edge, one-line teammate plates and a
+// one-line FPS readout
+test('V1.9 HUD: bottom row, agent strip, weapon list, teammate plates and one-line FPS readout', { timeout: 300000 }, async () => {
+    const { page, errors, frames, evaluate } = await boot({ viewport: { width: 1280, height: 720 } });
+    const row = await evaluate(() => {
+        const r = (q) => document.querySelector(q).getBoundingClientRect();
+        const slot = r('#ability-slot-c'), bar = r('#ability-bar'), ammo = r('.ammo-display'), weapons = r('#weapon-selector'), score = r('.score');
+        return {
+            slot: [Math.round(slot.width), Math.round(slot.height)],
+            tall: innerHeight - Math.min(bar.top, ammo.top),
+            sameRow: ammo.left >= bar.right && ammo.top < bar.bottom && bar.top < ammo.bottom,
+            nameShown: getComputedStyle(document.getElementById('ability-name-c')).display !== 'none',
+            title: document.getElementById('ability-slot-c').title, name: document.getElementById('ability-name-c').textContent,
+            weaponsAboveScore: weapons.bottom <= score.top && weapons.right > innerWidth - 40,
+            rows: Array.from(document.querySelectorAll('#weapon-selector .weapon-slot')).map((s) => s.getBoundingClientRect().height)
+        };
+    });
+    assert.deepEqual(row.slot, [56, 56], 'ability slots are 56 px square');
+    assert.ok(row.tall <= 96, `the bottom row stays within 96 px of the bottom (${row.tall})`);
+    assert.ok(row.sameRow, 'the ammo sits beside the abilities');
+    assert.equal(row.nameShown, false, 'ability names are hidden in the slots');
+    assert.equal(row.title, row.name, 'the slot tooltip names the ability');
+    assert.ok(row.weaponsAboveScore, 'the weapons are listed at the right edge above the score');
+    assert.ok(row.rows.length === 4 && row.rows.every((h) => h < 30), 'one short row per weapon');
+
+    // Agent strip: shows on an agent change and at a new round, gone after 4 s; the passive
+    // and the [G]/[TAB] hint are in the controls help
+    await evaluate(() => agentSystem.selectAgent('sage'));
+    assert.deepEqual(await evaluate(() => { const el = document.getElementById('agent-switcher-bar'); return [el.classList.contains('show'), el.textContent.replace(/\s+/g, ' ').trim()]; }), [true, 'SAGE SENTINEL']);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('agent-switcher-bar')).visibility === 'hidden', null, { timeout: 30000 });
+    await evaluate(() => tacticalDirector.advanceWave('TEST', performance.now()));
+    assert.equal(await evaluate(() => document.getElementById('agent-switcher-bar').classList.contains('show')), true, 'a new wave shows the strip');
+    const help = await evaluate(() => document.querySelector('#controls-hint-box .hint-agent-line').textContent);
+    assert.ok(help.includes(await evaluate(() => AGENT_DEFS[game.activeAgent].passiveText)) && /\[G\] PICKER/.test(help), 'passive and picker hint are in the help');
+
+    // FPS readout: one line; the quality name cycles the quality, the FPS opens Settings > FPS;
+    // the quality pill and the graph are hidden by default
+    const perf = await evaluate(() => ({ text: fpsDisplay.textContent, pill: getComputedStyle(qualityToggle).display, graph: getComputedStyle(document.getElementById('fps-sparkline-widget')).display }));
+    assert.match(perf.text, /^\d+ FPS \/ Medium$/);
+    assert.deepEqual([perf.pill, perf.graph], ['none', 'none']);
+    await evaluate(() => document.querySelector('#fps-display .perf-q').click());
+    assert.deepEqual(await evaluate(() => [adaptiveSettings.currentQuality, !!game.settingsOpen, fpsDisplay.textContent.split(' / ')[1]]), ['high', false, 'High']);
+    await evaluate(() => document.querySelector('#fps-display .perf-fps').click());
+    assert.deepEqual(await evaluate(() => [!!game.settingsOpen, document.querySelector('#settings-tabs-bar .settings-tab-btn.active').dataset.tab]), [true, 'fps']);
+    // The detailed mode keeps its quality pill under the multi-line text
+    await evaluate(() => document.querySelector('#setting-fps-mode-pills [data-fpsmode="detailed"]').click());
+    assert.deepEqual(await evaluate(() => [qualityToggle.style.display, qualityToggle.style.top]), ['block', '318px']);
+    await evaluate(() => { document.querySelector('#setting-fps-mode-pills [data-fpsmode="compact"]').click(); settingsManager.toggleSettings(false); });
+
+    // Teammate plates: the agent name on one line over a thin health bar, at most 96 px
+    // wide; health shows on the bar; faded while near the crosshair
+    const plates = await evaluate(() => tacticalEnhancements.wingmanBots.map((b) => ({ text: b.hudEl.textContent.trim(), w: b.hudEl.offsetWidth, h: b.hudEl.offsetHeight })));
+    assert.deepEqual(plates.map((p) => p.text), ['SAGE', 'REYNA']);
+    assert.ok(plates.every((p) => p.w <= 96 && p.h <= 24), `small one-line plates (${JSON.stringify(plates)})`);
+    await evaluate(() => {
+        const b = tacticalEnhancements.wingmanBots[0];
+        b.health = 40;
+        window.__look = setInterval(() => camera.rotation.set(0, Math.atan2(-(b.group.position.x - camera.position.x), -(b.group.position.z - camera.position.z)), 0), 5);
+    });
+    await frames(6);
+    const near = await evaluate(() => { const b = tacticalEnhancements.wingmanBots[0]; return [b.hpFillEl.style.width, b.hudEl.classList.contains('near-crosshair'), getComputedStyle(b.hudEl).opacity]; });
+    await evaluate(() => { clearInterval(window.__look); delete tacticalEnhancements.wingmanBots[0].health; });
+    assert.deepEqual(near.slice(0, 2), ['40%', true], 'health on the bar; faded near the crosshair');
+    assert.ok(Math.abs(parseFloat(near[2]) - 0.35) < 0.05, `about 35% opacity (${near[2]})`);
+    assert.deepEqual(errors, []);
 });

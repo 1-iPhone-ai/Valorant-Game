@@ -74,10 +74,12 @@ test('Ultra Realism: a manual tier above Cinematic with its own settings box; Au
     assert.deepEqual(st, { on: false, saved: false, others: true });
     await evaluate(() => document.querySelector('#setting-ultrafx-reflections-pills [data-ufx="on"]').click());
     assert.equal(await evaluate(() => ultraRealism.is('reflections')), true);
-    // The FPS panel reports the frame time with the tier's name
+    // The FPS readout names the tier and reports the frame time (V1.9: one line,
+    // "N FPS / Ultra Realism", with the frame time in its tooltip)
     await frames(4);
-    const fpsText = await evaluate(() => document.getElementById('fps-display').textContent);
-    assert.match(fpsText, /\(\d+\.\d ms\) \| Quality: ULTRA REALISM/);
+    const fps = await evaluate(() => ({ text: document.getElementById('fps-display').textContent, title: document.getElementById('fps-display').title }));
+    assert.match(fps.text, /^\d+ FPS \/ Ultra Realism$/);
+    assert.match(fps.title, /^\d+\.\d ms per frame/);
     // Auto from Ultra Realism drops to High
     await evaluate(() => qualityController.setAuto());
     assert.equal(await evaluate(() => adaptiveSettings.currentQuality), 'high');

@@ -316,6 +316,9 @@
         .aim-stats span { color: #94a3b8; letter-spacing: 1px; }
         .aim-hud { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; background: rgba(8, 12, 22, 0.75);
             border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 4px; padding: 6px 14px; font-size: 12px; font-weight: 800; letter-spacing: 2px; white-space: nowrap; max-width: calc(100vw - 32px); }
+        /* V1.9: 8 px under the mode bar (hudScale.fitTopBar sets --topbar-bottom): at a fixed 96px the
+           scaled mode bar covered it at HUD Size 130%, and on a 600 px window it reached the clear middle */
+        .aim-hud { top: calc(var(--topbar-bottom, 88px) + 8px); }
         .aim-hud b { color: #ff4655; }
         .aim-count { position: absolute; top: 38%; left: 50%; transform: translateX(-50%); font-size: 72px; font-weight: 900; color: #ffd166; text-shadow: 0 4px 18px rgba(0,0,0,0.7); }
         body.menu-open.agent-select .agent-picker-overlay { background: linear-gradient(270deg, rgba(6, 11, 19, 0.92) 0%, rgba(6, 11, 19, 0.6) 55%, rgba(6, 11, 19, 0) 70%);
@@ -328,6 +331,11 @@
         .dm-board { position: absolute; right: 14px; top: 290px; width: 210px; padding: 8px 10px; background: rgba(10, 14, 22, 0.82);
             border: 1px solid rgba(255, 70, 85, 0.5); border-radius: 6px; color: #e2e8f0; font-size: 12px; z-index: 30; display: none; }
         .dm-board.visible { display: block; }
+        /* V1.9: anchored above the right column (weapon list and score) instead of 290px from
+           the top, which ran into the weapon list on a 600 px tall window; above the Recoil
+           Trainer when that is shown too */
+        .dm-board { top: auto; bottom: calc(180px * var(--hud-scale, 1)); }
+        #recoil-trainer-widget.visible ~ .dm-board { bottom: calc(336px * var(--hud-scale, 1)); }
         .dm-head { font-weight: 900; letter-spacing: 2px; display: flex; justify-content: space-between; color: #ff4655; }
         .dm-head span { color: #fff; }
         .dm-sub { font-size: 10px; color: #94a3b8; margin-bottom: 4px; }
@@ -338,7 +346,7 @@
         .death-recap {
             position: absolute;
             left: 50%;
-            bottom: 230px;
+            bottom: calc(124px * var(--hud-scale, 1)); /* V1.9: was 230px, above the old 215 px stack; now just above the bottom row and the agent strip */
             transform: translateX(-50%) translateY(10px);
             min-width: 340px;
             max-width: 90vw;
@@ -592,7 +600,7 @@
         
         .hud {
             position: absolute;
-            bottom: 20px;
+            bottom: 14px; /* V1.9: was 20px; keeps the bottom row (abilities + ammo) within 96 px of the bottom edge */
             left: 0;
             width: 100%;
             padding: 0 20px;
@@ -631,7 +639,11 @@
         .weapon-info {
             display: flex;
             flex-direction: column;
-            align-items: center;
+            /* V1.9: the ammo's slot in the bottom row: as wide as its widest text ("∞ / MELEE",
+               166 px) with the box at its left, so switching guns never moves the row */
+            align-items: flex-start;
+            width: 166px;
+            flex: none;
         }
         
         .ammo-display {
@@ -641,7 +653,14 @@
             background: rgba(0, 0, 0, 0.5);
             border-radius: 4px;
             border: 1px solid rgba(255, 255, 255, 0.2);
-            margin-bottom: 10px;
+            /* V1.9: beside the abilities in the bottom row (was 10px above the weapon bar).
+               Same size (124 px for "25 / 25", as before) and a shadow so it reads over
+               bright floors; .weapon-info keeps the row from shifting as the text changes */
+            margin-bottom: 0;
+            min-width: 124px;
+            text-align: center;
+            white-space: nowrap;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
         }
         
         .ammo-current {
@@ -657,11 +676,22 @@
             opacity: 0.7;
         }
         
+        /* V1.9: a vertical list at the right edge above the score (it was a row under the
+           ammo, in the middle of the screen). One row per slot, the key then the name,
+           each row as wide as its text and lined up on the right edge */
         .weapon-selector {
             display: flex;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 4px;
-            padding: 5px;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 3px;
+        }
+
+        /* V1.9: the right HUD column (weapons, then the score) */
+        .hud-right-column {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
         }
         
         /* V1.8.1: each slot sizes to its name. The fixed 45 px box with 16px text let
@@ -672,15 +702,16 @@
         .weapon-slot {
             min-width: 45px;
             flex: none;
-            padding: 0 8px;
+            padding: 0 8px 0 4px; /* V1.9: was 0 8px (the key now sits inside, on the left) */
             white-space: nowrap;
             border: 1px solid transparent;
-            height: 35px;
-            background: rgba(255, 255, 255, 0.1);
+            height: 24px;         /* V1.9: was 35px: a list row, not a button */
+            background: rgba(10, 16, 24, 0.62); /* V1.9: was a light tint on the bar's dark box; the rows stand alone now */
             border-radius: 4px;
-            margin: 0 5px;
+            margin: 0;            /* V1.9: was 0 5px (gaps come from the list) */
+            gap: 7px;             /* V1.9: key, then name */
             display: flex;
-            justify-content: center;
+            justify-content: flex-end;
             align-items: center;
             font-size: 14px;
             color: rgba(255, 255, 255, 0.7);
@@ -693,16 +724,22 @@
             color: white;
         }
         
+        /* V1.9: the key number sits inline before the name (it was a badge above the slot);
+           grey, and red on the active row */
         .weapon-slot-key {
-            position: absolute;
-            top: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ff4655;
+            position: static;
+            min-width: 16px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.16);
             color: white;
-            font-size: 12px;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 16px;
             padding: 0 4px;
             border-radius: 3px;
+        }
+        .weapon-slot.active .weapon-slot-key {
+            background: #ff4655;
         }
         
         .score {
@@ -884,6 +921,16 @@
             z-index: 1000;
         }
         
+        /* V1.9: the compact readout is one line, "144 FPS / Medium" (perfReadout); clicking
+           the quality name cycles the quality as the old quality pill did */
+        .fps-display .perf-q {
+            color: #ffd166;
+            cursor: pointer;
+        }
+        .fps-display .perf-q:hover {
+            text-decoration: underline;
+        }
+
         /* Mobile touch controls */
         .touch-controls {
             display: none;
@@ -925,6 +972,12 @@
             z-index: 1000;
         }
         
+        /* V1.9: on touch devices the right buttons sit above the right HUD column (the weapon
+           list now stands over the score there); 186px matches .hud's 14px + that column */
+        body.touch-ui .action-buttons {
+            bottom: calc(186px * var(--hud-scale, 1));
+        }
+
         .action-button {
             width: 80px;
             height: 80px;
@@ -975,14 +1028,30 @@
         /* =============================================
            Valorant Agent Switcher & Ability Bar (C, Q, E, X)
            ============================================= */
+        /* V1.9: one row pinned to the bottom edge and centred under the crosshair: the
+           four ability slots, then the ammo (it was a 215 px tall column of agent bar,
+           abilities, ammo and weapons right under the crosshair) */
         .center-hud-column {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
             gap: 8px;
         }
 
+        /* V1.9: no longer a permanent bar: it shows the agent's name and role above the
+           bottom row for 4 s at a round start or agent change (agentStrip), then fades.
+           Not clickable ([G] and [TAB] still work). 'show' uses visibility: inherit, never
+           visible, so replays, photo mode and the menus still hide it with the rest. */
         .agent-switcher-bar {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 8px);
+            transform: translateX(-50%);
+            white-space: nowrap;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -991,15 +1060,24 @@
             border-left: 3px solid var(--agent-accent, #00e5ff);
             border-radius: 4px;
             padding: 4px 12px;
-            pointer-events: auto;
-            cursor: pointer;
+            pointer-events: none;
+            cursor: default;
             user-select: none;
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-            transition: border-color 0.2s, transform 0.15s;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.6s ease, visibility 0s linear 0.6s;
+        }
+
+        /* V1.9: set for 4 s by agentStrip.show() */
+        .agent-switcher-bar.show {
+            opacity: 1;
+            visibility: inherit;
+            transition: opacity 0.2s ease, visibility 0s;
         }
 
         .agent-switcher-bar:hover {
-            transform: translateY(-1px);
+            transform: translateX(-50%); /* V1.9: keep the centring (was a 1px lift) */
             border-color: var(--agent-accent, #00e5ff);
         }
 
@@ -1039,18 +1117,20 @@
         .ability-bar {
             display: flex;
             align-items: stretch;
-            gap: 8px;
+            gap: 6px;           /* V1.9: was 8px */
             background: rgba(15, 25, 35, 0.78);
-            padding: 6px 10px;
+            padding: 4px 6px;   /* V1.9: was 6px 10px; the bar is 66 px tall */
             border-radius: 6px;
             border: 1px solid rgba(255, 255, 255, 0.15);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
             pointer-events: auto;
         }
 
+        /* V1.9: 56 px square (was 78 x 68): key, cooldown number, icon and charge pips;
+           the ability name is hidden here (it is in the agent picker and the tooltip) */
         .ability-slot {
-            width: 78px;
-            height: 68px;
+            width: 56px;
+            height: 56px;
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.18);
             border-radius: 5px;
@@ -1059,7 +1139,7 @@
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
-            padding: 5px 4px 4px 4px;
+            padding: 3px 3px 4px 3px;
             overflow: hidden;
             cursor: pointer;
             user-select: none;
@@ -1109,7 +1189,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 3px;
+            gap: 2px;      /* V1.9 */
+            padding: 0;    /* V1.9: was 0 3px (the 56 px slot has its own padding) */
             z-index: 2;
         }
 
@@ -1142,7 +1223,7 @@
         }
         .controls-hint-pill {
             position: absolute;
-            top: 356px;
+            top: var(--help-top, 356px); /* V1.9: under the last left-column panel (applyHudVisibility) */
             left: 14px;
             z-index: 900;
             padding: 4px 10px;
@@ -1167,11 +1248,13 @@
             background: rgba(0, 0, 0, 0.65);
             border: 1px solid rgba(255, 255, 255, 0.35);
             color: #fff;
-            font-size: 10px;
+            font-size: 9px;     /* V1.9: was 10px, for the 56 px slot */
             font-weight: 800;
-            padding: 0 5px;
+            padding: 0 3px;     /* V1.9: was 0 5px */
             border-radius: 3px;
-            line-height: 14px;
+            line-height: 12px;  /* V1.9: was 14px */
+            flex: none;         /* V1.9: the key never shrinks; a long cooldown label clips instead */
+            white-space: nowrap;
         }
 
         .ability-cd-text {
@@ -1179,6 +1262,14 @@
             font-weight: 700;
             color: #ff9aa2;
             font-family: monospace;
+            /* V1.9: one line inside the 56 px slot. The widest label ("TP 12s" beside a
+               controller glyph) is clipped from its start, so the number stays visible */
+            white-space: nowrap;
+            overflow: hidden;
+            min-width: 0;
+            letter-spacing: -0.3px;
+            direction: rtl;
+            text-align: right;
         }
 
         .ability-icon {
@@ -1199,6 +1290,7 @@
         }
 
         .ability-name {
+            display: none; /* V1.9: hidden in the 56 px slot; the agent picker lists it and the slot's tooltip (title) shows it */
             font-size: 9px;
             font-weight: 700;
             letter-spacing: 0.5px;
@@ -1216,13 +1308,13 @@
             gap: 3px;
             align-items: center;
             justify-content: center;
-            height: 6px;
+            height: 7px;  /* V1.9: was 6px, room for the rotated 5 px pips */
             z-index: 2;
         }
 
         .ability-pip {
-            width: 6px;
-            height: 6px;
+            width: 5px;   /* V1.9: was 6px, so the ultimate's 6 pips fit the 56 px slot */
+            height: 5px;
             border-radius: 1px;
             transform: rotate(45deg);
             background: rgba(255, 255, 255, 0.22);
@@ -1382,11 +1474,13 @@
             position: absolute;
             /* V1.7: left column under the minimap + FPS cluster, never wider than the
                space left of the centred agent/ability bar; collapses after 12 s */
-            top: 356px;
+            /* V1.9: starts under the last left-column panel (--help-top, set by applyHudVisibility):
+               the FPS readout is one line now, so there is room for the agent's passive line */
+            top: var(--help-top, 356px);
             left: 14px;
             max-width: calc(50vw / var(--hud-scale, 1) - 260px); /* the agent bar starts at 50vw - 217px (scaled) */
             /* and stop above the health panel (bottom ~150 px), scrolling if needed */
-            max-height: calc(100vh / var(--hud-scale, 1) - 356px - 156px);
+            max-height: calc(100vh / var(--hud-scale, 1) - var(--help-top, 356px) - 156px);
             overflow-y: auto;
             transition: opacity 0.6s, transform 0.6s;
             background: rgba(15, 25, 35, 0.74);
@@ -1402,6 +1496,15 @@
 
         .controls-hint-box b {
             color: #00e5ff;
+        }
+
+        /* V1.9: the agent's passive and the [G]/[TAB] hint, moved here from the agent strip */
+        .controls-hint-box .hint-agent-line {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px 6px;
+            margin-bottom: 3px;
         }
 
         /* =============================================
@@ -2961,7 +3064,7 @@
         }
         .recoil-trainer-widget {
             position: absolute;
-            bottom: 130px;
+            bottom: 180px; /* V1.9: was 130px; above the weapon list, which now sits over the score */
             right: 22px;
             width: 148px;
             background: rgba(11, 18, 28, 0.86);
@@ -3077,18 +3180,48 @@
             100% { transform: rotate(45deg) scale(1.18); }
         }
 
+        /* V1.9: one line with the agent name over a thin health bar, at most 96 px wide (it
+           was three lines of large text in a 112 px box, bigger than the teammate). The
+           script scales it so it is never taller than the teammate on screen (down to a
+           readable minimum) and fades it near the crosshair. */
         .wingman-floating-hud {
             position: absolute;
             top: 0;
             left: 0;
-            width: 112px;
-            padding: 3px 6px;
-            background: rgba(9, 20, 28, 0.82);
-            border: 1px solid rgba(43, 240, 165, 0.65);
-            border-radius: 5px;
+            max-width: 96px;
+            padding: 1px 5px 3px;
+            background: rgba(9, 20, 28, 0.6);
+            border-radius: 3px;
             pointer-events: none;
             transform: translate3d(-9999px, -9999px, 0);
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+            transform-origin: 50% 100%;
+            transition: opacity 0.15s;
+        }
+        .wingman-floating-hud.near-crosshair { opacity: 0.35; }
+        .wingman-hud-name {
+            font-size: 11px;
+            line-height: 13px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #2bf0a5;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+        }
+        .wingman-hud-bar {
+            height: 3px;
+            margin-top: 1px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .wingman-hud-fill {
+            width: 100%;
+            height: 100%;
+            background: #2bf0a5;
+            transition: width 0.12s ease;
         }
         /* V1.7 fix: the 'visible' toggle had no style, so tags stayed on screen when
            wingmen were switched off, in Range/Match, or when behind the camera */
@@ -3322,8 +3455,8 @@
 <body>
     <div class="loading-screen" id="loading-screen">
         <div class="logo"></div>
-        <!-- V1.8.1: version label (tier rule, Bandit magazine and weapon bar fixes) -->
-        <div class="loading-text">VALORANT 3D FPS // V1.8.1 RADIANT EDITION</div>
+        <!-- V1.9: version label (HUD layout rework) -->
+        <div class="loading-text">VALORANT 3D FPS // V1.9 RADIANT EDITION</div>
         <div class="progress-bar">
             <div class="progress-fill" id="progress-fill"></div>
         </div>
@@ -3495,12 +3628,13 @@
                 </div>
             </div>
             
+            <!-- V1.9: one row pinned to the bottom edge (the abilities, then the ammo). The agent
+                 strip shows above it for 4 s at a round start or agent change; its passive and
+                 [G]/[TAB] hint moved to the controls help ([I]); the weapons moved to the right column -->
             <div class="center-hud-column">
                 <div class="agent-switcher-bar" id="agent-switcher-bar" title="Click or press [G] for 29-Agent Grid Picker • Press [TAB] to quick-cycle next Agent">
                     <span class="agent-badge-name" id="agent-badge-name">JETT</span>
                     <span class="agent-badge-role" id="agent-badge-role">DUELIST</span>
-                    <span class="agent-passive-tag" id="agent-passive-tag">DRIFT: HOLD SPACE</span>
-                    <span class="agent-switch-hint">[G] PICKER • [TAB]</span>
                 </div>
 
                 <div class="ability-bar" id="ability-bar">
@@ -3555,6 +3689,11 @@
                         <span class="ammo-separator">/</span>
                         <span class="ammo-max" id="ammo-max">30</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- V1.9: right column: the weapons as a vertical list (key, then name) above the score -->
+            <div class="hud-right-column">
                     <div class="weapon-selector" id="weapon-selector">
                         <div class="weapon-slot active" id="weapon-slot-1" title="1: Primary (rifles, SMGs, shotguns, heavies — [B] armory, [V] cycles)">
                             <span class="weapon-slot-key">1</span>
@@ -3576,12 +3715,11 @@
                             <span class="weapon-name">Knife</span>
                         </div>
                     </div>
+
+                <div class="score">
+                    <div>SCORE</div>
+                    <div class="score-value" id="score-value">0</div>
                 </div>
-            </div>
-            
-            <div class="score">
-                <div>SCORE</div>
-                <div class="score-value" id="score-value">0</div>
             </div>
         </div>
 
@@ -4235,7 +4373,8 @@
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>HUD FPS Counter Mode</strong>
-                                    <small>Choose between hidden, compact FPS pill, or full multi-line GPU/CPU telemetry</small>
+                                    <!-- V1.9: compact is now one line (FPS / quality) -->
+                                    <small>Choose between hidden, one line (FPS / quality: click the quality name to cycle it), or full multi-line GPU/CPU telemetry</small>
                                 </div>
                                 <div class="settings-pill-group" id="setting-fps-mode-pills">
                                     <button class="settings-pill-opt" data-fpsmode="off">OFF</button>
@@ -4247,11 +4386,12 @@
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>Live FPS &amp; Frame-Time Sparkline Graph</strong>
-                                    <small>Real-time top-left rolling frame-time graph with color-coded spike detection</small>
+                                    <!-- V1.9: off by default (new players); a saved choice is kept -->
+                                    <small>Real-time top-left rolling frame-time graph with color-coded spike detection (off by default)</small>
                                 </div>
                                 <div class="settings-pill-group" id="setting-sparkline-pills">
-                                    <button class="settings-pill-opt active" data-spark="on">SHOW GRAPH</button>
-                                    <button class="settings-pill-opt" data-spark="off">HIDE GRAPH</button>
+                                    <button class="settings-pill-opt" data-spark="on">SHOW GRAPH</button>
+                                    <button class="settings-pill-opt active" data-spark="off">HIDE GRAPH</button>
                                 </div>
                             </div>
 
@@ -5084,6 +5224,8 @@
             <canvas id="recoil-trainer-canvas" width="132" height="110"></canvas>
         </div>
         <div id="controls-hint-box" class="controls-hint-box">
+            <!-- V1.9: the agent's passive and the [G]/[TAB] hint, moved here from the agent strip -->
+            <div class="hint-agent-line"><span class="agent-passive-tag" id="agent-passive-tag">DRIFT: HOLD SPACE</span><span class="agent-switch-hint">[G] PICKER • [TAB] NEXT AGENT</span></div>
             <div><b>[1-4]</b> Arsenal &nbsp;|&nbsp; <b>[V]</b> Next gun in the slot (18 guns) &nbsp;|&nbsp; <b>[B]</b> Armory &nbsp;|&nbsp; <b>[Y]</b> Inspect</div>
             <div><b>[P]</b> Settings &amp; FPS &nbsp;|&nbsp; <b>[K/N]</b> Rank &amp; Combat Report &nbsp;|&nbsp; <b>[G]</b> 29 Agents &nbsp;|&nbsp; <b>[B]</b> Buy &nbsp;|&nbsp; <b>[F4]</b> 6 Maps &nbsp;|&nbsp; <b>[F5/F6]</b> Bot &amp; Wingman AI</div>
             <div><b>[F]</b> Plant/Defuse Spike, Orbs, Lotus Stone Doors &amp; Split Ziplines &nbsp;|&nbsp; <b>[T / Mid-Click]</b> 3D Ping &nbsp;|&nbsp; <b>[Click Radar]</b> Sky-Smoke / Ping</div>
@@ -5995,7 +6137,7 @@
                 mantle: true,          // jump into a ledge up to chest height to climb onto it
                 fpsCap: 0,
                 fpsDisplayMode: 'compact',
-                showSparkline: true,
+                showSparkline: false,  // V1.9: off by default (one-line FPS readout); a saved choice still loads
                 autoTargetHz: 55,
                 crosshairColor: '#ffffff',
                 crosshairDot: true,
@@ -8046,7 +8188,49 @@
             const q = adaptiveSettings.currentQuality;
             const name = q === 'ultraRealism' ? 'Ultra Realism' : q.charAt(0).toUpperCase() + q.slice(1);
             qualityToggle.textContent = qualityController.auto ? `Quality: Auto (${name})` : `Quality: ${name}`;
+            perfReadout.render(); // V1.9: the one-line readout shows the new quality at once
         }
+
+        // V1.9: the compact readout is one line, "144 FPS / Medium" (it was an FPS line with
+        // the frame time, a quality pill and a sparkline under the minimap). Clicking the
+        // FPS opens Settings > FPS as #fps-display did; clicking the quality name cycles the
+        // quality as #quality-toggle did (that pill now shows only in the detailed mode).
+        // The frame time and the FPS cap moved to the tooltip.
+        const perfReadout = {
+            fpsEl: null,
+            qEl: null,
+            lastFps: 0,
+            qualityName: function () {
+                const q = adaptiveSettings.currentQuality;
+                const name = q === 'ultraRealism' ? 'Ultra Realism' : q.charAt(0).toUpperCase() + q.slice(1);
+                return qualityController.auto ? `Auto (${name})` : name;
+            },
+            // (Re)build the two parts: the detailed mode writes plain text over them
+            ensure: function () {
+                if (this.fpsEl && this.fpsEl.parentNode === fpsDisplay) return;
+                this.fpsEl = document.createElement('span');
+                this.fpsEl.className = 'perf-fps';
+                this.qEl = document.createElement('span');
+                this.qEl.className = 'perf-q';
+                this.qEl.title = 'Click to cycle the quality (Auto, Low, Medium, High, Ultra, Cinematic)';
+                this.qEl.addEventListener('click', (e) => { e.stopPropagation(); cycleQualitySettings(); });
+                fpsDisplay.textContent = '';
+                fpsDisplay.append(this.fpsEl, ' / ', this.qEl);
+            },
+            render: function (fpsVal) {
+                if (typeof fpsVal === 'number') this.lastFps = fpsVal;
+                const mode = (game.userSettings && game.userSettings.fpsDisplayMode) || 'compact';
+                if (mode !== 'compact') return;
+                this.ensure();
+                this.fpsEl.textContent = `${this.lastFps} FPS`;
+                const qName = this.qualityName();
+                if (this.qEl.textContent !== qName) this.qEl.textContent = qName;
+                const s = perfTelemetry.summary;
+                const frameMs = s && s.frameMsMean > 0 ? s.frameMsMean : (this.lastFps > 0 ? 1000 / this.lastFps : 0);
+                const cap = (game.userSettings && game.userSettings.fpsCap > 0) ? game.userSettings.fpsCap : 0;
+                fpsDisplay.title = `${frameMs.toFixed(1)} ms per frame${cap ? ` (cap ${cap} FPS)` : ''}. Click for FPS & quality settings [P]; click the quality name to cycle it`;
+            }
+        };
         
         // Frame-time controller.
         //  - Decisions use 1 s windows of raw frame intervals and main-thread CPU time.
@@ -13433,6 +13617,8 @@
         // Mobile touch controls
         function setupMobileControls() {
             if (!deviceInfo.touchEnabled) return;
+            // V1.9: lets the CSS lift the right-hand buttons clear of the right HUD column
+            document.body.classList.add('touch-ui');
             
             // Show touch controls
             const touchControls = document.createElement('div');
@@ -14231,6 +14417,8 @@
                     r = bar.getBoundingClientRect();
                     if (r.left >= mapRight) break;
                 }
+                // V1.9: where the mode bar ends, for panels hung under it (the aim trainer's bar)
+                if (r) document.documentElement.style.setProperty('--topbar-bottom', `${Math.ceil(r.bottom)}px`);
                 // Kill feed: top-right beside the mode bar when there is room, else just below it
                 const kf = document.getElementById('kill-feed');
                 if (kf && r) {
@@ -14286,6 +14474,25 @@
             }
         };
         
+        // =============================================
+        // V1.9 Agent strip: no longer a permanent bar over the abilities. It shows the
+        // agent's name and role for 4 s when a round starts or the agent changes, then
+        // fades out (CSS). Its passive and the [G]/[TAB] hint are in the controls help.
+        // =============================================
+        const agentStrip = {
+            SHOW_MS: 4000,
+            timer: 0,
+            show: function () {
+                if (!agentSwitcherBar) return;
+                agentSwitcherBar.classList.add('show');
+                if (this.timer) clearTimeout(this.timer);
+                this.timer = setTimeout(() => {
+                    this.timer = 0;
+                    agentSwitcherBar.classList.remove('show');
+                }, this.SHOW_MS);
+            }
+        };
+
         // =============================================
         // V1.7 Enemy footsteps (positional) and low-health warning
         // =============================================
@@ -23434,6 +23641,7 @@
                 const def = AGENT_DEFS[agentId];
                 this.refreshAgentTheme();
                 this.syncHud(performance.now(), true);
+                agentStrip.show(); // V1.9: the agent strip shows for 4 s on an agent change
                 if (typeof tacticalDirector !== 'undefined' && game.agentPickerOpen) {
                     tacticalDirector.renderAgentPickerGrid();
                     tacticalDirector.inspectAgentInPicker(agentId);
@@ -23469,6 +23677,8 @@
                     const ab = def.abilities[slotKey];
                     if (abilityIcons[slotKey]) abilityIcons[slotKey].innerHTML = ab.svg;
                     if (abilityNames[slotKey]) abilityNames[slotKey].textContent = ab.name;
+                    // V1.9: the name is hidden in the smaller slot; it shows as the slot's tooltip
+                    if (abilitySlots[slotKey]) abilitySlots[slotKey].title = ab.name;
                 });
             },
 
@@ -35443,12 +35653,14 @@
                     this.updateWaveHUD(performance.now());
                     showNotification(`WAVE ${game.roundNumber} ACTIVE — Eliminate Hostiles or Plant Spike at Site A or Site B [F]`, 3200);
                 }
+                agentStrip.show(); // V1.9: a mode starts with its first round: show the agent strip for 4 s
             },
 
             // =============================================
             // Retake Defuse Mode ([F3]) with 50% Half-Defuse Checkpoint
             // =============================================
             startRetakeRound: function(now) {
+                agentStrip.show(); // V1.9: each retake round shows the agent strip for 4 s
                 const siteKey = (game.roundNumber % 2 === 1) ? 'A' : 'B';
                 const siteInfo = this.spikeSites[siteKey] || this.spikeSites.A;
                 this.activeSpikeSiteKey = siteKey;
@@ -35533,6 +35745,7 @@
             },
 
             advanceWave: function(reasonText, effectNow) {
+                agentStrip.show(); // V1.9: a new wave (round) shows the agent strip for 4 s
                 game.roundNumber++;
                 game.roundKillStreak = 0;
                 this.waveKills = 0;
@@ -41898,7 +42111,7 @@
             lowHealthWarning: true,
             fpsCap: 0,
             fpsDisplayMode: 'compact',
-            showSparkline: true,
+            showSparkline: false,  // V1.9: off for new players (saved settings keep theirs)
             autoTargetHz: 55,
             crosshairColor: '#ffffff',
             crosshairDot: true,
@@ -42180,6 +42393,7 @@
                 breakables.reset();
                 this.rs = { kills: [], dmg: 0, killer: null };
                 this.round++;
+                agentStrip.show(); // V1.9: each Match / Ranked / Spike Rush round shows the agent strip for 4 s
                 const prevSide = this.side;
                 this.side = this.sideForRound(this.round);
                 if (this.round === this.cfg.halfRounds + 1 || (this.round === this.cfg.halfRounds * 2 + 1)) {
@@ -45011,11 +45225,11 @@
                 const el = document.createElement('div');
                 el.id = 'main-menu';
                 el.className = 'main-menu';
-                // V1.8.1: version label below (V1.8.1 RADIANT EDITION, as on the loading screen)
+                // V1.9: version label below (V1.9 RADIANT EDITION, as on the loading screen)
                 el.innerHTML = `
                     <div class="mm-side">
                         <div class="mm-logo">VALORANT 3D FPS</div>
-                        <div class="mm-sub">V1.8.1 RADIANT EDITION</div>
+                        <div class="mm-sub">V1.9 RADIANT EDITION</div>
                         <div class="mm-view" data-view="main">
                             <button class="mm-btn" data-act="play">PLAY</button>
                             <button class="mm-btn mm-pause-only" data-act="agent">AGENT SELECT</button>
@@ -45107,7 +45321,7 @@
             boot: function () {
                 this.init();
                 const skip = window.__skipMainMenu || (game.userSettings && game.userSettings.skipMenu);
-                if (skip) { this.started = true; return; }
+                if (skip) { this.started = true; agentStrip.show(); return; } // V1.9: play starts now: show the agent strip
                 this.show('start');
             },
 
@@ -45223,9 +45437,11 @@
 
             resume: function () {
                 const changeMode = this.mode !== currentModeId();
+                const firstStart = !this.started; // V1.9
                 this.started = true;
                 this.hide();
                 if (changeMode) tacticalDirector.setGameMode(this.mode);
+                else if (firstStart) agentStrip.show(); // V1.9: leaving the start screen starts play (setGameMode shows it otherwise)
                 if (!deviceInfo.touchEnabled && !document.pointerLockElement) { try { document.body.requestPointerLock(); } catch (e) {} }
             },
 
@@ -46672,13 +46888,21 @@
                 }
                 // V1.7: cluster sits under the minimap (detailed mode is ~5 lines tall)
                 if (qualityToggle) {
-                    qualityToggle.style.display = mode === 'off' ? 'none' : 'block';
+                    // V1.9: compact shows the quality inside its one line (perfReadout), so the pill is for the detailed mode only
+                    qualityToggle.style.display = mode === 'detailed' ? 'block' : 'none';
                     qualityToggle.style.top = mode === 'detailed' ? '318px' : '';
                 }
                 if (sparkEl) {
                     sparkEl.style.display = (cfg.showSparkline && mode !== 'off') ? 'flex' : 'none';
-                    sparkEl.style.top = mode === 'detailed' ? '348px' : '282px';
+                    // V1.9: compact: straight under the one-line readout (282px left room for the quality pill)
+                    sparkEl.style.top = mode === 'detailed' ? '348px' : '252px';
                 }
+                perfReadout.render(); // V1.9: draw the one-line readout now (it updates every second)
+                // V1.9: the controls help (and its pill) start just under the last panel of this
+                // column: the one-line readout (247px), the graph (316px) or the detailed lines
+                const sparkOn = !!cfg.showSparkline && mode !== 'off';
+                const helpTop = mode === 'off' ? 224 : mode === 'detailed' ? (sparkOn ? 420 : 356) : (sparkOn ? 324 : 255);
+                document.documentElement.style.setProperty('--help-top', `${helpTop}px`);
                 hudScale.fitTopBar();
             },
 
@@ -47934,13 +48158,17 @@
                     this.wingmanGroup.add(g);
 
                     // Floating 2D Ally Nametag HUD
-                    let hudEl = null, statusEl = null;
+                    // V1.9: one line with the agent name only ("SAGE"; s.name stays the kill feed's
+                    // source label) over a thin health bar; updateWingmanBots sizes and fades it
+                    let hudEl = null, statusEl = null, hpFillEl = null;
                     if (hudLayer) {
                         hudEl = document.createElement('div');
                         hudEl.className = 'wingman-floating-hud visible';
-                        hudEl.innerHTML = `<div class="wingman-hud-name">🤝 ${s.name}</div>
+                        const plateName = (s.name.split('//')[1] || s.name).trim();
+                        hudEl.innerHTML = `<div class="wingman-hud-name">${plateName}</div>
                             <div class="wingman-hud-bar"><div class="wingman-hud-fill"></div></div>`;
                         statusEl = hudEl.querySelector('.wingman-hud-name');
+                        hpFillEl = hudEl.querySelector('.wingman-hud-fill');
                         hudLayer.appendChild(hudEl);
                     }
 
@@ -47951,6 +48179,7 @@
                         gunMesh: gun,
                         hudEl: hudEl,
                         statusEl: statusEl,
+                        hpFillEl: hpFillEl, // V1.9: the health bar fill
                         offsetX: s.offsetX,
                         offsetZ: s.offsetZ,
                         lastFireAt: 0,
@@ -48083,10 +48312,28 @@
                             const sx = (this._projVec.x * 0.5 + 0.5) * vw;
                             const sy = (-this._projVec.y * 0.5 + 0.5) * vh;
                             bot.hudEl.classList.add('visible');
+                            // V1.9: scale with distance so the plate is never taller than the teammate
+                            // on screen (feet to helmet top: 1.86 m of the 2.35 m anchor), but never
+                            // below a readable 80% (about 9 px text)
+                            const feetSy = (-this._projVec.set(bot.group.position.x, 0, bot.group.position.z).project(camera).y * 0.5 + 0.5) * vh;
+                            const bodyPx = Math.max(0, feetSy - sy) * (1.86 / 2.35);
+                            if (!bot.plateH) { bot.plateW = bot.hudEl.offsetWidth; bot.plateH = bot.hudEl.offsetHeight; }
+                            const sc = bot.plateH > 0 ? Math.max(0.8, Math.min(1, bodyPx / bot.plateH)) : 1;
                             // V1.7: clamp so the label stays fully on screen (it was cut off at the edges)
-                            const cx = Math.max(80, Math.min(vw - 80, sx));
+                            // V1.9: 52 px from the sides (was 80 px, for the old 112 px wide tag)
+                            const cx = Math.max(52, Math.min(vw - 52, sx));
                             const cy = Math.max(60, Math.min(vh - 10, sy));
-                            bot.hudEl.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0) translate(-50%, -100%)`;
+                            bot.hudEl.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0) translate(-50%, -100%) scale(${sc.toFixed(3)})`;
+                            // V1.9: fade to 35% while any part of the plate is within 120 px of the crosshair
+                            const halfW = bot.plateW * sc * 0.5, plateH = bot.plateH * sc;
+                            const ddx = Math.max(0, Math.abs(cx - vw * 0.5) - halfW);
+                            const ddy = Math.max(0, cy - plateH - vh * 0.5, vh * 0.5 - cy);
+                            const near = ddx * ddx + ddy * ddy < 120 * 120;
+                            if (near !== bot.plateNear) { bot.plateNear = near; bot.hudEl.classList.toggle('near-crosshair', near); }
+                            // V1.9: teammate health on the thin bar (wingmen have no health of their own, so it reads full)
+                            const hp = typeof bot.health === 'number' ? bot.health : 100;
+                            const hpPct = Math.max(0, Math.min(100, Math.round(100 * hp / (bot.maxHealth || 100))));
+                            if (bot.hpFillEl && hpPct !== bot.plateHp) { bot.plateHp = hpPct; bot.hpFillEl.style.width = `${hpPct}%`; }
                         }
                     }
                 }
@@ -48605,10 +48852,8 @@
                         `shadow/s ${s.shadowRefreshesPerSec.toFixed(1)} grid ${s.gridRefs}/${s.gridCells} fx ${s.activeTrails}/${s.activeHitEffects}/${s.activeDecals}/${s.activeFlashLights}\n` +
                         `sim ${s.simStepsMean.toFixed(2)}/f drop ${s.droppedSimMs.toFixed(1)}ms shot ${s.outsideShotCpuMs.toFixed(2)}ms up ${(s.requestedUploadBytes / 1024).toFixed(1)}/${(s.glUploadBytes / 1024).toFixed(1)}kB`;
                 } else if (dispMode === 'compact') {
-                    const capSuffix = (game.userSettings && game.userSettings.fpsCap > 0) ? `/${game.userSettings.fpsCap}` : '';
-                    // V1.8: with the frame time (mean of the last frames)
-                    const frameMs = perfTelemetry.summary.frameMsMean > 0 ? perfTelemetry.summary.frameMsMean : (fps > 0 ? 1000 / fps : 0);
-                    fpsDisplay.textContent = `FPS: ${fps}${capSuffix} (${frameMs.toFixed(1)} ms) | Quality: ${qualityLabel(adaptiveSettings.currentQuality)}`;
+                    // V1.9: one line, "144 FPS / Medium"; the frame time (V1.8) and the cap are in its tooltip
+                    perfReadout.render(fps);
                 }
             }
             
