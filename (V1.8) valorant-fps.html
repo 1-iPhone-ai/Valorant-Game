@@ -664,8 +664,17 @@
             padding: 5px;
         }
         
+        /* V1.8.1: each slot sizes to its name. The fixed 45 px box with 16px text let
+           "Operator", "Guardian" and "No primary" spill out and run into the next slot.
+           14px keeps all four on one row at 1024 px; flex: none stops a squeezed bar
+           shrinking a slot below its name; every slot carries the active slot's 1 px
+           border (clear until active) so switching weapons never shifts the slots. */
         .weapon-slot {
-            width: 45px;
+            min-width: 45px;
+            flex: none;
+            padding: 0 8px;
+            white-space: nowrap;
+            border: 1px solid transparent;
             height: 35px;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 4px;
@@ -673,7 +682,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 16px;
+            font-size: 14px;
             color: rgba(255, 255, 255, 0.7);
             position: relative;
         }
@@ -3313,7 +3322,8 @@
 <body>
     <div class="loading-screen" id="loading-screen">
         <div class="logo"></div>
-        <div class="loading-text">VALORANT 3D FPS // V1.8 RADIANT EDITION</div>
+        <!-- V1.8.1: version label (tier rule, Bandit magazine and weapon bar fixes) -->
+        <div class="loading-text">VALORANT 3D FPS // V1.8.1 RADIANT EDITION</div>
         <div class="progress-bar">
             <div class="progress-fill" id="progress-fill"></div>
         </div>
@@ -4255,6 +4265,23 @@
                                     <button class="settings-pill-opt" data-targethz="120">120 Hz</button>
                                     <button class="settings-pill-opt" data-targethz="144">144 Hz</button>
                                     <button class="settings-pill-opt" data-targethz="240">240 Hz</button>
+                                </div>
+                            </div>
+
+                            <!-- V1.8.1: Content Tier, separate from graphics quality (fixed per session, so it applies after a reload) -->
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Content Tier</strong>
+                                    <small>Controls bot count, bot accuracy and character model detail; applies after a reload (Auto picks from the device)</small>
+                                </div>
+                                <div class="settings-control-right">
+                                    <div class="settings-pill-group" id="setting-content-tier-pills">
+                                        <button class="settings-pill-opt active" data-contenttier="auto">AUTO</button>
+                                        <button class="settings-pill-opt" data-contenttier="low">LOW</button>
+                                        <button class="settings-pill-opt" data-contenttier="medium">MEDIUM</button>
+                                        <button class="settings-pill-opt" data-contenttier="high">HIGH</button>
+                                    </div>
+                                    <span class="settings-val-badge" id="setting-content-tier-val" title="The content tier this session is using">IN USE: LOW</span>
                                 </div>
                             </div>
                         </div>
@@ -5258,13 +5285,28 @@
         
         // Content tier: fixes the actor population, actor/map model detail, the AI
         // activity radius and the low-tier enemy shot rule for the whole session.
-        // It reproduces the tier each device got from the previous startup rule
-        // (which also looked at DPR), so difficulty is unchanged per device. It is
-        // never used to judge graphics capability, and graphics adaptation never
-        // changes it.
-        const contentTier = (deviceInfo.isMobile || deviceInfo.hardwareConcurrency <= 4 ||
-                             deviceInfo.devicePixelRatio < 2) ? 'low'
-                          : deviceInfo.hardwareConcurrency <= 6 ? 'medium' : 'high';
+        // V1.8.1: the device rule no longer looks at devicePixelRatio. Copying the old
+        // startup rule sent every screen below a pixel ratio of 2 (a normal 1080p or
+        // 1440p desktop monitor) to Low however fast the PC. Now phones and 4 or fewer
+        // CPU threads are Low, 5-6 threads Medium, more High; the Content Tier setting
+        // can also pick one by hand. It is never used to judge graphics capability,
+        // and graphics adaptation never changes it.
+        const contentTierAuto = (deviceInfo.isMobile || deviceInfo.hardwareConcurrency <= 4) ? 'low'
+                              : deviceInfo.hardwareConcurrency <= 6 ? 'medium' : 'high';
+        // V1.8.1: a Content Tier setting value; anything but low/medium/high means Auto
+        function contentTierModeOf(v) { return (v === 'low' || v === 'medium' || v === 'high') ? v : 'auto'; }
+        // V1.8.1: the saved Content Tier choice (game.userSettings.contentTierMode). The
+        // settings are only loaded later (settingsManager.init), so this one value is read
+        // here from the same storage entry under the same opt-out rule (these are
+        // settingsManager.LS_CONSENT_KEY and LS_DATA_KEY); unreadable means Auto.
+        const contentTierChoice = (function readSavedContentTier() {
+            try {
+                if (localStorage.getItem('valorant_v16_ls_consent') === 'false') return 'auto';
+                const saved = JSON.parse(localStorage.getItem('valorant_v16_user_settings') || 'null');
+                return contentTierModeOf(saved && saved.contentTierMode);
+            } catch (e) { return 'auto'; }
+        })();
+        const contentTier = contentTierChoice === 'auto' ? contentTierAuto : contentTierChoice;
         const CONTENT_TIERS = {
             low:    { enemies: 2, movingTargets: 1, detailedModels: false, targetSegments: 16, cylinderSegments: 8,  fingers: 2, activityRadius: 60 },
             medium: { enemies: 4, movingTargets: 2, detailedModels: true,  targetSegments: 32, cylinderSegments: 16, fingers: 4, activityRadius: 80 },
@@ -5681,7 +5723,7 @@
                         falloff: [[15, 1], [30, 0.82], [Infinity, 0.66]], color: 0x475569, sound: 'ghost', kit: 'ghost',
                         desc: 'Suppressed • accurate • 105 headshot up close' },
             bandit:   { slot: 'pistol', cat: 'sidearm', cls: 'pistol', price: 600, name: 'Bandit Hand-Cannon', hud: 'Bandit', tag: 'HEAVY SEMI', shortCode: 'BN',
-                        damage: 44, headshotMult: 3.1, legMult: 0.85, mag: 9, reloadTime: 1.6, fireRate: 200, automatic: false, recoil: 0.026, heat: 1.6,
+                        damage: 44, headshotMult: 3.1, legMult: 0.85, mag: 8, reloadTime: 1.6, fireRate: 200, automatic: false, recoil: 0.026, heat: 1.6, // V1.8.1: mag 8 (was 9): the real gun holds 8; armory card, HUD and Spike Rush all read it from here
                         adsFov: 62, adsSpreadMult: 0.72, first: 0.0014, err: 0.006, tap: [-0.15, 0.95], reset: 340, pen: 1.4,
                         falloff: [[12, 1], [24, 0.78], [Infinity, 0.6]], color: 0x7f1d1d, sound: 'bandit', kit: 'bandit',
                         desc: '136 headshot within 12 m • falls off fast' },
@@ -5918,6 +5960,7 @@
             settingsOpen: false,
             userSettings: {
                 qualityMode: 'auto',
+                contentTierMode: 'auto', // V1.8.1: Content Tier, 'auto' (device rule) | 'low' | 'medium' | 'high'; read at startup (contentTier), so it applies after a reload
                 enemyHighlightColor: 'red', // 'red' | 'yellow' | 'purple'
                 atmosphereMode: 'daylight', // 'daylight' | 'competitive' | 'night' | 'sunset' | 'dawn'
                 fov: 75,
@@ -41817,6 +41860,8 @@
         // =============================================
         const DEFAULT_USER_SETTINGS = {
             qualityMode: 'auto',
+            // V1.8.1: Content Tier ('auto' | 'low' | 'medium' | 'high'), read at startup by contentTier
+            contentTierMode: 'auto',
             // V1.8: Ultra Realism feature switches (used while that tier is on)
             ultraFx: { sky: true, materials: true, detail: true, lighting: true, post: true, reflections: true, guns: true, characters: true, effects: true },
             enemyHighlightColor: 'red',
@@ -44966,10 +45011,11 @@
                 const el = document.createElement('div');
                 el.id = 'main-menu';
                 el.className = 'main-menu';
+                // V1.8.1: version label below (V1.8.1 RADIANT EDITION, as on the loading screen)
                 el.innerHTML = `
                     <div class="mm-side">
                         <div class="mm-logo">VALORANT 3D FPS</div>
-                        <div class="mm-sub">V1.8 RADIANT EDITION</div>
+                        <div class="mm-sub">V1.8.1 RADIANT EDITION</div>
                         <div class="mm-view" data-view="main">
                             <button class="mm-btn" data-act="play">PLAY</button>
                             <button class="mm-btn mm-pause-only" data-act="agent">AGENT SELECT</button>
@@ -45253,6 +45299,7 @@
         };
 
         const settingsManager = {
+            // V1.8.1: readSavedContentTier (by contentTier) reads both keys at startup, before init
             LS_CONSENT_KEY: 'valorant_v16_ls_consent',
             LS_DATA_KEY: 'valorant_v16_user_settings',
             // Career (RR) and progression save only while settings are remembered
@@ -45715,6 +45762,17 @@
                     game.userSettings.autoTargetHz = hz;
                     qualityController.setFrameTarget(hz);
                     this.saveToStorage();
+                });
+
+                // V1.8.1: Content Tier is only saved here. contentTier is fixed for the session,
+                // so the choice is used from the next load (it needs saving on to survive it)
+                this.bindPillGroup('setting-content-tier-pills', 'data-contenttier', (val) => {
+                    game.userSettings.contentTierMode = contentTierModeOf(val);
+                    this.syncContentTierUI();
+                    this.saveToStorage();
+                    showNotification(game.userSettings.localStorageEnabled
+                        ? 'Content Tier ' + game.userSettings.contentTierMode.toUpperCase() + ': applies after a reload'
+                        : 'Content Tier needs SAVE SETTINGS ON to apply after a reload', 2400);
                 });
 
                 // TAB 3: Crosshair Studio
@@ -46705,6 +46763,22 @@
                     : '💾 SAVE SETTINGS IN THIS BROWSER: OFF (CLICK TO ENABLE)';
             },
 
+            // V1.8.1: Content Tier pills, plus the tier this session is using beside them
+            // (and the one the next load will use, when the choice has changed since)
+            syncContentTierUI: function() {
+                const mode = contentTierModeOf(game.userSettings.contentTierMode); // as the startup read sees it
+                const g = document.getElementById('setting-content-tier-pills');
+                if (g) g.querySelectorAll('.settings-pill-opt').forEach(b => {
+                    b.classList.toggle('active', b.getAttribute('data-contenttier') === mode);
+                });
+                const badge = document.getElementById('setting-content-tier-val');
+                if (!badge) return;
+                const next = mode === 'auto' ? contentTierAuto : mode;
+                badge.textContent = 'IN USE: ' + contentTier.toUpperCase() + (next !== contentTier ? ' · ' + next.toUpperCase() + ' AFTER RELOAD' : '');
+                badge.title = 'Auto picks ' + contentTierAuto.toUpperCase() + ' on this device (' +
+                    (deviceInfo.isMobile ? 'mobile, ' : '') + deviceInfo.hardwareConcurrency + ' CPU threads)';
+            },
+
             syncAllUI: function() {
                 const cfg = game.userSettings;
                 const setActivePill = (groupId, attr, val) => {
@@ -46745,6 +46819,7 @@
                 setActivePill('setting-fps-mode-pills', 'data-fpsmode', cfg.fpsDisplayMode);
                 setActivePill('setting-sparkline-pills', 'data-spark', cfg.showSparkline ? 'on' : 'off');
                 setActivePill('setting-autotarget-pills', 'data-targethz', cfg.autoTargetHz);
+                this.syncContentTierUI(); // V1.8.1
                 setActivePill('setting-ch-dot-pills', 'data-chdot', cfg.crosshairDot ? 'on' : 'off');
                 setActivePill('setting-ch-outline-pills', 'data-choutline', cfg.crosshairOutline !== false ? 'on' : 'off');
                 setActivePill('setting-ch-bloom-pills', 'data-chbloom', cfg.crosshairBloom);
