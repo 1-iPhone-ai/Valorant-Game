@@ -346,7 +346,7 @@
         .death-recap {
             position: absolute;
             left: 50%;
-            bottom: calc(124px * var(--hud-scale, 1)); /* V1.9: was 230px, above the old 215 px stack; now just above the bottom row and the agent strip */
+            bottom: calc(130px * var(--hud-scale, 1)); /* V1.9: was 230px, above the old 215 px stack; now just above the bottom row and the agent strip */
             transform: translateX(-50%) translateY(10px);
             min-width: 340px;
             max-width: 90vw;
@@ -639,10 +639,11 @@
         .weapon-info {
             display: flex;
             flex-direction: column;
-            /* V1.9: the ammo's slot in the bottom row: as wide as its widest text ("∞ / MELEE",
-               166 px) with the box at its left, so switching guns never moves the row */
+            /* V1.9: the ammo's slot in the bottom row: 124 px ("25 / 25") with the box at its
+               left; a wider text ("100 / 100", "∞ / MELEE") runs on to the right, so switching
+               guns never moves the row and the wider ability slots still fit a 1024 px window */
             align-items: flex-start;
-            width: 166px;
+            width: 124px;
             flex: none;
         }
         
@@ -1126,8 +1127,9 @@
             pointer-events: auto;
         }
 
-        /* V1.9: 56 px square (was 78 x 68): key, cooldown number, icon and charge pips;
-           the ability name is hidden here (it is in the agent picker and the tooltip) */
+        /* V1.9: 56 px square (was 78 x 68): key, cooldown number, icon and charge pips.
+           With Settings > HUD > Ability Names on (the default) the slot is 78 x 64 with
+           the name under the icon (.ability-bar.show-names, below) */
         .ability-slot {
             width: 56px;
             height: 56px;
@@ -1290,7 +1292,7 @@
         }
 
         .ability-name {
-            display: none; /* V1.9: hidden in the 56 px slot; the agent picker lists it and the slot's tooltip (title) shows it */
+            display: none; /* V1.9: shown by .ability-bar.show-names (Ability Names setting); always in the tooltip and the agent picker */
             font-size: 9px;
             font-weight: 700;
             letter-spacing: 0.5px;
@@ -1330,6 +1332,49 @@
         .ult-slot .ability-pip.filled {
             background: #ffcc00;
             box-shadow: 0 0 5px #ffcc00;
+        }
+
+        /* V1.9: Settings > HUD > Ability Names (on by default). Wider slots with the name
+           under the icon; the bar is 74 px tall (88 px with its margin), still clear of the
+           middle of the screen. agentSystem.fitAbilityNames marks a name too long for its
+           slot 'long-name' (a slightly smaller line) and, if it still does not fit,
+           'two-line' (two lines over a smaller icon), so every name shows in full */
+        .ability-bar.show-names .ability-slot {
+            width: 78px;
+            height: 64px;
+        }
+        .ability-bar.show-names .ability-icon {
+            width: 22px;
+            height: 22px;
+        }
+        .ability-bar.show-names .ability-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+        .ability-bar.show-names .ability-name {
+            display: block;
+            max-width: 100%;
+            font-size: 8.5px;
+            line-height: 10px;
+            letter-spacing: 0.3px;
+            text-align: center;
+        }
+        .ability-bar.show-names .ability-slot.long-name .ability-name {
+            font-size: 8px;
+            letter-spacing: 0.2px;
+        }
+        .ability-bar.show-names .ability-slot.two-line .ability-icon {
+            width: 16px;
+            height: 16px;
+        }
+        .ability-bar.show-names .ability-slot.two-line .ability-icon svg {
+            width: 15px;
+            height: 15px;
+        }
+        .ability-bar.show-names .ability-slot.two-line .ability-name {
+            white-space: normal;
+            line-height: 8.5px;
+            overflow: visible;
         }
 
         /* Screen FX overlays for abilities */
@@ -4880,6 +4925,18 @@
                                 </div>
                             </div>
 
+                            <!-- V1.9: ability names in the bottom ability bar (on by default) -->
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Ability Names (Bottom Ability Bar)</strong>
+                                    <small>Show each ability's name under its icon. Hide for smaller slots: the name still shows on hover and in the agent picker</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-hud-abilitynames-pills">
+                                    <button class="settings-pill-opt active" data-abilitynames="show">SHOW NAMES</button>
+                                    <button class="settings-pill-opt" data-abilitynames="hide">HIDE</button>
+                                </div>
+                            </div>
+
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>Keybind Legend Box (Bottom-Left)</strong>
@@ -6162,6 +6219,7 @@
                 headshotVolume: 100,
                 showRecoilTrainer: false,
                 showMinimap: true,
+                showAbilityNames: true, // V1.9: ability names under the icons in the ability bar (on by default)
                 showHints: true,
                 showDamageNumbers: true,
                 hudScale: 100,         // V1.7: HUD Size % (80-130)
@@ -23677,9 +23735,25 @@
                     const ab = def.abilities[slotKey];
                     if (abilityIcons[slotKey]) abilityIcons[slotKey].innerHTML = ab.svg;
                     if (abilityNames[slotKey]) abilityNames[slotKey].textContent = ab.name;
-                    // V1.9: the name is hidden in the smaller slot; it shows as the slot's tooltip
+                    // V1.9: the name also shows as the slot's tooltip (it is hidden with Ability Names off)
                     if (abilitySlots[slotKey]) abilitySlots[slotKey].title = ab.name;
                 });
+                this.fitAbilityNames(); // V1.9
+            },
+
+            // V1.9: with Ability Names on, a name too wide for its slot (11 of the 116) first
+            // gets a slightly smaller line ('long-name'); one that still does not fit (5, e.g.
+            // FROM THE SHADOWS) wraps onto two lines over a smaller icon ('two-line'), so every
+            // name shows in full. Measured for all four slots at once (one layout per step).
+            fitAbilityNames: function() {
+                const keys = ['c', 'q', 'e', 'x'].filter((k) => abilitySlots[k] && abilityNames[k]);
+                const on = keys.length > 0 && abilitySlots[keys[0]].parentElement.classList.contains('show-names');
+                keys.forEach((k) => abilitySlots[k].classList.remove('long-name', 'two-line'));
+                if (!on) return;
+                const overflows = (k) => abilityNames[k].scrollWidth > abilityNames[k].clientWidth + 0.5;
+                const long = keys.filter(overflows);
+                long.forEach((k) => abilitySlots[k].classList.add('long-name'));
+                long.filter(overflows).forEach((k) => abilitySlots[k].classList.add('two-line'));
             },
 
             consumeCharge: function(slotKey, now) {
@@ -42136,6 +42210,7 @@
             headshotVolume: 100,
             showRecoilTrainer: false,
             showMinimap: true,
+            showAbilityNames: true, // V1.9: ability names in the ability bar, on by default (older saves get it from here)
             showHints: true,
             showDamageNumbers: true,
             hudScale: 100,
@@ -46296,6 +46371,13 @@
                     this.saveToStorage();
                 });
 
+                // V1.9: ability names in the ability bar (on by default)
+                this.bindPillGroup('setting-hud-abilitynames-pills', 'data-abilitynames', (val) => {
+                    game.userSettings.showAbilityNames = (val === 'show');
+                    this.applyHudVisibility();
+                    this.saveToStorage();
+                });
+
                 const hudScaleSlider = document.getElementById('setting-hud-scale');
                 if (hudScaleSlider) {
                     hudScaleSlider.addEventListener('input', (e) => {
@@ -46876,6 +46958,10 @@
                 const recoilEl = document.getElementById('recoil-trainer-widget');
 
                 if (minimapEl) minimapEl.style.display = cfg.showMinimap ? '' : 'none';
+                // V1.9: ability names under the icons (Settings > HUD, on by default); then fit long names
+                const abilityBarEl = document.getElementById('ability-bar');
+                if (abilityBarEl) abilityBarEl.classList.toggle('show-names', cfg.showAbilityNames !== false);
+                if (typeof agentSystem !== 'undefined' && agentSystem.fitAbilityNames) agentSystem.fitAbilityNames();
                 if (hintsEl) hintsEl.style.display = cfg.showHints ? '' : 'none';
                 if (typeof controlsHelp !== 'undefined') controlsHelp.sync();
                 if (floatingDmgLayer) floatingDmgLayer.style.display = cfg.showDamageNumbers ? '' : 'none';
@@ -47051,6 +47137,7 @@
                 setActivePill('setting-audio-mute-pills', 'data-audiomute', game.soundEnabled ? 'on' : 'off');
                 setActivePill('setting-hud-recoil-pills', 'data-recoilhud', cfg.showRecoilTrainer ? 'show' : 'hide');
                 setActivePill('setting-hud-minimap-pills', 'data-minimap', cfg.showMinimap ? 'show' : 'hide');
+                setActivePill('setting-hud-abilitynames-pills', 'data-abilitynames', cfg.showAbilityNames !== false ? 'show' : 'hide'); // V1.9
                 setActivePill('setting-hud-hints-pills', 'data-hints', cfg.showHints ? 'show' : 'hide');
                 setActivePill('setting-hud-dmg-pills', 'data-dmgnums', cfg.showDamageNumbers ? 'show' : 'hide');
                 setActivePill('setting-bot-diff-pills', 'data-botdiff', cfg.botDifficulty || 'gold');

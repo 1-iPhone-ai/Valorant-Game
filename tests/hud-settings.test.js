@@ -67,6 +67,15 @@ test('settings are remembered across reloads by default, and the opt-out sticks'
     await page.evaluate(() => { game.userSettings.showSparkline = true; settingsManager.saveToStorage(); });
     await reload();
     assert.equal(await page.evaluate(() => game.userSettings.showSparkline), true, 'a saved FPS graph setting is kept');
+    // V1.9: ability names are on by default, also for a save from before the setting existed,
+    // and a saved choice to hide them is kept
+    assert.equal(await page.evaluate(() => game.userSettings.showAbilityNames), true, 'ability names on by default');
+    await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('valorant_v16_user_settings')); delete s.showAbilityNames; localStorage.setItem('valorant_v16_user_settings', JSON.stringify(s)); });
+    await reload();
+    assert.equal(await page.evaluate(() => game.userSettings.showAbilityNames), true, 'an older save gets ability names on');
+    await page.evaluate(() => { game.userSettings.showAbilityNames = false; settingsManager.saveToStorage(); });
+    await reload();
+    assert.deepEqual(await page.evaluate(() => [game.userSettings.showAbilityNames, document.getElementById('ability-bar').classList.contains('show-names')]), [false, false], 'a saved choice to hide them is kept');
     await page.evaluate(() => {
         game.userSettings.atmosphereMode = 'night';
         game.userSettings.brightness = 125;
@@ -148,9 +157,9 @@ test('HUD Size 80-130%: panels scale together with no overlaps at 1280x720, 1920
     }
 });
 
-// V1.9 HUD layout: one bottom row of 56 px ability slots and the ammo, a short-lived
-// agent strip, the weapons listed at the right edge, one-line teammate plates and a
-// one-line FPS readout
+// V1.9 HUD layout: one bottom row of ability slots (named by default; 56 px squares with
+// Ability Names off) and the ammo, a short-lived agent strip, the weapons listed at the
+// right edge, one-line teammate plates and a one-line FPS readout
 test('V1.9 HUD: bottom row, agent strip, weapon list, teammate plates and one-line FPS readout', { timeout: 300000 }, async () => {
     const { page, errors, frames, evaluate } = await boot({ viewport: { width: 1280, height: 720 } });
     const row = await evaluate(() => {
@@ -166,13 +175,33 @@ test('V1.9 HUD: bottom row, agent strip, weapon list, teammate plates and one-li
             rows: Array.from(document.querySelectorAll('#weapon-selector .weapon-slot')).map((s) => s.getBoundingClientRect().height)
         };
     });
-    assert.deepEqual(row.slot, [56, 56], 'ability slots are 56 px square');
+    assert.deepEqual(row.slot, [78, 64], 'with Ability Names on (the default) the slots are 78 x 64 px');
     assert.ok(row.tall <= 96, `the bottom row stays within 96 px of the bottom (${row.tall})`);
     assert.ok(row.sameRow, 'the ammo sits beside the abilities');
-    assert.equal(row.nameShown, false, 'ability names are hidden in the slots');
+    assert.equal(row.nameShown, true, 'ability names show under the icons by default');
     assert.equal(row.title, row.name, 'the slot tooltip names the ability');
     assert.ok(row.weaponsAboveScore, 'the weapons are listed at the right edge above the score');
     assert.ok(row.rows.length === 4 && row.rows.every((h) => h < 30), 'one short row per weapon');
+
+    // Every agent's ability names show in full: a long one gets a smaller line or two lines
+    const cut = await evaluate(() => {
+        const out = [];
+        for (const id of AGENT_ORDER) {
+            agentSystem.selectAgent(id);
+            for (const k of ['c', 'q', 'e', 'x']) {
+                const n = document.getElementById('ability-name-' + k), slot = n.parentElement;
+                const nb = n.getBoundingClientRect(), pb = document.getElementById('ability-pips-' + k).getBoundingClientRect();
+                const lines = Math.round(nb.height / parseFloat(getComputedStyle(n).lineHeight));
+                if (n.scrollWidth > n.clientWidth + 0.5 || lines > (slot.classList.contains('two-line') ? 2 : 1) || nb.bottom > pb.top + 0.5) out.push(`${id} ${k}: ${n.textContent}`);
+            }
+        }
+        return out;
+    });
+    assert.deepEqual(cut, [], 'every ability name fits its slot');
+    // Hiding them (Settings > HUD) gives the compact 56 px slots
+    await evaluate(() => document.querySelector('#setting-hud-abilitynames-pills [data-abilitynames="hide"]').click());
+    assert.deepEqual(await evaluate(() => { const b = document.getElementById('ability-slot-c').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height), getComputedStyle(document.getElementById('ability-name-c')).display]; }), [56, 56, 'none']);
+    await evaluate(() => document.querySelector('#setting-hud-abilitynames-pills [data-abilitynames="show"]').click());
 
     // Agent strip: shows on an agent change and at a new round, gone after 4 s; the passive
     // and the [G]/[TAB] hint are in the controls help
