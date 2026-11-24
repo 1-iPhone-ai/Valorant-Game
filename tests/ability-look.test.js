@@ -166,6 +166,19 @@ test('Classic builds and compiles nothing; High Fidelity draws the ten proof abi
     }
     assert.deepEqual(missing, [], 'every proof ability is drawn by its renderer');
 
+    // Tailwind's wind wraps the off-hand on the existing cast gesture's own clock (driven directly, as cast.test does)
+    const hand = await evaluate(() => {
+        agentSystem.selectAgent('jett');
+        agentSystem.castAbility('e');
+        const a = castFX.active;
+        if (!a) return 'no cast gesture';
+        abilityLook.update(a.start + 60, 0.016);
+        let swirl = null;
+        abilityLook.vmRoot.traverse((o) => { if (o.isMesh) swirl = o; });
+        return { kind: a.kind, swirl: swirl.visible, onHand: swirl.position.distanceTo(castFX.core.position) < 1e-6, fade: swirl.material.uniforms.uFade.value > 0 };
+    });
+    assert.deepEqual(hand, { kind: 'cast', swirl: true, onHand: true, fade: true }, 'the wind swirl rides the cast gesture');
+
     // While bound, only that item's Classic materials are hidden; colliders and shot proxies stay
     r = await evaluate(() => {
         const out = { hiddenWhileBound: true, wallProxyIntact: true };
@@ -224,15 +237,16 @@ test('gameplay is identical in both looks: smoke sight lines, wall shots and blo
         return now;
     }, look).then(async () => {
         await frames(3);
+        // an open stretch of the map: the player at (-40, 0) looking along +Z, nothing in the way for 40 m
         await evaluate(() => {
             const A = agentSystem, now = performance.now();
-            A.spawnSmokeSphere(4, 1.2, 8, 0x6d28d9, 4.6, 9000, now);
-            A.spawnMollyZone(-6, 0, 10, now, false, false, false);
+            A.spawnSmokeSphere(-36, 1.2, 14, 0x6d28d9, 4.6, 9000, now);
+            A.spawnMollyZone(-45, 0, 10, now, false, false, false);
             agentSystem.selectAgent('sage');
-            characterController.position.set(0, 1.7, 22);
+            characterController.position.set(-40, 1.7, 0);
             characterController.prevSimPosition.copy(characterController.position);
             camera.position.copy(characterController.position);
-            camera.rotation.set(-0.3, 0, 0, 'YXZ');
+            camera.rotation.set(-0.1, Math.PI, 0, 'YXZ');   // level enough that the wall goes 3.4 m ahead (looking down boosts you up on it)
             agentSystem.castAbility('c');
         });
         await frames(look === 'hifi' ? 8 : 4);
@@ -243,18 +257,21 @@ test('gameplay is identical in both looks: smoke sight lines, wall shots and blo
             const molly = A.mollies.find((m) => m.inUse);
             // sight lines across the smoke (a 9 x 5 fan from two eyes)
             const sight = [];
-            for (const o of [new THREE.Vector3(0, 1.6, 20), new THREE.Vector3(10, 1.6, 16)]) {
+            for (const o of [new THREE.Vector3(-40, 1.6, 2), new THREE.Vector3(-30, 1.6, 4)]) {
                 for (let i = 0; i < 9; i++) for (let j = 0; j < 5; j++) {
-                    const t = new THREE.Vector3(-2 + i * 1.5, 0.2 + j * 0.6, 0);
+                    const t = new THREE.Vector3(-42 + i * 1.5, 0.2 + j * 0.6, 26);
                     sight.push(A.isBlockedBySmoke(o, t) ? 1 : 0);
                 }
             }
-            // bullets through the wall: what is hit first, and where
+            // bullets at the wall from the player's side, across its width and past both ends: what is hit first, and where
+            // (the shot index exact-tests with the game's own raycaster, as a bullet does)
             const shots = [];
-            const ray = new THREE.Ray();
+            const ray = raycaster.ray, savedO = ray.origin.clone(), savedD = ray.direction.clone(), savedFar = raycaster.far;
+            const wc = wall.collider, midX = (wc.minX + wc.maxX) / 2, midY = (wc.minY + wc.maxY) / 2;
             for (let i = 0; i < 7; i++) {
-                ray.origin.set(-3 + i, 1.2, 24);
-                ray.direction.set(0, 0, -1);
+                ray.origin.set(midX - 3 + i, midY, wc.minZ - 3);
+                ray.direction.set(0, 0, 1);
+                raycaster.far = 40;
                 _shotHits.length = 0;
                 envShotIndex.raycast(ray, 40);
                 _shotHits.sort(compareHitDistance);
@@ -262,6 +279,7 @@ test('gameplay is identical in both looks: smoke sight lines, wall shots and blo
                 shots.push(h ? [h.object === wall.mesh, +h.distance.toFixed(3)] : null);
                 _shotHits.length = 0;
             }
+            ray.origin.copy(savedO); ray.direction.copy(savedD); raycaster.far = savedFar;
             const c = wall.collider;
             return {
                 bound: abilityLook.mode === 'hifi' ? [!!(smoke._hf && smoke._hf.on), !!(wall._hf && wall._hf.on), !!(molly._hf && molly._hf.on)] : null,

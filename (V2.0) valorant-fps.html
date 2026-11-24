@@ -43961,7 +43961,7 @@
                 strip.visible = false; strip.frustumCulled = false;
                 L.root.add(strip);
                 const inst = { busy: false, strip: strip, mat: mat };
-                const dir = L._v[2];
+                const dir = L._v[2], savedO = new THREE.Vector3(), savedD = new THREE.Vector3();
                 return {
                     acquire: function (key, beam, now) {
                         if (inst.busy) return null;
@@ -43972,6 +43972,7 @@
                         // first surface along the beam (read-only use of the shot index, as getAimGroundPoint does)
                         let hitD = 100;
                         const savedFar = raycaster.far;
+                        savedO.copy(raycaster.ray.origin); savedD.copy(raycaster.ray.direction);   // V2.0: the shared raycaster is put back as it was
                         raycaster.ray.origin.copy(o);
                         raycaster.ray.direction.copy(dir);
                         raycaster.far = 100;
@@ -43979,6 +43980,7 @@
                         envShotIndex.raycast(raycaster.ray, 100);
                         if (_shotHits.length > 0) { _shotHits.sort(compareHitDistance); hitD = _shotHits[0].distance; }
                         _shotHits.length = 0;
+                        raycaster.ray.origin.copy(savedO); raycaster.ray.direction.copy(savedD);
                         raycaster.far = savedFar;
                         const hx = o.x + dir.x * hitD, hy = o.y + dir.y * hitD, hz = o.z + dir.z * hitD;
                         haloSystem.flash(o.x, o.y, o.z, 0xd8f3ff, 1.6, 260);
