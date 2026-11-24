@@ -10108,8 +10108,8 @@
                     planBox(-37, -35.5, -4, -2.5, 0, 8, CH);                                                           // a jamb at the mid entry
                     // Doglegs in the Library and the Kitchen Yard just off A and C: no line runs from the
                     // attackers' lanes through a site down a defender link
-                    planBox(19, 21, -38, -35.5, 0, 8, CH); planBox(24, 26, -35.5, -33, 0, 8, CH);
-                    planBox(19, 21, 35.5, 38, 0, 8, CH); planBox(24, 26, 33, 35.5, 0, 8, CH);
+                    planBox(20, 22, -38, -35.5, 0, 8, CH); planBox(25, 27, -35.5, -33, 0, 8, CH);
+                    planBox(20, 22, 35.5, 38, 0, 8, CH); planBox(25, 27, 33, 35.5, 0, 8, CH);
                     // A site (16 x 16, x 2..18). Entrances: the Pilgrim Walk and the Cloister from the west, the
                     // Library from the east. The Bell Tower (heaven) is a 2.5 m platform in the north-east
                     // corner, up five 0.5 m steps along the north wall, with a chest-high rail facing the site.
@@ -12909,6 +12909,7 @@
         };
 
         const _enemyColScratch = [];
+        const _enemyHereScratch = [];   // V2.1: where a pushed bot ended up
         // Index of the first map box (from a collisionIndex query) a bot of this radius
         // overlaps at its height, or -1
         const _enemyEscapeScratch = [];
@@ -12963,7 +12964,10 @@
             // bot back and forth into each other, so it could stay wedged inside them.
             // If it is still inside one, step it out to the nearest point that is clear
             // of every box (rare: only reached when the pass above could not free it).
-            if (!testOnly && enemyInsideBox(pos, radius, nearby) >= 0) {
+            // V2.1: ...and look again round where it ended up: a run of steps can push it more than
+            // a metre, into a box (the platform at their top) the first look did not cover
+            if (!testOnly && (enemyInsideBox(pos, radius, nearby) >= 0 || (hitWall &&
+                enemyInsideBox(pos, radius, collisionIndex.query(pos.x - radius - 1.2, pos.z - radius - 1.2, pos.x + radius + 1.2, pos.z + radius + 1.2, _enemyHereScratch)) >= 0))) {
                 const wide = collisionIndex.query(pos.x - radius - 9, pos.z - radius - 9, pos.x + radius + 9, pos.z + radius + 9, _enemyEscapeScratch);
                 let best = Infinity, bx = pos.x, bz = pos.z;
                 const ox = pos.x, oz = pos.z;
@@ -46926,9 +46930,21 @@
                 for (const p of this._layoutSpots(L)) if (p[0] > minX - 1.5 && p[0] < maxX + 1.5 && p[1] > minZ - 1.5 && p[1] < maxZ + 1.5) return false;
                 if (!barrel) return true;
                 const w = 2.6;
-                const xOk = this._clear(minX - w, minZ, minX, maxZ, 0) || this._clear(maxX, minZ, maxX + w, maxZ, 0);
-                const zOk = this._clear(minX, minZ - w, maxX, minZ, 0) || this._clear(minX, maxZ, maxX, maxZ + w, 0);
+                const xOk = this._open(minX - w, minZ, minX, maxZ) || this._open(maxX, minZ, maxX + w, maxZ);
+                const zOk = this._open(minX, minZ - w, maxX, minZ) || this._open(minX, maxZ, maxX, maxZ + w);
                 return xOk && zOk;
+            },
+            // V2.1: no wall, cover piece or other prop in this strip of floor (a way past a barrel)
+            _open: function (minX, minZ, maxX, maxZ) {
+                for (const r of collisionIndex.query(minX, minZ, maxX, maxZ, this._scratch)) {
+                    if (r.maxY < 0.15) continue;
+                    if (r.maxX > minX && r.minX < maxX && r.maxZ > minZ && r.minZ < maxZ) return false;
+                }
+                for (const p of this.glass.concat(this.barrels)) {
+                    const b = p.box;
+                    if (b.max.x > minX && b.min.x < maxX && b.max.z > minZ && b.min.z < maxZ) return false;
+                }
+                return Math.abs(minX) < 49.5 && Math.abs(maxX) < 49.5 && Math.abs(minZ) < 49.5 && Math.abs(maxZ) < 49.5;
             },
 
             _collider: function (box) {
@@ -46954,11 +46970,13 @@
                 let seed = 0;
                 for (const ch of String(game.mapPreset || 'ascent')) seed = seed * 31 + ch.charCodeAt(0);
                 const rnd = this._rng(seed);
-                // V2.1: a map with safe props (narrow lanes) gets more tries to find its spots
-                const triesMax = mapLayout().propSafe ? 2400 : 400;
+                // V2.1: a map with safe props (narrow lanes, some along the arena's edge) gets more tries
+                // over the whole arena to find its spots
+                const safe = !!mapLayout().propSafe;
+                const triesMax = safe ? 2400 : 400, glassSpan = safe ? 46 : 38, barrelSpan = safe ? 46 : 40;
                 for (let tries = 0; tries < triesMax && this.glass.length < 4; tries++) {
                     const alongX = rnd() < 0.5;
-                    const x = (rnd() * 2 - 1) * 38, z = (rnd() * 2 - 1) * 38;
+                    const x = (rnd() * 2 - 1) * glassSpan, z = (rnd() * 2 - 1) * glassSpan;
                     const hw = 1.6, ht = 0.08;
                     const minX = x - (alongX ? hw : ht), maxX = x + (alongX ? hw : ht), minZ = z - (alongX ? ht : hw), maxZ = z + (alongX ? ht : hw);
                     if (!this._awayFromKeySpots(x, z) || !this._clear(minX, minZ, maxX, maxZ, mapLayout().propMargin)) continue;
@@ -46966,7 +46984,7 @@
                     this._makeGlass(x, z, alongX);
                 }
                 for (let tries = 0; tries < triesMax && this.barrels.length < 6; tries++) {
-                    const x = (rnd() * 2 - 1) * 40, z = (rnd() * 2 - 1) * 40;
+                    const x = (rnd() * 2 - 1) * barrelSpan, z = (rnd() * 2 - 1) * barrelSpan;
                     if (!this._awayFromKeySpots(x, z) || !this._clear(x - 0.45, z - 0.45, x + 0.45, z + 0.45, 0.5)) continue;
                     // Next to cover, like a real map
                     if (this._clear(x - 0.45, z - 0.45, x + 0.45, z + 0.45, 2.6)) continue;
