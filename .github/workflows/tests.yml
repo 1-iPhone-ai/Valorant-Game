@@ -1,7 +1,7 @@
 name: Game regression tests
 
 # Headless Chromium (software WebGL, no GPU needed) loads the latest
-# "(V1.x) valorant-fps.html" and checks: clean load, no shader compiles after
+# "(V2.x) valorant-fps.html" and checks: clean load, no shader compiles after
 # warm-up, every agent ability and ultimate, all maps and atmosphere modes,
 # quality switching, and controller input (simulated gamepad).
 #

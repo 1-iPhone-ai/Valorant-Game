@@ -1,7 +1,7 @@
 {
   "name": "valorant-game-tests",
   "private": true,
-  "description": "Headless browser regression tests for the latest (V1.x) valorant-fps.html",
+  "description": "Headless browser regression tests for the latest (V2.x) valorant-fps.html",
   "scripts": {
     "test": "node --test --test-concurrency=1 --test-reporter=spec"
   },
