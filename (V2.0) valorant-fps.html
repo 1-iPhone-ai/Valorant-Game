@@ -28860,6 +28860,7 @@
                 item.mesh.visible = true;
                 item.lookKey = abilityLook.tag;   // V2.0: the ability this ring belongs to (High Fidelity draws its own)
                 if (!abilityLook.claims(item)) fxKit.ring(x, y, z, colorHex, Math.min(6, maxScale || 1));   // V1.7 dust + sparks
+                else abilityLook.bindNow(item, 'ring', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
             spawnSmokeSphere: function(x, y, z, colorHex, radius, durationMs, now) {
@@ -28978,6 +28979,7 @@
                 item.mesh.visible = true;
                 item.lookKey = abilityLook.tag;   // V2.0: the ability this burst belongs to (High Fidelity draws its own)
                 if (!abilityLook.claims(item)) fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
+                else abilityLook.bindNow(item, 'flash', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
             spawnReconBeacon: function(x, y, z, now) {
@@ -42639,6 +42641,12 @@
                 for (const k in this.R) if (this.R[k].clear) this.R[k].clear();
             },
 
+            // A claimed burst or ring is bound as it spawns: the four flash items are reused when all are
+            // out (Paint Shells' clusters), so one may be taken back before the next frame's scan sees it
+            bindNow: function (it, kind, now) {
+                if (this.mode === 'hifi') this.scanOne(it, kind, now, 0);
+            },
+
             // Bot rusher's Tailwind dash (tacticalDirector): wind streaks along the move
             botDash: function (enemy, sx, sz, now) {
                 if (this.mode !== 'hifi' || !this.R.self) return;
@@ -43890,8 +43898,17 @@
                     const coreMat = mk(2, 2.4, 0), streakMat = mk(3, 14, 0), orbMat = mk(0, 0.7, 0);
                     const core = new THREE.Mesh(quad, coreMat), streaks = new THREE.Mesh(streakGeo, streakMat), orb = new THREE.Mesh(quad, orbMat);
                     for (const m of [core, streaks, orb]) { m.visible = false; m.frustumCulled = false; m.renderOrder = 3; L.root.add(m); }
-                    pool.push({ busy: false, kind: '', burstAt: 0, dur: 380, core: core, coreMat: coreMat, streaks: streaks, streakMat: streakMat, orb: orb, orbMat: orbMat });
+                    pool.push({ busy: false, tail: false, kind: '', burstAt: 0, dur: 380, core: core, coreMat: coreMat, streaks: streaks, streakMat: streakMat, orb: orb, orbMat: orbMat });
                 }
+                const animate = (p, now) => {
+                    const t = Math.max(0, (now - p.burstAt) / p.dur);
+                    const rise = Math.min(1, t / 0.08), fall = Math.pow(Math.max(0, 1 - t), 1.6);
+                    p.coreMat.uniforms.uFade.value = rise * fall;
+                    p.coreMat.uniforms.uScale.value = 1.6 + 3.2 * Math.sqrt(Math.min(1, t * 2.5));
+                    p.streakMat.uniforms.uFade.value = rise * Math.pow(Math.max(0, 1 - t), 2.2);
+                    p.streakMat.uniforms.uScale.value = 9 + 16 * Math.min(1, t * 3);
+                };
+                const free = (p) => { p.busy = false; p.tail = false; p.core.visible = p.streaks.visible = p.orb.visible = false; };
                 const burst = (p, x, y, z, now, dur) => {
                     p.burstAt = now; p.dur = dur;
                     p.core.position.set(x, y, z); p.streaks.position.set(x, y, z);
@@ -43908,7 +43925,7 @@
                         for (let i = 0; i < pool.length; i++) {
                             const p = pool[i];
                             if (p.busy) continue;
-                            p.busy = true; p.kind = kind; p.burstAt = 0;
+                            p.busy = true; p.tail = false; p.kind = kind; p.burstAt = 0;
                             if (kind === 'hazard') { p.orb.visible = true; p.orb.position.set(it.x, it.y, it.z); }
                             else burst(p, it.position.x, it.position.y, it.position.z, now, Math.max(120, it.expireAt - it.startAt));
                             return p;
@@ -43926,15 +43943,23 @@
                                 return;
                             }
                         }
-                        const t = Math.max(0, (now - p.burstAt) / p.dur);
-                        const rise = Math.min(1, t / 0.08), fall = Math.pow(Math.max(0, 1 - t), 1.6);
-                        p.coreMat.uniforms.uFade.value = rise * fall;
-                        p.coreMat.uniforms.uScale.value = 1.6 + 3.2 * Math.sqrt(Math.min(1, t * 2.5));
-                        p.streakMat.uniforms.uFade.value = rise * Math.pow(Math.max(0, 1 - t), 2.2);
-                        p.streakMat.uniforms.uScale.value = 9 + 16 * Math.min(1, t * 3);
+                        animate(p, now);
                     },
-                    release: function (p) { p.busy = false; p.core.visible = p.streaks.visible = p.orb.visible = false; },
-                    tick: function () {}
+                    // natural: the Classic item ended or was reused; a burst that has started plays out on its
+                    // own clock (a switch to Classic, or an orb that never burst, ends at once)
+                    release: function (p, natural) {
+                        if (natural && p.burstAt) p.tail = true;
+                        else free(p);
+                    },
+                    clear: function () { for (let i = 0; i < pool.length; i++) free(pool[i]); },
+                    tick: function (now) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (!p.tail) continue;
+                            if (now - p.burstAt >= p.dur) free(p);
+                            else animate(p, now);
+                        }
+                    }
                 };
             },
 

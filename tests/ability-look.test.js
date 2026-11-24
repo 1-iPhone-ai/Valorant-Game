@@ -165,6 +165,18 @@ test('Classic builds and compiles nothing; High Fidelity draws the ten proof abi
         missing.push(...(await waitBound(keys)));
     }
     assert.deepEqual(missing, [], 'every proof ability is drawn by its renderer');
+    // All four flash items out (Paint Shells' clusters): a Curveball that pops then, and has its item
+    // taken back before the next frame, is still drawn (a claimed burst is bound as it spawns)
+    const reused = await evaluate(() => {
+        __bound.delete('phoenix.q>flash');
+        const A = agentSystem, now = performance.now();
+        const burst = (tag, x, col) => { abilityLook.tag = tag; A.spawnFlashBurst(x, 1, 10, col, 5.5, 420, now); abilityLook.tag = null; };
+        for (let k = 0; k < 4; k++) burst('raze.e', -6 + k * 3, 0xfb923c);
+        burst('phoenix.q', 0, 0xffe066);
+        burst('raze.e', 3, 0xfb923c);
+        return __bound.has('phoenix.q>flash');
+    });
+    assert.equal(reused, true, 'a Curveball whose flash item is reused at once is still drawn');
 
     // Tailwind's wind wraps the off-hand on the existing cast gesture's own clock (driven directly, as cast.test does)
     const hand = await evaluate(() => {
