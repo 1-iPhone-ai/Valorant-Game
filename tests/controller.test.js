@@ -103,13 +103,16 @@ test('PlayStation pad: detection, analog movement, look, fire, ADS, menus', { ti
     await press(9);
     assert.deepEqual(await evaluate(() => [mainMenu.open, mainMenu.kind]), [true, 'pause']);
     const focusAct = () => evaluate(() => gamepadController.navFocus && gamepadController.navFocus.dataset.act);
-    // Steer to SETTINGS from either side (a held D-pad auto-repeats, so a slow frame can move twice)
+    // Steer to SETTINGS from either side. A held D-pad auto-repeats after 380 ms, so at software
+    // frame rates a 3-frame press moved 2 or 3 items and could bounce over SETTINGS for good
+    // (it did once V1.9 drew frames ~4% faster); a one-frame tap moves exactly one item.
     const order = ['play', 'agent', 'modes', 'map', 'ranked', 'career', 'workshop', 'settings', 'controls', 'photo'];
     const target = order.indexOf('settings');
+    const tap = async (i) => { await evaluate((i) => __press(i, true), i); await frames(1); await evaluate((i) => __press(i, false), i); await frames(2); };
     for (let i = 0; i < 14; i++) {
         const at = order.indexOf(await focusAct());
         if (at === target) break;
-        await press(at > target ? 12 : 13);
+        await tap(at > target ? 12 : 13);
     }
     assert.equal(await focusAct(), 'settings', 'D-pad reaches SETTINGS');
     await press(0);

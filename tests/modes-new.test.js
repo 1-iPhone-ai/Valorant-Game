@@ -32,8 +32,16 @@ test('Deathmatch: free-for-all board, your kills and deaths, bots killing each o
     const duel = await evaluate(() => {
         const bots = enemyObjects.filter((x) => x.isActive && !x.hit).slice(0, 2);
         const p = characterController.position;
-        // Far from the player, in the open, 8 m apart
-        const spot = findOpenSpot(30, 0);
+        // Far from the player, in the open, 6 m apart with nothing between them. A random open spot
+        // alone put the second bot inside or behind a wall of the walled Ascent about 40% of the
+        // time, and then neither bot ever had a shot (the test failed at random)
+        let spot = null;
+        for (let i = 0; i < 200 && !spot; i++) {
+            const s = findOpenSpot(30, 0), s2 = s.clone();
+            s2.x += 6;
+            if (resolveEnemyMapCollision(s2.clone(), 0.8, true)) continue;
+            if (agentSystem.hasWallLineOfSight(new THREE.Vector3(s.x, 1.45, s.z), new THREE.Vector3(s2.x, 1.3, s2.z), 6)) spot = s;
+        }
         bots[0].mesh.position.set(spot.x, 0, spot.z); bots[1].mesh.position.set(spot.x + 6, 0, spot.z);
         for (const b of enemyObjects) if (b !== bots[0] && b !== bots[1] && b.isActive) { b.mesh.position.set(-45, 0, -45 + b.slot * 2); }
         for (const b of bots) { b.poseDirty = true; syncEnemyBroadphase(b); b.dmNextShotAt = 0; }
