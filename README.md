@@ -16,6 +16,7 @@ The `tests/` folder holds headless browser tests. They need no GPU, because Chro
 - **Load:** the game loads without errors.
 - **Shader compiles:** none happen after warm-up, including when switching quality.
 - **Abilities:** every agent's abilities and ultimate cast, and ground effects stay circular.
+- **Ability numbers (V1.9.1):** the Duelists' gameplay numbers live in one table, `AGENT_TUNING[agent][slot]` (C, Q, E and X, each with a `look`); it keeps that shape, holds only numbers, and nothing changes it during play.
 - **Maps and modes:** all 7 maps × 3 atmosphere modes.
 - **Controller:** input works through a simulated gamepad.
 - **Game modes:** Wave, Retake and the 30-bot Range play through planting, defusing, detonation, round changes and the range scorecard.

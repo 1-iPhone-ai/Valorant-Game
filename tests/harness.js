@@ -13,7 +13,7 @@ const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
 
-const GAME_FILE = path.resolve(__dirname, '..', process.env.GAME_FILE || '(V1.9) valorant-fps.html');
+const GAME_FILE = path.resolve(__dirname, '..', process.env.GAME_FILE || '(V1.9.1) valorant-fps.html');
 const THREE_JS = fs.readFileSync(require.resolve('three/build/three.min.js'));
 
 // Autoplay is allowed so the Web Audio graph runs without a user gesture (the

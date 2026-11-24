@@ -102,3 +102,50 @@ test('Reyna and Omen kits work end to end', { timeout: 240000 }, async () => {
     assert.ok(r.stepped && r.portals === 2, 'Shrouded Step teleports with two portals');
     assert.deepEqual(errors, []);
 });
+
+// V1.9.1: the Duelists' ability numbers live in AGENT_TUNING[agent][slot]. The table keeps its
+// shape (all four slots, a look from the fixed list, numbers only), ABILITY_TUNING is folded
+// into it, and nothing writes to the table while the kits are played.
+test('AGENT_TUNING: every Duelist has C, Q, E and X with a look, numbers only, unchanged by play', { timeout: 300000 }, async () => {
+    const { page, errors, frames } = await boot({ quality: 'low' });
+    const LOOKS = ['smoke', 'wall', 'groundZone', 'projectile', 'blast', 'flash', 'beam', 'pulse', 'deployable', 'self'];
+    const shape = await page.evaluate((LOOKS) => {
+        const bad = [];
+        const duelists = Object.keys(AGENT_DEFS).filter((id) => AGENT_DEFS[id].role === 'DUELIST');
+        for (const id of duelists) {
+            for (const slot of ['c', 'q', 'e', 'x']) if (!(AGENT_TUNING[id] && AGENT_TUNING[id][slot])) bad.push(`${id}.${slot} missing`);
+        }
+        for (const [id, slots] of Object.entries(AGENT_TUNING)) {
+            for (const [slot, t] of Object.entries(slots)) {
+                if (!['c', 'q', 'e', 'x'].includes(slot)) { bad.push(`${id}.${slot} is not a slot`); continue; }
+                if (!Array.isArray(t.look) || !t.look.length || t.look.some((l) => !LOOKS.includes(l))) bad.push(`${id}.${slot}.look`);
+                for (const [k, v] of Object.entries(t)) if (k !== 'look' && !Number.isFinite(v)) bad.push(`${id}.${slot}.${k}`);
+            }
+        }
+        return { duelists, bad, oldTable: typeof ABILITY_TUNING, snapshot: JSON.stringify(AGENT_TUNING) };
+    }, LOOKS);
+    assert.equal(shape.duelists.length, 8, 'eight Duelists');
+    assert.deepEqual(shape.bad, []);
+    assert.equal(shape.oldTable, 'undefined', 'ABILITY_TUNING is folded into AGENT_TUNING');
+    // Every Duelist: C, Q, E, the E re-press, the ultimate, shots during it and a kill
+    for (const id of shape.duelists) {
+        await page.evaluate((id) => {
+            agentSystem.selectAgent(id);
+            game.ultActiveUntil = 0; game.ultAgent = null;
+            const p = characterController.position;
+            agentSystem.onActorEliminated('enemy', new THREE.Vector3(p.x + 2, 0, p.z));
+            for (const k of ['c', 'q', 'e', 'e']) {
+                const s = agentSystem.stateByAgent[id][k]; s.charges = s.maxCharges; s.rechargeEnd = 0;
+                agentSystem.castAbility(k);
+            }
+            game.ultPoints = game.maxUltPoints;
+            agentSystem.castAbility('x');
+            for (let i = 0; i < 3; i++) { game.lastShot = 0; shoot(); }
+            const e = enemyObjects.find((x) => x.isActive && !x.hit);
+            if (e) damageEnemyActor(e, 9999, performance.now(), Date.now(), 'Vandal', 'head');
+        }, id);
+        await frames(20);
+    }
+    assert.equal(await page.evaluate(() => JSON.stringify(AGENT_TUNING)), shape.snapshot, 'nothing writes to AGENT_TUNING');
+    assert.deepEqual(errors, []);
+});
