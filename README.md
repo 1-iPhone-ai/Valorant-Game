@@ -1,6 +1,6 @@
 # Valorant-Game
 
-A single-file browser FPS built on Three.js r128. Open the latest `(V1.x) valorant-fps.html` in a browser to play.
+A single-file browser FPS built on Three.js r128. Open the latest `(V2.x) valorant-fps.html` in a browser to play.
 
 Earlier versions are kept as separate files.
 
@@ -17,6 +17,7 @@ The `tests/` folder holds headless browser tests. They need no GPU, because Chro
 - **Shader compiles:** none happen after warm-up, including when switching quality.
 - **Abilities:** every agent's abilities and ultimate cast, and ground effects stay circular.
 - **Ability numbers (V1.9.1):** the Duelists' gameplay numbers live in one table, `AGENT_TUNING[agent][slot]` (C, Q, E and X, each with a `look`); it keeps that shape, holds only numbers, and nothing changes it during play.
+- **Ability Effects (V2.0):** Settings → Video & Quality → Ability Effects is AUTO (High Fidelity in the Ultra Realism tier, Classic in every other tier), CLASSIC or HIGH FIDELITY; Low quality and browsers without WebGL 2 use Classic and the panel says so. The checks cover: both defaults are Auto and older saves load as Auto; Classic builds and compiles nothing new; High Fidelity draws the ten converted abilities (Omen Dark Cover, Sage Barrier Orb, Phoenix Hot Hands and Curveball, Sova Shock Bolt and Hunter's Fury, Raze Paint Shells, Breach Fault Line, Killjoy Turret, Jett Tailwind), a bot rusher's dash and orb, and the kill cam, hides only their Classic look and compiles nothing while they play; smoke sight lines, wall shots and blocks and the fire zone are identical in both looks; switching back restores every Classic material.
 - **Maps and modes:** all 7 maps × 3 atmosphere modes.
 - **Controller:** input works through a simulated gamepad.
 - **Game modes:** Wave, Retake and the 30-bot Range play through planting, defusing, detonation, round changes and the range scorecard.

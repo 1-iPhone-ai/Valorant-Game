@@ -4274,6 +4274,19 @@
                                 </div>
                             </div>
 
+                            <!-- V2.0: Ability Effects (Classic or High Fidelity look for agent abilities) -->
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Ability Effects</strong>
+                                    <small>High Fidelity draws abilities with lit, volumetric effects; Auto uses it in Ultra Realism only. Now: <span id="setting-abilityfx-status" style="color:#94a3b8;">CLASSIC</span></small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-abilityfx-pills">
+                                    <button class="settings-pill-opt active" data-abilityfx="auto">AUTO</button>
+                                    <button class="settings-pill-opt" data-abilityfx="classic">CLASSIC</button>
+                                    <button class="settings-pill-opt" data-abilityfx="hifi">HIGH FIDELITY</button>
+                                </div>
+                            </div>
+
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>Brightness</strong>
@@ -6252,6 +6265,7 @@
                 enemyFootsteps: true,
                 lowHealthWarning: true,
                 glowHalos: 'auto',     // V1.7: 'auto' (profile budget) | 'off' | 'max'
+                abilityEffects: 'auto', // V2.0: 'auto' (High Fidelity only in Ultra Realism) | 'classic' | 'hifi'
                 brightness: 100,       // V1.7: % of the atmosphere mode's exposure (70-140)
                 reduceFlashes: false,  // V1.7 accessibility: soften full-screen flashes and the low-health pulse
                 cameraShake: true,     // V1.7: subtle shake on nearby blasts (off with Reduce Flashes too)
@@ -27420,7 +27434,9 @@
                 turret.headGroup.rotation.set(0, yaw + Math.PI, 0);
                 turret.group.visible = true;
 
+                abilityLook.tag = 'killjoy.e';   // V2.0: Killjoy's Turret deploy
                 this.spawnWindRing(tx, floorY + 0.1, tz, 0xfacc15, 2.8, now);
+                abilityLook.tag = null;
                 soundFX.turretFire();
                 showNotification("SENTINEL TURRET DEPLOYED! Auto-Targeting Enemies in 28m Line-of-Sight!", 1800);
             },
@@ -27447,7 +27463,9 @@
                 }
 
                 characterController.startDash(dirX, dirY, dirZ, AGENT_TUNING.jett.e.dashSpeedPerTick, AGENT_TUNING.jett.e.dashSec);
+                abilityLook.tag = 'jett.e';   // V2.0: Jett's Tailwind
                 this.spawnWindRing(characterController.position.x, characterController.position.y - 1.3, characterController.position.z, 0x38f6ff, 3.6, now);
+                abilityLook.tag = null;
                 this.dashFxUntil = now + 280;
                 soundFX.dash();
                 showNotification("TAILWIND DASH!", 1100);
@@ -27893,7 +27911,9 @@
                     if (wall.inUse) wall.mat.color.setHex(0x34d399).convertSRGBToLinear();
                 }, 80);
                 if (wall.health <= 0) {
+                    abilityLook.tag = 'sage.c';   // V2.0: the Barrier Orb shatters
                     this.spawnFlashBurst(wall.group.position.x, wall.group.position.y, wall.group.position.z, 0x34d399, 3.2, 280, performance.now());
+                    abilityLook.tag = null;
                     this.deactivateIceWall(wall);
                     soundFX.slowZone();
                     showNotification("BARRIER ORB SHATTERED!", 1400);
@@ -28838,7 +28858,8 @@
                 item.mesh.position.set(x, y, z);
                 item.mesh.scale.set(0.4, 0.4, 0.4);
                 item.mesh.visible = true;
-                fxKit.ring(x, y, z, colorHex, Math.min(6, maxScale || 1));   // V1.7 dust + sparks
+                item.lookKey = abilityLook.tag;   // V2.0: the ability this ring belongs to (High Fidelity draws its own)
+                if (!abilityLook.claims(item)) fxKit.ring(x, y, z, colorHex, Math.min(6, maxScale || 1));   // V1.7 dust + sparks
             },
 
             spawnSmokeSphere: function(x, y, z, colorHex, radius, durationMs, now) {
@@ -28848,7 +28869,8 @@
                 }
                 item.inUse = true;
                 item.position.set(x, Math.max(radius * 0.65, y), z);
-                fxKit.smokeCloud(x, item.position.y, z, colorHex, radius);   // V1.7 rolling puffs
+                item.lookKey = abilityLook.smokeKey(colorHex);   // V2.0: High Fidelity draws Omen's Dark Cover
+                if (!abilityLook.claims(item)) fxKit.smokeCloud(x, item.position.y, z, colorHex, radius);   // V1.7 rolling puffs
                 item.radius = radius;
                 item.startAt = now;
                 item.expireAt = now + durationMs;
@@ -28954,7 +28976,8 @@
                 item.mesh.position.copy(item.position);
                 item.mesh.scale.set(0.3, 0.3, 0.3);
                 item.mesh.visible = true;
-                fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
+                item.lookKey = abilityLook.tag;   // V2.0: the ability this burst belongs to (High Fidelity draws its own)
+                if (!abilityLook.claims(item)) fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
             },
 
             spawnReconBeacon: function(x, y, z, now) {
@@ -28997,7 +29020,9 @@
                 } else if (proj.type === 'paintshell') {
                     soundFX.blastPack();
                     const floorY = this.findSupportFloorY(p.x, p.y, p.z);
+                    abilityLook.tag = 'raze.e';   // V2.0: Raze's Paint Shells
                     this.detonateExplosionAoE(p.x, Math.max(floorY, p.y), p.z, AGENT_TUNING.raze.e.radiusM, AGENT_TUNING.raze.e.maxDamage, "Paint Shells", 0xfb923c, AGENT_TUNING.raze.e.revealMs, now);
+                    abilityLook.tag = null;
                     // Spawn 4 secondary cluster sub-munitions in a cross pattern after 380ms
                     const offsets = [
                         { dx: AGENT_TUNING.raze.e.clusterSpreadM, dz: AGENT_TUNING.raze.e.clusterSkewM },
@@ -29030,7 +29055,9 @@
                     const isFlashDrive = (proj.type === 'flashdrive');
                     const isFlashpoint = (proj.type === 'flashpoint');
                     const flashColor = isFlashpoint ? 0xfb923c : (isFlashDrive ? 0x818cf8 : (isBlindside ? 0x3b82f6 : 0xffe066));
+                    abilityLook.tag = proj.type === 'flash' ? 'phoenix.q' : null;   // V2.0: Phoenix's Curveball (the other flashes stay Classic)
                     this.spawnFlashBurst(p.x, p.y, p.z, flashColor, 5.6, 380, now);
+                    abilityLook.tag = null;
                     let blindedCount = 0;
                     for (let i = 0; i < enemyObjects.length; i++) {
                         const e = enemyObjects[i];
@@ -29062,7 +29089,9 @@
                         showNotification(`${label} BLINDED ${blindedCount} ${blindedCount === 1 ? 'ENEMY' : 'ENEMIES'}!`, 1600);
                     }
                 } else if (proj.type === 'shock') {
+                    abilityLook.tag = 'sova.q';   // V2.0: Sova's Shock Bolt
                     this.spawnFlashBurst(p.x, p.y, p.z, 0x57a8ff, 5.5, 420, now);
+                    abilityLook.tag = null;
                     soundFX.shock();
                     const nowMs = Date.now();
                     const shockRadius = 6.0;
@@ -29496,7 +29525,9 @@
                     if (now >= cl.detonateAt) {
                         this.pendingClusters.splice(i, 1);
                         soundFX.blastPack();
+                        abilityLook.tag = 'raze.e';   // V2.0: Raze's Paint Shells clusters
                         this.detonateExplosionAoE(cl.x, cl.y, cl.z, AGENT_TUNING.raze.e.clusterRadiusM, AGENT_TUNING.raze.e.clusterMaxDamage, "Paint Shells Cluster", 0xfb923c, AGENT_TUNING.raze.e.clusterRevealMs, now);
+                        abilityLook.tag = null;
                     }
                 }
 
@@ -30668,10 +30699,12 @@
                         const abX = bf.endPos.x - bf.startPos.x;
                         const abZ = bf.endPos.z - bf.startPos.z;
                         const abLenSq = Math.max(0.01, abX * abX + abZ * abZ);
+                        abilityLook.tag = 'breach.e';   // V2.0: Breach's Fault Line
                         for (let k = 1; k <= 4; k++) {
                             const f = k / 4;
                             this.spawnWindRing(bf.startPos.x + abX * f, bf.startPos.y + 0.1, bf.startPos.z + abZ * f, 0xfb923c, 3.8, now);
                         }
+                        abilityLook.tag = null;
                         let concussedCount = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -32122,7 +32155,8 @@
                     // rolling puffs over the surface give the sphere a smoky edge
                     s.innerMat.opacity = 0.12 * fade;
                     s.ringMat.opacity = 0.72 * fade;
-                    if (grow >= 1) fxKit.smokeShell(s.position.x, s.position.y, s.position.z, s.outerMat.color, s.radius, Math.min(0.05, delta || 0.016), fade);
+                    // V2.0: no Classic puffs around a High Fidelity smoke (its volume ends at the sphere)
+                    if (grow >= 1 && !abilityLook.claims(s)) fxKit.smokeShell(s.position.x, s.position.y, s.position.z, s.outerMat.color, s.radius, Math.min(0.05, delta || 0.016), fade);
 
                     if (characterController.position.distanceToSquared(s.position) <= (s.radius * 0.95) * (s.radius * 0.95)) {
                         playerInSmoke = true;
@@ -37042,10 +37076,12 @@
                     enemy.nextAbilityAt = perfNow + 7800 + Math.random() * 2200;
                     this.lastBotAbilityCastAt = perfNow;
                     enemy.dashUntil = perfNow + 680;
+                    const dsx = pos.x, dsz = pos.z;   // V2.0: where the dash starts (High Fidelity wind)
                     pos.x += (perpX * 1.4 + nx * 0.9);
                     pos.z += (perpZ * 1.4 + nz * 0.9);
                     resolveEnemyMapCollision(pos, 0.68);
                     soundFX.at(pos.x, pos.y + 1, pos.z, () => soundFX.jettDash());
+                    abilityLook.botDash(enemy, dsx, dsz, perfNow);
 
                     const hz = this.acquireBotHazard();
                     if (hz) {
@@ -39586,6 +39622,8 @@
             postFX.warm();
             // V1.8: and every Ultra Realism program
             ultraRealism.warm();
+            // V2.0: and High Fidelity's, built and compiled here only when it is on at start
+            abilityLook.warm();
             perfTelemetry.shaderWarmupMs = performance.now() - start;
             perfTelemetry.programWatermark = renderer.info.programs ? renderer.info.programs.length : 0;
         }
@@ -42300,6 +42338,1989 @@
             }
         };
 
+        // =============================================
+        // V2.0: abilityLook, the High Fidelity look for agent abilities
+        // =============================================
+        // Settings > Video & Quality > Ability Effects: AUTO (High Fidelity while the Ultra Realism
+        // tier is on, Classic in every other tier), CLASSIC, HIGH FIDELITY. Low quality always uses
+        // Classic, and so does a browser without WebGL 2 (the panel says so).
+        //  - Classic is untouched: nothing here is built, added to the scene or compiled until High
+        //    Fidelity is first used, and the Classic code only gained checks that are false in Classic.
+        //  - Ability code keeps owning every piece of gameplay state, and its Classic meshes stay in
+        //    place as the source of truth (positions, sizes, lifetimes, health, shot proxies,
+        //    colliders). In High Fidelity only their materials stop drawing (material.visible), and a
+        //    High Fidelity visual follows the same transform and state. Gameplay never reads these.
+        //  - One renderer per effect type, the look tags of AGENT_TUNING: smoke, wall, groundZone,
+        //    projectile, blast, flash, beam, pulse, deployable, self. CONVERTED lists the abilities
+        //    that have a High Fidelity look; every other ability keeps its Classic look.
+        //  - Everything is pooled and pre-built the first time High Fidelity is used, in small steps
+        //    (all at once inside the boot warm-up when High Fidelity is on at start). Every shader is
+        //    an unlit ShaderMaterial (one program each, whatever the light count) or reuses the
+        //    MeshStandard / MeshBasic / LineBasic programs the Classic abilities already compile, and
+        //    all of them are compiled before High Fidelity draws, so nothing compiles during play.
+        //  - Lights on floors and walls go through abilityLights, particles and camera shake through
+        //    fxKit, glare through the pooled glow quads (haloSystem), soft edges through the Ultra
+        //    post chain's depth (the same layer-2 pass ultraFX uses for soft particles).
+        const abilityLook = {
+            mode: 'classic',          // what is drawn now
+            wanted: 'classic',        // what the setting asks for (High Fidelity waits for its build)
+            note: '',                 // why High Fidelity is not used, for the settings panel
+            uiDirty: true,
+            tag: null,                // set around a shared spawn: the ability the next pooled visual belongs to
+            forceUnsupported: false,  // test hook: behave as if WebGL 2 were missing
+            state: 'idle',            // 'idle' | 'building' | 'ready'
+            steps: null, stepIndex: 0, budgetMs: 3,
+            compileList: null, compileIndex: 0,
+            buildMs: 0, compileMs: 0, builtAt: 0,
+            root: null, vmRoot: null,
+            soft: false,              // the Ultra post chain draws our depth-reading meshes in its soft pass
+            softObjects: [],
+            tex: {}, U: null, R: {},
+            mats: [],                 // every material we own (for the compile step)
+            bound: 0,
+            _v: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
+            _c: new THREE.Color(), _c2: new THREE.Color(), _m: new THREE.Matrix4(), _q: new THREE.Quaternion(), _e: new THREE.Euler(),
+
+            // The abilities with a High Fidelity look (agent.slot). Their look is AGENT_TUNING's tag
+            // where the agent has one; Sage, Sova, Breach and Killjoy have no AGENT_TUNING yet.
+            CONVERTED: {
+                'omen.e': null, 'sage.c': ['wall'], 'phoenix.c': null, 'sova.q': ['projectile', 'blast'],
+                'raze.e': null, 'phoenix.q': null, 'sova.x': ['beam'], 'breach.e': ['pulse'],
+                'killjoy.e': ['deployable'], 'jett.e': null
+            },
+            lookOf: function (key) {
+                if (this.CONVERTED[key]) return this.CONVERTED[key];
+                const a = key.split('.');
+                return (AGENT_TUNING[a[0]] && AGENT_TUNING[a[0]][a[1]] && AGENT_TUNING[a[0]][a[1]].look) || [];
+            },
+            converted: function (key) { return !!key && Object.prototype.hasOwnProperty.call(this.CONVERTED, key); },
+            // A pooled visual High Fidelity draws instead of its Classic look (and its Classic particles)
+            claims: function (item) { return this.mode === 'hifi' && !!item && this.converted(item.lookKey); },
+            // Omen's Dark Cover is the only smoke cast in this colour
+            smokeKey: function (colorHex) { return colorHex === 0x6d28d9 ? 'omen.e' : null; },
+
+            supported: function () {
+                if (this.forceUnsupported) return false;
+                const caps = renderer.capabilities;
+                return !!(caps && caps.isWebGL2);
+            },
+            resolve: function () {
+                const s = (game.userSettings && game.userSettings.abilityEffects) || 'auto';
+                let want = 'classic', note = '';
+                if (s !== 'classic') {
+                    if (adaptiveSettings.currentQuality === 'low') note = s === 'hifi' ? 'LOW QUALITY: USES CLASSIC' : '';
+                    else if (!this.supported()) note = 'NOT AVAILABLE (NEEDS WEBGL 2): USES CLASSIC';
+                    else if (s === 'hifi' || ultraRealism.active) want = 'hifi';
+                }
+                if (want !== this.wanted || note !== this.note) { this.wanted = want; this.note = note; this.uiDirty = true; }
+            },
+            // Settings change: re-resolve and switch at once (abilities already in the world included)
+            refresh: function () {
+                this.resolve();
+                if (this.wanted !== 'hifi' && this.mode === 'hifi') this.setMode('classic');
+                if (this.wanted === 'hifi' && this.state === 'ready' && this.mode !== 'hifi') this.setMode('hifi');
+                this.uiDirty = true;
+                this.syncUI();
+            },
+            syncUI: function () {
+                this.uiDirty = false;
+                const st = document.getElementById('setting-abilityfx-status');
+                if (!st) return;
+                let text, color;
+                if (this.note) { text = this.note; color = '#ff8a8a'; }
+                else if (this.wanted === 'hifi' && this.mode !== 'hifi') { text = 'PREPARING HIGH FIDELITY…'; color = '#fcd34d'; }
+                else if (this.mode === 'hifi') {
+                    text = this.soft ? 'HIGH FIDELITY' : 'HIGH FIDELITY (SOFT EDGES AND WALL-CLIMBING PULSES NEED ULTRA REALISM POST PROCESSING)';
+                    color = '#7dffb2';
+                } else { text = 'CLASSIC'; color = '#94a3b8'; }
+                st.textContent = text;
+                st.style.color = color;
+            },
+
+            setMode: function (m) {
+                if (m === this.mode) return;
+                this.mode = m;
+                this.uiDirty = true;
+                if (m === 'classic') {
+                    this.unbindAll();
+                    if (this.root) this.root.visible = false;
+                    if (this.vmRoot) this.vmRoot.visible = false;
+                } else {
+                    if (this.root) this.root.visible = true;
+                    if (this.vmRoot) this.vmRoot.visible = true;
+                }
+            },
+
+            // Boot: inside warmShaderVariants, before the program watermark is recorded. Builds and
+            // compiles everything now when High Fidelity is on at start; otherwise nothing happens.
+            warm: function () {
+                this.resolve();
+                if (this.wanted !== 'hifi') return;
+                this.prepare(true);
+                this.setMode('hifi');
+            },
+
+            // Staged build, then the compile step; sync = all at once (boot warm-up, tests)
+            prepare: function (sync) {
+                if (this.state === 'ready') return;
+                if (this.state === 'idle') {
+                    this.steps = this.buildSteps();
+                    this.stepIndex = 0;
+                    this.state = 'building';
+                    this.uiDirty = true;
+                }
+                const t0 = performance.now();
+                while (this.stepIndex < this.steps.length) {
+                    this.steps[this.stepIndex].call(this);
+                    this.stepIndex++;
+                    if (!sync && performance.now() - t0 > this.budgetMs) break;
+                }
+                this.buildMs += performance.now() - t0;
+                if (this.stepIndex < this.steps.length) return;
+                // Compile: one material per step during play (each is its own program), all at once at boot
+                if (!this.compileList) { this.compileList = this.mats.slice(); this.compileIndex = 0; }
+                const t1 = performance.now();
+                while (this.compileIndex < this.compileList.length) {
+                    this.compileOne(this.compileList[this.compileIndex]);
+                    this.compileIndex++;
+                    if (!sync && performance.now() - t1 > this.budgetMs) break;
+                }
+                this.compileMs += performance.now() - t1;
+                // A deliberate warm step after a settings change: these programs are not first-use stalls
+                if (!sync && renderer.info.programs) perfTelemetry.programWatermark = Math.max(perfTelemetry.programWatermark, renderer.info.programs.length);
+                if (this.compileIndex < this.compileList.length) return;
+                this.state = 'ready';
+                this.builtAt = performance.now();
+                this.uiDirty = true;
+            },
+            // Warm one material: draw it once into a 4x4 sRGB target (the screen's and the post targets'
+            // encoding) in a one-mesh scene with the world's fog. r128 picks an unlit material's program
+            // at its first draw and keeps it whatever the lights, layers or passes after that, so this
+            // is its only program. (Lit parts reuse the MeshStandard programs the Classic turret warms.)
+            compileOne: function (mat) {
+                const S = this._compileScene || (this._compileScene = new THREE.Scene());
+                const M = this._compileMesh || (this._compileMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.01, 0.01)));
+                if (!this._compileRT) { this._compileRT = new THREE.WebGLRenderTarget(4, 4); this._compileRT.texture.encoding = THREE.sRGBEncoding; }
+                S.fog = mat.userData.hfViewmodel ? null : scene.fog;
+                M.material = mat;
+                M.frustumCulled = false;
+                if (M.parent !== S) S.add(M);
+                const prev = renderer.getRenderTarget();
+                renderer.setRenderTarget(this._compileRT);
+                renderer.render(S, mat.userData.hfViewmodel ? viewmodelCamera : camera);
+                renderer.setRenderTarget(prev);
+            },
+
+            // ---------------------------------------------------------------- per frame
+            update: function (now, delta) {
+                this.tag = null;              // a tag never outlives the spawn call it was set around
+                this.resolve();
+                if (this.wanted === 'hifi' && this.state !== 'ready') this.prepare(false);
+                const m = (this.wanted === 'hifi' && this.state === 'ready') ? 'hifi' : 'classic';
+                if (m !== this.mode) this.setMode(m);
+                if (this.mode === 'hifi') {
+                    const dt = Math.min(0.05, Math.max(0, delta || 0.016));
+                    this.frameUniforms(now);
+                    this.syncLayers();
+                    this.bound = 0;
+                    const A = agentSystem;
+                    this.scan(A.projectiles, 'projectile', now, dt);
+                    this.scan(A.smokes, 'smoke', now, dt);
+                    this.scan(A.mollies, 'molly', now, dt);
+                    this.scan(A.iceWalls, 'wall', now, dt);
+                    this.scan(A.flashes, 'flash', now, dt);
+                    this.scan(A.windRings, 'ring', now, dt);
+                    this.scan(A.breachFaultLines, 'fault', now, dt);
+                    this.scan(A.kjTurrets, 'turret', now, dt);
+                    if (A.sovaBeam) this.scanOne(A.sovaBeam, 'beam', now, dt);
+                    if (tacticalDirector.botHazardsPool) this.scan(tacticalDirector.botHazardsPool, 'hazard', now, dt);
+                    for (const k in this.R) this.R[k].tick(now, dt);
+                }
+                if (this.uiDirty) this.syncUI();
+            },
+
+            // A Classic item -> the converted ability it belongs to (null: draw it Classic)
+            keyOf: function (kind, it) {
+                switch (kind) {
+                    case 'projectile':
+                        if (!it.inUse) return null;
+                        if (it.type === 'smoke') return it.smokeColor === 0x6d28d9 ? 'omen.e' : null;
+                        if (it.type === 'molly') return 'phoenix.c';
+                        if (it.type === 'flash') return 'phoenix.q';
+                        if (it.type === 'shock') return 'sova.q';
+                        if (it.type === 'paintshell') return 'raze.e';
+                        return null;
+                    case 'smoke': case 'flash': case 'ring':
+                        return (it.inUse && this.converted(it.lookKey)) ? it.lookKey : null;
+                    case 'molly': return (it.inUse && !it.isNanoswarm && !it.isIncendiary && !it.isSnakeBite) ? 'phoenix.c' : null;
+                    case 'wall': return it.inUse ? 'sage.c' : null;
+                    case 'fault': return it.inUse ? 'breach.e' : null;
+                    case 'turret': return it.inUse ? 'killjoy.e' : null;
+                    case 'beam': return it.active ? 'sova.x' : null;
+                    case 'hazard': return (it.inUse && it.type === 'flash') ? 'phoenix.q' : null;
+                }
+                return null;
+            },
+            stampOf: function (kind, it) {
+                if (kind === 'projectile') return it.spawnAt;
+                if (kind === 'hazard') return it.startTime;
+                return it.startAt;
+            },
+            // Which renderer draws a kind of item (flash bursts and wind rings depend on the ability)
+            route: function (kind, key) {
+                switch (kind) {
+                    case 'projectile': return 'projectile';
+                    case 'smoke': return 'smoke';
+                    case 'molly': return 'groundZone';
+                    case 'wall': return 'wall';
+                    case 'beam': return 'beam';
+                    case 'fault': return 'pulse';
+                    case 'turret': return 'deployable';
+                    case 'hazard': return 'flash';
+                    case 'flash':
+                        if (key === 'phoenix.q') return 'flash';
+                        if (key === 'sova.q' || key === 'raze.e') return 'blast';
+                        return 'absorb';            // Sage's shatter flash: the wall renderer draws the shatter
+                    case 'ring':
+                        if (key === 'jett.e') return 'self';
+                        return 'absorb';            // Paint Shells, Fault Line, Turret: their renderer draws it
+                }
+                return 'absorb';
+            },
+            // The Classic materials of an item (collected once): hidden while High Fidelity draws it
+            classicMats: function (kind, it) {
+                if (it._hfMats) return it._hfMats;
+                const list = [];
+                const root = it.group || it.mesh;
+                if (root) root.traverse((o) => { if (o.material && list.indexOf(o.material) < 0) list.push(o.material); });
+                it._hfMats = list;
+                return list;
+            },
+            scan: function (list, kind, now, dt) {
+                if (!list) return;
+                for (let i = 0; i < list.length; i++) this.scanOne(list[i], kind, now, dt);
+            },
+            scanOne: function (it, kind, now, dt) {
+                const key = this.keyOf(kind, it);
+                let b = it._hf;
+                if (b && b.on && (b.key !== key || b.stamp !== this.stampOf(kind, it))) this.unbind(it, true);
+                if (key && !(b && b.on)) b = this.bind(it, kind, key, now);
+                if (!b || !b.on) return;
+                const mats = b.mats;
+                for (let i = 0; i < mats.length; i++) mats[i].visible = false;
+                this.bound++;
+                b.r.sync(b, it, now, dt);
+            },
+            bind: function (it, kind, key, now) {
+                const b = it._hf || (it._hf = { on: false, key: null, kind: kind, stamp: 0, r: null, inst: null, mats: null });
+                const r = this.R[this.route(kind, key)];
+                if (!r) return null;
+                const inst = r.acquire(key, it, now, kind);
+                if (!inst) return null;     // pool exhausted: this one stays Classic
+                b.on = true; b.key = key; b.kind = kind; b.stamp = this.stampOf(kind, it); b.r = r; b.inst = inst;
+                b.mats = this.classicMats(kind, it);
+                return b;
+            },
+            // natural: the Classic item ended or was reused (a High Fidelity tail may play);
+            // otherwise a switch to Classic (the visual goes at once)
+            unbind: function (it, natural) {
+                const b = it._hf;
+                if (!b || !b.on) return;
+                b.on = false;
+                for (let i = 0; i < b.mats.length; i++) b.mats[i].visible = true;
+                b.r.release(b.inst, natural, it);
+                b.inst = null;
+            },
+            unbindAll: function () {
+                const A = agentSystem;
+                const lists = [A.projectiles, A.smokes, A.mollies, A.iceWalls, A.flashes, A.windRings, A.breachFaultLines, A.kjTurrets, tacticalDirector.botHazardsPool];
+                for (const list of lists) if (list) for (const it of list) this.unbind(it, false);
+                if (A.sovaBeam) this.unbind(A.sovaBeam, false);
+                for (const k in this.R) if (this.R[k].clear) this.R[k].clear();
+            },
+
+            // Bot rusher's Tailwind dash (tacticalDirector): wind streaks along the move
+            botDash: function (enemy, sx, sz, now) {
+                if (this.mode !== 'hifi' || !this.R.self) return;
+                this.R.self.dash(sx, enemy.mesh.position.y, sz, enemy.mesh.position.x, enemy.mesh.position.y, enemy.mesh.position.z, now, false);
+            },
+
+            // ---------------------------------------------------------------- shared per-frame uniforms
+            frameUniforms: function (now) {
+                const U = this.U;
+                U.uTime.value = (now * 0.001) % 3600;
+                U.uSunDir.value.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
+                U.uSunCol.value.copy(directionalLight.color).multiplyScalar(Math.min(1.5, 0.35 + 0.65 * directionalLight.intensity));
+                const bg = scene.background;
+                if (bg && bg.isColor) U.uSkyCol.value.copy(bg).convertSRGBToLinear().multiplyScalar(0.85).addScalar(0.05);
+                U.uGroundCol.value.copy(U.uSkyCol.value).multiplyScalar(0.32).addScalar(0.015);
+            },
+            // Depth-reading meshes go to the soft pass (layer 2) while the Ultra post chain draws one
+            syncLayers: function () {
+                const soft = !!(ultraPost.active && ultraPost.softParticles && this.U.tDepth.value);
+                if (soft === this.soft) return;
+                this.soft = soft;
+                this.U.uSoftHF.value = soft ? 1 : 0;
+                for (let i = 0; i < this.softObjects.length; i++) this.softObjects[i].layers.set(soft ? 2 : 0);
+                this.uiDirty = true;
+            },
+
+            // ---------------------------------------------------------------- the staged build
+            buildSteps: function () {
+                const steps = [this.buildBase];
+                for (let z = 0; z < 48; z += 8) steps.push(function () { this.fillNoise3D(z, z + 8); });
+                steps.push(this.finishNoise3D);
+                for (let y = 0; y < 256; y += 64) steps.push(function () { this.fillNoise2D(y, y + 64); });
+                steps.push(this.finishNoise2D);
+                steps.push(this.buildCrackTexture);
+                steps.push(this.buildScorchTexture);
+                steps.push(this.makeScorchPool);
+                const kinds = ['smoke', 'wall', 'groundZone', 'projectile', 'blast', 'flash', 'beam', 'pulse', 'deployable', 'self'];
+                for (let i = 0; i < kinds.length; i++) steps.push(function () { this.R[kinds[i]] = this['make_' + kinds[i]](); });
+                steps.push(function () { this.R.absorb = this.makeAbsorb(); });
+                return steps;
+            },
+            buildBase: function () {
+                this.root = new THREE.Group();
+                this.root.name = 'abilityLookHF';
+                this.root.visible = this.mode === 'hifi';
+                scene.add(this.root);
+                this.vmRoot = new THREE.Group();
+                this.vmRoot.name = 'abilityLookHFViewmodel';
+                this.vmRoot.visible = this.mode === 'hifi';
+                weaponGroup.add(this.vmRoot);
+                const fx = (typeof ultraFX !== 'undefined' && ultraFX.U) ? ultraFX.U : null;
+                this.U = {
+                    uTime: { value: 0 },
+                    uSunDir: { value: new THREE.Vector3(0.4, 0.8, 0.5).normalize() },
+                    uSunCol: { value: new THREE.Color(1, 1, 1) },
+                    uSkyCol: { value: new THREE.Color(0.5, 0.6, 0.7) },
+                    uGroundCol: { value: new THREE.Color(0.15, 0.15, 0.16) },
+                    // depth of the Ultra post chain's world pass (shared with ultraFX's soft particles)
+                    tDepth: fx ? fx.tDepth : { value: null },
+                    uRes: fx ? fx.uRes : { value: new THREE.Vector2(1, 1) },
+                    uNear: fx ? fx.uNear : { value: 0.1 },
+                    uFar: fx ? fx.uFar : { value: 1000 },
+                    uSoftHF: { value: 0 },
+                    uNoise3: { value: null }, uNoise2: { value: null }, uCrack: { value: null }, uScorch: { value: null }
+                };
+                this.fogU = THREE.UniformsUtils.clone(THREE.UniformsLib.fog);
+                this.SRC = this.shaderSources();
+                this.frameUniforms(performance.now());
+            },
+
+            // Tileable value noise on a hashed lattice (deterministic, no assets)
+            makeNoise: function (seed) {
+                const perm = new Uint8Array(512), val = new Float32Array(256), p = new Uint8Array(256);
+                let s = seed >>> 0 || 1;
+                const rnd = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
+                for (let i = 0; i < 256; i++) p[i] = i;
+                for (let i = 255; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; const t = p[i]; p[i] = p[j]; p[j] = t; }
+                for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+                for (let i = 0; i < 256; i++) val[i] = rnd();
+                const fade = (t) => t * t * (3 - 2 * t);
+                const h = (a, b, c) => val[perm[perm[perm[a] + b] + c]];
+                const v3 = (x, y, z, per) => {
+                    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+                    const fx = fade(x - xi), fy = fade(y - yi), fz = fade(z - zi);
+                    const X0 = ((xi % per) + per) % per, Y0 = ((yi % per) + per) % per, Z0 = ((zi % per) + per) % per;
+                    const X1 = (X0 + 1) % per, Y1 = (Y0 + 1) % per, Z1 = (Z0 + 1) % per;
+                    const l = (a, b, t) => a + (b - a) * t;
+                    return l(l(l(h(X0, Y0, Z0), h(X1, Y0, Z0), fx), l(h(X0, Y1, Z0), h(X1, Y1, Z0), fx), fy),
+                        l(l(h(X0, Y0, Z1), h(X1, Y0, Z1), fx), l(h(X0, Y1, Z1), h(X1, Y1, Z1), fx), fy), fz);
+                };
+                return { v3: v3, rnd: rnd };
+            },
+            // 48^3 billowy fbm for smoke and fireballs, 8 slices per step
+            fillNoise3D: function (z0, z1) {
+                const N = 48;
+                if (!this._n3) { this._n3 = new Uint8Array(N * N * N); this._noise = this.makeNoise(1337); }
+                const d = this._n3, n = this._noise;
+                for (let z = z0; z < z1; z++) {
+                    for (let y = 0; y < N; y++) {
+                        for (let x = 0; x < N; x++) {
+                            let a = 0, amp = 0.55, f = 4 / N, per = 4, sum = 0;
+                            for (let o = 0; o < 4; o++) { a += amp * n.v3(x * f, y * f, z * f, per); sum += amp; amp *= 0.5; f *= 2; per *= 2; }
+                            const v = a / sum, b = 1 - Math.abs(v * 2 - 1);
+                            d[(z * N + y) * N + x] = Math.max(0, Math.min(255, Math.round((v * 0.6 + b * 0.4) * 255)));
+                        }
+                    }
+                }
+            },
+            finishNoise3D: function () {
+                const N = 48;
+                const t = new THREE.DataTexture3D(this._n3, N, N, N);
+                t.format = THREE.RedFormat;
+                t.type = THREE.UnsignedByteType;
+                t.minFilter = t.magFilter = THREE.LinearFilter;
+                t.wrapS = t.wrapT = t.wrapR = THREE.RepeatWrapping;
+                t.unpackAlignment = 1;
+                t.needsUpdate = true;
+                this.tex.noise3 = t;
+                this.U.uNoise3.value = t;
+            },
+            // 256^2 RGBA: R fbm, G ridged, B billow, A fine detail; 64 rows per step
+            fillNoise2D: function (y0, y1) {
+                const N = 256;
+                if (!this._n2) { this._n2 = new Uint8Array(N * N * 4); if (!this._noise) this._noise = this.makeNoise(1337); }
+                const d = this._n2, n = this._noise;
+                for (let y = y0; y < y1; y++) {
+                    for (let x = 0; x < N; x++) {
+                        let fb = 0, rg = 0, bl = 0, amp = 0.5, f = 8 / N, per = 8, sum = 0;
+                        for (let o = 0; o < 5; o++) {
+                            const v = n.v3(x * f, y * f, 3.7 * o, per);
+                            fb += amp * v; rg += amp * (1 - Math.abs(v * 2 - 1)); bl += amp * Math.abs(v * 2 - 1);
+                            sum += amp; amp *= 0.5; f *= 2; per *= 2;
+                        }
+                        const i = (y * N + x) * 4;
+                        d[i] = Math.round(fb / sum * 255);
+                        d[i + 1] = Math.round(Math.pow(rg / sum, 2) * 255);
+                        d[i + 2] = Math.round(bl / sum * 255);
+                        d[i + 3] = Math.round(n.v3(x * 64 / N, y * 64 / N, 11.3, 64) * 255);
+                    }
+                }
+            },
+            finishNoise2D: function () {
+                const t = new THREE.DataTexture(this._n2, 256, 256, THREE.RGBAFormat);
+                t.wrapS = t.wrapT = THREE.RepeatWrapping;
+                t.minFilter = THREE.LinearMipmapLinearFilter;
+                t.magFilter = THREE.LinearFilter;
+                t.generateMipmaps = true;
+                t.needsUpdate = true;
+                this.tex.noise2 = t;
+                this.U.uNoise2.value = t;
+            },
+            // Ice cracks: R = crack, G = the damage (0-1) at which that piece of crack appears
+            buildCrackTexture: function () {
+                const S = 512, c = document.createElement('canvas');
+                c.width = c.height = S;
+                const g = c.getContext('2d');
+                g.fillStyle = 'rgb(0,255,0)';
+                g.fillRect(0, 0, S, S);
+                const rnd = this.makeNoise(9001).rnd;
+                g.lineCap = 'round';
+                const crack = (x, y, ang, len, w, order, depth) => {
+                    let px = x, py = y;
+                    const steps = 6 + ((rnd() * 6) | 0);
+                    for (let i = 0; i < steps; i++) {
+                        ang += (rnd() - 0.5) * 0.9;
+                        const seg = len / steps;
+                        const nx = px + Math.cos(ang) * seg, ny = py + Math.sin(ang) * seg;
+                        const o = Math.min(1, order + (i / steps) * 0.25);
+                        g.strokeStyle = `rgb(255,${Math.round(o * 255)},0)`;
+                        g.lineWidth = Math.max(1, w * (1 - i / steps * 0.6));
+                        for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+                            g.beginPath(); g.moveTo(px + ox, py + oy); g.lineTo(nx + ox, ny + oy); g.stroke();
+                        }
+                        if (depth < 2 && rnd() < 0.35) crack(nx, ny, ang + (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 0.6), len * 0.55, w * 0.65, o + 0.08, depth + 1);
+                        px = nx; py = ny;
+                    }
+                };
+                for (let k = 0; k < 14; k++) {
+                    const x = rnd() * S, y = rnd() * S, order = (k / 14) * 0.85;
+                    const arms = 3 + ((rnd() * 3) | 0);
+                    for (let a = 0; a < arms; a++) crack(x, y, (a / arms) * Math.PI * 2 + rnd(), 90 + rnd() * 140, 4 + rnd() * 3, order, 0);
+                }
+                const t = new THREE.CanvasTexture(c);
+                t.wrapS = t.wrapT = THREE.RepeatWrapping;
+                t.minFilter = THREE.LinearMipmapLinearFilter;
+                this.tex.crack = t;
+                this.U.uCrack.value = t;
+            },
+            // Scorch: burnt ground with a ragged edge (alpha) and soot streaks
+            buildScorchTexture: function () {
+                const S = 256, c = document.createElement('canvas');
+                c.width = c.height = S;
+                const g = c.getContext('2d');
+                const img = g.createImageData(S, S);
+                const n = this._noise || this.makeNoise(1337);
+                for (let y = 0; y < S; y++) {
+                    for (let x = 0; x < S; x++) {
+                        const dx = x / S * 2 - 1, dy = y / S * 2 - 1;
+                        const r = Math.sqrt(dx * dx + dy * dy);
+                        const ang = Math.atan2(dy, dx);
+                        const ragged = 0.72 + 0.22 * n.v3(Math.cos(ang) * 2 + 3, Math.sin(ang) * 2 + 3, 1.5, 64) + 0.1 * n.v3(x / 12, y / 12, 4.1, 64);
+                        const streak = 0.5 + 0.5 * Math.sin(ang * 7 + n.v3(x / 30, y / 30, 2.2, 64) * 6);
+                        const m = Math.max(0, Math.min(1, (ragged - r) * 4)) * (0.75 + 0.25 * streak);
+                        const v = 18 + 26 * n.v3(x / 9, y / 9, 7.7, 64);
+                        const i = (y * S + x) * 4;
+                        img.data[i] = v + 8; img.data[i + 1] = v + 2; img.data[i + 2] = v;
+                        img.data[i + 3] = Math.round(Math.min(1, m * 1.1) * 235);
+                    }
+                }
+                g.putImageData(img, 0, 0);
+                const t = new THREE.CanvasTexture(c);
+                t.encoding = THREE.sRGBEncoding;
+                this.tex.scorch = t;
+                this.U.uScorch.value = t;
+            },
+
+            // One unlit ShaderMaterial for a shader; the shared uniforms are the same objects in all
+            shader: function (name, own, opts, viewmodel) {
+                const src = this.SRC[name];
+                const u = Object.assign({}, this.fogU, this.U, own || {});
+                const m = new THREE.ShaderMaterial(Object.assign({
+                    vertexShader: src.v, fragmentShader: src.f, uniforms: u,
+                    fog: !viewmodel, lights: false, transparent: true, depthWrite: false
+                }, opts || {}));
+                m.userData.hfViewmodel = !!viewmodel;
+                this.mats.push(m);
+                return m;
+            },
+            // n camera-facing quads in one geometry (one draw): corner, centre, size, params, axis
+            quads: function (n, cornerY0) {
+                const g = new THREE.BufferGeometry();
+                const corner = new Float32Array(n * 8), center = new Float32Array(n * 12), size = new Float32Array(n * 8);
+                const param = new Float32Array(n * 16), dir = new Float32Array(n * 12), pos = new Float32Array(n * 12);
+                const index = [];
+                const y0 = cornerY0 === undefined ? -0.5 : cornerY0, y1 = y0 + 1;
+                const cs = [[-0.5, y0], [0.5, y0], [0.5, y1], [-0.5, y1]];
+                for (let q = 0; q < n; q++) {
+                    for (let k = 0; k < 4; k++) {
+                        corner[(q * 4 + k) * 2] = cs[k][0]; corner[(q * 4 + k) * 2 + 1] = cs[k][1];
+                        size[(q * 4 + k) * 2] = 1; size[(q * 4 + k) * 2 + 1] = 1;
+                        dir[(q * 4 + k) * 3 + 2] = 1;
+                    }
+                    index.push(q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3);
+                }
+                g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                g.setAttribute('aCorner', new THREE.BufferAttribute(corner, 2));
+                g.setAttribute('aCenter', new THREE.BufferAttribute(center, 3).setUsage(THREE.DynamicDrawUsage));
+                g.setAttribute('aSize', new THREE.BufferAttribute(size, 2).setUsage(THREE.DynamicDrawUsage));
+                g.setAttribute('aParam', new THREE.BufferAttribute(param, 4).setUsage(THREE.DynamicDrawUsage));
+                g.setAttribute('aDir', new THREE.BufferAttribute(dir, 3).setUsage(THREE.DynamicDrawUsage));
+                g.setIndex(index);
+                g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
+                return g;
+            },
+            // Write quad q's per-quad attributes (all four corners)
+            setQuad: function (g, q, cx, cy, cz, w, h, p0, p1, p2, p3, dx, dy, dz) {
+                const C = g.attributes.aCenter.array, Z = g.attributes.aSize.array, P = g.attributes.aParam.array, D = g.attributes.aDir.array;
+                for (let k = 0; k < 4; k++) {
+                    const v = q * 4 + k;
+                    C[v * 3] = cx; C[v * 3 + 1] = cy; C[v * 3 + 2] = cz;
+                    Z[v * 2] = w; Z[v * 2 + 1] = h;
+                    P[v * 4] = p0; P[v * 4 + 1] = p1; P[v * 4 + 2] = p2; P[v * 4 + 3] = p3;
+                    if (dx !== undefined) { D[v * 3] = dx; D[v * 3 + 1] = dy; D[v * 3 + 2] = dz; }
+                }
+            },
+            quadsDirty: function (g) {
+                g.attributes.aCenter.needsUpdate = true; g.attributes.aSize.needsUpdate = true;
+                g.attributes.aParam.needsUpdate = true; g.attributes.aDir.needsUpdate = true;
+            },
+            lin: function (hex, target) { return (target || new THREE.Color()).setHex(hex).convertSRGBToLinear(); },
+            theme: function (agent) { const d = AGENT_DEFS[agent]; return d ? new THREE.Color(d.themeColor).getHex() : 0xffffff; },
+            // fxKit particle helper (fxKit colours are written as given)
+            emit: function (kind, x, y, z, vx, vy, vz, hex, life, s0, s1, a0, drag, grav) {
+                if (!fxKit.enabled()) return;
+                const pool = (kind === FX_KIND.smoke || kind === FX_KIND.dust) ? fxKit.smokes : fxKit.parts;
+                fxKit._emit(pool, kind, x, y, z, vx, vy, vz, hex, life, s0, s1, a0, drag, grav);
+            },
+            floorY: function (x, y, z) {
+                return agentSystem.findSupportFloorY ? agentSystem.findSupportFloorY(x, y, z) : 0;
+            },
+
+            // ---------------------------------------------------------------- shaders (one program each)
+            shaderSources: function () {
+                const COMMON = `
+                    uniform float uTime;
+                    uniform vec3 uSunDir;
+                    uniform vec3 uSunCol;
+                    uniform vec3 uSkyCol;
+                    uniform vec3 uGroundCol;`;
+                const SOFT = `
+                    uniform sampler2D tDepth;
+                    uniform vec2 uRes;
+                    uniform float uNear;
+                    uniform float uFar;
+                    uniform float uSoftHF;
+                    float hfLin(float d) { float z = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }
+                    float hfScene() { return hfLin(texture2D(tDepth, gl_FragCoord.xy / uRes).x); }
+                    // 1 in the open; falls to 0 where the surface meets the world (Ultra post chain only)
+                    float hfSoft(float viewDepth, float fadeM) {
+                        if (uSoftHF < 0.5) return 1.0;
+                        return clamp((hfScene() - viewDepth) / fadeM, 0.0, 1.0);
+                    }`;
+                const END = `
+                    #include <tonemapping_fragment>
+                    #include <encodings_fragment>
+                    #include <fog_fragment>`;
+                const V_WORLD = `
+                    varying vec3 vWorld;
+                    varying float vViewZ;
+                    #include <fog_pars_vertex>
+                    void main() {
+                        vec4 wp = modelMatrix * vec4(position, 1.0);
+                        vWorld = wp.xyz;
+                        vec4 mvPosition = viewMatrix * wp;
+                        vViewZ = -mvPosition.z;
+                        gl_Position = projectionMatrix * mvPosition;
+                        #include <fog_vertex>
+                    }`;
+                return {
+                    // SMOKE: a lit volume of churning noise inside exactly the Classic sphere, opaque out
+                    // to its edge (a 1% anti-aliased rim) and never past it
+                    smoke: { v: V_WORLD, f: `
+                        precision highp sampler3D;
+                        uniform sampler3D uNoise3;
+                        uniform vec3 uCenter;
+                        uniform float uRadius;
+                        uniform float uFade;
+                        uniform vec3 uTint;
+                        uniform vec3 uTint2;
+                        uniform float uSeed;
+                        varying vec3 vWorld;
+                        varying float vViewZ;
+                        ${COMMON}
+                        ${SOFT}
+                        #include <fog_pars_fragment>
+                        float hfDens(vec3 q) {
+                            vec3 drift = vec3(uTime * 0.011, uTime * 0.027, -uTime * 0.008);
+                            float a = texture(uNoise3, q * 0.38 + drift + uSeed).r;
+                            float b = texture(uNoise3, q * 0.95 - drift * 1.9 + uSeed * 2.3).r;
+                            float n = a * 0.62 + b * 0.38;
+                            return clamp((n - 0.45) * 2.6 + (1.0 - length(q)) * 1.1, 0.0, 1.0);
+                        }
+                        void main() {
+                            vec3 ro = cameraPosition;
+                            vec3 rd = normalize(vWorld - ro);
+                            vec3 oc = ro - uCenter;
+                            float R = uRadius;
+                            float b = dot(oc, rd);
+                            float c = dot(oc, oc) - R * R;
+                            float h = b * b - c;
+                            if (h <= 0.0) discard;
+                            h = sqrt(h);
+                            bool inside = c < 0.0;
+                            if (inside == gl_FrontFacing) discard;
+                            float t0 = max(-b - h, 0.0);
+                            float len = min(-b + h - t0, R * 1.3);
+                            float dt = len / 6.0;
+                            vec3 col = vec3(0.0);
+                            float acc = 0.0;
+                            for (int i = 0; i < 6; i++) {
+                                vec3 q = (ro + rd * (t0 + dt * (float(i) + 0.5)) - uCenter) / R;
+                                float d = hfDens(q);
+                                float ds = hfDens(q + uSunDir * 0.3);
+                                float sun = clamp(1.15 - ds * 1.25, 0.0, 1.0);
+                                vec3 nrm = normalize(q + vec3(1e-4));
+                                vec3 amb = mix(uGroundCol, uSkyCol, nrm.y * 0.5 + 0.5);
+                                vec3 lit = uTint * (amb * 1.1 + uSunCol * sun * (0.25 + 0.75 * max(dot(nrm, uSunDir), 0.0)));
+                                lit += uTint2 * (1.0 - d) * 0.3;
+                                float w = max(d, 0.05) * (1.0 - acc * 0.5);
+                                col += lit * w;
+                                acc += w;
+                            }
+                            col /= max(acc, 1e-3);
+                            float dmin = sqrt(max(dot(oc, oc) - b * b, 0.0));
+                            float a = uFade * (inside ? 1.0 : smoothstep(R, R * 0.99, dmin));
+                            if (uSoftHF > 0.5) {
+                                float sd = hfScene();
+                                if (inside) a *= mix(0.3, 1.0, clamp(sd / 3.0, 0.0, 1.0));
+                                else { vec4 ev = viewMatrix * vec4(ro + rd * t0, 1.0); a *= clamp((sd + ev.z) / 0.3, 0.0, 1.0); }
+                            }
+                            gl_FragColor = vec4(col, a);
+                            ${END}
+                        }` },
+
+                    // ICE (Sage): fresnel, sun and sky reflections, cracks inside that grow as health
+                    // drops, frost at the base
+                    ice: { v: `
+                        varying vec3 vWorld;
+                        varying vec3 vNormalW;
+                        varying vec3 vLocal;
+                        #include <fog_pars_vertex>
+                        void main() {
+                            vLocal = position;
+                            vec4 wp = modelMatrix * vec4(position, 1.0);
+                            vWorld = wp.xyz;
+                            vNormalW = normalize(mat3(modelMatrix) * normal);
+                            vec4 mvPosition = viewMatrix * wp;
+                            gl_Position = projectionMatrix * mvPosition;
+                            #include <fog_vertex>
+                        }`, f: `
+                        uniform sampler2D uCrack;
+                        uniform sampler2D uNoise2;
+                        uniform vec3 uIce;
+                        uniform vec3 uDeep;
+                        uniform float uDamage;
+                        uniform float uHit;
+                        uniform float uFade;
+                        uniform float uFrostIn;
+                        varying vec3 vWorld;
+                        varying vec3 vNormalW;
+                        varying vec3 vLocal;
+                        ${COMMON}
+                        #include <fog_pars_fragment>
+                        vec2 hfFace(vec3 p, vec3 n) {
+                            vec3 an = abs(n);
+                            if (an.x > an.y && an.x > an.z) return p.zy;
+                            if (an.y > an.z) return p.xz;
+                            return p.xy;
+                        }
+                        float hfCrack(vec2 uv) { vec4 k = texture2D(uCrack, uv); return k.r * step(k.g, uDamage * 0.95 - 0.04); }
+                        void main() {
+                            vec3 N = normalize(vNormalW);
+                            vec3 V = normalize(cameraPosition - vWorld);
+                            float ndv = clamp(abs(dot(N, V)), 0.0, 1.0);
+                            float fres = pow(1.0 - ndv, 3.0);
+                            vec2 uv = hfFace(vWorld, N) * 0.22;
+                            vec2 off = hfFace(V - N * dot(V, N), N) / max(ndv, 0.25);
+                            float cr = hfCrack(uv) + hfCrack(uv * 1.37 + 0.31 - off * 0.03) * 0.45;
+                            cr = clamp(cr, 0.0, 1.0);
+                            vec4 nz = texture2D(uNoise2, uv * 0.7);
+                            vec3 Rf = reflect(-V, N);
+                            vec3 env = mix(uGroundCol, uSkyCol * 1.25, clamp(Rf.y * 0.5 + 0.55, 0.0, 1.0));
+                            float sd = max(dot(Rf, uSunDir), 0.0);
+                            float spec = pow(sd, 90.0) * 2.2 + pow(sd, 12.0) * 0.18;
+                            float diff = 0.35 + 0.65 * max(dot(N, uSunDir), 0.0);
+                            vec3 body = mix(uDeep, uIce, 0.35 + 0.45 * nz.r) * (uSkyCol * 0.55 + uSunCol * diff * 0.6 + 0.12);
+                            vec3 col = mix(body, env, fres * 0.75) + uSunCol * spec;
+                            col = mix(col, vec3(0.86, 0.97, 1.0) * (0.75 + 0.45 * diff), cr * 0.6);
+                            float yb = vLocal.y + 0.5;
+                            float frost = max(smoothstep(0.30, 0.0, yb + (nz.g - 0.5) * 0.18), uFrostIn * (0.6 + 0.4 * nz.b));
+                            col = mix(col, vec3(0.9, 0.97, 1.0) * (0.7 + 0.5 * diff), frost * 0.8);
+                            col += uIce * uHit * 0.6;
+                            float a = clamp((0.8 + 0.2 * fres + cr * 0.15 + frost * 0.2) * uFade, 0.0, 1.0);
+                            gl_FragColor = vec4(col, a);
+                            ${END}
+                        }` },
+
+                    // GROUND decals on a unit disc / square: 0 fire bed, 1 scorch, 2 frost, 3 shock ring
+                    ground: { v: `
+                        varying vec2 vP;
+                        varying vec3 vWorld;
+                        #include <fog_pars_vertex>
+                        void main() {
+                            vP = uv * 2.0 - 1.0;
+                            vec4 wp = modelMatrix * vec4(position, 1.0);
+                            vWorld = wp.xyz;
+                            vec4 mvPosition = viewMatrix * wp;
+                            gl_Position = projectionMatrix * mvPosition;
+                            #include <fog_vertex>
+                        }`, f: `
+                        uniform sampler2D uNoise2;
+                        uniform sampler2D uScorch;
+                        uniform float uMode;
+                        uniform vec3 uColA;
+                        uniform vec3 uColB;
+                        uniform float uFade;
+                        uniform float uAge;
+                        uniform float uSeed;
+                        varying vec2 vP;
+                        varying vec3 vWorld;
+                        ${COMMON}
+                        #include <fog_pars_fragment>
+                        void main() {
+                            float r = length(vP);
+                            vec4 col = vec4(0.0);
+                            if (uMode < 0.5) {
+                                if (r > 1.0) discard;
+                                vec2 w = vWorld.xz * 0.55;
+                                float n1 = texture2D(uNoise2, w * 0.35 + vec2(0.0, -uTime * 0.21) + uSeed).r;
+                                float n2 = texture2D(uNoise2, w * 0.9 + vec2(uTime * 0.07, -uTime * 0.45)).g;
+                                float fl = clamp(n1 * 0.6 + n2 * 0.55 - 0.42 + (1.0 - r) * 0.22, 0.0, 1.0);
+                                float flick = 0.88 + 0.12 * sin(uTime * 23.0 + n1 * 9.0);
+                                vec3 hot = mix(uColB, vec3(1.0, 0.82, 0.45), smoothstep(0.6, 1.0, fl));
+                                vec3 fire = mix(uColA * 0.28, hot, smoothstep(0.2, 0.85, fl)) * (0.45 + 1.5 * fl * fl) * flick;
+                                float edge = smoothstep(0.955, 0.985, r) * (1.0 - smoothstep(0.985, 1.0, r));
+                                fire += uColB * edge * 1.8;
+                                col = vec4(fire, ((0.35 + 0.5 * fl) * smoothstep(1.0, 0.985, r) + edge) * uFade);
+                            } else if (uMode < 1.5) {
+                                float grow = clamp(uAge * 3.0, 0.05, 1.0);
+                                vec4 s = texture2D(uScorch, vP * 0.5 / grow + 0.5);
+                                float m = s.a * step(r, grow);
+                                col = vec4(mix(uColA, s.rgb, 0.7), m * uFade);
+                            } else if (uMode < 2.5) {
+                                float n = texture2D(uNoise2, vWorld.xz * 0.6).g;
+                                float n2 = texture2D(uNoise2, vWorld.xz * 2.3).a;
+                                float m = smoothstep(1.0, 0.45, max(abs(vP.x), abs(vP.y)) + (n - 0.5) * 0.4);
+                                vec3 c = mix(uColA, vec3(0.92, 0.98, 1.0), 0.6 + 0.4 * n) * (uSkyCol * 0.6 + uSunCol * 0.5) + pow(n2, 12.0) * 6.0 * uSunCol;
+                                col = vec4(c, m * (0.55 + 0.35 * n) * uFade);
+                            } else {
+                                if (r > 1.0) discard;
+                                float n = texture2D(uNoise2, vWorld.xz * 0.4 + uSeed).r;
+                                float d = r - uAge + (n - 0.5) * 0.06;
+                                float ring = exp(-d * d * 900.0) + exp(-max(-d, 0.0) * 9.0) * 0.25 * step(d, 0.0);
+                                vec3 c = mix(uColB, vec3(1.0, 0.95, 0.85), exp(-d * d * 3000.0)) * ring * 2.5;
+                                col = vec4(c, clamp(ring, 0.0, 1.0) * uFade);
+                            }
+                            gl_FragColor = col;
+                            ${END}
+                        }` },
+
+                    // BILLBOARDS: orbs, flame tongues, flash cores, streaks, wind, afterimages, hand swirl
+                    bb: { v: `
+                        attribute vec2 aCorner;
+                        attribute vec3 aCenter;
+                        attribute vec2 aSize;
+                        attribute vec4 aParam;
+                        attribute vec3 aDir;
+                        uniform float uBB;
+                        uniform float uScale;
+                        uniform float uMode;
+                        uniform float uTime;
+                        varying vec2 vC;
+                        varying vec4 vParam;
+                        varying float vViewZ;
+                        #include <fog_pars_vertex>
+                        void main() {
+                            vC = aCorner;
+                            vParam = aParam;
+                            vec2 size = aSize * uScale;
+                            if (uMode > 0.5 && uMode < 1.5) size.y *= 0.75 + 0.35 * sin(uTime * (7.0 + aParam.y * 5.0) + aParam.x * 6.2831);
+                            vec4 mvPosition;
+                            if (uBB < 0.5) {
+                                mvPosition = modelViewMatrix * vec4(aCenter, 1.0);
+                                float a = aParam.z + uTime * aParam.w;
+                                vec2 q = aCorner * size;
+                                mvPosition.xy += vec2(q.x * cos(a) - q.y * sin(a), q.x * sin(a) + q.y * cos(a));
+                            } else if (uBB < 1.5) {
+                                vec4 wc = modelMatrix * vec4(aCenter, 1.0);
+                                vec3 tc = cameraPosition - wc.xyz;
+                                vec3 right = normalize(vec3(tc.z, 0.0, -tc.x) + vec3(1e-5, 0.0, 0.0));
+                                mvPosition = viewMatrix * vec4(wc.xyz + right * aCorner.x * size.x + vec3(0.0, aCorner.y * size.y, 0.0), 1.0);
+                            } else {
+                                vec4 wc = modelMatrix * vec4(aCenter, 1.0);
+                                vec3 dir = normalize(mat3(modelMatrix) * aDir + vec3(0.0, 1e-5, 0.0));
+                                vec3 side = normalize(cross(dir, normalize(cameraPosition - wc.xyz)) + vec3(1e-5, 0.0, 0.0));
+                                mvPosition = viewMatrix * vec4(wc.xyz + dir * aCorner.y * size.y + side * aCorner.x * size.x, 1.0);
+                            }
+                            vViewZ = -mvPosition.z;
+                            gl_Position = projectionMatrix * mvPosition;
+                            #include <fog_vertex>
+                        }`, f: `
+                        uniform sampler2D uNoise2;
+                        uniform float uMode;
+                        uniform vec3 uColA;
+                        uniform vec3 uColB;
+                        uniform float uFade;
+                        uniform float uAge;
+                        uniform float uStyle;
+                        uniform float uSeed;
+                        varying vec2 vC;
+                        varying vec4 vParam;
+                        varying float vViewZ;
+                        ${COMMON}
+                        ${SOFT}
+                        #include <fog_pars_fragment>
+                        void main() {
+                            vec4 col = vec4(0.0);
+                            float ph = vParam.x;
+                            if (uMode < 0.5) {
+                                float r = length(vC) * 2.0;
+                                if (r > 1.0) discard;
+                                float n = texture2D(uNoise2, vC * 0.9 + vec2(uTime * 0.6, -uTime * 0.9) + uSeed).r;
+                                float core = exp(-r * r * 18.0);
+                                float halo = exp(-r * r * 4.0) * (0.6 + 0.6 * n);
+                                if (uStyle < 0.5) {
+                                    col = vec4(mix(uColB, uColA, core) * (core * 5.0 + halo * 1.6), clamp(core + halo * 0.8, 0.0, 1.0));
+                                } else if (uStyle < 1.5) {
+                                    float rim = smoothstep(0.25, 0.55, r) * (1.0 - smoothstep(0.55, 1.0, r)) * (0.5 + n);
+                                    col = vec4(uColA * 0.08 * (1.0 - r) + uColB * rim * 2.2, clamp(smoothstep(1.0, 0.3, r) * 0.95 + rim * 0.4, 0.0, 1.0));
+                                } else {
+                                    float arc = pow(abs(sin(vC.x * 9.0 + n * 4.0 + uTime * 30.0)), 18.0) * exp(-r * 3.0);
+                                    col = vec4(mix(uColB, vec3(1.0), core) * (core * 6.0 + halo * 1.2 + arc * 3.0), clamp(core + halo * 0.7 + arc, 0.0, 1.0));
+                                }
+                            } else if (uMode < 1.5) {
+                                float y = vC.y;
+                                float n = texture2D(uNoise2, vec2(vC.x * 0.8 + ph, y * 0.6 - uTime * 1.6 + ph * 3.0)).r;
+                                float w = (1.0 - y) * (0.75 + 0.5 * n);
+                                float shape = smoothstep(w, w * 0.25, abs(vC.x * 2.0 + (n - 0.5) * 0.5 * y)) * smoothstep(0.0, 0.12, y) * smoothstep(1.0, 0.55, y + n * 0.25);
+                                float root = smoothstep(0.32, 0.0, y) * smoothstep(0.6, 0.0, abs(vC.x * 2.0) / max(w, 0.05));
+                                vec3 c = mix(uColA, vec3(1.0, 0.86, 0.55), root * shape);
+                                c = mix(c, uColB * 0.7, smoothstep(0.4, 1.0, y));
+                                col = vec4(c * (1.35 * shape + 0.08), shape * 0.85 * hfSoft(vViewZ, 0.25));
+                            } else if (uMode < 2.5) {
+                                float r = length(vC) * 2.0;
+                                if (r > 1.0) discard;
+                                float k = exp(-r * r * 10.0) * 6.0 + exp(-r * 3.5) * 1.2;
+                                col = vec4(mix(uColA, vec3(1.0), exp(-r * r * 30.0)) * k, clamp(k, 0.0, 1.0));
+                            } else if (uMode < 3.5) {
+                                float x = abs(vC.x) * 2.0;
+                                float y = abs(vC.y) * 2.0;
+                                float k = exp(-y * y * 140.0) * pow(max(1.0 - x, 0.0), 2.5) * 3.5 + exp(-y * y * 20.0) * pow(max(1.0 - x, 0.0), 4.0) * 0.6;
+                                col = vec4(mix(uColA, vec3(1.0), exp(-y * y * 600.0)) * k, clamp(k, 0.0, 1.0));
+                            } else if (uMode < 4.5) {
+                                float y = vC.y + 0.5;
+                                float x = abs(vC.x) * 2.0;
+                                float head = smoothstep(0.0, 0.35, y) * smoothstep(1.0, 0.7, y);
+                                float n = texture2D(uNoise2, vec2(y * 0.8 - uAge * 2.0 + ph, x * 0.3 + ph)).r;
+                                float k = exp(-x * x * 9.0) * head * (0.4 + 0.8 * n) * smoothstep(1.0, 0.6, uAge * 1.3 + ph * 0.3);
+                                col = vec4(uColA * k * 1.6, k * 0.8 * hfSoft(vViewZ, 0.3));
+                            } else if (uMode < 5.5) {
+                                float y = vC.y;
+                                float x = abs(vC.x) * 2.0;
+                                float bodyW = 0.55 + 0.45 * smoothstep(0.0, 0.82, y) * smoothstep(1.0, 0.82, y);
+                                float body = smoothstep(1.0, 0.55, x / bodyW);
+                                float n = texture2D(uNoise2, vec2(vC.x * 1.5, y * 1.2 - uAge * 1.5) + ph).r;
+                                float k = body * (0.45 + 0.7 * n) * smoothstep(0.0, 0.08, y) * smoothstep(1.0, 0.92, y);
+                                col = vec4(uColA * k * 1.4, k * 0.55 * hfSoft(vViewZ, 0.3));
+                            } else {
+                                float r = length(vC) * 2.0;
+                                if (r > 1.0) discard;
+                                float ang = atan(vC.y, vC.x);
+                                float arms = pow(0.5 + 0.5 * sin(ang * 3.0 - r * 9.0 + uTime * 14.0), 6.0);
+                                float k = arms * smoothstep(1.0, 0.45, r) * smoothstep(0.08, 0.3, r);
+                                col = vec4(uColA * k * 1.8, k);
+                            }
+                            col.a *= uFade;
+                            gl_FragColor = col;
+                            ${END}
+                        }` },
+
+                    // FIREBALL: a noise-displaced sphere, white-hot at first, cooling to smoke
+                    fireball: { v: `
+                        precision highp sampler3D;
+                        uniform sampler3D uNoise3;
+                        uniform float uAge;
+                        uniform float uSeed;
+                        varying vec3 vN;
+                        varying vec3 vWorld;
+                        varying float vNoise;
+                        varying float vViewZ;
+                        #include <fog_pars_vertex>
+                        void main() {
+                            float n = texture(uNoise3, position * 0.45 + vec3(0.0, uAge * 0.6, 0.0) + uSeed).r;
+                            vNoise = n;
+                            vec3 p = position * (0.82 + n * 0.45);
+                            vec4 wp = modelMatrix * vec4(p, 1.0);
+                            vWorld = wp.xyz;
+                            vN = normalize(mat3(modelMatrix) * normal);
+                            vec4 mvPosition = viewMatrix * wp;
+                            vViewZ = -mvPosition.z;
+                            gl_Position = projectionMatrix * mvPosition;
+                            #include <fog_vertex>
+                        }`, f: `
+                        uniform vec3 uColA;
+                        uniform vec3 uColB;
+                        uniform float uFade;
+                        uniform float uHeat;
+                        varying vec3 vN;
+                        varying vec3 vWorld;
+                        varying float vNoise;
+                        varying float vViewZ;
+                        ${COMMON}
+                        ${SOFT}
+                        #include <fog_pars_fragment>
+                        void main() {
+                            vec3 V = normalize(cameraPosition - vWorld);
+                            vec3 N = normalize(vN);
+                            float ndv = abs(dot(N, V));
+                            float heat = clamp(uHeat * (0.55 + 0.9 * vNoise) * (0.4 + 0.6 * ndv), 0.0, 1.5);
+                            vec3 fire = mix(uColB, mix(uColA, vec3(1.0, 0.95, 0.8), clamp(heat - 0.85, 0.0, 1.0)), clamp(heat, 0.0, 1.0)) * (0.45 + 2.4 * heat * heat);
+                            vec3 smoke = mix(uGroundCol, uSkyCol, 0.5 + 0.5 * N.y) * 0.35 + uSunCol * 0.15 * max(dot(N, uSunDir), 0.0);
+                            vec3 c = mix(smoke, fire, smoothstep(0.08, 0.5, heat));
+                            float a = uFade * smoothstep(0.0, 0.35, ndv) * (0.55 + 0.45 * vNoise) * hfSoft(vViewZ, 0.5);
+                            gl_FragColor = vec4(c, a);
+                            ${END}
+                        }` },
+
+                    // BEAM: a camera-facing strip along +Z, a white core inside a softer glow
+                    beam: { v: `
+                        attribute float aSide;
+                        attribute float aT;
+                        uniform float uLen;
+                        uniform float uWidth;
+                        varying vec2 vB;
+                        #include <fog_pars_vertex>
+                        void main() {
+                            vec4 wc = modelMatrix * vec4(0.0, 0.0, aT * uLen, 1.0);
+                            vec3 dir = normalize(mat3(modelMatrix) * vec3(0.0, 0.0, 1.0));
+                            vec3 side = normalize(cross(dir, normalize(cameraPosition - wc.xyz)) + vec3(1e-5, 0.0, 0.0));
+                            float w = uWidth * (0.35 + 0.65 * smoothstep(0.0, 0.03, aT));
+                            vB = vec2(aSide, aT);
+                            vec4 mvPosition = viewMatrix * vec4(wc.xyz + side * aSide * w, 1.0);
+                            gl_Position = projectionMatrix * mvPosition;
+                            #include <fog_vertex>
+                        }`, f: `
+                        uniform sampler2D uNoise2;
+                        uniform vec3 uColA;
+                        uniform vec3 uColB;
+                        uniform float uFade;
+                        uniform float uLen;
+                        varying vec2 vB;
+                        ${COMMON}
+                        #include <fog_pars_fragment>
+                        void main() {
+                            float x = abs(vB.x);
+                            float along = vB.y * uLen;
+                            float n = texture2D(uNoise2, vec2(along * 0.08 - uTime * 6.0, x * 0.5)).r;
+                            float core = exp(-x * x * 90.0);
+                            float glow = exp(-x * x * 7.0) * (0.55 + 0.6 * n);
+                            float pulse = 0.8 + 0.4 * sin(along * 0.9 - uTime * 60.0);
+                            gl_FragColor = vec4(uColA * core * 6.0 + uColB * glow * 2.2 * pulse, clamp(core + glow * 0.8, 0.0, 1.0) * uFade);
+                            ${END}
+                        }` },
+
+                    // QUAKE (Breach): with the depth texture it lands on whatever surface the corridor
+                    // box holds, so it hugs the floor and climbs walls; without it, a floor strip
+                    quake: { v: V_WORLD, f: `
+                        uniform sampler2D uNoise2;
+                        uniform float uDecal;
+                        uniform mat4 uProjInv;
+                        uniform mat4 uCamWorld;
+                        uniform mat4 uToLocal;
+                        uniform float uCharge;
+                        uniform float uFront;
+                        uniform float uAfter;
+                        uniform float uFade;
+                        uniform vec3 uColA;
+                        uniform vec3 uColB;
+                        varying vec3 vWorld;
+                        varying float vViewZ;
+                        ${COMMON}
+                        ${SOFT}
+                        #include <fog_pars_fragment>
+                        void main() {
+                            vec3 wp = vWorld;
+                            if (uDecal > 0.5) {
+                                vec2 suv = gl_FragCoord.xy / uRes;
+                                vec4 vp = uProjInv * vec4(suv * 2.0 - 1.0, texture2D(tDepth, suv).x * 2.0 - 1.0, 1.0);
+                                vp /= vp.w;
+                                wp = (uCamWorld * vp).xyz;
+                            }
+                            vec3 lp = (uToLocal * vec4(wp, 1.0)).xyz;
+                            if (abs(lp.x) > 0.5 || lp.z < 0.0 || lp.z > 1.0 || lp.y < 0.0 || lp.y > 1.0) discard;
+                            float n = texture2D(uNoise2, wp.xz * 0.35 + wp.y * 0.2).r;
+                            float n2 = texture2D(uNoise2, wp.xz * 1.1 + vec2(0.3, uTime * 0.1)).g;
+                            float cx = abs(lp.x + (n - 0.5) * 0.18);
+                            float fissure = exp(-cx * cx * 900.0) * step(lp.z, uCharge * 1.05) * (0.6 + 0.6 * n2);
+                            vec3 c = uColA * fissure * (1.5 + 2.5 * uCharge);
+                            float a = fissure;
+                            if (uFront >= 0.0) {
+                                float d = lp.z - uFront + (n - 0.5) * 0.04;
+                                float band = exp(-d * d * 4000.0) * (1.0 - smoothstep(0.75, 1.0, lp.y));
+                                float behind = step(d, 0.0) * exp(-uAfter * 2.2) * smoothstep(0.65, 0.95, n2 + (1.0 - abs(lp.x) * 2.0) * 0.2);
+                                float lines = pow(0.5 + 0.5 * sin(lp.y * 60.0 - uTime * 40.0), 8.0) * exp(-d * d * 600.0);
+                                c += uColB * band * 4.0 + uColA * behind * 2.5 + vec3(1.0, 0.9, 0.7) * lines * 1.2;
+                                a = max(a, clamp(band + behind + lines, 0.0, 1.0));
+                            }
+                            float side = smoothstep(0.5, 0.42, abs(lp.x));
+                            gl_FragColor = vec4(c * side, a * side * uFade);
+                            ${END}
+                        }` }
+                };
+            },
+
+            // ---------------------------------------------------------------- renderers
+            // Each renderer: acquire(key, item, now, kind) -> instance | null, sync(binding, item, now, dt)
+            // while the Classic item lives, release(instance, natural, item), tick(now, dt) for its tails.
+            makeAbsorb: function () {
+                const inst = {};
+                // The Classic piece is drawn by another High Fidelity instance (a blast's ring, a quake's rings)
+                return { acquire: function () { return inst; }, sync: function () {}, release: function () {}, tick: function () {} };
+            },
+
+            // Scorch marks that outlast their fire or blast (normal blending, pooled)
+            scorchPool: null,
+            makeScorchPool: function () {
+                if (this.scorchPool) return;
+                this.scorchPool = [];
+                {
+                    const geo = new THREE.CircleGeometry(1, 40);
+                    geo.rotateX(-Math.PI / 2);
+                    for (let i = 0; i < 6; i++) {
+                        const mat = this.shader('ground', { uMode: { value: 1 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uFade: { value: 0 }, uAge: { value: 0 }, uSeed: { value: i * 0.31 } },
+                            { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+                        const mesh = new THREE.Mesh(geo, mat);
+                        mesh.visible = false; mesh.frustumCulled = false; mesh.renderOrder = -1;
+                        this.root.add(mesh);
+                        this.scorchPool.push({ mesh: mesh, mat: mat, start: 0, end: 0 });
+                    }
+                }
+            },
+            scorch: function (x, y, z, radius, hex, holdMs, now) {
+                if (!this.scorchPool) return null;
+                let s = this.scorchPool[0];
+                for (let i = 0; i < this.scorchPool.length; i++) { const c = this.scorchPool[i]; if (c.end < s.end) s = c; }
+                s.mesh.position.set(x, y + 0.025, z);
+                s.mesh.scale.set(radius, 1, radius);
+                s.mesh.rotation.y = Math.random() * 6.283;
+                this.lin(hex, s.mat.uniforms.uColA.value);
+                s.start = now; s.end = now + holdMs;
+                s.mesh.visible = true;
+                return s;
+            },
+            tickScorch: function (now) {
+                if (!this.scorchPool) return;
+                for (let i = 0; i < this.scorchPool.length; i++) {
+                    const s = this.scorchPool[i];
+                    if (!s.mesh.visible) continue;
+                    if (now >= s.end) { s.mesh.visible = false; continue; }
+                    const age = (now - s.start) * 0.001, rem = s.end - now;
+                    s.mat.uniforms.uAge.value = age;
+                    s.mat.uniforms.uFade.value = Math.min(1, age * 6) * (rem < 2500 ? rem / 2500 : 1) * 0.9;
+                }
+            },
+
+            // SMOKE (Omen Dark Cover): the volume follows the Classic sphere's centre, growth and fade
+            make_smoke: function () {
+                const L = this, pool = [];
+                const geo = new THREE.SphereGeometry(1.0024, 48, 32);   // just outside the true sphere: the shader trims it exactly
+                for (let i = 0; i < 4; i++) {
+                    const mat = L.shader('smoke', {
+                        uCenter: { value: new THREE.Vector3() }, uRadius: { value: 1 }, uFade: { value: 0 },
+                        uTint: { value: new THREE.Color() }, uTint2: { value: new THREE.Color() }, uSeed: { value: i * 0.37 }
+                    }, { side: THREE.DoubleSide, depthWrite: true });   // V2.0: opaque inside the sphere, so later see-through draws (bots in render order 2, tracers, sparks) stay hidden behind it
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.visible = false; mesh.frustumCulled = false;
+                    L.root.add(mesh);
+                    L.softObjects.push(mesh);
+                    pool.push({ busy: false, mesh: mesh, mat: mat });
+                }
+                const LOOK = { 'omen.e': { body: 0x2a2340, wisp: L.theme('omen') } };
+                return {
+                    acquire: function (key) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (p.busy) continue;
+                            const lk = LOOK[key] || LOOK['omen.e'];
+                            L.lin(lk.body, p.mat.uniforms.uTint.value);
+                            L.lin(lk.wisp, p.mat.uniforms.uTint2.value);
+                            p.busy = true;
+                            p.mesh.visible = true;
+                            return p;
+                        }
+                        return null;
+                    },
+                    sync: function (b, s, now) {
+                        const p = b.inst, sc = s.group.scale.x;
+                        p.mesh.position.copy(s.group.position);
+                        p.mesh.scale.setScalar(sc);
+                        p.mat.uniforms.uCenter.value.copy(s.group.position);
+                        p.mat.uniforms.uRadius.value = sc;
+                        const rem = s.expireAt - now;
+                        p.mat.uniforms.uFade.value = rem < 650 ? Math.max(0, rem / 650) : 1;   // the Classic fade
+                    },
+                    release: function (p) { p.busy = false; p.mesh.visible = false; },
+                    tick: function () {}
+                };
+            },
+
+            // WALL (Sage Barrier Orb): lit ice on the Classic box (same centre and size), frost on the
+            // floor around it, cracks that follow its health, a hit flash, ice shards when it breaks
+            make_wall: function () {
+                const L = this, pool = [];
+                const box = new THREE.BoxGeometry(1, 1, 1, 6, 3, 2);
+                const plane = new THREE.PlaneGeometry(1, 1);
+                plane.rotateX(-Math.PI / 2);
+                const ice = L.lin(0x7ee8d0), deep = L.lin(0x0f766e);
+                const sage = L.theme('sage');
+                for (let i = 0; i < 2; i++) {
+                    const mat = L.shader('ice', {
+                        uIce: { value: ice.clone().lerp(L.lin(sage), 0.35) }, uDeep: { value: deep.clone() },
+                        uDamage: { value: 0 }, uHit: { value: 0 }, uFade: { value: 1 }, uFrostIn: { value: 0 }
+                    }, { depthWrite: true });
+                    const mesh = new THREE.Mesh(box, mat);
+                    mesh.visible = false; mesh.frustumCulled = false;
+                    const frostMat = L.shader('ground', { uMode: { value: 2 }, uColA: { value: L.lin(0xbff7ee) }, uColB: { value: new THREE.Color() }, uFade: { value: 0 }, uAge: { value: 0 }, uSeed: { value: i } },
+                        { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+                    const frost = new THREE.Mesh(plane, frostMat);
+                    frost.visible = false; frost.frustumCulled = false;
+                    L.root.add(mesh, frost);
+                    pool.push({ busy: false, mesh: mesh, mat: mat, frost: frost, frostMat: frostMat, lastHp: 0, hitAt: -1e9, start: 0, frostUntil: 0, wall: null });
+                }
+                return {
+                    acquire: function (key, w, now) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (p.busy) continue;
+                            p.busy = true; p.wall = w; p.lastHp = w.health; p.start = w.startAt || now; p.hitAt = -1e9;
+                            p.mesh.visible = p.frost.visible = true;
+                            // frost bursts out at the base as it forms
+                            const gp = w.group.position;
+                            for (let k = 0; k < 18; k++) {
+                                const a = Math.random() * 6.283, sp = 1 + Math.random() * 2;
+                                L.emit(FX_KIND.dust, gp.x + (Math.random() - 0.5) * w.sizeX, gp.y - w.sizeY * 0.5 + 0.1, gp.z + (Math.random() - 0.5) * w.sizeZ,
+                                    Math.cos(a) * sp, 0.4 + Math.random(), Math.sin(a) * sp, 0xdffcf5, 1.1 + Math.random() * 0.6, 0.5, 1.6, 0.5, 1.4, -0.3);
+                            }
+                            return p;
+                        }
+                        return null;
+                    },
+                    sync: function (b, w, now) {
+                        const p = b.inst, gp = w.group.position, sc = w.mesh.scale;
+                        p.mesh.position.copy(gp);
+                        p.mesh.scale.copy(sc);
+                        p.frost.position.set(gp.x, gp.y - sc.y * 0.5 + 0.02, gp.z);
+                        p.frost.scale.set(sc.x + 1.4, 1, sc.z + 1.4);
+                        const u = p.mat.uniforms;
+                        if (w.health < p.lastHp) p.hitAt = now;
+                        p.lastHp = w.health;
+                        u.uDamage.value = Math.max(0, Math.min(1, 1 - w.health / Math.max(1, w.maxHealth)));
+                        u.uHit.value = Math.max(0, 1 - (now - p.hitAt) / 140);
+                        const age = (now - p.start) * 0.001;
+                        u.uFrostIn.value = Math.max(0, 1 - age * 2.5);
+                        p.frostMat.uniforms.uFade.value = Math.min(1, age * 4);
+                    },
+                    release: function (p, natural, w) {
+                        if (natural && w && w.health <= 0) {
+                            // shattered: ice shards and frost powder from the whole wall
+                            const gp = w.group.position;
+                            for (let k = 0; k < 46; k++) {
+                                const x = gp.x + (Math.random() - 0.5) * w.sizeX, y = gp.y + (Math.random() - 0.5) * w.sizeY, z = gp.z + (Math.random() - 0.5) * w.sizeZ;
+                                L.emit(FX_KIND.spark, x, y, z, (Math.random() - 0.5) * 9, Math.random() * 6, (Math.random() - 0.5) * 9, 0xe0fffb, 0.7 + Math.random() * 0.5, 0.09, 0.03, 1, 0.8, 9.8);
+                            }
+                            for (let k = 0; k < 14; k++) {
+                                L.emit(FX_KIND.dust, gp.x + (Math.random() - 0.5) * w.sizeX, gp.y + (Math.random() - 0.5) * w.sizeY, gp.z + (Math.random() - 0.5) * w.sizeZ,
+                                    (Math.random() - 0.5) * 2, 0.3, (Math.random() - 0.5) * 2, 0xd9fbf4, 1.4, 0.8, 2.2, 0.55, 1.2, -0.2);
+                            }
+                            haloSystem.flash(gp.x, gp.y, gp.z, 0xbff7ee, 3.2, 260);
+                            abilityLights.flash(gp.x, gp.y, gp.z, 0x7ee8d0, 7, 1.8, 420);
+                        } else if (natural && w) {
+                            const gp = w.group.position;
+                            for (let k = 0; k < 12; k++) {
+                                L.emit(FX_KIND.dust, gp.x + (Math.random() - 0.5) * w.sizeX, gp.y - w.sizeY * 0.25, gp.z + (Math.random() - 0.5) * w.sizeZ,
+                                    0, 0.6, 0, 0xdffcf5, 1.2, 0.6, 1.8, 0.45, 1.0, -0.4);
+                            }
+                        }
+                        p.busy = false; p.wall = null;
+                        p.mesh.visible = p.frost.visible = false;
+                    },
+                    tick: function () {}
+                };
+            },
+
+            // GROUND ZONE (Phoenix Hot Hands): a burning bed with a clean damage edge, flame tongues, and a
+            // scorch mark that stays after it (the Classic embers and their flicker light keep running)
+            make_groundZone: function () {
+                const L = this, pool = [];
+                const disc = new THREE.CircleGeometry(1, 64);
+                disc.rotateX(-Math.PI / 2);
+                const N = 30;
+                const fire = L.lin(L.theme('phoenix')), red = L.lin(0xc2410c);
+                for (let i = 0; i < 3; i++) {
+                    const bedMat = L.shader('ground', { uMode: { value: 0 }, uColA: { value: red.clone() }, uColB: { value: fire.clone() }, uFade: { value: 0 }, uAge: { value: 0 }, uSeed: { value: i * 0.53 } },
+                        { blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+                    const bed = new THREE.Mesh(disc, bedMat);
+                    const g = L.quads(N, 0);
+                    const flameMat = L.shader('bb', { uMode: { value: 1 }, uBB: { value: 1 }, uScale: { value: 1 }, uColA: { value: fire.clone() }, uColB: { value: red.clone() }, uFade: { value: 0 }, uAge: { value: 0 }, uStyle: { value: 0 }, uSeed: { value: i } },
+                        { blending: THREE.AdditiveBlending });
+                    const flames = new THREE.Mesh(g, flameMat);
+                    for (const m of [bed, flames]) { m.visible = false; m.frustumCulled = false; L.root.add(m); }
+                    L.softObjects.push(flames);
+                    pool.push({ busy: false, bed: bed, bedMat: bedMat, flames: flames, flameMat: flameMat, g: g, radius: 0, scorched: false });
+                }
+                // flame tongues spread over the disc (fixed pattern, scaled by the radius)
+                const seed = L.makeNoise(4242).rnd;
+                const spots = [];
+                for (let q = 0; q < N; q++) { const a = q * 2.39996, r = Math.sqrt((q + 0.5) / N) * 0.9; spots.push([Math.cos(a) * r, Math.sin(a) * r, seed(), seed()]); }
+                return {
+                    acquire: function (key, m, now) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (p.busy) continue;
+                            p.busy = true; p.radius = 0; p.scorched = false;
+                            p.bed.visible = p.flames.visible = true;
+                            return p;
+                        }
+                        return null;
+                    },
+                    sync: function (b, m, now) {
+                        const p = b.inst, r = m.radius, pos = m.position;
+                        p.bed.position.set(pos.x, pos.y + 0.03, pos.z);
+                        p.bed.scale.set(r, 1, r);
+                        p.flames.position.set(pos.x, pos.y, pos.z);
+                        if (r !== p.radius) {
+                            p.radius = r;
+                            for (let q = 0; q < N; q++) {
+                                const s = spots[q], h = (0.55 + s[2] * 0.9) * (1 - Math.hypot(s[0], s[1]) * 0.45);
+                                L.setQuad(p.g, q, s[0] * r, 0, s[1] * r, 0.5 + s[3] * 0.55, h * 1.75, s[2], s[3], 0, 0);
+                            }
+                            L.quadsDirty(p.g);
+                        }
+                        if (!p.scorched) { p.scorched = true; L.scorch(pos.x, pos.y, pos.z, r * 1.05, 0x2b1a12, Math.max(4000, m.expireAt - now) + 9000, now); }
+                        const rem = m.expireAt - now, age = (now - m.startAt) * 0.001;
+                        const fade = (rem < 500 ? Math.max(0, rem / 500) : 1) * Math.min(1, age * 5);   // the Classic fade, and a quick catch
+                        p.bedMat.uniforms.uFade.value = fade;
+                        p.flameMat.uniforms.uFade.value = fade;
+                    },
+                    release: function (p) { p.busy = false; p.bed.visible = p.flames.visible = false; },
+                    tick: function (now) { L.tickScorch(now); }
+                };
+            },
+
+            // PROJECTILE: a modelled object (Sova's arrow, Raze's grenade) or a lit orb (Omen's shadow
+            // orb, Phoenix's fireballs) on the Classic projectile's position, with spin and a trail
+            make_projectile: function () {
+                const L = this, pool = [];
+                const quad = L.quads(1);
+                // shared lit materials: the same MeshStandard programs the Classic turret already uses
+                const metal = new THREE.MeshStandardMaterial({ color: 0x8b95a1, roughness: 0.32, metalness: 0.85 });
+                const fin = new THREE.MeshStandardMaterial({ color: L.theme('sova'), roughness: 0.45, metalness: 0.25 });
+                const shell = new THREE.MeshStandardMaterial({ color: L.theme('raze'), roughness: 0.42, metalness: 0.2 });
+                const band = new THREE.MeshStandardMaterial({ color: 0x2a2f37, roughness: 0.6, metalness: 0.5 });
+                L.litMats = (L.litMats || []).concat([metal, fin, shell, band]);
+                // arrow along +Z: shaft, head, three fins
+                const shaftGeo = mergeGeometryParts([
+                    { geometry: new THREE.CylinderGeometry(0.016, 0.016, 0.86, 8), matrix: partMatrix(0, 0, -0.17, Math.PI / 2, 0, 0) },
+                    { geometry: new THREE.ConeGeometry(0.05, 0.17, 10), matrix: partMatrix(0, 0, 0.33, Math.PI / 2, 0, 0) },
+                    { geometry: new THREE.CylinderGeometry(0.03, 0.03, 0.05, 10), matrix: partMatrix(0, 0, 0.23, Math.PI / 2, 0, 0) }
+                ]);
+                const finParts = [];
+                for (let k = 0; k < 3; k++) {
+                    const a = k * Math.PI * 2 / 3;
+                    finParts.push({ geometry: new THREE.BoxGeometry(0.006, 0.07, 0.16), matrix: partMatrix(Math.cos(a) * 0.035, Math.sin(a) * 0.035, -0.53, 0, 0, a + Math.PI / 2) });
+                }
+                const finGeo = mergeGeometryParts(finParts);
+                // grenade: a rounded shell with a dark band and cap
+                const shellGeo = roundedBoxGeometry(0.2, 0.2, 0.27, 0.09, 3);
+                const bandGeo = mergeGeometryParts([
+                    { geometry: new THREE.CylinderGeometry(0.106, 0.106, 0.045, 14), matrix: partMatrix(0, 0, 0, Math.PI / 2, 0, 0) },
+                    { geometry: new THREE.CylinderGeometry(0.04, 0.05, 0.05, 10), matrix: partMatrix(0, 0, 0.15, Math.PI / 2, 0, 0) }
+                ]);
+                for (let i = 0; i < 6; i++) {
+                    const orbMat = L.shader('bb', { uMode: { value: 0 }, uBB: { value: 0 }, uScale: { value: 0.6 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uFade: { value: 1 }, uAge: { value: 0 }, uStyle: { value: 0 }, uSeed: { value: i * 0.17 } },
+                        { blending: THREE.AdditiveBlending });
+                    const orb = new THREE.Mesh(quad, orbMat);
+                    const arrow = new THREE.Group();
+                    arrow.add(new THREE.Mesh(shaftGeo, metal), new THREE.Mesh(finGeo, fin));
+                    const tipMat = L.shader('bb', { uMode: { value: 0 }, uBB: { value: 0 }, uScale: { value: 0.32 }, uColA: { value: L.lin(0xffffff) }, uColB: { value: L.lin(0x57a8ff) }, uFade: { value: 1 }, uAge: { value: 0 }, uStyle: { value: 2 }, uSeed: { value: i } },
+                        { blending: THREE.AdditiveBlending });
+                    const tip = new THREE.Mesh(quad, tipMat);
+                    tip.position.z = 0.33;
+                    arrow.add(tip);
+                    const grenade = new THREE.Group();
+                    grenade.add(new THREE.Mesh(shellGeo, shell), new THREE.Mesh(bandGeo, band));
+                    for (const o of [orb, arrow, grenade]) { o.visible = false; L.root.add(o); o.traverse((c) => { c.frustumCulled = false; }); }
+                    pool.push({ busy: false, key: null, orb: orb, orbMat: orbMat, arrow: arrow, grenade: grenade, spin: 0, lastEmit: 0 });
+                }
+                const ORB = {
+                    'omen.e': { style: 1, a: 0x0b0614, b: L.theme('omen'), size: 0.72, blend: THREE.NormalBlending },
+                    'phoenix.c': { style: 0, a: 0xfff1b8, b: 0xff6a00, size: 0.8, blend: THREE.AdditiveBlending },
+                    'phoenix.q': { style: 0, a: 0xffffff, b: 0xffb02e, size: 0.62, blend: THREE.AdditiveBlending }
+                };
+                const fwd = L._v[0];
+                const j = () => (Math.random() - 0.5) * 0.4;
+                return {
+                    acquire: function (key, proj) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (p.busy) continue;
+                            p.busy = true; p.key = key; p.spin = 0; p.lastEmit = 0;
+                            const o = ORB[key];
+                            if (o) {
+                                p.orbMat.uniforms.uStyle.value = o.style;
+                                L.lin(o.a, p.orbMat.uniforms.uColA.value);
+                                L.lin(o.b, p.orbMat.uniforms.uColB.value);
+                                p.orbMat.uniforms.uScale.value = o.size;
+                                p.orbMat.blending = o.blend;
+                                p.orb.visible = true;
+                            } else if (key === 'sova.q') p.arrow.visible = true;
+                            else if (key === 'raze.e') p.grenade.visible = true;
+                            return p;
+                        }
+                        return null;
+                    },
+                    sync: function (b, proj, now, dt) {
+                        const p = b.inst, pos = proj.position, v = proj.velocity;
+                        const sp = v.length();
+                        if (sp > 1e-3) fwd.copy(v).multiplyScalar(1 / sp); else fwd.set(0, 0, 1);
+                        if (p.key === 'sova.q') {
+                            p.arrow.position.copy(pos);
+                            L._v[1].copy(pos).add(fwd);
+                            p.arrow.lookAt(L._v[1]);
+                            p.spin += dt * 9;
+                            p.arrow.rotateZ(p.spin);
+                        } else if (p.key === 'raze.e') {
+                            p.grenade.position.copy(pos);
+                            L._v[1].copy(pos).add(fwd);
+                            p.grenade.lookAt(L._v[1]);
+                            p.spin += dt * 16;
+                            p.grenade.rotateX(p.spin);
+                        } else {
+                            p.orb.position.copy(pos);
+                            p.orbMat.uniforms.uAge.value = (now - (proj.spawnAt || now)) * 0.001;
+                        }
+                        // trail
+                        if (now - p.lastEmit < 28) return;
+                        p.lastEmit = now;
+                        const bx = pos.x - fwd.x * 0.25, by = pos.y - fwd.y * 0.25, bz = pos.z - fwd.z * 0.25;
+                        if (p.key === 'omen.e') {
+                            L.emit(FX_KIND.smoke, bx, by, bz, j(), j(), j(), 0x2a1650, 0.9, 0.22, 0.7, 0.55, 1.6, -0.15);
+                        } else if (p.key === 'phoenix.c') {
+                            L.emit(FX_KIND.ember, bx, by, bz, j() * 2, 0.6 + Math.random(), j() * 2, 0xff8a1f, 0.5, 0.06, 0.02, 1, 0.8, -1.2);
+                            L.emit(FX_KIND.smoke, bx, by, bz, j(), 0.4, j(), 0x3a2a22, 0.8, 0.18, 0.55, 0.32, 1.2, -0.4);
+                        } else if (p.key === 'phoenix.q') {
+                            L.emit(FX_KIND.glow, bx, by, bz, 0, 0, 0, 0xffc04d, 0.32, 0.35, 0.06, 0.8, 0, 0);
+                        } else if (p.key === 'sova.q') {
+                            L.emit(FX_KIND.spark, bx, by, bz, j() * 3, j() * 3, j() * 3, 0x8fd0ff, 0.22, 0.05, 0.015, 1, 2, 2);
+                            L.emit(FX_KIND.glow, pos.x, pos.y, pos.z, 0, 0, 0, 0x57a8ff, 0.18, 0.25, 0.05, 0.6, 0, 0);
+                        } else if (p.key === 'raze.e') {
+                            L.emit(FX_KIND.smoke, bx, by, bz, j(), j(), j(), 0x9ca3af, 0.7, 0.12, 0.45, 0.4, 1.4, -0.3);
+                            L.emit(FX_KIND.spark, bx, by, bz, j() * 2, Math.random(), j() * 2, 0xffb35c, 0.2, 0.04, 0.01, 1, 1, 4);
+                        }
+                    },
+                    release: function (p) { p.busy = false; p.key = null; p.orb.visible = p.arrow.visible = p.grenade.visible = false; },
+                    tick: function () {}
+                };
+            },
+
+            // BLAST (Raze Paint Shells, Sova Shock Bolt): a bright core, a fireball (or arcs), a shock
+            // ring on the floor, a smoke plume, debris, a scorch or paint mark, light and camera shake
+            make_blast: function () {
+                const L = this, pool = [];
+                const sphere = new THREE.SphereGeometry(1, 32, 24);
+                const disc = new THREE.CircleGeometry(1, 64);
+                disc.rotateX(-Math.PI / 2);
+                for (let i = 0; i < 6; i++) {
+                    const ballMat = L.shader('fireball', { uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uFade: { value: 0 }, uHeat: { value: 0 }, uAge: { value: 0 }, uSeed: { value: i * 0.29 } });
+                    const ball = new THREE.Mesh(sphere, ballMat);
+                    const ringMat = L.shader('ground', { uMode: { value: 3 }, uColA: { value: new THREE.Color() }, uColB: { value: new THREE.Color() }, uFade: { value: 0 }, uAge: { value: 0 }, uSeed: { value: i * 0.41 } },
+                        { blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+                    const ring = new THREE.Mesh(disc, ringMat);
+                    const arcPos = new Float32Array(24 * 2 * 3);
+                    const arcGeo = new THREE.BufferGeometry();
+                    arcGeo.setAttribute('position', new THREE.BufferAttribute(arcPos, 3).setUsage(THREE.DynamicDrawUsage));
+                    const arcMat = new THREE.LineBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
+                    const arcs = new THREE.LineSegments(arcGeo, arcMat);
+                    for (const m of [ball, ring, arcs]) { m.visible = false; m.frustumCulled = false; L.root.add(m); }
+                    L.softObjects.push(ball);
+                    pool.push({ busy: false, electric: false, start: 0, x: 0, y: 0, z: 0, fy: 0, R: 1, ball: ball, ballMat: ballMat, ring: ring, ringMat: ringMat, arcs: arcs, arcMat: arcMat, arcPos: arcPos });
+                }
+                const fire = (x, y, z, R, raze) => {
+                    // debris by the surface: chips and sparks off the ground, a dust ring along it
+                    for (let k = 0; k < 26; k++) {
+                        const a = Math.random() * 6.283, up = 2 + Math.random() * 7, out = 2 + Math.random() * R * 1.4;
+                        L.emit(FX_KIND.spark, x, y + 0.2, z, Math.cos(a) * out, up, Math.sin(a) * out, raze ? 0xffb066 : 0x9fdcff, 0.6 + Math.random() * 0.5, 0.08, 0.02, 1, 0.6, 9.8);
+                    }
+                    const nDust = raze ? 14 : 6;   // an electric burst kicks up less than a grenade
+                    for (let k = 0; k < nDust; k++) {
+                        const a = (k / nDust) * 6.283;
+                        L.emit(FX_KIND.dust, x + Math.cos(a) * 0.6, y + 0.15, z + Math.sin(a) * 0.6, Math.cos(a) * R * 1.5, 0.3, Math.sin(a) * R * 1.5, raze ? 0x7d7267 : 0x8a8f96, 1.1, 0.6, raze ? 1.8 : 1.1, 0.5, 2.2, 0.4);
+                    }
+                    // a smoke plume that rises and spreads (a thin ozone haze for the shock)
+                    for (let k = 0; k < (raze ? 12 : 3); k++) {
+                        L.emit(FX_KIND.smoke, x + (Math.random() - 0.5) * R * 0.5, y + 0.4 + Math.random() * R * 0.4, z + (Math.random() - 0.5) * R * 0.5,
+                            (Math.random() - 0.5) * 1.2, 1.2 + Math.random() * 1.5, (Math.random() - 0.5) * 1.2, raze ? 0x3b3633 : 0x6f7f8f, 2.2 + Math.random(), 0.8, R * (raze ? 0.55 : 0.3), 0.6, 0.9, -0.6);
+                    }
+                };
+                return {
+                    acquire: function (key, f, now) {
+                        let p = null;
+                        for (let i = 0; i < pool.length; i++) if (!pool[i].busy) { p = pool[i]; break; }
+                        if (!p) { p = pool[0]; for (let i = 1; i < pool.length; i++) if (pool[i].start < p.start) p = pool[i]; }
+                        const raze = key === 'raze.e';
+                        p.busy = true; p.electric = !raze; p.start = now;
+                        // the Classic flash sits 0.35 m above the blast for Paint Shells; its radius is 0.92 of the blast
+                        p.x = f.position.x; p.y = f.position.y - (raze ? 0.35 : 0); p.z = f.position.z;
+                        p.R = f.maxRadius / 0.92;
+                        p.fy = L.floorY(p.x, p.y + 0.5, p.z);
+                        const R = p.R;
+                        L.lin(raze ? 0xfff3c4 : 0xe6f6ff, p.ballMat.uniforms.uColA.value);
+                        L.lin(raze ? L.theme('raze') : 0x57a8ff, p.ballMat.uniforms.uColB.value);
+                        L.lin(raze ? 0xff7a1a : 0x7cc4ff, p.ringMat.uniforms.uColB.value);
+                        p.ball.visible = true;   // a fireball for Paint Shells, a white-blue plasma core for the shock
+                        p.arcs.visible = !raze;
+                        p.ring.visible = true;
+                        p.ring.position.set(p.x, p.fy + 0.04, p.z);
+                        p.ring.scale.set(R * 1.15, 1, R * 1.15);
+                        fire(p.x, Math.max(p.fy, p.y), p.z, R, raze);
+                        haloSystem.flash(p.x, p.y + 0.3, p.z, raze ? 0xffe0a0 : 0xd6eeff, R * 0.9, 320);
+                        abilityLights.flash(p.x, p.y + 0.6, p.z, raze ? 0xff9a3c : 0x6fb8ff, R * 2.2 + 3, 3.4, 560);
+                        fxKit.shakeAt(p.x, p.y, p.z, Math.min(1, R / 6));
+                        L.scorch(p.x, p.fy, p.z, R * (raze ? 0.75 : 0.45), raze ? L.theme('raze') : 0x1b1c22, 9000, now);
+                        return p;
+                    },
+                    sync: function () {},
+                    // the blast plays out on its own clock; a switch to Classic ends it at once
+                    release: function (p, natural) { if (!natural) { p.busy = false; p.ball.visible = p.ring.visible = p.arcs.visible = false; } },
+                    clear: function () { for (const p of pool) { p.busy = false; p.ball.visible = p.ring.visible = p.arcs.visible = false; } },
+                    tick: function (now) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (!p.busy) continue;
+                            const t = (now - p.start) * 0.001, R = p.R;
+                            if (t > 1.3) { p.busy = false; p.ball.visible = p.ring.visible = p.arcs.visible = false; continue; }
+                            // fireball: swells, cools, rises a little (the shock's core: a short, small plasma flash)
+                            const bu = p.ballMat.uniforms;
+                            if (p.electric) {
+                                const ge = 1 - Math.pow(1 - Math.min(1, t / 0.12), 3);
+                                p.ball.position.set(p.x, p.y + 0.4, p.z);
+                                p.ball.scale.setScalar(R * (0.1 + 0.22 * ge));
+                                bu.uHeat.value = Math.max(0, 1.5 - t * 4.5);
+                                bu.uFade.value = t < 0.16 ? 1 : Math.max(0, 1 - (t - 0.16) / 0.2);
+                            } else {
+                                const g = 1 - Math.pow(1 - Math.min(1, t / 0.45), 3);
+                                p.ball.position.set(p.x, p.y + 0.3 + t * 0.9, p.z);
+                                p.ball.scale.setScalar(Math.min(2.0, R * 0.4) * (0.3 + 0.7 * g));   // a grenade's fireball, well inside the blast radius
+                                bu.uHeat.value = Math.max(0, 1.25 - t * 2.0);
+                                bu.uFade.value = t < 0.35 ? 1 : Math.max(0, 1 - (t - 0.35) / 0.4);   // the smoke particles carry on from here
+                            }
+                            bu.uAge.value = t;
+                            // ring races out along the floor
+                            const ru = p.ringMat.uniforms;
+                            ru.uAge.value = Math.min(1, t / 0.42) * 0.97;
+                            ru.uFade.value = Math.max(0, 1 - t / 0.7);
+                            // arcs (shock): jagged bolts from the core, re-cut every frame
+                            if (p.electric) {
+                                if (t > 0.42) { p.arcs.visible = false; continue; }
+                                const A = p.arcPos;
+                                for (let k = 0; k < 24; k++) {
+                                    const bolt = (k / 4) | 0, seg = k % 4;
+                                    const a = bolt * 1.047 + (now * 0.004) % 6.283;
+                                    const r0 = seg / 4 * R * 0.9, r1 = (seg + 1) / 4 * R * 0.9;
+                                    const jx = (Math.random() - 0.5) * 0.7, jy = (Math.random() - 0.5) * 0.7;
+                                    A[k * 6] = p.x + Math.cos(a) * r0; A[k * 6 + 1] = p.y + 0.4 + (seg ? jy : 0); A[k * 6 + 2] = p.z + Math.sin(a) * r0;
+                                    A[k * 6 + 3] = p.x + Math.cos(a) * r1 + jx; A[k * 6 + 4] = p.y + 0.4 + jy; A[k * 6 + 5] = p.z + Math.sin(a) * r1 + jx;
+                                }
+                                p.arcs.geometry.attributes.position.needsUpdate = true;
+                                p.arcMat.opacity = Math.max(0, 1 - t / 0.42);
+                            }
+                        }
+                    }
+                };
+            },
+
+            // FLASH (Phoenix Curveball, also the bot rusher's): a hot core with bloom and streaks at
+            // the source; the screen whiteout and the blind logic are the Classic ones, untouched
+            make_flash: function () {
+                const L = this, pool = [];
+                const quad = L.quads(1);
+                const streakGeo = L.quads(3);
+                L.setQuad(streakGeo, 0, 0, 0, 0, 1, 0.06, 0, 0, 0, 0);
+                L.setQuad(streakGeo, 1, 0, 0, 0, 0.55, 0.035, 0, 0, 0.62, 0);
+                L.setQuad(streakGeo, 2, 0, 0, 0, 0.55, 0.035, 0, 0, -0.62, 0);
+                L.quadsDirty(streakGeo);
+                const hot = L.lin(0xffd166), fireCol = L.lin(L.theme('phoenix'));
+                for (let i = 0; i < 4; i++) {
+                    const mk = (mode, scale, style) => L.shader('bb', { uMode: { value: mode }, uBB: { value: 0 }, uScale: { value: scale }, uColA: { value: hot.clone() }, uColB: { value: fireCol.clone() }, uFade: { value: 0 }, uAge: { value: 0 }, uStyle: { value: style }, uSeed: { value: i * 0.7 } },
+                        { blending: THREE.AdditiveBlending, depthTest: true });
+                    const coreMat = mk(2, 2.4, 0), streakMat = mk(3, 14, 0), orbMat = mk(0, 0.7, 0);
+                    const core = new THREE.Mesh(quad, coreMat), streaks = new THREE.Mesh(streakGeo, streakMat), orb = new THREE.Mesh(quad, orbMat);
+                    for (const m of [core, streaks, orb]) { m.visible = false; m.frustumCulled = false; m.renderOrder = 3; L.root.add(m); }
+                    pool.push({ busy: false, kind: '', burstAt: 0, dur: 380, core: core, coreMat: coreMat, streaks: streaks, streakMat: streakMat, orb: orb, orbMat: orbMat });
+                }
+                const burst = (p, x, y, z, now, dur) => {
+                    p.burstAt = now; p.dur = dur;
+                    p.core.position.set(x, y, z); p.streaks.position.set(x, y, z);
+                    p.core.visible = p.streaks.visible = true; p.orb.visible = false;
+                    haloSystem.flash(x, y, z, 0xfff1c1, 6.5, dur);
+                    abilityLights.flash(x, y, z, 0xffb347, 14, 3.6, dur + 80);
+                    for (let k = 0; k < 22; k++) {
+                        const a = Math.random() * 6.283, e = (Math.random() - 0.3) * 2, s = 3 + Math.random() * 6;
+                        L.emit(FX_KIND.ember, x, y, z, Math.cos(a) * s, e * 2, Math.sin(a) * s, 0xffa338, 0.55 + Math.random() * 0.4, 0.07, 0.02, 1, 1.2, 4);
+                    }
+                };
+                return {
+                    acquire: function (key, it, now, kind) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (p.busy) continue;
+                            p.busy = true; p.kind = kind; p.burstAt = 0;
+                            if (kind === 'hazard') { p.orb.visible = true; p.orb.position.set(it.x, it.y, it.z); }
+                            else burst(p, it.position.x, it.position.y, it.position.z, now, Math.max(120, it.expireAt - it.startAt));
+                            return p;
+                        }
+                        return null;
+                    },
+                    sync: function (b, it, now) {
+                        const p = b.inst;
+                        if (p.kind === 'hazard') {
+                            if (!p.burstAt && it.detonated) burst(p, it.x, it.y, it.z, now, Math.max(120, it.endTime - now));
+                            if (!p.burstAt) {
+                                p.orb.position.set(it.x, it.y, it.z);
+                                p.orbMat.uniforms.uFade.value = 1;
+                                p.orbMat.uniforms.uScale.value = 0.6 + 0.18 * Math.sin(now * 0.025);
+                                return;
+                            }
+                        }
+                        const t = Math.max(0, (now - p.burstAt) / p.dur);
+                        const rise = Math.min(1, t / 0.08), fall = Math.pow(Math.max(0, 1 - t), 1.6);
+                        p.coreMat.uniforms.uFade.value = rise * fall;
+                        p.coreMat.uniforms.uScale.value = 1.6 + 3.2 * Math.sqrt(Math.min(1, t * 2.5));
+                        p.streakMat.uniforms.uFade.value = rise * Math.pow(Math.max(0, 1 - t), 2.2);
+                        p.streakMat.uniforms.uScale.value = 9 + 16 * Math.min(1, t * 3);
+                    },
+                    release: function (p) { p.busy = false; p.core.visible = p.streaks.visible = p.orb.visible = false; },
+                    tick: function () {}
+                };
+            },
+
+            // BEAM (Sova Hunter's Fury): a white core inside a softer glow along the Classic beam, an
+            // impact where it first meets the map (it carries on through, as before), light at both ends
+            make_beam: function () {
+                const L = this, SEG = 96;
+                const g = new THREE.BufferGeometry();
+                const pos = new Float32Array((SEG + 1) * 2 * 3), side = new Float32Array((SEG + 1) * 2), at = new Float32Array((SEG + 1) * 2);
+                const index = [];
+                for (let s = 0; s <= SEG; s++) {
+                    side[s * 2] = -1; side[s * 2 + 1] = 1;
+                    at[s * 2] = at[s * 2 + 1] = s / SEG;
+                    if (s < SEG) index.push(s * 2, s * 2 + 1, s * 2 + 3, s * 2, s * 2 + 3, s * 2 + 2);
+                }
+                g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                g.setAttribute('aSide', new THREE.BufferAttribute(side, 1));
+                g.setAttribute('aT', new THREE.BufferAttribute(at, 1));
+                g.setIndex(index);
+                g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
+                const mat = L.shader('beam', { uColA: { value: L.lin(0xf4fbff) }, uColB: { value: L.lin(0x38bdf8).lerp(L.lin(L.theme('sova')), 0.5) }, uFade: { value: 0 }, uLen: { value: 100 }, uWidth: { value: 0.95 } },
+                    { blending: THREE.AdditiveBlending });
+                const strip = new THREE.Mesh(g, mat);
+                strip.visible = false; strip.frustumCulled = false;
+                L.root.add(strip);
+                const inst = { busy: false, strip: strip, mat: mat };
+                const dir = L._v[2];
+                return {
+                    acquire: function (key, beam, now) {
+                        if (inst.busy) return null;
+                        inst.busy = true;
+                        strip.visible = true;
+                        const o = beam.group.position;
+                        dir.set(0, 0, 1).applyQuaternion(beam.group.quaternion);
+                        // first surface along the beam (read-only use of the shot index, as getAimGroundPoint does)
+                        let hitD = 100;
+                        const savedFar = raycaster.far;
+                        raycaster.ray.origin.copy(o);
+                        raycaster.ray.direction.copy(dir);
+                        raycaster.far = 100;
+                        _shotHits.length = 0;
+                        envShotIndex.raycast(raycaster.ray, 100);
+                        if (_shotHits.length > 0) { _shotHits.sort(compareHitDistance); hitD = _shotHits[0].distance; }
+                        _shotHits.length = 0;
+                        raycaster.far = savedFar;
+                        const hx = o.x + dir.x * hitD, hy = o.y + dir.y * hitD, hz = o.z + dir.z * hitD;
+                        haloSystem.flash(o.x, o.y, o.z, 0xd8f3ff, 1.6, 260);
+                        abilityLights.flash(o.x, o.y, o.z, 0x7dd3fc, 6, 2.2, 380);
+                        if (hitD < 99) {
+                            haloSystem.flash(hx, hy, hz, 0xe0f7ff, 2.6, 420);
+                            abilityLights.flash(hx, hy, hz, 0x38bdf8, 9, 3.0, 520);
+                            for (let k = 0; k < 30; k++) {
+                                L.emit(FX_KIND.spark, hx, hy, hz, -dir.x * 4 + (Math.random() - 0.5) * 9, Math.random() * 7, -dir.z * 4 + (Math.random() - 0.5) * 9, 0xa5e3ff, 0.5 + Math.random() * 0.4, 0.07, 0.02, 1, 0.9, 9.8);
+                            }
+                            L.emit(FX_KIND.glow, hx, hy, hz, 0, 0, 0, 0x7dd3fc, 0.5, 0.6, 2.4, 0.9, 0, 0);
+                            for (let k = 0; k < 5; k++) L.emit(FX_KIND.smoke, hx, hy, hz, (Math.random() - 0.5), 0.8, (Math.random() - 0.5), 0x5b6573, 1.6, 0.4, 1.4, 0.5, 1.2, -0.4);
+                        }
+                        return inst;
+                    },
+                    sync: function (b, beam, now) {
+                        strip.position.copy(beam.group.position);
+                        strip.quaternion.copy(beam.group.quaternion);
+                        const frac = (now - beam.startAt) / Math.max(1, beam.expireAt - beam.startAt);
+                        mat.uniforms.uFade.value = Math.max(0, 1 - frac);   // the Classic fade
+                        mat.uniforms.uWidth.value = 0.95 * (1 - frac * 0.55);
+                    },
+                    release: function () { inst.busy = false; strip.visible = false; },
+                    tick: function () {}
+                };
+            },
+
+            // PULSE (Breach Fault Line): the fissure glows up along the Classic corridor while it charges,
+            // then a quake front races along it with a scan-line edge. With the Ultra post chain's depth
+            // it is drawn on whatever surfaces the corridor holds (floors and the walls it meets); without
+            // it, on a floor strip (the settings panel says so).
+            make_pulse: function () {
+                const L = this, pool = [];
+                const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+                boxGeo.translate(0, 0.5, 0.5);
+                const stripGeo = new THREE.PlaneGeometry(1, 1);
+                stripGeo.rotateX(-Math.PI / 2);
+                stripGeo.translate(0, 0.106, 0.5);
+                const orange = L.lin(L.theme('breach')), hot = L.lin(0xffd08a);
+                for (let i = 0; i < 2; i++) {
+                    const own = () => ({
+                        uDecal: { value: 0 }, uProjInv: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uToLocal: { value: new THREE.Matrix4() },
+                        uCharge: { value: 0 }, uFront: { value: -1 }, uAfter: { value: 0 }, uFade: { value: 0 }, uColA: { value: orange.clone() }, uColB: { value: hot.clone() }
+                    });
+                    const decalMat = L.shader('quake', own(), { blending: THREE.AdditiveBlending, side: THREE.BackSide, depthTest: false });
+                    decalMat.uniforms.uDecal.value = 1;
+                    const stripMat = L.shader('quake', own(), { blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+                    const decal = new THREE.Mesh(boxGeo, decalMat);
+                    const strip = new THREE.Mesh(stripGeo, stripMat);
+                    decal.onBeforeRender = function (r, s, cam) {
+                        decalMat.uniforms.uProjInv.value.copy(cam.projectionMatrixInverse);
+                        decalMat.uniforms.uCamWorld.value.copy(cam.matrixWorld);
+                    };
+                    for (const m of [decal, strip]) { m.visible = false; m.frustumCulled = false; m.matrixAutoUpdate = false; L.root.add(m); }
+                    L.softObjects.push(decal);
+                    pool.push({ busy: false, decal: decal, decalMat: decalMat, strip: strip, stripMat: stripMat, M: new THREE.Matrix4(), erupted: false, dustAt: -1, sx: 0, sz: 0, ex: 0, ez: 0, fy: 0 });
+                }
+                const fwd = L._v[3], right = L._v[4];
+                const setU = (u, c, f, a, d) => { u.uCharge.value = c; u.uFront.value = f; u.uAfter.value = a; u.uFade.value = d; };
+                return {
+                    acquire: function (key, bf, now) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (p.busy) continue;
+                            p.busy = true; p.erupted = false; p.dustAt = -1;
+                            // corridor frame: x across (4.5 m), y up (5 m, from 0.5 m below the floor), z from start to end
+                            const s0 = bf.startPos, e0 = bf.endPos;
+                            fwd.set(e0.x - s0.x, 0, e0.z - s0.z);
+                            const len = Math.max(0.01, fwd.length());
+                            fwd.multiplyScalar(1 / len);
+                            right.set(fwd.z, 0, -fwd.x);
+                            const W = 4.5, H = 5;
+                            p.M.set(right.x * W, 0, fwd.x * len, s0.x,
+                                    0, H, 0, s0.y - 0.5,
+                                    right.z * W, 0, fwd.z * len, s0.z,
+                                    0, 0, 0, 1);
+                            p.decal.matrix.copy(p.M);
+                            p.strip.matrix.copy(p.M);
+                            p.decal.matrixWorldNeedsUpdate = p.strip.matrixWorldNeedsUpdate = true;
+                            const inv = L._m.copy(p.M).invert();
+                            p.decalMat.uniforms.uToLocal.value.copy(inv);
+                            p.stripMat.uniforms.uToLocal.value.copy(inv);
+                            p.sx = s0.x; p.sz = s0.z; p.ex = e0.x; p.ez = e0.z; p.fy = s0.y;
+                            return p;
+                        }
+                        return null;
+                    },
+                    sync: function (b, bf, now) {
+                        const p = b.inst;
+                        p.decal.visible = L.soft;
+                        p.strip.visible = !L.soft;
+                        const charge = Math.max(0, Math.min(1, (now - bf.startAt) / Math.max(1, bf.detonateAt - bf.startAt)));
+                        const front = now >= bf.detonateAt ? Math.min(1, (now - bf.detonateAt) / 320) : -1;
+                        const after = Math.max(0, (now - bf.detonateAt) * 0.001);
+                        const rem = bf.expireAt - now;
+                        const fade = rem < 350 ? Math.max(0, rem / 350) : 1;   // the Classic fade
+                        setU(p.decalMat.uniforms, charge, front, after, fade);
+                        setU(p.stripMat.uniforms, charge, front, after, fade);
+                        if (front >= 0 && !p.erupted) {
+                            p.erupted = true;
+                            const cx = (p.sx + p.ex) * 0.5, cz = (p.sz + p.ez) * 0.5;
+                            fxKit.shakeAt(cx, p.fy, cz, 0.55);
+                            for (let k = 0; k < 3; k++) {
+                                const f = (k + 0.5) / 3;
+                                abilityLights.flash(p.sx + (p.ex - p.sx) * f, p.fy + 0.6, p.sz + (p.ez - p.sz) * f, 0xff8a3d, 8, 2.4, 620);
+                            }
+                        }
+                        // rock dust and grit kicked up as the front passes
+                        if (front >= 0 && front <= 1 && now - p.dustAt > 22) {
+                            p.dustAt = now;
+                            const x = p.sx + (p.ex - p.sx) * front, z = p.sz + (p.ez - p.sz) * front;
+                            for (let k = 0; k < 3; k++) {
+                                const o = (Math.random() - 0.5) * 4.2;
+                                L.emit(FX_KIND.dust, x + right.x * o, p.fy + 0.2, z + right.z * o, (Math.random() - 0.5), 2 + Math.random() * 2.5, (Math.random() - 0.5), 0x8a7a68, 1.2, 0.5, 1.7, 0.6, 1.6, 2.2);
+                                L.emit(FX_KIND.spark, x + right.x * o, p.fy + 0.1, z + right.z * o, (Math.random() - 0.5) * 2, 3 + Math.random() * 4, (Math.random() - 0.5) * 2, 0xffb070, 0.5, 0.06, 0.02, 1, 0.5, 9.8);
+                            }
+                        }
+                    },
+                    release: function (p) { p.busy = false; p.decal.visible = p.strip.visible = false; },
+                    tick: function () {}
+                };
+            },
+
+            // DEPLOYABLE (Killjoy Turret): a modelled turret on the Classic one's spot, its head turning
+            // as the Classic head does (and scanning when it has no target), recoil and a muzzle flash on
+            // every Classic shot, and a status light: teal idle, amber tracking, red firing, blinking at the end
+            make_deployable: function () {
+                const L = this, pool = [];
+                const body = new THREE.MeshStandardMaterial({ color: 0xc6ccd4, roughness: 0.4, metalness: 0.55 });
+                const accent = new THREE.MeshStandardMaterial({ color: L.theme('killjoy'), roughness: 0.34, metalness: 0.2 });
+                const dark = new THREE.MeshStandardMaterial({ color: 0x1c2128, roughness: 0.55, metalness: 0.45 });
+                L.litMats = (L.litMats || []).concat([body, accent, dark]);
+                const legs = [];
+                for (let k = 0; k < 3; k++) {
+                    const a = k * Math.PI * 2 / 3;
+                    legs.push({ geometry: roundedBoxGeometry(0.05, 0.46, 0.05, 0.02, 2), matrix: partMatrix(Math.sin(a) * 0.17, 0.17, Math.cos(a) * 0.17, Math.cos(a) * 0.62, 0, -Math.sin(a) * 0.62) });
+                    legs.push({ geometry: roundedBoxGeometry(0.1, 0.03, 0.12, 0.012, 2), matrix: partMatrix(Math.sin(a) * 0.32, 0.015, Math.cos(a) * 0.32, 0, a, 0) });
+                }
+                legs.push({ geometry: new THREE.CylinderGeometry(0.15, 0.18, 0.16, 16), matrix: partMatrix(0, 0.34, 0, 0, 0, 0) });
+                legs.push({ geometry: new THREE.CylinderGeometry(0.055, 0.065, 0.36, 12), matrix: partMatrix(0, 0.58, 0, 0, 0, 0) });
+                const baseGeo = mergeGeometryParts(legs);
+                const headBodyGeo = mergeGeometryParts([
+                    { geometry: roundedBoxGeometry(0.46, 0.28, 0.54, 0.07, 3), matrix: partMatrix(0, 0, 0, 0, 0, 0) },
+                    { geometry: roundedBoxGeometry(0.1, 0.18, 0.32, 0.04, 2), matrix: partMatrix(0.29, -0.02, -0.04, 0, 0, 0) },
+                    { geometry: roundedBoxGeometry(0.1, 0.18, 0.32, 0.04, 2), matrix: partMatrix(-0.29, -0.02, -0.04, 0, 0, 0) }
+                ]);
+                const headAccentGeo = mergeGeometryParts([
+                    { geometry: roundedBoxGeometry(0.4, 0.05, 0.44, 0.02, 2), matrix: partMatrix(0, 0.155, -0.02, 0, 0, 0) },
+                    { geometry: roundedBoxGeometry(0.34, 0.06, 0.04, 0.015, 2), matrix: partMatrix(0, -0.1, 0.27, 0, 0, 0) }
+                ]);
+                const headDarkGeo = mergeGeometryParts([
+                    { geometry: new THREE.CylinderGeometry(0.042, 0.048, 0.44, 12), matrix: partMatrix(0, -0.02, 0.46, Math.PI / 2, 0, 0) },
+                    { geometry: new THREE.CylinderGeometry(0.062, 0.062, 0.06, 12), matrix: partMatrix(0, -0.02, 0.68, Math.PI / 2, 0, 0) },
+                    { geometry: roundedBoxGeometry(0.22, 0.12, 0.05, 0.02, 2), matrix: partMatrix(0, 0.05, 0.27, 0, 0, 0) }
+                ]);
+                const lightGeo = mergeGeometryParts([
+                    { geometry: new THREE.SphereGeometry(0.038, 12, 10), matrix: partMatrix(0, 0.05, 0.3, 0, 0, 0) },
+                    { geometry: new THREE.BoxGeometry(0.26, 0.014, 0.014), matrix: partMatrix(0, 0.185, 0.18, 0, 0, 0) }
+                ]);
+                for (let i = 0; i < 2; i++) {
+                    const lightMat = new THREE.MeshBasicMaterial({ color: 0x5eead4 });
+                    L.mats.push(lightMat);
+                    const g = new THREE.Group();
+                    const base = new THREE.Mesh(baseGeo, body);
+                    const head = new THREE.Group();
+                    head.position.y = 0.78;
+                    head.add(new THREE.Mesh(headBodyGeo, body), new THREE.Mesh(headAccentGeo, accent), new THREE.Mesh(headDarkGeo, dark), new THREE.Mesh(lightGeo, lightMat));
+                    g.add(base, head);
+                    g.visible = false;
+                    g.traverse((o) => { o.frustumCulled = false; });
+                    L.root.add(g);
+                    pool.push({ busy: false, g: g, base: base, head: head, lightMat: lightMat, yaw: 0, lastYaw: 0, trackAt: -1e9, lastShot: 0, recoilAt: -1e9, start: 0 });
+                }
+                const muzzle = L._v[1];
+                return {
+                    acquire: function (key, t, now) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (p.busy) continue;
+                            p.busy = true; p.start = t.startAt || now;
+                            p.yaw = p.lastYaw = t.headGroup.rotation.y;
+                            p.trackAt = -1e9; p.lastShot = t.lastShotAt; p.recoilAt = -1e9;
+                            p.g.visible = true;
+                            for (let k = 0; k < 10; k++) {
+                                const a = Math.random() * 6.283;
+                                L.emit(FX_KIND.dust, t.position.x + Math.cos(a) * 0.3, t.position.y + 0.1, t.position.z + Math.sin(a) * 0.3, Math.cos(a) * 1.4, 0.4, Math.sin(a) * 1.4, 0x8d8579, 0.9, 0.3, 0.9, 0.45, 2, 0.5);
+                            }
+                            return p;
+                        }
+                        return null;
+                    },
+                    sync: function (b, t, now, dt) {
+                        const p = b.inst;
+                        p.g.position.copy(t.group.position);
+                        // unfolds as it lands (0.3 s)
+                        const age = (now - p.start) * 0.001, unfold = Math.min(1, age / 0.3);
+                        p.base.scale.set(1, 0.35 + 0.65 * unfold, 1);
+                        p.head.position.y = 0.78 * (0.45 + 0.55 * unfold);
+                        // head: the Classic yaw while it tracks, a slow scan when it has nobody
+                        const cy = t.headGroup.rotation.y;
+                        if (Math.abs(cy - p.lastYaw) > 1e-4) { p.lastYaw = cy; p.trackAt = now; }
+                        const tracking = now - p.trackAt < 900;
+                        const want = tracking ? cy : cy + Math.sin(now * 0.0011) * 0.5;
+                        let d = want - p.yaw;
+                        d = Math.atan2(Math.sin(d), Math.cos(d));
+                        p.yaw += d * Math.min(1, dt * (tracking ? 18 : 3));
+                        p.head.rotation.y = p.yaw;
+                        // a new Classic shot: recoil, muzzle flash, light
+                        if (t.lastShotAt && t.lastShotAt !== p.lastShot) {
+                            p.lastShot = t.lastShotAt;
+                            p.recoilAt = now;
+                            p.head.updateMatrixWorld(true);
+                            muzzle.set(0, -0.02, 0.74).applyMatrix4(p.head.matrixWorld);
+                            haloSystem.flash(muzzle.x, muzzle.y, muzzle.z, 0xfff2a8, 0.75, 70);
+                            abilityLights.flash(muzzle.x, muzzle.y, muzzle.z, 0xffd24d, 4, 1.6, 110);
+                            L.emit(FX_KIND.spark, muzzle.x, muzzle.y, muzzle.z, Math.sin(p.yaw) * 6, 0.5, Math.cos(p.yaw) * 6, 0xffd27a, 0.12, 0.05, 0.02, 1, 3, 0);
+                        }
+                        const kick = Math.max(0, 1 - (now - p.recoilAt) / 90);
+                        p.head.position.x = -Math.sin(p.yaw) * 0.04 * kick;
+                        p.head.position.z = -Math.cos(p.yaw) * 0.04 * kick;
+                        // status light
+                        const rem = t.expireAt - now;
+                        let hex = 0x5eead4, on = 0.75 + 0.25 * Math.sin(now * 0.004);
+                        if (now - t.lastShotAt < 160) { hex = 0xff5a4d; on = 1; }
+                        else if (tracking) { hex = 0xfbbf24; on = 1; }
+                        if (rem < 2000 && Math.sin(now * 0.025) < 0) on = 0.15;
+                        p.lightMat.color.setHex(hex).convertSRGBToLinear().multiplyScalar(on);
+                        abilityLights.add(p.g.position.x, p.g.position.y + 0.9, p.g.position.z, hex, 2.2, 0.5 * on);
+                    },
+                    release: function (p) { p.busy = false; p.g.visible = false; },
+                    tick: function () {}
+                };
+            },
+
+            // SELF (Jett Tailwind, also the bot rusher's dash): wind streaks along the dash, afterimages
+            // where it started, and a wind swirl on the off-hand with the existing cast gesture
+            make_self: function () {
+                const L = this, pool = [], N = 22;
+                const wind = L.lin(L.theme('jett'));
+                for (let i = 0; i < 3; i++) {
+                    const g = L.quads(N);
+                    const streakMat = L.shader('bb', { uMode: { value: 4 }, uBB: { value: 2 }, uScale: { value: 1 }, uColA: { value: wind.clone() }, uColB: { value: wind.clone() }, uFade: { value: 0 }, uAge: { value: 0 }, uStyle: { value: 0 }, uSeed: { value: i } },
+                        { blending: THREE.AdditiveBlending });
+                    const streaks = new THREE.Mesh(g, streakMat);
+                    const gg = L.quads(3, 0);
+                    const ghostMat = L.shader('bb', { uMode: { value: 5 }, uBB: { value: 1 }, uScale: { value: 1 }, uColA: { value: wind.clone() }, uColB: { value: wind.clone() }, uFade: { value: 0 }, uAge: { value: 0 }, uStyle: { value: 0 }, uSeed: { value: i } },
+                        { blending: THREE.AdditiveBlending });
+                    const ghost = new THREE.Mesh(gg, ghostMat);
+                    for (const m of [streaks, ghost]) { m.visible = false; m.frustumCulled = false; L.root.add(m); }
+                    L.softObjects.push(streaks, ghost);
+                    pool.push({ busy: false, start: 0, follow: false, g: g, gg: gg, streaks: streaks, streakMat: streakMat, ghost: ghost, ghostMat: ghostMat, sx: 0, sy: 0, sz: 0, ex: 0, ey: 0, ez: 0, filled: 0, rr: new Float32Array(N * 5) });
+                }
+                const swirlMat = L.shader('bb', { uMode: { value: 6 }, uBB: { value: 0 }, uScale: { value: 0.16 }, uColA: { value: wind.clone() }, uColB: { value: wind.clone() }, uFade: { value: 0 }, uAge: { value: 0 }, uStyle: { value: 0 }, uSeed: { value: 0 } },
+                    { blending: THREE.AdditiveBlending, depthTest: false }, true);
+                const swirl = new THREE.Mesh(L.quads(1), swirlMat);
+                swirl.visible = false; swirl.frustumCulled = false; swirl.renderOrder = 6;
+                L.vmRoot.add(swirl);
+                const hand = { on: false, start: 0, dur: 620 };
+                const rnd = L.makeNoise(777).rnd;
+                // lay streaks out along [start, end] around a body-sized tube (each streak keeps its own
+                // random spot for the whole dash); while the player is still dashing they also run 2.5 m on
+                // ahead and keep clear of the eye, so they stream past the camera in first person
+                const layout = (p, from, to) => {
+                    let dx = p.ex - p.sx, dz = p.ez - p.sz, ux = 0, uz = 1;
+                    const d0 = Math.hypot(dx, dz), cc = characterController;
+                    if (d0 > 0.05) { ux = dx / d0; uz = dz / d0; }
+                    else if (p.follow) { const v = Math.hypot(cc.dashVelX, cc.dashVelZ); if (v > 1e-4) { ux = cc.dashVelX / v; uz = cc.dashVelZ / v; } }
+                    const ext = p.follow ? 2.5 : 0, r0 = p.follow ? 0.45 : 0.25;
+                    dx += ux * ext; dz += uz * ext;
+                    const R = p.rr;
+                    for (let q = from; q < to; q++) {
+                        const t = (q + 0.5) / N, a = R[q * 5] * 6.283, r = r0 + R[q * 5 + 1] * 0.45;
+                        const x = p.sx + dx * t - uz * Math.cos(a) * r, z = p.sz + dz * t + ux * Math.cos(a) * r;
+                        const y = p.sy + 0.25 + R[q * 5 + 2] * 1.5;
+                        L.setQuad(p.g, q, x, y, z, 0.05 + R[q * 5 + 3] * 0.08, 0.7 + R[q * 5 + 4] * 1.1, R[q * 5 + 3], R[q * 5 + 4], 0, 0, ux, 0, uz);
+                    }
+                    L.quadsDirty(p.g);
+                };
+                const self = {
+                    // start a dash from (sx, sy, sz) feet to (ex, ey, ez) feet; follow = keep extending with the player
+                    dash: function (sx, sy, sz, ex, ey, ez, now, follow) {
+                        let p = null;
+                        for (let i = 0; i < pool.length; i++) if (!pool[i].busy) { p = pool[i]; break; }
+                        if (!p) { p = pool[0]; for (let i = 1; i < pool.length; i++) if (pool[i].start < p.start) p = pool[i]; }
+                        p.busy = true; p.start = now; p.follow = follow;
+                        p.sx = sx; p.sy = sy; p.sz = sz; p.ex = ex; p.ey = ey; p.ez = ez;
+                        for (let k = 0; k < p.rr.length; k++) p.rr[k] = rnd();
+                        layout(p, 0, N);
+                        for (let k = 0; k < 3; k++) {
+                            const f = k * 0.22;
+                            L.setQuad(p.gg, k, sx + (ex - sx) * f, sy, sz + (ez - sz) * f, 0.9, 1.78, rnd(), rnd(), 0, 0);
+                        }
+                        L.quadsDirty(p.gg);
+                        p.streaks.visible = p.ghost.visible = true;
+                        for (let k = 0; k < 8; k++) L.emit(FX_KIND.dust, sx + (Math.random() - 0.5) * 0.6, sy + 0.1, sz + (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 2, 0.3, (Math.random() - 0.5) * 2, 0xc7eef3, 0.7, 0.3, 1.1, 0.4, 2.2, 0);
+                        return p;
+                    },
+                    // the player's Tailwind: its wind ring is the Classic item (spawned at the cast)
+                    acquire: function (key, ring, now) {
+                        const cc = characterController, fy = cc.position.y - cc.height;
+                        const p = self.dash(cc.position.x, fy, cc.position.z, cc.position.x, fy, cc.position.z, now, true);
+                        if (castFX.active && castFX.active.kind === 'cast' && now - castFX.active.start < 120) { hand.on = true; hand.start = castFX.active.start; hand.dur = castFX.active.dur; }
+                        return p;
+                    },
+                    sync: function () {},
+                    release: function () {},
+                    clear: function () { for (const p of pool) { p.busy = false; p.streaks.visible = p.ghost.visible = false; } hand.on = false; swirl.visible = false; },
+                    tick: function (now) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const p = pool[i];
+                            if (!p.busy) continue;
+                            const age = (now - p.start) * 0.001;
+                            if (p.follow) {
+                                const cc = characterController;
+                                if (cc.dashTimer > 0 || age < 0.12) {
+                                    p.ex = cc.position.x; p.ey = cc.position.y - cc.height; p.ez = cc.position.z;
+                                    layout(p, 0, N);
+                                } else p.follow = false;
+                            }
+                            if (age > 0.95) { p.busy = false; p.streaks.visible = p.ghost.visible = false; continue; }
+                            p.streakMat.uniforms.uAge.value = age;
+                            p.streakMat.uniforms.uFade.value = Math.min(1, age * 12) * Math.max(0, 1 - age / 0.95);
+                            p.ghostMat.uniforms.uAge.value = age;
+                            p.ghostMat.uniforms.uFade.value = Math.max(0, 1 - age / 0.55);
+                        }
+                        // the hand: wind wrapping the off-hand, on the cast gesture's own clock
+                        if (hand.on) {
+                            const t = (now - hand.start) / hand.dur;
+                            if (t >= 1 || !castFX.core) { hand.on = false; swirl.visible = false; }
+                            else {
+                                swirl.visible = true;
+                                swirl.position.copy(castFX.core.position);
+                                swirlMat.uniforms.uFade.value = Math.sin(Math.min(1, t) * Math.PI);
+                                swirlMat.uniforms.uScale.value = 0.1 + 0.12 * Math.sin(Math.min(1, t * 1.4) * Math.PI * 0.5);
+                            }
+                        }
+                    }
+                };
+                return self;
+            }
+        };
+
         // Initialize the optimized game
         // Debug populations. Not used by normal play. Counts are the totals to reach,
         // placed on a 12-unit grid so many actors fall outside the activity radius.
@@ -42432,6 +44453,7 @@
             mapDetail: 'off',
             charDetail: 'off',
             glowHalos: 'auto',
+            abilityEffects: 'auto',   // V2.0: older saves get Auto from here
             brightness: 100,
             reduceFlashes: false,
             cameraShake: true,
@@ -46210,6 +48232,13 @@
                     this.saveToStorage();
                 });
 
+                // V2.0: Ability Effects (Auto / Classic / High Fidelity), applied at once
+                this.bindPillGroup('setting-abilityfx-pills', 'data-abilityfx', (val) => {
+                    game.userSettings.abilityEffects = (val === 'classic' || val === 'hifi') ? val : 'auto';
+                    abilityLook.refresh();
+                    this.saveToStorage();
+                });
+
                 // V1.7 controller settings
                 const bindGpSlider = (id, badgeId, key, fmt) => {
                     const el = document.getElementById(id);
@@ -47395,6 +49424,9 @@
                 setActivePill('setting-shadow-hz-pills', 'data-shz', cfg.shadowHz);
                 setActivePill('setting-surface-detail-pills', 'data-detail', cfg.surfaceDetail || 'auto');
                 setActivePill('setting-glow-halos-pills', 'data-halos', cfg.glowHalos || 'auto');
+                // V2.0: Ability Effects pill and its status note
+                setActivePill('setting-abilityfx-pills', 'data-abilityfx', (cfg.abilityEffects === 'classic' || cfg.abilityEffects === 'hifi') ? cfg.abilityEffects : 'auto');
+                abilityLook.syncUI();
                 setActivePill('setting-map-detail-pills', 'data-mapdetail', cfg.mapDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-reduce-flash-pills', 'data-reduceflash', cfg.reduceFlashes ? 'on' : 'off');
                 setActivePill('setting-camera-shake-pills', 'data-camshake', cfg.cameraShake === false ? 'off' : 'on');
@@ -49296,6 +51328,7 @@
             agentSystem.updateRender(time, now, delta);
             tacticalDirector.update(delta, now);
             tacticalEnhancements.update(delta, now);
+            abilityLook.update(now, delta);   // V2.0: High Fidelity ability visuals (does nothing in Classic)
             tacticalRadar.update(now);
             packEnemyBatches();
             packTargetBatches();
