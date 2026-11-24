@@ -168,6 +168,8 @@ test('Classic builds and compiles nothing; High Fidelity draws the ten proof abi
 
     // Tailwind's wind wraps the off-hand on the existing cast gesture's own clock (driven directly, as cast.test does)
     const hand = await evaluate(() => {
+        // no gesture still playing (a cast never cuts into an ultimate's, e.g. Sova's just above)
+        if (castFX.active) { castFX.active = null; castFX.hide(); }
         agentSystem.selectAgent('jett');
         agentSystem.castAbility('e');
         const a = castFX.active;
