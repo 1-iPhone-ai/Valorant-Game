@@ -244,3 +244,52 @@ test('V1.9 HUD: bottom row, agent strip, weapon list, teammate plates and one-li
     assert.ok(Math.abs(parseFloat(near[2]) - 0.35) < 0.05, `about 35% opacity (${near[2]})`);
     assert.deepEqual(errors, []);
 });
+
+// V1.9 HUD Layout setting: CLASSIC puts the V1.8 HUD back (centre stack with the agent bar,
+// weapon row under the ammo, the three FPS readouts, the old teammate tags) and V1.9 returns
+test('HUD Layout: Classic brings back the V1.8 HUD, and V1.9 comes back after', { timeout: 300000 }, async () => {
+    const { errors, frames, evaluate } = await boot({ viewport: { width: 1280, height: 720 } });
+    assert.equal(await evaluate(() => game.userSettings.hudLayout), 'v19', 'V1.9 layout by default');
+    await evaluate(() => document.querySelector('#setting-hud-layout-pills [data-hudlayout="classic"]').click());
+    await frames(20);
+    const c = await evaluate(() => {
+        const r = (q) => document.querySelector(q).getBoundingClientRect();
+        const agent = r('#agent-switcher-bar'), bar = r('#ability-bar'), ammo = r('.ammo-display'), ws = r('#weapon-selector');
+        return {
+            saved: JSON.parse(localStorage.getItem('valorant_v16_user_settings') || '{}').hudLayout,
+            stack: agent.bottom <= bar.top && bar.bottom <= ammo.top && ammo.bottom <= ws.top,
+            centred: [agent, bar, ammo, ws].every((b) => Math.abs((b.left + b.right) / 2 - innerWidth / 2) < 30),
+            agent: [getComputedStyle(document.getElementById('agent-switcher-bar')).opacity, !!document.querySelector('#agent-switcher-bar #agent-passive-tag')],
+            slot: [Math.round(r('#ability-slot-c').width), Math.round(r('#ability-slot-c').height), getComputedStyle(document.getElementById('ability-name-c')).display],
+            weaponRow: ws.width > ws.height,
+            fps: fpsDisplay.textContent, pill: getComputedStyle(qualityToggle).display, graph: [game.userSettings.showSparkline, getComputedStyle(document.getElementById('fps-sparkline-widget')).display],
+            tag: tacticalEnhancements.wingmanBots[0].hudEl.querySelector('.wingman-hud-name').textContent
+        };
+    });
+    assert.equal(c.saved, 'classic', 'the layout is saved');
+    assert.ok(c.stack && c.centred, 'agent bar, abilities, ammo and weapons stacked in the centre');
+    assert.deepEqual(c.agent, ['1', true], 'the agent bar stays, with its passive');
+    assert.deepEqual(c.slot, [78, 68, 'block'], 'V1.8 ability slots with names');
+    assert.ok(c.weaponRow, 'the weapons are a row again');
+    assert.match(c.fps, /^FPS: \d+ \(\d+\.\d ms\) \| Quality: MEDIUM$/);
+    assert.equal(c.pill, 'block', 'the quality pill is back');
+    assert.deepEqual(c.graph, [true, 'flex'], 'the FPS graph is back with the layout');
+    assert.equal(c.tag, '🤝 WINGMAN-ALPHA // SAGE', 'the old teammate tag');
+
+    await evaluate(() => document.querySelector('#setting-hud-layout-pills [data-hudlayout="v19"]').click());
+    await frames(4);
+    const v = await evaluate(() => ({
+        classic: document.body.classList.contains('hud-classic'),
+        homes: [!!document.querySelector('.hud-right-column #weapon-selector'), !!document.querySelector('#controls-hint-box #agent-passive-tag')],
+        fps: fpsDisplay.textContent, pill: getComputedStyle(qualityToggle).display, graph: game.userSettings.showSparkline,
+        slot: (() => { const b = document.getElementById('ability-slot-c').getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })(),
+        tag: tacticalEnhancements.wingmanBots[0].hudEl.querySelector('.wingman-hud-name').textContent
+    }));
+    assert.equal(v.classic, false);
+    assert.deepEqual(v.homes, [true, true], 'weapons back at the right edge, passive back in the help');
+    assert.match(v.fps, /^\d+ FPS \/ Medium$/);
+    assert.deepEqual([v.pill, v.graph], ['none', false], 'one-line readout, graph hidden again');
+    assert.deepEqual(v.slot, [78, 64], 'V1.9 named slots');
+    assert.equal(v.tag, 'SAGE');
+    assert.deepEqual(errors, []);
+});

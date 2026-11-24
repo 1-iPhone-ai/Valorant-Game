@@ -3495,6 +3495,65 @@
             letter-spacing: 0.7px;
             background: rgba(15, 23, 42, 0.8);
         }
+
+        /* =============================================
+           V1.9 Classic HUD layout (Settings > HUD > HUD Layout: CLASSIC). body.hud-classic
+           puts the V1.8 HUD back: the centre stack (permanent, clickable agent bar with its
+           passive and picker hint, 78 x 68 named ability slots, ammo, the weapon row), the
+           old teammate tags and V1.8's positions for the death recap, the Recoil Trainer,
+           the Deathmatch board and the touch buttons. hudLayout moves the weapon row and
+           the passive back into place; each rule below restores the V1.8 values of what a
+           V1.9 rule above changed. (The FPS cluster and help panel follow in script.)
+           ============================================= */
+        body.hud-classic .hud { bottom: 20px; }
+        body.hud-classic .center-hud-column {
+            position: static; left: auto; bottom: auto; transform: none; flex-direction: column;
+        }
+        body.hud-classic .agent-switcher-bar {
+            position: static; left: auto; bottom: auto; transform: none; white-space: normal;
+            pointer-events: auto; cursor: pointer; opacity: 1; visibility: inherit;
+            transition: border-color 0.2s, transform 0.15s;
+        }
+        body.hud-classic .agent-switcher-bar:hover { transform: translateY(-1px); }
+        body.hud-classic .ability-bar { gap: 8px; padding: 6px 10px; }
+        body.hud-classic .ability-slot { width: 78px; height: 68px; padding: 5px 4px 4px 4px; }
+        body.hud-classic .ability-top-row { gap: 0; padding: 0 3px; }
+        body.hud-classic .ability-key { font-size: 10px; padding: 0 5px; line-height: 14px; flex: 0 1 auto; white-space: normal; }
+        body.hud-classic .ability-cd-text {
+            white-space: normal; overflow: visible; min-width: auto; letter-spacing: normal; direction: ltr; text-align: start;
+        }
+        body.hud-classic .ability-name { display: block; }
+        body.hud-classic .ability-pips { height: 6px; }
+        body.hud-classic .ability-pip { width: 6px; height: 6px; }
+        body.hud-classic .weapon-info { align-items: center; width: auto; flex: 0 1 auto; }
+        body.hud-classic .ammo-display { margin-bottom: 10px; min-width: 0; text-align: start; white-space: normal; text-shadow: none; }
+        body.hud-classic .weapon-selector {
+            flex-direction: row; align-items: normal; gap: 0; background: rgba(0, 0, 0, 0.5); border-radius: 4px; padding: 5px;
+        }
+        body.hud-classic .weapon-slot {
+            padding: 0 8px; height: 35px; background: rgba(255, 255, 255, 0.1); margin: 0 5px; gap: 0; justify-content: center;
+        }
+        body.hud-classic .weapon-slot.active { background: rgba(255, 70, 85, 0.3); }
+        body.hud-classic .weapon-slot-key {
+            position: absolute; top: -10px; left: 50%; transform: translateX(-50%); min-width: 0; text-align: start;
+            background: #ff4655; font-size: 12px; font-weight: inherit; line-height: normal;
+        }
+        body.hud-classic .controls-hint-box .hint-agent-line { display: none; }
+        body.hud-classic .recoil-trainer-widget { bottom: 130px; }
+        body.hud-classic .dm-board,
+        body.hud-classic #recoil-trainer-widget.visible ~ .dm-board { top: 290px; bottom: auto; }
+        body.hud-classic:not(.replay-active) .death-recap { bottom: 230px; }
+        body.touch-ui.hud-classic .action-buttons { bottom: 120px; }
+        body.hud-classic .wingman-floating-hud {
+            width: 112px; max-width: none; padding: 3px 6px; background: rgba(9, 20, 28, 0.82);
+            border: 1px solid rgba(43, 240, 165, 0.65); border-radius: 5px; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55); transition: none;
+        }
+        body.hud-classic .wingman-floating-hud.near-crosshair { opacity: 1; }
+        body.hud-classic .wingman-hud-name {
+            font-size: 16px; line-height: normal; font-weight: 400; letter-spacing: normal; color: inherit;
+            text-align: start; white-space: normal; overflow: visible; text-overflow: clip; text-shadow: none;
+        }
+        body.hud-classic .wingman-hud-bar { display: none; }
     </style>
 </head>
 <body>
@@ -4892,6 +4951,18 @@
                                 <span>HUD, OVERLAY VISIBILITY &amp; AIM TRAINER WIDGET</span>
                             </div>
 
+                            <!-- V1.9: HUD layout: the V1.9 layout or the V1.8 one (Classic) -->
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>HUD Layout</strong>
+                                    <small>V1.9: abilities and ammo in one row at the bottom, weapons at the right edge, a clear middle of the screen. Classic: the V1.8 HUD (centre stack with the agent bar and weapon row, three FPS readouts, old teammate tags). Switching also sets the FPS graph to that layout's default (Classic: shown)</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-hud-layout-pills">
+                                    <button class="settings-pill-opt active" data-hudlayout="v19">V1.9</button>
+                                    <button class="settings-pill-opt" data-hudlayout="classic">CLASSIC (V1.8)</button>
+                                </div>
+                            </div>
+
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>HUD Size</strong>
@@ -4929,7 +5000,7 @@
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>Ability Names (Bottom Ability Bar)</strong>
-                                    <small>Show each ability's name under its icon. Hide for smaller slots: the name still shows on hover and in the agent picker</small>
+                                    <small>Show each ability's name under its icon. Hide for smaller slots: the name still shows on hover and in the agent picker (the Classic layout always shows them, as V1.8 did)</small>
                                 </div>
                                 <div class="settings-pill-group" id="setting-hud-abilitynames-pills">
                                     <button class="settings-pill-opt active" data-abilitynames="show">SHOW NAMES</button>
@@ -6220,6 +6291,7 @@
                 showRecoilTrainer: false,
                 showMinimap: true,
                 showAbilityNames: true, // V1.9: ability names under the icons in the ability bar (on by default)
+                hudLayout: 'v19',      // V1.9: 'v19' (default) | 'classic' (the V1.8 HUD, see hudLayout)
                 showHints: true,
                 showDamageNumbers: true,
                 hudScale: 100,         // V1.7: HUD Size % (80-130)
@@ -8275,10 +8347,18 @@
                 fpsDisplay.textContent = '';
                 fpsDisplay.append(this.fpsEl, ' / ', this.qEl);
             },
+            // V1.9: the V1.8 compact line, for the Classic HUD layout (hudLayout)
+            classicLine: function (fpsVal) {
+                this.lastFps = fpsVal;
+                const capSuffix = (game.userSettings && game.userSettings.fpsCap > 0) ? `/${game.userSettings.fpsCap}` : '';
+                // V1.8: with the frame time (mean of the last frames)
+                const frameMs = perfTelemetry.summary.frameMsMean > 0 ? perfTelemetry.summary.frameMsMean : (fpsVal > 0 ? 1000 / fpsVal : 0);
+                return `FPS: ${fpsVal}${capSuffix} (${frameMs.toFixed(1)} ms) | Quality: ${qualityLabel(adaptiveSettings.currentQuality)}`;
+            },
             render: function (fpsVal) {
                 if (typeof fpsVal === 'number') this.lastFps = fpsVal;
                 const mode = (game.userSettings && game.userSettings.fpsDisplayMode) || 'compact';
-                if (mode !== 'compact') return;
+                if (mode !== 'compact' || hudLayout.classic) return; // V1.9: Classic keeps the V1.8 line (classicLine)
                 this.ensure();
                 this.fpsEl.textContent = `${this.lastFps} FPS`;
                 const qName = this.qualityName();
@@ -14532,6 +14612,57 @@
             }
         };
         
+        // =============================================
+        // V1.9 HUD Layout (Settings > HUD): 'v19' (default) or 'classic', the V1.8 HUD: the
+        // centre stack (permanent agent bar with its passive and picker hint, named ability
+        // slots, ammo, the weapon row), the three FPS readouts and the old teammate tags.
+        // apply() puts the pieces V1.9 moved back where V1.8 had them (ids and listeners
+        // move with them); body.hud-classic restores V1.8's styles (CSS at the end).
+        // =============================================
+        const hudLayout = {
+            classic: false,
+            apply: function (mode) {
+                const classic = mode === 'classic';
+                const changed = classic !== this.classic;
+                this.classic = classic;
+                document.body.classList.toggle('hud-classic', classic);
+                // Weapon row: under the ammo (V1.8) or listed above the score (V1.9)
+                const ws = document.getElementById('weapon-selector');
+                const info = document.querySelector('.weapon-info');
+                const right = document.querySelector('.hud-right-column');
+                if (ws && info && right) {
+                    if (classic && ws.parentElement !== info) info.appendChild(ws);
+                    else if (!classic && ws.parentElement !== right) right.insertBefore(ws, right.querySelector('.score'));
+                }
+                // Passive and picker hint: in the agent bar (V1.8) or in the controls help (V1.9)
+                const passive = document.getElementById('agent-passive-tag');
+                const hint = document.querySelector('.agent-switch-hint');
+                const helpLine = document.querySelector('#controls-hint-box .hint-agent-line');
+                if (passive && hint && agentSwitcherBar && helpLine) {
+                    const home = classic ? agentSwitcherBar : helpLine;
+                    if (passive.parentElement !== home) home.appendChild(passive);
+                    if (hint.parentElement !== home) home.appendChild(hint);
+                    hint.textContent = classic ? '[G] PICKER • [TAB]' : '[G] PICKER • [TAB] NEXT AGENT';
+                }
+                if (!changed) return;
+                // Teammate tags: "🤝 WINGMAN-ALPHA // SAGE" (V1.8) or the agent name (V1.9)
+                const td = typeof tacticalEnhancements !== 'undefined' ? tacticalEnhancements : null;
+                if (td && td.wingmanBots) {
+                    for (const b of td.wingmanBots) {
+                        if (b.statusEl) b.statusEl.textContent = classic ? `🤝 ${b.name}` : (b.name.split('//')[1] || b.name).trim();
+                        b.plateH = 0;
+                        b.plateNear = false;
+                        if (b.hudEl) b.hudEl.classList.remove('near-crosshair');
+                    }
+                }
+                // FPS readout: the V1.8 line at once (perfReadout rebuilds the V1.9 one)
+                if (classic && fpsDisplay) {
+                    fpsDisplay.title = 'Click or press [P] to open FPS & Quality Settings';
+                    if ((game.userSettings.fpsDisplayMode || 'compact') === 'compact') fpsDisplay.textContent = perfReadout.classicLine(perfReadout.lastFps);
+                }
+            }
+        };
+
         // =============================================
         // V1.9 Agent strip: no longer a permanent bar over the abilities. It shows the
         // agent's name and role for 4 s when a round starts or the agent changes, then
@@ -42211,6 +42342,7 @@
             showRecoilTrainer: false,
             showMinimap: true,
             showAbilityNames: true, // V1.9: ability names in the ability bar, on by default (older saves get it from here)
+            hudLayout: 'v19',       // V1.9: 'v19' | 'classic' (the V1.8 HUD); older saves get the V1.9 layout
             showHints: true,
             showDamageNumbers: true,
             hudScale: 100,
@@ -46378,6 +46510,19 @@
                     this.saveToStorage();
                 });
 
+                // V1.9: HUD layout, V1.9 or Classic (V1.8). A change of layout also sets the FPS
+                // graph to that layout's default (V1.8 showed it, V1.9 hides it); it can be changed after
+                this.bindPillGroup('setting-hud-layout-pills', 'data-hudlayout', (val) => {
+                    const next = val === 'classic' ? 'classic' : 'v19';
+                    if (game.userSettings.hudLayout !== next) {
+                        game.userSettings.hudLayout = next;
+                        game.userSettings.showSparkline = next === 'classic';
+                    }
+                    this.applyHudVisibility();
+                    this.syncAllUI();
+                    this.saveToStorage();
+                });
+
                 const hudScaleSlider = document.getElementById('setting-hud-scale');
                 if (hudScaleSlider) {
                     hudScaleSlider.addEventListener('input', (e) => {
@@ -46957,10 +47102,14 @@
                 const sparkEl = document.getElementById('fps-sparkline-widget');
                 const recoilEl = document.getElementById('recoil-trainer-widget');
 
+                // V1.9: the HUD layout first (Classic puts the V1.8 HUD back, see hudLayout)
+                hudLayout.apply(cfg.hudLayout);
+                const classic = hudLayout.classic;
                 if (minimapEl) minimapEl.style.display = cfg.showMinimap ? '' : 'none';
-                // V1.9: ability names under the icons (Settings > HUD, on by default); then fit long names
+                // V1.9: ability names under the icons (Settings > HUD, on by default); then fit long names.
+                // The Classic layout always shows them in its own (V1.8) slots.
                 const abilityBarEl = document.getElementById('ability-bar');
-                if (abilityBarEl) abilityBarEl.classList.toggle('show-names', cfg.showAbilityNames !== false);
+                if (abilityBarEl) abilityBarEl.classList.toggle('show-names', cfg.showAbilityNames !== false && !classic);
                 if (typeof agentSystem !== 'undefined' && agentSystem.fitAbilityNames) agentSystem.fitAbilityNames();
                 if (hintsEl) hintsEl.style.display = cfg.showHints ? '' : 'none';
                 if (typeof controlsHelp !== 'undefined') controlsHelp.sync();
@@ -46975,19 +47124,21 @@
                 // V1.7: cluster sits under the minimap (detailed mode is ~5 lines tall)
                 if (qualityToggle) {
                     // V1.9: compact shows the quality inside its one line (perfReadout), so the pill is for the detailed mode only
-                    qualityToggle.style.display = mode === 'detailed' ? 'block' : 'none';
+                    // (Classic: shown in both, as in V1.8)
+                    qualityToggle.style.display = (classic ? mode !== 'off' : mode === 'detailed') ? 'block' : 'none';
                     qualityToggle.style.top = mode === 'detailed' ? '318px' : '';
                 }
                 if (sparkEl) {
                     sparkEl.style.display = (cfg.showSparkline && mode !== 'off') ? 'flex' : 'none';
-                    // V1.9: compact: straight under the one-line readout (282px left room for the quality pill)
-                    sparkEl.style.top = mode === 'detailed' ? '348px' : '252px';
+                    // V1.9: compact: straight under the one-line readout (282px left room for the quality pill, as Classic still has)
+                    sparkEl.style.top = mode === 'detailed' ? '348px' : (classic ? '282px' : '252px');
                 }
                 perfReadout.render(); // V1.9: draw the one-line readout now (it updates every second)
                 // V1.9: the controls help (and its pill) start just under the last panel of this
                 // column: the one-line readout (247px), the graph (316px) or the detailed lines
+                // (Classic: 356px, as in V1.8)
                 const sparkOn = !!cfg.showSparkline && mode !== 'off';
-                const helpTop = mode === 'off' ? 224 : mode === 'detailed' ? (sparkOn ? 420 : 356) : (sparkOn ? 324 : 255);
+                const helpTop = classic ? 356 : mode === 'off' ? 224 : mode === 'detailed' ? (sparkOn ? 420 : 356) : (sparkOn ? 324 : 255);
                 document.documentElement.style.setProperty('--help-top', `${helpTop}px`);
                 hudScale.fitTopBar();
             },
@@ -47138,6 +47289,7 @@
                 setActivePill('setting-hud-recoil-pills', 'data-recoilhud', cfg.showRecoilTrainer ? 'show' : 'hide');
                 setActivePill('setting-hud-minimap-pills', 'data-minimap', cfg.showMinimap ? 'show' : 'hide');
                 setActivePill('setting-hud-abilitynames-pills', 'data-abilitynames', cfg.showAbilityNames !== false ? 'show' : 'hide'); // V1.9
+                setActivePill('setting-hud-layout-pills', 'data-hudlayout', cfg.hudLayout === 'classic' ? 'classic' : 'v19'); // V1.9
                 setActivePill('setting-hud-hints-pills', 'data-hints', cfg.showHints ? 'show' : 'hide');
                 setActivePill('setting-hud-dmg-pills', 'data-dmgnums', cfg.showDamageNumbers ? 'show' : 'hide');
                 setActivePill('setting-bot-diff-pills', 'data-botdiff', cfg.botDifficulty || 'gold');
@@ -48251,7 +48403,7 @@
                     if (hudLayer) {
                         hudEl = document.createElement('div');
                         hudEl.className = 'wingman-floating-hud visible';
-                        const plateName = (s.name.split('//')[1] || s.name).trim();
+                        const plateName = hudLayout.classic ? `🤝 ${s.name}` : (s.name.split('//')[1] || s.name).trim(); // V1.9: Classic keeps the V1.8 tag
                         hudEl.innerHTML = `<div class="wingman-hud-name">${plateName}</div>
                             <div class="wingman-hud-bar"><div class="wingman-hud-fill"></div></div>`;
                         statusEl = hudEl.querySelector('.wingman-hud-name');
@@ -48399,6 +48551,13 @@
                             const sx = (this._projVec.x * 0.5 + 0.5) * vw;
                             const sy = (-this._projVec.y * 0.5 + 0.5) * vh;
                             bot.hudEl.classList.add('visible');
+                            if (hudLayout.classic) {
+                                // V1.9 Classic HUD layout: the V1.8 tag, placed as V1.8 did (no scaling or fading)
+                                const cx = Math.max(80, Math.min(vw - 80, sx));
+                                const cy = Math.max(60, Math.min(vh - 10, sy));
+                                bot.hudEl.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0) translate(-50%, -100%)`;
+                                continue;
+                            }
                             // V1.9: scale with distance so the plate is never taller than the teammate
                             // on screen (feet to helmet top: 1.86 m of the 2.35 m anchor), but never
                             // below a readable 80% (about 9 px text)
@@ -48939,8 +49098,10 @@
                         `shadow/s ${s.shadowRefreshesPerSec.toFixed(1)} grid ${s.gridRefs}/${s.gridCells} fx ${s.activeTrails}/${s.activeHitEffects}/${s.activeDecals}/${s.activeFlashLights}\n` +
                         `sim ${s.simStepsMean.toFixed(2)}/f drop ${s.droppedSimMs.toFixed(1)}ms shot ${s.outsideShotCpuMs.toFixed(2)}ms up ${(s.requestedUploadBytes / 1024).toFixed(1)}/${(s.glUploadBytes / 1024).toFixed(1)}kB`;
                 } else if (dispMode === 'compact') {
-                    // V1.9: one line, "144 FPS / Medium"; the frame time (V1.8) and the cap are in its tooltip
-                    perfReadout.render(fps);
+                    // V1.9: one line, "144 FPS / Medium"; the frame time (V1.8) and the cap are in its tooltip.
+                    // The Classic HUD layout keeps the V1.8 line.
+                    if (hudLayout.classic) fpsDisplay.textContent = perfReadout.classicLine(fps);
+                    else perfReadout.render(fps);
                 }
             }
             
