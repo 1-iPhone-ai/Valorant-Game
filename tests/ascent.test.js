@@ -387,10 +387,11 @@ test('Ascent: all 8 modes start cleanly, with the player and bots on open floor'
     assert.deepEqual(errors, []);
 });
 
-// The six other maps, read the same way from V1.7 and from this build
+// The maps not rebuilt yet, read the same way from V1.7 and from this build (V2.1: Bind and
+// Haven have their own layouts now; tests/bind-haven.test.js covers them)
 const FINGERPRINT = async (evaluate, frames) => {
     const out = {};
-    for (const map of ['bind', 'haven', 'icebox', 'lotus', 'split', 'skyline']) {
+    for (const map of ['icebox', 'lotus', 'split', 'skyline']) {
         await evaluate((m) => tacticalDirector.cycleMapPreset(m), map);
         await frames(2);
         out[map] = await evaluate(() => {
@@ -414,7 +415,7 @@ const FINGERPRINT = async (evaluate, frames) => {
     return out;
 };
 
-test('the six other maps are exactly as in V1.7: pieces, sites, spawns, ult orbs, callout zones, practice targets', { timeout: 400000 }, async () => {
+test('the maps not rebuilt yet are exactly as in V1.7: pieces, sites, spawns, ult orbs, callout zones, practice targets', { timeout: 400000 }, async () => {
     const old = await boot({ quality: 'low', file: '(V1.7) valorant-fps.html' });
     const before = await FINGERPRINT(old.evaluate, old.frames);
     assert.deepEqual(old.errors, []);
