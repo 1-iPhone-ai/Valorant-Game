@@ -103,18 +103,24 @@ test('Reyna and Omen kits work end to end', { timeout: 240000 }, async () => {
     assert.deepEqual(errors, []);
 });
 
-// V1.9.1: the Duelists' ability numbers live in AGENT_TUNING[agent][slot]. The table keeps its
-// shape (all four slots, a look from the fixed list, numbers only), ABILITY_TUNING is folded
-// into it, and nothing writes to the table while the kits are played.
-test('AGENT_TUNING: every Duelist has C, Q, E and X with a look, numbers only, unchanged by play', { timeout: 300000 }, async () => {
+// V1.9.1: the Duelists' ability numbers live in AGENT_TUNING[agent][slot]; V2.2: every agent's do.
+// The table keeps its shape (all four slots, a look from the fixed list, numbers only),
+// ABILITY_TUNING is folded into it, and nothing writes to the table while the kits are played.
+test('AGENT_TUNING: every agent has C, Q, E and X with a look, numbers only, unchanged by play', { timeout: 600000 }, async () => {
     const { page, errors, frames } = await boot({ quality: 'low' });
     const LOOKS = ['smoke', 'wall', 'groundZone', 'projectile', 'blast', 'flash', 'beam', 'pulse', 'deployable', 'self'];
     const shape = await page.evaluate((LOOKS) => {
         const bad = [];
-        const duelists = Object.keys(AGENT_DEFS).filter((id) => AGENT_DEFS[id].role === 'DUELIST');
-        for (const id of duelists) {
+        const agents = Object.keys(AGENT_DEFS);
+        const roles = {};
+        for (const id of agents) {
+            roles[AGENT_DEFS[id].role] = (roles[AGENT_DEFS[id].role] || 0) + 1;
             for (const slot of ['c', 'q', 'e', 'x']) if (!(AGENT_TUNING[id] && AGENT_TUNING[id][slot])) bad.push(`${id}.${slot} missing`);
         }
+        for (const id of Object.keys(AGENT_TUNING)) if (!AGENT_DEFS[id]) bad.push(`${id} is not an agent`);
+        // The ten High Fidelity abilities keep the looks they had (V2.2: they read them from AGENT_TUNING)
+        const hifi = {};
+        for (const k of Object.keys(abilityLook.CONVERTED)) hifi[k] = abilityLook.lookOf(k);
         for (const [id, slots] of Object.entries(AGENT_TUNING)) {
             for (const [slot, t] of Object.entries(slots)) {
                 if (!['c', 'q', 'e', 'x'].includes(slot)) { bad.push(`${id}.${slot} is not a slot`); continue; }
@@ -122,13 +128,19 @@ test('AGENT_TUNING: every Duelist has C, Q, E and X with a look, numbers only, u
                 for (const [k, v] of Object.entries(t)) if (k !== 'look' && !Number.isFinite(v)) bad.push(`${id}.${slot}.${k}`);
             }
         }
-        return { duelists, bad, oldTable: typeof ABILITY_TUNING, snapshot: JSON.stringify(AGENT_TUNING) };
+        return { agents, roles, hifi, bad, oldTable: typeof ABILITY_TUNING, snapshot: JSON.stringify(AGENT_TUNING) };
     }, LOOKS);
-    assert.equal(shape.duelists.length, 8, 'eight Duelists');
+    assert.equal(shape.agents.length, 29, '29 agents');
+    assert.deepEqual(shape.roles, { DUELIST: 8, INITIATOR: 7, SENTINEL: 7, CONTROLLER: 7 });
     assert.deepEqual(shape.bad, []);
     assert.equal(shape.oldTable, 'undefined', 'ABILITY_TUNING is folded into AGENT_TUNING');
-    // Every Duelist: C, Q, E, the E re-press, the ultimate, shots during it and a kill
-    for (const id of shape.duelists) {
+    assert.deepEqual(shape.hifi, {
+        'omen.e': ['projectile', 'smoke'], 'sage.c': ['wall'], 'phoenix.c': ['projectile', 'groundZone'], 'sova.q': ['projectile', 'blast'],
+        'raze.e': ['projectile', 'blast'], 'phoenix.q': ['projectile', 'flash'], 'sova.x': ['beam'], 'breach.e': ['pulse'],
+        'killjoy.e': ['deployable'], 'jett.e': ['self']
+    }, 'the High Fidelity abilities keep their looks');
+    // Every agent: C, Q, E, the E re-press, the ultimate, shots during it and a kill
+    for (const id of shape.agents) {
         await page.evaluate((id) => {
             agentSystem.selectAgent(id);
             game.ultActiveUntil = 0; game.ultAgent = null;

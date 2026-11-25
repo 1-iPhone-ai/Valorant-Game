@@ -20919,10 +20919,11 @@
         // =============================================
         // V1.9.1: AGENT_TUNING, one table for agent ability numbers (it replaces ABILITY_TUNING).
         // AGENT_TUNING[agent][slot], slot c / q / e / x as in AGENT_DEFS (charges, cooldowns and
-        // ult points stay in AGENT_DEFS). It holds every gameplay number of the eight Duelists, and
-        // Omen's four numbers that were in ABILITY_TUNING; the other roles keep theirs in their
-        // methods for now. One number, one home: places that use the same number for the same
-        // thing read the same entry. Visual numbers (sizes, colours, flashes, sounds) stay inline.
+        // ult points stay in AGENT_DEFS). It holds every gameplay number of every agent: the eight
+        // Duelists since V1.9.1, the Controllers, Initiators and Sentinels since V2.2. One number,
+        // one home: places that use the same number for the same thing read the same entry. Visual
+        // numbers (sizes, colours, flashes, sounds) stay inline, and so does a number one line
+        // shares between agents of different kits (one buff or debuff that several agents give).
         // Units are in the names: Ms milliseconds, Sec seconds, M metres, Mps metres per second,
         // PerTick metres per 60 Hz movement tick (characterController), SqM2 a radius squared,
         // Hp health or shield points, Mult a multiplier; damage is health per hit.
@@ -44954,11 +44955,11 @@
             _c: new THREE.Color(), _c2: new THREE.Color(), _m: new THREE.Matrix4(), _q: new THREE.Quaternion(), _e: new THREE.Euler(),
 
             // The abilities with a High Fidelity look (agent.slot). Their look is AGENT_TUNING's tag
-            // where the agent has one; Sage, Sova, Breach and Killjoy have no AGENT_TUNING yet.
+            // (V2.2: every agent is in AGENT_TUNING now, Sage, Sova, Breach and Killjoy included).
             CONVERTED: {
-                'omen.e': null, 'sage.c': ['wall'], 'phoenix.c': null, 'sova.q': ['projectile', 'blast'],
-                'raze.e': null, 'phoenix.q': null, 'sova.x': ['beam'], 'breach.e': ['pulse'],
-                'killjoy.e': ['deployable'], 'jett.e': null
+                'omen.e': null, 'sage.c': null, 'phoenix.c': null, 'sova.q': null,
+                'raze.e': null, 'phoenix.q': null, 'sova.x': null, 'breach.e': null,
+                'killjoy.e': null, 'jett.e': null
             },
             lookOf: function (key) {
                 if (this.CONVERTED[key]) return this.CONVERTED[key];
