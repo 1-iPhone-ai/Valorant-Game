@@ -10391,7 +10391,7 @@
             lotus: {
                 id: 'lotus',
                 name: 'LOTUS',
-                subtitle: 'Ancient Indian Rock-Cut Temple & Rotating Stone Doors [F]',
+                subtitle: 'Cliff Temple, Three Sites & Rotating Stone Doors [F]',   // V2.1: its own layout
                 skyColor: 0x1c141d,
                 // V1.7 lighting mood: warm amber sun, teal/amber temple accents
                 sunColor: 0xffc98a,
@@ -10400,29 +10400,173 @@
                 accentB: 0xf59e0b,
                 floorColor: 0x4a3525,
                 wallColor: 0x2d1e17,
+                // V2.1: Lotus's own layout, an original temple cut into a cliff, with THREE spike sites.
+                // Attackers west, defenders east; A north (-Z), B in the centre (the smallest, nearest
+                // the defenders), C south (+Z). From the Outer Court (mid) the attackers take Lion Gate to
+                // A and Serpent Gate to C, both through a rotating stone door [F], and the Torch Passage
+                // (a carved tunnel with a dogleg) to B; the Scree Path (north edge) and the River Walk
+                // (south edge, past the Lotus Pool in its bend) are the long ways to A and C. Incense Walk
+                // joins A and B behind a breakable wall; Ash Walk joins B and C. Defenders take the
+                // Monks' Stair to A and the Relic Store to C, and reach B down the Bell Loft and the
+                // Water Stair. The Pilgrim Hall, a dead end off the court, holds the range and the aim
+                // trainer. Every lane has a 3.5 m chokepoint; buildings are 8-10 m and never thinner
+                // than 3 m between two open areas.
+                plan: {
+                    atkSpawn: [-49.5, -37, -10, 10],
+                    defSpawn: [37, 49.5, -10, 10],
+                    courtIn: [-37, -31, -3, 3],
+                    court: [-31, -15, -10, 10],
+                    lionN: [-29, -23, -34, -10],
+                    lionE: [-23, 6, -34, -28],
+                    screeW: [-47, -41, -47, -10],
+                    screeN: [-47, -6, -47, -41],
+                    screeE: [-6, 6, -44, -38],
+                    aSite: [6, 22, -44, -28],
+                    torch1: [-15, -3, -6, -2],
+                    torchJog: [-3, 3, -6, 6],
+                    torch2: [3, 16, 2, 6],
+                    bSite: [16, 30, -7, 7],
+                    incense: [18, 22, -28, -7],
+                    bellLoft: [22, 42, -22, -17],
+                    ash: [18, 22, 7, 28],
+                    waterStair: [22, 42, 19, 24],
+                    serpS: [-23, -17, 10, 34],
+                    serpE: [-17, 6, 28, 34],
+                    riverW: [-47, -41, 10, 47],
+                    riverS: [-47, -14, 41, 47],
+                    riverBend: [-14, -8, 38, 47],
+                    riverE: [-8, 6, 38, 43],
+                    cSite: [6, 22, 28, 44],
+                    monkN: [42, 48, -38, -10],
+                    monkW: [22, 48, -33, -28],
+                    relicS: [42, 48, 10, 38],
+                    relicW: [22, 48, 28, 33],
+                    pilgrim: [-38, -26, 14, 34],
+                    pilgrimIn: [-31, -27, 10, 14]
+                },
+                // V2.1: High Detail surface types by colour (the rest by shape)
+                surf: { 0x6b4a36: 'stone', 0x4a3020: 'stone', 0x5a3a28: 'stone', 0x9a7458: 'stone', 0xc8a27c: 'stone', 0xa88466: 'stone', 0x6b4f2a: 'wood', 0x8c6a2f: 'metal' },
                 build: function() {
-                    // Central Lotus Sanctum Step-Pyramid & Rose-Gold Shrine
-                    createBox(0, 3.5, 0, 14, 7, 14, 0x7c2d12);
-                    createBox(0, 8.2, 0, 10, 2.5, 10, 0xb45309);
-                    createBox(0, 10.5, 0, 6, 2.2, 6, 0xf43f5e);
-                    // Temple Courtyards & Sandstone Archways (Framing West/East Rotating Doors at x = -18 / +18, z = 0)
-                    createBox(-18, 3.5, -14, 4.5, 7, 16, 0x573b26);
-                    createBox(-18, 3.5, 14, 4.5, 7, 16, 0x573b26);
-                    createBox(18, 3.5, -14, 4.5, 7, 16, 0x573b26);
-                    createBox(18, 3.5, 14, 4.5, 7, 16, 0x573b26);
-                    // Overgrown Emerald Terraces
-                    createBox(-32, 2.2, -20, 9, 4.4, 9, 0x065f46);
-                    createBox(32, 2.2, -20, 9, 4.4, 9, 0x065f46);
-                    createBox(-32, 2.2, 20, 9, 4.4, 9, 0x9f1239);
-                    createBox(32, 2.2, 20, 9, 4.4, 9, 0x9f1239);
-                    // Carved Lotus Pillars
-                    createCylinder(-10, 5, -18, 1.25, 10, 0xd97706);
-                    createCylinder(10, 5, -18, 1.25, 10, 0xd97706);
-                    createCylinder(-10, 5, 18, 1.25, 10, 0x10b981);
-                    createCylinder(10, 5, 18, 1.25, 10, 0x10b981);
-                    // Radianite Relic Crates
-                    createBox(-8, 1.2, -28, 3, 2.4, 3, 0xf43f5e);
-                    createBox(8, 1.2, 28, 3, 2.4, 3, 0x10b981);
+                    const P = this.plan;
+                    // V2.1: rock-cut blocks round the plan's open floor (the shared helper)
+                    buildPlanBuildings(P, { walls: [0x8a5a3c, 0x7a4e34, 0x96644a, 0x6e452e], parapet: 0x3b2418 });
+                    const CH = 0x6b4a36, LT = 0x4a3020, SB = 0x5a3a28, STONE = 0x9a7458, PALE = 0xc8a27c, STEP = 0xa88466, WOOD = 0x6b4f2a, BRONZE = 0x8c6a2f;
+                    // Chokepoints: 3.5 m gaps in every lane, under a carved lintel
+                    planBox(-35, -33, -3, -1.75, 0, 8, CH); planBox(-35, -33, 1.75, 3, 0, 8, CH); planBox(-35, -33, -1.75, 1.75, 5, 8, LT);         // into the Outer Court
+                    planBox(-30, -26, -47, -45.75, 0, 8, CH); planBox(-30, -26, -42.25, -41, 0, 8, CH); planBox(-30, -26, -45.75, -42.25, 5, 8, LT); // Scree Path
+                    planBox(-30, -26, 41, 42.25, 0, 8, CH); planBox(-30, -26, 45.75, 47, 0, 8, CH); planBox(-30, -26, 42.25, 45.75, 5, 8, LT);       // River Walk
+                    planBox(-10, -8, -6, -5.5, 0, 8, CH); planBox(-10, -8, -5.5, -2, 4.2, 8, LT);                                                   // Torch Passage
+                    planBox(-8, -6, -34, -32.75, 0, 8, CH); planBox(-8, -6, -29.25, -28, 0, 8, CH); planBox(-8, -6, -32.75, -29.25, 5, 8, LT);       // Lion Gate (east run)
+                    planBox(-8, -6, 28, 29.25, 0, 8, CH); planBox(-8, -6, 32.75, 34, 0, 8, CH); planBox(-8, -6, 29.25, 32.75, 5, 8, LT);             // Serpent Gate (east run)
+                    planBox(18, 18.5, -14, -12, 0, 8, CH); planBox(18.5, 22, -14, -12, 4.2, 8, LT);                                                  // Incense Walk
+                    planBox(21.5, 22, 12, 14, 0, 8, CH); planBox(18, 21.5, 12, 14, 4.2, 8, LT);                                                      // Ash Walk
+                    planBox(30, 33, -33, -32.25, 0, 8, CH); planBox(30, 33, -28.75, -28, 0, 8, CH); planBox(30, 33, -32.25, -28.75, 5, 8, LT);       // Monks' Stair
+                    planBox(30, 33, 28, 28.75, 0, 8, CH); planBox(30, 33, 32.25, 33, 0, 8, CH); planBox(30, 33, 28.75, 32.25, 5, 8, LT);             // Relic Store
+                    planBox(34, 36, -22, -21.25, 0, 8, CH); planBox(34, 36, -17.75, -17, 0, 8, CH); planBox(34, 36, -21.25, -17.75, 5, 8, LT);       // Bell Loft
+                    planBox(34, 36, 19, 19.75, 0, 8, CH); planBox(34, 36, 23.25, 24, 0, 8, CH); planBox(34, 36, 19.75, 23.25, 5, 8, LT);             // Water Stair
+                    // Carved frames over the rotating stone doors (the doors themselves turn: layout.doors)
+                    planBox(-29, -23, -22.6, -21.4, 6.8, 8, LT); planBox(-23, -17, 21.4, 22.6, 6.8, 8, LT);
+                    // Spawn walls with ways round both ends, and crates beyond both ways round
+                    planBox(-46.5, -39.5, -4, -2, 0, 6, SB); planBox(-49.5, -46, 3, 5, 0, 3, WOOD); planBox(-42.5, -37, 3, 5, 0, 3, WOOD);
+                    planBox(40, 46.5, 2, 4, 0, 6, SB); planBox(46, 49.5, -5, -3, 0, 3, WOOD); planBox(37, 42.5, -5, -3, 0, 3, WOOD);
+                    // The Outer Court: a carved elephant on a plinth in the middle (no line runs from Lion
+                    // Gate across the court into Serpent Gate or down the Torch Passage)
+                    planBox(-27, -19, -3, 3, 0, 3, PALE);
+                    planBox(-25.5, -20, -1.6, 1.6, 3, 5.4, STONE); planBox(-27.2, -25.5, -1.1, 1.1, 3.9, 5.8, STONE);
+                    createCylinder(-27.6, 4.3, 0, 0.28, 2.2, STONE);
+                    planBox(-27.8, -26.2, -0.85, -0.65, 4.0, 4.2, PALE); planBox(-27.8, -26.2, 0.65, 0.85, 4.0, 4.2, PALE);   // tusks
+                    // A site (16 x 16, x 6..22). Entrances: Lion Gate and the Scree Path from the west, the
+                    // Monks' Stair at the south-east corner, Incense Walk from B (south). The Sun Terrace
+                    // (heaven) is a 3 m terrace in the north-east, up five 0.5 m steps along the north wall;
+                    // its south edge is open, a drop back into the site.
+                    planBox(16, 22, -44, -38, 0, 3, PALE);
+                    for (let k = 1; k <= 5; k++) planBox(10 + k, 11 + k, -44, -41.5, 0, k * 0.5, STEP);
+                    planBox(11, 15, -39, -36, 0, 3.2, STONE); planBox(10.8, 15.2, -39.2, -35.8, 3.2, 3.6, PALE);   // the carved shrine
+                    planBox(11, 15, -33, -28, 0, 2.8, STONE);                                                       // a fallen colossus
+                    planBox(6, 8, -37, -35, 0, 2.2, PALE);                                                          // the stone lion on its plinth
+                    planBox(6, 22, -28.2, -28, 3, 3.3, this.accentA); planBox(21.8, 22, -38, -33, 3, 3.3, this.accentA);   // site trim
+                    // C site: A's mirror image, with the Moon Terrace where A has the Sun Terrace
+                    planBox(16, 22, 38, 44, 0, 3, PALE);
+                    for (let k = 1; k <= 5; k++) planBox(10 + k, 11 + k, 41.5, 44, 0, k * 0.5, STEP);
+                    planBox(11, 15, 36, 39, 0, 3.2, STONE); planBox(10.8, 15.2, 35.8, 39.2, 3.2, 3.6, PALE);
+                    planBox(11, 15, 28, 33, 0, 2.8, STONE);
+                    planBox(6, 8, 35, 37, 0, 2.2, PALE);
+                    planBox(6, 22, 28, 28.2, 3, 3.3, this.accentB); planBox(21.8, 22, 33, 38, 3, 3.3, this.accentB);
+                    // B site (14 x 14, the smallest), the Stone Grove: an altar along the west wall and two
+                    // square pillars before it. Entrances: the Torch Passage (west), Incense Walk (north),
+                    // Ash Walk (south).
+                    planBox(16, 24, -2.5, 2.5, 0, 3, STONE); planBox(16, 24.2, -2.7, 2.7, 3, 3.4, PALE);
+                    planBox(26.4, 27.6, -0.6, 0.6, 0, 8, PALE); planBox(25.9, 27.1, 3.9, 5.1, 0, 8, PALE);
+                    planBox(26.1, 27.9, -0.9, 0.9, 8, 8.4, BRONZE); planBox(25.6, 27.4, 3.6, 5.4, 8, 8.4, BRONZE);
+                    planBox(16, 30, 6.8, 7, 3, 3.3, BRONZE);                                                        // site trim
+                    // Lane cover, against the walls (every way through stays 2.5 m or wider)
+                    planBox(-47, -45, -30, -28, 0, 1.2, WOOD); planBox(-47, -45, 26, 28, 0, 1.2, WOOD);             // Scree Path, River Walk
+                    planBox(46, 48, -26, -24, 0, 1.1, STONE); planBox(46, 48, 24, 26, 0, 1.1, STONE);               // Monks' Stair, Relic Store
+                    // Covered ways: carved stone roofs 6 m up over the Torch Passage, Incense Walk and Ash
+                    // Walk, with light slots
+                    for (const xx of [[-15, -9], [-8, -3]]) planBox(xx[0], xx[1], -6, -2, 6, 6.6, LT);
+                    planBox(-3, 3, -6, 6, 6, 6.6, LT);
+                    for (const xx of [[3, 9], [10, 16]]) planBox(xx[0], xx[1], 2, 6, 6, 6.6, LT);
+                    for (const zz of [[-28, -22], [-21, -15], [-11, -7]]) planBox(18, 22, zz[0], zz[1], 6, 6.6, LT);
+                    for (const zz of [[7, 11], [15, 21], [22, 28]]) planBox(18, 22, zz[0], zz[1], 6, 6.6, LT);
+                    // Landmarks above the roofs (inside solid blocks: nothing at street level changes): a
+                    // stepped spire over the Stone Grove, and the carved cliff face behind the attackers' side
+                    planBox(31, 36, -2.5, 2.5, 0, 12, PALE); planBox(31.5, 35.5, -2, 2, 12, 14, STONE);
+                    planBox(32, 35, -1.5, 1.5, 14, 16, PALE); planBox(32.5, 34.5, -1, 1, 16, 17.5, STONE);
+                    createCylinder(33.5, 18.4, 0, 0.35, 1.8, BRONZE);
+                    planBox(-40, -31, -31, -13, 0, 15, 0x6e452e); planBox(-39, -32, -29, -15, 15, 17, 0x7a4e34);
+                },
+                // V2.1: High Detail props for the cliff temple (decor only: no colliders, nothing in the
+                // way at player height): carved friezes along the lanes, bronze bells under the lintels,
+                // creepers on the cliff walls, oil lamps in wall niches, and the Lotus Pool in the River
+                // Walk's bend
+                hiDecor: function(add, rnd) {
+                    const LEAF = [0x2f6b3a, 0x3c7d44, 0x285a33], FRIEZE = 0x5a3a28, BRONZE = 0x8c6a2f, FLAME = 0xffb347;
+                    // Friezes: a carved band 3.6 m up on the long lane walls (x0, z0, x1, z1, which side)
+                    const frieze = (x0, z0, x1, z1, nx, nz) => {
+                        const len = Math.hypot(x1 - x0, z1 - z0), cx = (x0 + x1) / 2 + nx * 0.04, cz = (z0 + z1) / 2 + nz * 0.04;
+                        const sx = nx ? 0.06 : len, sz = nx ? len : 0.06;
+                        add('box', cx, 3.6, cz, sx, 0.5, sz, FRIEZE, 1, MAP_SURF.stone);
+                        for (let t = 0.6; t < len - 0.4; t += 1.2) {
+                            const x = x0 + (x1 - x0) * t / len + nx * 0.07, z = z0 + (z1 - z0) * t / len + nz * 0.07;
+                            add('box', x, 3.6, z, nx ? 0.05 : 0.5, 0.36, nx ? 0.5 : 0.05, 0xc8a27c, 1, MAP_SURF.stone);
+                        }
+                    };
+                    frieze(-41, -40, -41, -12, -1, 0); frieze(-41, 12, -41, 40, -1, 0); frieze(-44, -41, -8, -41, 0, -1); frieze(-44, 41, -16, 41, 0, 1);
+                    frieze(-23, -32, -23, -12, -1, 0); frieze(-17, 12, -17, 32, -1, 0); frieze(42, -36, 42, -12, 1, 0); frieze(42, 12, 42, 36, 1, 0);
+                    // Bronze bells under the lintels (chokepoints and the stone doors' frames)
+                    const bell = (x, z, top) => {
+                        add('box', x, top - 0.25, z, 0.04, 0.5, 0.04, 0x2b2620, 1, 0);
+                        add('cylinder', x, top - 0.72, z, 0.26, 0.5, 0.26, BRONZE, 1.1, MAP_SURF.metal);
+                        add('cylinder', x, top - 0.99, z, 0.32, 0.06, 0.32, BRONZE, 1.1, MAP_SURF.metal);
+                    };
+                    for (const p of [[-34, 0], [-28, -44], [-28, 44], [-7, -31], [-7, 31], [31.5, -30.5], [31.5, 30.5], [35, -19.5], [35, 21.5]]) bell(p[0], p[1], 5);
+                    for (const p of [[-26, -22], [-20, 22]]) bell(p[0], p[1], 6.8);
+                    for (const p of [[-9, -4], [20, -13], [20, 13]]) bell(p[0], p[1], 4.2);
+                    // Creepers hanging down the cliff walls of the lanes
+                    for (let i = 0; i < 70; i++) {
+                        const side = rnd() < 0.5 ? -1 : 1;
+                        const z = side * (12 + rnd() * 26), x = rnd() < 0.5 ? -41.05 : -46.95;
+                        const len = 1.2 + rnd() * 2.6;
+                        add('box', x, 8 - len / 2, z, 0.05, len, 0.18 + rnd() * 0.2, LEAF[i % 3], 1, MAP_SURF.wood);
+                    }
+                    for (let i = 0; i < 40; i++) {
+                        const x = -44 + rnd() * 36, z = rnd() < 0.5 ? -46.95 : 46.95, len = 1 + rnd() * 2.2;
+                        add('box', x, 8 - len / 2, z, 0.18 + rnd() * 0.2, len, 0.05, LEAF[i % 3], 1, MAP_SURF.wood);
+                    }
+                    // Oil lamps in niches: a dark niche, a bronze dish and a flame
+                    const lamp = (x, z, nx, nz) => {
+                        add('box', x + nx * 0.03, 2.3, z + nz * 0.03, nx ? 0.06 : 0.5, 0.6, nx ? 0.5 : 0.06, 0x1d1410, 1, 0);
+                        add('cylinder', x + nx * 0.15, 2.08, z + nz * 0.15, 0.14, 0.05, 0.14, BRONZE, 1, MAP_SURF.metal);
+                        add('box', x + nx * 0.15, 2.2, z + nz * 0.15, 0.05, 0.14, 0.05, FLAME, 1.6, 0);
+                    };
+                    for (const z of [-36, -20, 20, 36]) { lamp(-41, z, -1, 0); lamp(42, z, 1, 0); }
+                    for (const x of [-38, -20, -12]) { lamp(x, -41, 0, -1); lamp(x, 41, 0, 1); }
+                    for (const x of [-14, 0]) { lamp(x, -34, 0, 1); lamp(x, 34, 0, -1); }
+                    // The Lotus Pool in the River Walk's bend: still water and lotus pads
+                    add('box', -11, 0.025, 45.2, 5.4, 0.03, 3.2, 0x1f5f6a, 1, 0);
+                    for (let i = 0; i < 9; i++) add('cylinder', -13.2 + rnd() * 4.4, 0.05, 44 + rnd() * 2.4, 0.22 + rnd() * 0.12, 0.02, 0.22 + rnd() * 0.12, LEAF[i % 3], 1, 0);
+                    for (let i = 0; i < 4; i++) add('cylinder', -12.8 + rnd() * 3.6, 0.12, 44.3 + rnd() * 1.8, 0.09, 0.12, 0.09, 0xf2a7c3, 1.2, 0);
                 }
             },
             split: {
@@ -10823,6 +10967,80 @@
                 { name: 'B STACK ASCENDER', x: 7.5, z: 35.75, topY: 5.4, exit: { x: 10.25, z: 35.75 } }
             ]
         };
+        // V2.1: Lotus's callouts (the Sun and Moon Terraces are the raised spots on A and C)
+        function lotusZoneName(x, y, z) {
+            const P = MAP_PRESETS.lotus.plan;
+            const any = (...ks) => ks.some((k) => _inPlanRect(P[k], x, z));
+            if (any('aSite')) return (y > 3.6 && x >= 16 && z <= -38) ? 'SUN TERRACE' : 'A SITE';
+            if (any('bSite')) return 'B SITE';
+            if (any('cSite')) return (y > 3.6 && x >= 16 && z >= 38) ? 'MOON TERRACE' : 'C SITE';
+            if (any('lionN', 'lionE')) return 'LION GATE';
+            if (any('screeW', 'screeN', 'screeE')) return 'SCREE PATH';
+            if (any('court', 'courtIn')) return 'OUTER COURT';
+            if (any('torch1', 'torchJog', 'torch2')) return 'TORCH PASSAGE';
+            if (any('incense')) return 'INCENSE WALK';
+            if (any('bellLoft')) return 'BELL LOFT';
+            if (any('ash')) return 'ASH WALK';
+            if (any('waterStair')) return 'WATER STAIR';
+            if (any('serpS', 'serpE')) return 'SERPENT GATE';
+            if (any('riverBend')) return 'LOTUS POOL';
+            if (any('riverW', 'riverS', 'riverE')) return 'RIVER WALK';
+            if (any('monkN', 'monkW')) return 'MONKS STAIR';
+            if (any('relicS', 'relicW')) return 'RELIC STORE';
+            if (any('pilgrim', 'pilgrimIn')) return 'PILGRIM HALL';
+            if (any('atkSpawn')) return 'ATTACKER SPAWN';
+            if (any('defSpawn')) return 'DEFENDER SPAWN';
+            return 'LOTUS';
+        }
+        // V2.1: Lotus's layout: three sites. B is the smallest and the nearest to the defenders; route
+        // lengths are within 20% of Ascent's (B's and C's against Ascent's B), defenders 1-2 s ahead with
+        // both stone doors open (each round starts with them open).
+        const LOTUS_LAYOUT = {
+            sites: { A: { x: 9, z: -41 }, B: { x: 21, z: 4.5 }, C: { x: 9, z: 41 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 45, z: 0, yaw: Math.PI / 2 } },
+            // The Pilgrim Hall (the range and aim-trainer hall)
+            start: { x: -32, z: 30, yaw: 0 },
+            bootStart: { x: -32, z: 30, yaw: 0 },
+            botSpawns: [[-44, -25, 'rusher'], [9, -41, 'sniper'], [-44, 25, 'armored'], [9, 41, 'standard'], [-27.5, -15, 'rusher'], [45, -22, 'armored']],
+            botSpawnsLow: [[-44, -25, 'rusher'], [9, 41, 'armored']],
+            // Open spots all over the map (lanes, sites, the court, links, both spawns)
+            respawnSpots: [[-44, -25], [-36, -44], [-12, -44], [-27.5, -15], [-12, -31], [9, -41], [18, -35], [8.5, -31], [36, -30.5], [45, -22],
+                [-44, 25], [-36, 44], [-11, 41], [-21.5, 16], [-12, 31], [9, 41], [18, 35], [8.5, 31], [36, 30.5], [45, 22],
+                [-23, -7], [-17, 7], [-9, -4], [0, 0], [21, 4.5], [28.5, -5], [20, -18], [20, 18], [30, -19.5], [30, 21.5], [-42, -7], [44, 7]],
+            orbs: [{ x: -17, z: -7, name: 'OUTER COURT ORB' }, { x: 30, z: -19.5, name: 'BELL LOFT ORB' }],
+            zoneName: lotusZoneName,
+            // Defenders (when you attack): two at A, one at B, two at C
+            matchDefend: () => [[18, -35], [8.5, -31], [21, 4.5], [18, 35], [8.5, 31]],
+            // Attacking bots stack south of the spawn wall, clear of it and the crates
+            matchAttack: (o) => [[o.x, o.z + 1.5], [o.x + 2.5, o.z + 1], [o.x - 3, o.z + 1.5], [o.x - 2, o.z + 7.5], [o.x + 2, o.z + 8]],
+            // Retake: you come in from the defender side, down the Monks' Stair (A), the Bell Loft (B)
+            // or the Relic Store (C)
+            retake: {
+                A: { player: { x: 45, z: -14, yaw: 0 }, guards: [[9, -41, 'armored'], [18, -35, 'standard'], [8.5, -31, 'rusher'], [19, -30, 'sniper'], [13, -34.5, 'armored'], [7.5, -40, 'standard']] },
+                B: { player: { x: 40, z: -19.5, yaw: Math.PI / 2 }, guards: [[21, 4.5, 'armored'], [28.5, 1.5, 'standard'], [20, -5, 'rusher'], [28.5, -5, 'sniper'], [24, 5.5, 'armored'], [17.5, 5, 'standard']] },
+                C: { player: { x: 45, z: 14, yaw: Math.PI }, guards: [[9, 41, 'armored'], [18, 35, 'standard'], [8.5, 31, 'rusher'], [19, 30, 'sniper'], [13, 34.5, 'armored'], [7.5, 40, 'standard']] }
+            },
+            // The Pilgrim Hall is kept clear for the range and the aim trainer
+            range: { player: { x: -32, z: 31 }, lanesX: [-36.5, -35, -33, -31, -29.5, -28], lanesZ: [19, 20.5, 22] },
+            aim: { x: -32, z: 31 },
+            // No glass or barrels in the Pilgrim Hall or either spawn
+            propKeepOut: [[-38, -26, 14, 34], [-49.5, -37, -10, 10], [37, 49.5, -10, 10]],
+            // Practice targets: open air in the long east-west lanes, 10 m clear either side
+            targetSpots: [[-33, 3.5, -44], [-33, 3.5, 44], [-8, 3, -31], [-8, 3, 31], [9, 3, 4], [36, 3.5, -30.5]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.6,
+            propSafe: true,
+            checkTargets: true,
+            // Rotating stone doors [F]: a pivot in the middle of a 6 m lane; open, the slab stands along
+            // the lane (2.6 m to pass on either side); shut, it closes the lane. Slow and loud.
+            doors: [
+                { name: 'LION GATE', x: -26, z: -22, len: 6, axis: 'z' },
+                { name: 'SERPENT GATE', x: -20, z: 22, len: 6, axis: 'z' }
+            ],
+            // A breakable wall across Incense Walk (A - B): solid until shot to pieces, back each round
+            breakWall: { name: 'INCENSE WALL', x0: 18, x1: 22, z0: -26, z1: -25, h: 4.2, hp: 350 }
+        };
 
         function mapLayout() {
             const p = (typeof game !== 'undefined' && MAP_PRESETS[game.mapPreset]) || MAP_PRESETS.ascent;
@@ -10844,7 +11062,8 @@
         MAP_PRESETS.bind.layout = BIND_LAYOUT;   // V2.1
         MAP_PRESETS.haven.layout = HAVEN_LAYOUT; // V2.1
         MAP_PRESETS.icebox.layout = ICEBOX_LAYOUT;   // V2.1
-        for (const id of ['lotus', 'split', 'skyline']) MAP_PRESETS[id].layout = LEGACY_LAYOUT;
+        MAP_PRESETS.lotus.layout = LOTUS_LAYOUT;     // V2.1
+        for (const id of ['split', 'skyline']) MAP_PRESETS[id].layout = LEGACY_LAYOUT;
 
         // Create map elements from active MAP_PRESETS entry
         function createMap() {
@@ -10913,6 +11132,8 @@
             // V1.8: this map's sites and ult orbs (props keep clear of them)
             if (typeof tacticalDirector !== 'undefined' && tacticalDirector.applyMapLayout) tacticalDirector.applyMapLayout();
             breakables.build();
+            // V2.1: this map's doors and breakable wall, before the walk grid is built round them
+            if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.lotusDoors) tacticalEnhancements.placeMapMechanics();
             navGrid.build();   // V1.8: bots route all the time now, so build it here, not mid-fight
             relocateBlockedTargets();
             ultraRealism.onMapBuilt();
@@ -13594,8 +13815,14 @@
                 this.owner.clear();
                 // Rebuilt on first use: the map's colliders enter the collision index after this
                 navGrid.blocked = null;
+                // V2.1: clear of this map's stone doors (the whole square each one turns through) and its
+                // breakable wall too (they are not map pieces, and are put in place after this)
+                const L = mapLayout(), keepOut = [];
+                for (const d of (L.doors || [])) keepOut.push([d.x - d.len / 2, d.x + d.len / 2, d.z - d.len / 2, d.z + d.len / 2]);
+                if (L.breakWall) keepOut.push([L.breakWall.x0, L.breakWall.x1, L.breakWall.z0, L.breakWall.z1]);
                 const blocked = (x, z) => {
                     if (Math.abs(x) > 47 || Math.abs(z) > 47) return true;
+                    for (const k of keepOut) if (x > k[0] - 0.7 && x < k[1] + 0.7 && z > k[2] - 0.7 && z < k[3] + 0.7) return true;
                     for (const p of mapPieces) {
                         const b = p.bounds;
                         if (b.min.y > 1.2) continue;
@@ -35375,9 +35602,10 @@
                         ctx.fill();
                         ctx.stroke();
                     }
-                } else if (game.mapPreset === 'lotus' && typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.lotusDoors) {
+                } else if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.lotusDoors && mapL.doors) {   // V2.1: from the layout
                     for (let d = 0; d < tacticalEnhancements.lotusDoors.length; d++) {
                         const door = tacticalEnhancements.lotusDoors[d];
+                        if (!door.cfg) continue;
                         ctx.strokeStyle = door.isOpen ? '#10b981' : '#f43f5e';
                         ctx.fillStyle = 'rgba(28, 20, 29, 0.9)';
                         ctx.lineWidth = 2.0;
@@ -35397,6 +35625,15 @@
                         ctx.fill();
                         ctx.stroke();
                     }
+                }
+                const bw = typeof tacticalEnhancements !== 'undefined' ? tacticalEnhancements.breakWall : null;
+                if (bw && bw.cfg && !bw.broken) {
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo((bw.cfg.x0 - px) * scale, ((bw.cfg.z0 + bw.cfg.z1) / 2 - pz) * scale);
+                    ctx.lineTo((bw.cfg.x1 - px) * scale, ((bw.cfg.z0 + bw.cfg.z1) / 2 - pz) * scale);
+                    ctx.stroke();
                 }
                 for (const rp of (mapL.ropes || [])) {
                     ctx.strokeStyle = '#ffd166';
@@ -38631,6 +38868,8 @@
                     if (firstEnvHit && firstEnvOwner && firstEnvOwner.iceWall && typeof agentSystem !== 'undefined') {
                         agentSystem.damageIceWall(firstEnvOwner.iceWall, baseDamage);
                     }
+                    // V2.1: ...and a map's breakable wall
+                    if (firstEnvHit && firstEnvOwner && firstEnvOwner.breakWall) tacticalEnhancements.damageBreakWall(firstEnvOwner.breakWall, baseDamage, firstEnvHit.point);
                     // Glass breaks wherever the bullet crosses it before stopping; a barrel takes the hit
                     const envStop = firstEnvHit ? firstEnvHit.distance : WEAPON_RANGE;
                     breakables.shatterAlong(raycaster.ray.origin, raycaster.ray.direction, Math.min(envStop, barrelDist));
@@ -41616,7 +41855,8 @@
             ascent: { floorAlbedo: 0x8a8274, plaster: 1.3, decor: '_buildAscent', roof: 0xb4583c },
             bind: { floorAlbedo: 0x9c7f5c, plaster: 1.2, decor: '_buildBind', roof: 0xd0a878 },
             haven: { floorAlbedo: 0x6f7178, plaster: 1.15, decor: '_buildHaven', roof: 0x8a6a2a },
-            icebox: { floorAlbedo: 0x7a838e, plaster: 0, decor: '_buildIcebox', roof: 0x5a6b7c }
+            icebox: { floorAlbedo: 0x7a838e, plaster: 0, decor: '_buildIcebox', roof: 0x5a6b7c },
+            lotus: { floorAlbedo: 0x7a5a44, plaster: 0, decor: '_buildLotus', roof: 0x8a5a3c }
         };
         function ultraMapStyle() { return (typeof game !== 'undefined' && ULTRA_MAP_STYLE[game.mapPreset]) || null; }
         const ultraU = {
@@ -42677,7 +42917,70 @@
                     K.add(L.box, lx, 4.32, lz, g1, 0.06, g2, STRIPE, S.metal);
                 });
                 K.finish();
+            },
+            // V2.1: Lotus (cliff temple): a carved cornice and a plinth band on the rock-cut blocks,
+            // pilasters with lamp niches between them on the long walls (their light is baked), small
+            // stepped shrines on the bigger roofs, and carved frames with a teal band over the passages
+            _buildLotus: function () {
+                const K = this._kit(), S = K.S, L = K.L;
+                const CORNICE = 0x6b4a36, PLINTH = 0x5a3a28, PILASTER = 0x9a7458, NICHE = 0x1d1410, TEAL = 0x14b8a6, PALE = 0xc8a27c, BRONZE = 0x8c6a2f;
+                let bi = 0, shrines = 0;
+                for (const T of K.tall) {
+                    const b = T.b, top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    bi++;
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0, mid = (f.a0 + f.a1) / 2;
+                        const [qx, qz] = K.pt(f, mid, 0.4);
+                        if (K.inside(qx, 2, qz, 0)) continue;
+                        // A cornice under the roof edge and a plinth band at the foot
+                        K.onFace(L.boxCast, f, mid, top - 0.35, 0.12, flen + 0.2, 0.5, 0.24, CORNICE, S.stone);
+                        K.onFace(L.box, f, mid, 0.3, 0.06, flen, 0.6, 0.12, PLINTH, S.stone);
+                        if (flen < 6 || T.w < 3.5) continue;
+                        // Pilasters every 4 m; a niche with a lamp in every other bay
+                        const n = Math.floor(flen / 4);
+                        for (let i = 0; i <= n; i++) {
+                            const a = f.a0 + (flen - n * 4) / 2 + i * 4;
+                            const [px, pz] = K.pt(f, a, 0.3);
+                            if (K.inside(px, 2, pz, 0.1)) continue;
+                            K.onFace(L.box, f, a, top / 2, 0.08, 0.5, top - 0.9, 0.16, PILASTER, S.stone);
+                            if (i < n && (i % 2) === 0) {
+                                const na = a + 2;
+                                K.onFace(L.box, f, na, 2.4, 0.01, 0.8, 1.2, 0.02, NICHE, S.stone);
+                                K.onFace(L.boxCast, f, na, 1.75, 0.1, 0.9, 0.08, 0.2, PALE, S.stone);
+                                const [lx, lz] = K.pt(f, na, 0.6);
+                                if (!K.inside(lx, 3.4, lz, 0.2)) K.lampAt(f, na, 3.4);
+                            }
+                        }
+                    }
+                    // A little stepped shrine on every third big roof
+                    if (T.w >= 6 && T.len >= 8 && (bi % 3) === 0 && shrines < 10) {
+                        K.add(L.boxCast, cx, top + 0.5, cz, 2.6, 1.0, 2.6, PALE, S.stone);
+                        K.add(L.boxCast, cx, top + 1.3, cz, 1.8, 0.6, 1.8, PILASTER, S.stone);
+                        K.add(L.cone, cx, top + 2.0, cz, 1.3, 0.8, 1.3, PALE, S.stone);
+                        K.add(L.cyl, cx, top + 2.6, cz, 0.08, 0.5, 0.08, BRONZE, S.metal);
+                        shrines++;
+                    }
+                }
+                // Carved frames over the passages: jambs, a lintel and a teal band
+                K.passages((ax, oth, A, B, gap, o0, o1, mid) => {
+                    const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                    for (const [oe, sgn] of [[o0, 1], [o1, -1]]) {
+                        const oc = oe + sgn * 0.18;
+                        for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                            const [jx, jz] = P2(u + us * 0.05, oc);
+                            const [sx, sz] = P2(0.1, 0.36);
+                            K.add(L.box, jx, 1.9, jz, sx, 3.8, sz, PILASTER, S.stone);
+                        }
+                        const [lx, lz] = P2(mid, oc);
+                        const [w1, w2] = P2(gap + 0.2, 0.38);
+                        K.add(L.boxCast, lx, 3.95, lz, w1, 0.3, w2, CORNICE, S.stone);
+                        const [g1, g2] = P2(gap + 0.2, 0.4);
+                        K.add(L.box, lx, 4.16, lz, g1, 0.1, g2, TEAL, S.stone);
+                    }
+                });
+                K.finish();
             }
+
 
         };
         // ---- Ultra Realism: baked light and a near shadow cascade ----
@@ -45967,6 +46270,7 @@
                 // V1.7: a new round ends any replay and starts fresh round stats
                 replayDirector.stop();
                 breakables.reset();
+                if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.resetMapMechanics) tacticalEnhancements.resetMapMechanics();   // V2.1: doors open, wall whole
                 this.rs = { kills: [], dmg: 0, killer: null };
                 this.round++;
                 agentStrip.show(); // V1.9: each Match / Ranked / Spike Rush round shows the agent strip for 4 s
@@ -51527,69 +51831,201 @@
             // =============================================
             // 3. LOTUS Rotating Stone Doors [F] & SPLIT Vertical Ascender Ziplines [F]
             // =============================================
+            // V2.1: rotating stone doors from the map's layout (layout.doors: the pivot x, z, the slab's
+            // length across its lane, and the lane's axis). A pool of rigs, placed when the layout changes.
+            // A door is solid: shut, it closes its lane to players, bots (the walk grid is refreshed, so
+            // they route round) and bullets; it turns slowly and loudly on [F], blocking its whole square
+            // while it turns. Every round starts with the doors open.
             buildLotusDoors3D: function() {
                 this.lotusGroup = new THREE.Group();
                 this.lotusDoors = [];
-                const doorConfigs = [
-                    { id: 'A', name: 'WEST LOTUS ROTATING DOOR (A-RUBBLE)', x: -18, z: 0 },
-                    { id: 'C', name: 'EAST LOTUS ROTATING DOOR (C-MOUND)',  x: 18,  z: 0 }
-                ];
-
-                for (let i = 0; i < doorConfigs.length; i++) {
-                    const cfg = doorConfigs[i];
+                const slabGeo = new THREE.BoxGeometry(1, 6.6, 0.8);       // x is scaled to the door's length
+                const slabMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.75, metalness: 0.25 });
+                const crystalGeo = new THREE.OctahedronGeometry(0.65, 0);
+                const ringGeo = new THREE.RingGeometry(2.9, 3.2, 40);
+                ringGeo.rotateX(-Math.PI / 2);
+                for (let i = 0; i < 4; i++) {
                     const pivot = new THREE.Group();
-                    pivot.position.set(cfg.x, 0, cfg.z);
-
-                    // Ancient Carved Monolith Slab
-                    const slabGeo = new THREE.BoxGeometry(3.8, 6.6, 10.5);
-                    const slabMat = new THREE.MeshStandardMaterial({
-                        color: 0x7c2d12,
-                        roughness: 0.75,
-                        metalness: 0.25
-                    });
-                    const slabMesh = new THREE.Mesh(slabGeo, slabMat);
-                    slabMesh.position.y = 3.3;
-                    pivot.add(slabMesh);
-
-                    // Glowing Lotus Crystal Core on both faces
-                    const crystalGeo = new THREE.OctahedronGeometry(0.65, 0);
-                    const crystalMat = new THREE.MeshBasicMaterial({
-                        color: 0xf43f5e
-                    });
-                    const crystalMesh = new THREE.Mesh(crystalGeo, crystalMat);
-                    crystalMesh.position.set(0, 3.3, 0);
-                    crystalMesh.scale.set(3.4, 1.2, 1.2);
-                    pivot.add(crystalMesh);
-
-                    // Floor Rotation Track Ring
-                    const ringGeo = new THREE.RingGeometry(4.8, 5.4, 32);
-                    ringGeo.rotateX(-Math.PI / 2);
-                    const ringMat = new THREE.MeshBasicMaterial({
-                        color: 0xf43f5e,
-                        transparent: true,
-                        opacity: 0.65,
-                        side: THREE.DoubleSide
-                    });
-                    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-                    ringMesh.position.y = 0.06;
-                    pivot.add(ringMesh);
-
+                    const slab = new THREE.Mesh(slabGeo, slabMat);
+                    slab.position.y = 3.3;
+                    pivot.add(slab);
+                    // A glowing crystal set in both faces (green open, red shut)
+                    const crystalMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+                    const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+                    crystal.position.set(0, 3.3, 0);
+                    crystal.scale.set(1.2, 1.2, 1.4);
+                    pivot.add(crystal);
+                    // The floor track it turns on
+                    const ringMat = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.position.y = 0.06;
+                    pivot.add(ring);
+                    pivot.visible = false;
                     this.lotusGroup.add(pivot);
-                    this.lotusDoors.push({
-                        id: cfg.id,
-                        name: cfg.name,
-                        x: cfg.x,
-                        z: cfg.z,
-                        pivot: pivot,
-                        crystalMat: crystalMat,
-                        ringMat: ringMat,
-                        isOpen: false,
-                        currentAngle: 0,
-                        targetAngle: 0
-                    });
+                    const rec = createColliderRecord('static', null);
+                    const shot = { bounds: new THREE.Box3(), proxy: slab, disabled: true, shotStamp: 0 };
+                    const door = { pivot: pivot, slab: slab, crystalMat: crystalMat, ringMat: ringMat, cfg: null, name: '', x: 0, z: 0,
+                        isOpen: true, turning: false, currentAngle: 0, targetAngle: 0, openAngle: 0, closedAngle: 0, rec: rec, shot: shot };
+                    shootableOwners.set(slab, { kind: 'env', lotusDoor: door });
+                    this.lotusDoors.push(door);
                 }
-                this.lotusGroup.visible = false;
                 scene.add(this.lotusGroup);
+                this.buildBreakWall3D();
+                this.placeMapMechanics();
+            },
+
+            // A door's footprint: 'open' (the slab along its lane), 'shut' (across it) or 'turning' (the
+            // square it sweeps)
+            _doorBox: function(d, state) {
+                const c = d.cfg, h = c.len / 2, t = 0.4;
+                if (state === 'turning') return [c.x - h, c.x + h, c.z - h, c.z + h];
+                const alongZ = (state === 'open') === (c.axis === 'z');
+                return alongZ ? [c.x - t, c.x + t, c.z - h, c.z + h] : [c.x - h, c.x + h, c.z - t, c.z + t];
+            },
+            _doorSolid: function(d, state) {
+                const b = this._doorBox(d, state), r = d.rec;
+                if (r.indexed) collisionIndex.remove(r);
+                r.minX = b[0]; r.maxX = b[1]; r.minZ = b[2]; r.maxZ = b[3]; r.minY = 0; r.maxY = 6.6;
+                r.anchorX = d.cfg.x; r.anchorZ = d.cfg.z;
+                collisionIndex.insert(r);
+                const h = d.cfg.len / 2 + 1;
+                if (typeof navGrid !== 'undefined' && navGrid.refreshArea) navGrid.refreshArea(d.cfg.x - h, d.cfg.z - h, d.cfg.x + h, d.cfg.z + h);
+            },
+            _doorColour: function(d) {
+                const hex = d.isOpen ? 0x10b981 : 0xf43f5e;
+                d.crystalMat.color.setHex(hex).convertSRGBToLinear();
+                d.ringMat.color.setHex(hex).convertSRGBToLinear();
+            },
+
+            // V2.1: a breakable wall from the map's layout (layout.breakWall): solid to players, bots and
+            // bullets until shot to pieces, then gone for the rest of the round (the walk grid is
+            // refreshed both ways). Back at each round's start.
+            buildBreakWall3D: function() {
+                const mat = new THREE.MeshStandardMaterial({ color: 0x8a5a3c, roughness: 0.75, metalness: 0.25 });
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+                mesh.visible = false;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+                const w = { mesh: mesh, mat: mat, cfg: null, hp: 0, broken: false, rec: createColliderRecord('static', null),
+                    shot: { bounds: new THREE.Box3(), proxy: mesh, disabled: true, shotStamp: 0 } };
+                shootableOwners.set(mesh, { kind: 'env', breakWall: w });
+                this.breakWall = w;
+            },
+            _wallSolid: function(w, on) {
+                const c = w.cfg;
+                if (w.rec.indexed) collisionIndex.remove(w.rec);
+                if (on) {
+                    w.rec.minX = c.x0; w.rec.maxX = c.x1; w.rec.minZ = c.z0; w.rec.maxZ = c.z1; w.rec.minY = 0; w.rec.maxY = c.h;
+                    w.rec.anchorX = (c.x0 + c.x1) / 2; w.rec.anchorZ = (c.z0 + c.z1) / 2;
+                    collisionIndex.insert(w.rec);
+                }
+                w.shot.disabled = !on;
+                if (typeof navGrid !== 'undefined' && navGrid.refreshArea) navGrid.refreshArea(c.x0 - 1, c.z0 - 1, c.x1 + 1, c.z1 + 1);
+            },
+
+            // Into the shot index once (a map rebuild clears it; a new round does not)
+            _shotPut: function(piece) {
+                const I = envShotIndex, b = piece.bounds;
+                const cell = I.cells.get((I.cellCoord(b.min.x) + 512) * 1024 + (I.cellCoord(b.min.z) + 512));
+                if (!cell || cell.indexOf(piece) < 0) I.insert(piece);
+            },
+            // Put this map's doors and breakable wall in place (all open / intact), or take them away
+            placeMapMechanics: function() {
+                const L = mapLayout();
+                this._mechLayout = L;
+                const doors = L.doors || [];
+                this.lotusDoors.forEach((d, i) => {
+                    const cfg = doors[i] || null;
+                    if (d.rec.indexed) collisionIndex.remove(d.rec);
+                    d.shot.disabled = true;
+                    d.cfg = cfg;
+                    d.pivot.visible = !!cfg;
+                    if (!cfg) return;
+                    d.name = cfg.name; d.x = cfg.x; d.z = cfg.z;
+                    d.closedAngle = cfg.axis === 'z' ? 0 : Math.PI / 2;
+                    d.openAngle = cfg.axis === 'z' ? Math.PI / 2 : 0;
+                    d.isOpen = true; d.turning = false;
+                    d.currentAngle = d.targetAngle = d.openAngle;
+                    d.pivot.position.set(cfg.x, 0, cfg.z);
+                    d.pivot.rotation.y = d.currentAngle;
+                    d.slab.scale.x = cfg.len;
+                    d.pivot.updateMatrixWorld(true);
+                    const h = cfg.len / 2;
+                    d.shot.bounds.min.set(cfg.x - h, 0, cfg.z - h);
+                    d.shot.bounds.max.set(cfg.x + h, 6.6, cfg.z + h);
+                    this._shotPut(d.shot);
+                    d.shot.disabled = false;
+                    this._doorColour(d);
+                    this._doorSolid(d, 'open');
+                });
+                const w = this.breakWall, wc = L.breakWall || null;
+                if (w) {
+                    if (w.rec.indexed) collisionIndex.remove(w.rec);
+                    w.shot.disabled = true;
+                    w.cfg = wc;
+                    w.mesh.visible = !!wc;
+                    if (wc) {
+                        w.mesh.position.set((wc.x0 + wc.x1) / 2, wc.h / 2, (wc.z0 + wc.z1) / 2);
+                        w.mesh.scale.set(wc.x1 - wc.x0, wc.h, wc.z1 - wc.z0);
+                        w.mesh.updateMatrixWorld(true);
+                        w.shot.bounds.min.set(wc.x0, 0, wc.z0);
+                        w.shot.bounds.max.set(wc.x1, wc.h, wc.z1);
+                        this._shotPut(w.shot);
+                        w.hp = wc.hp; w.broken = false;
+                        w.mat.color.setHex(0x8a5a3c).convertSRGBToLinear();
+                        this._wallSolid(w, true);
+                    }
+                }
+            },
+            // A new round: doors open, the wall whole again
+            resetMapMechanics: function() {
+                if (this.lotusDoors) this.placeMapMechanics();
+            },
+            damageBreakWall: function(w, dmg, point) {
+                if (!w || !w.cfg || w.broken) return;
+                w.hp -= dmg;
+                // It darkens as it cracks
+                const k = Math.max(0, w.hp / w.cfg.hp);
+                w.mat.color.setHex(0x8a5a3c).convertSRGBToLinear().multiplyScalar(0.45 + 0.55 * k);
+                if (w.hp > 0) return;
+                w.broken = true;
+                w.mesh.visible = false;
+                this._wallSolid(w, false);
+                const c = w.cfg, cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
+                if (typeof createHitEffect === 'function') for (let i = 0; i < 6; i++) createHitEffect(new THREE.Vector3(c.x0 + (c.x1 - c.x0) * Math.random(), 0.4 + Math.random() * (c.h - 0.6), cz), true);
+                this.playStoneDoorTurn(0.9);
+                showNotification(c.name + ' SMASHED: THE WAY THROUGH IS OPEN', 2200);
+            },
+            // The doors' grind: two detuned saws and a rumble for the length of the turn, then a thud (louder
+            // and longer than the old click)
+            playStoneDoorTurn: function(secs) {
+                try {
+                    soundFX.init();
+                    if (!soundFX.ctx || soundFX.muted) return;
+                    const ctx = soundFX.ctx, now = ctx.currentTime, out = soundFX.masterGain || ctx.destination;
+                    for (const f of [61, 64.5, 41]) {
+                        const osc = ctx.createOscillator(), g = ctx.createGain();
+                        osc.type = f < 50 ? 'triangle' : 'sawtooth';
+                        osc.frequency.setValueAtTime(f, now);
+                        osc.frequency.linearRampToValueAtTime(f * 0.82, now + secs);
+                        g.gain.setValueAtTime(0.001, now);
+                        g.gain.linearRampToValueAtTime(f < 50 ? 0.34 : 0.2, now + 0.12);
+                        g.gain.setValueAtTime(f < 50 ? 0.34 : 0.2, now + secs - 0.15);
+                        g.gain.exponentialRampToValueAtTime(0.001, now + secs + 0.05);
+                        osc.connect(g); g.connect(out);
+                        osc.start(now); osc.stop(now + secs + 0.08);
+                    }
+                    const thud = ctx.createOscillator(), tg = ctx.createGain();
+                    thud.type = 'sine';
+                    thud.frequency.setValueAtTime(90, now + secs);
+                    thud.frequency.exponentialRampToValueAtTime(38, now + secs + 0.35);
+                    tg.gain.setValueAtTime(0.001, now + secs);
+                    tg.gain.linearRampToValueAtTime(0.45, now + secs + 0.02);
+                    tg.gain.exponentialRampToValueAtTime(0.001, now + secs + 0.4);
+                    thud.connect(tg); tg.connect(out);
+                    thud.start(now + secs); thud.stop(now + secs + 0.42);
+                } catch (e) {}
             },
 
             buildSplitZiplines3D: function() {
@@ -51789,7 +52225,6 @@
             },
 
             onMapChanged: function(mapId) {
-                if (this.lotusGroup) this.lotusGroup.visible = (mapId === 'lotus');
                 if (this.splitGroup) this.splitGroup.visible = (mapId === 'split');
                 if (this.skylineGroup) this.skylineGroup.visible = (mapId === 'skyline');
                 if (typeof progression !== 'undefined' && progression.sprayMesh) progression.hideSpray();
@@ -51808,26 +52243,34 @@
                 const py = characterController.position.y;
                 const pz = characterController.position.z;
 
-                // A) LOTUS Rotating Stone Doors ([F] within 6m)
-                if (game.mapPreset === 'lotus' && this.lotusGroup && this.lotusGroup.visible) {
+                // A) V2.1: the rotating stone doors from the map's layout ([F] within 4 m of the pivot): a
+                // quarter turn takes about 2.4 s and blocks the door's square until it is done
+                if (this.lotusDoors && this._mechLayout !== mapLayout()) this.placeMapMechanics();
+                if (this.lotusDoors) {
                     for (let i = 0; i < this.lotusDoors.length; i++) {
                         const door = this.lotusDoors[i];
+                        if (!door.cfg) continue;
                         const dist = Math.hypot(px - door.x, pz - door.z);
-                        if (dist <= 6.2 && game.keys.f && (now - this.lastInteractFAt) > 650) {
+                        if (!door.turning && dist <= 4.2 && game.keys.f && (now - this.lastInteractFAt) > 650) {
                             this.lastInteractFAt = now;
                             door.isOpen = !door.isOpen;
-                            door.targetAngle = door.isOpen ? (Math.PI * 0.5) : 0;
-                            const colHex = door.isOpen ? 0x10b981 : 0xf43f5e;
-                            door.crystalMat.color.setHex(colHex).convertSRGBToLinear();
-                            door.ringMat.color.setHex(colHex).convertSRGBToLinear();
-                            this.playStoneDoorSound();
-                            showNotification(`${door.name}: ${door.isOpen ? 'ROTATING OPEN [PASSAGE UNLOCKED]' : 'ROTATING CLOSED [PASSAGE SEALED]'}`, 2000);
+                            door.targetAngle = door.isOpen ? door.openAngle : door.closedAngle;
+                            door.turning = true;
+                            this._doorSolid(door, 'turning');
+                            this._doorColour(door);
+                            this.playStoneDoorTurn(2.4);
+                            showNotification(`${door.name}: ${door.isOpen ? 'ROTATING OPEN [PASSAGE UNLOCKED]' : 'ROTATING SHUT [PASSAGE SEALED]'}`, 2000);
                         }
-                        // Smoothly interpolate door rotation
-                        const diff = door.targetAngle - door.currentAngle;
-                        if (Math.abs(diff) > 0.005) {
-                            door.currentAngle += Math.sign(diff) * Math.min(Math.abs(diff), delta * 2.2);
+                        if (door.turning) {
+                            const diff = door.targetAngle - door.currentAngle;
+                            const step = delta * 0.655;
+                            if (Math.abs(diff) <= step) {
+                                door.currentAngle = door.targetAngle;
+                                door.turning = false;
+                                this._doorSolid(door, door.isOpen ? 'open' : 'shut');
+                            } else door.currentAngle += Math.sign(diff) * step;
                             door.pivot.rotation.y = door.currentAngle;
+                            door.pivot.updateMatrixWorld(true);   // shots and sight test the slab where it is now
                         }
                     }
                 }

@@ -108,13 +108,14 @@ test('daily challenges: three a day, the same all day, new ones the next day; fi
         out.repeatable = progression.daily.list.map((c) => c.id).join() === day1.join();
         // A slide challenge: real slides count, the tenth completes it and pays 400 XP
         progression.daily.list = [{ id: 'slide10', progress: 0, done: false }, { id: 'kills15', progress: 0, done: false }, { id: 'defuse1', progress: 0, done: false }];
-        // Sprint-and-slide runs need a long straight: Lotus's open band at z = 32 (props off)
-        tacticalDirector.cycleMapPreset('lotus');
+        // Sprint-and-slide runs need a long straight: Icebox's Reefer Row, along z = -46 from its west
+        // end (a 40-tick sprint covers about 50 m; the row is clear for 53 m from x = -46); props off
+        tacticalDirector.cycleMapPreset('icebox');
         game.userSettings.breakables = false; breakables.applyEnabled();
         const cc = characterController;
         const before = progression.totalXp;
         for (let i = 0; i < 10; i++) {
-            cc.reset(); cc.position.set(-30, cc.standHeight, 32); cc.grounded = true; cc.slideCooldown = 0;
+            cc.reset(); cc.position.set(-46, cc.standHeight, -46); cc.grounded = true; cc.slideCooldown = 0;
             camera.rotation.set(0, -Math.PI / 2, 0, 'YXZ');
             game.keys.w = true; cc.setSprinting(true);
             for (let k = 0; k < 40; k++) cc.update(1 / 60);
