@@ -149,3 +149,37 @@ test('AGENT_TUNING: every Duelist has C, Q, E and X with a look, numbers only, u
     assert.equal(await page.evaluate(() => JSON.stringify(AGENT_TUNING)), shape.snapshot, 'nothing writes to AGENT_TUNING');
     assert.deepEqual(errors, []);
 });
+
+// V2.1: a thrown projectile's fuse counts its simulated flight, as its movement does. CI on PR #31
+// caught Phoenix's Curveball popping where it was thrown, never drawn: the frame after the throw took
+// longer than its 420 ms fuse, and the fuse ran on the wall clock while the simulation (four ticks a
+// frame at most) had barely moved it
+test('a projectile thrown just before a long frame flies like any other: its fuse counts simulated time', { timeout: 300000 }, async () => {
+    const { errors, frames, evaluate } = await boot({ quality: 'medium' });
+    await evaluate(() => { window.updateEnemies = () => {}; game.userSettings.infiniteAbilities = true; });
+    const flights = [];
+    for (const stall of [0, 600]) {
+        await evaluate((stall) => {
+            agentSystem.selectAgent('phoenix');
+            const cc = characterController;
+            cc.position.set(0, 1.7, 22); cc.prevSimPosition.copy(cc.position);
+            camera.position.copy(cc.position); camera.rotation.set(-0.3, 0, 0, 'YXZ');
+            agentSystem.castAbility('q');
+            window.__p = agentSystem.projectiles.find((q) => q.inUse && q.type === 'flash');
+            window.__p0 = __p.position.clone();
+            // Count the rendered frames that show it in flight (this runs after each of the game's frames)
+            window.__seen = 0;
+            let n = 0;
+            const look = () => { if (__p.inUse) __seen++; if (++n < 60) requestAnimationFrame(look); };
+            requestAnimationFrame(look);
+            const t = performance.now();
+            while (performance.now() - t < stall) {}      // one long frame right after the throw
+        }, stall);
+        await frames(70);
+        flights.push(await evaluate(() => ({ seen: __seen, flew: +__p.position.distanceTo(__p0).toFixed(2) })));
+    }
+    assert.ok(flights[0].seen >= 1 && flights[0].flew > 2.5, `a normal throw flies (${JSON.stringify(flights[0])})`);
+    assert.ok(flights[1].seen >= 1, `a throw just before a long frame is seen in flight (${JSON.stringify(flights[1])})`);
+    assert.ok(Math.abs(flights[1].flew - flights[0].flew) < 0.2, `and lands where a normal throw does (${flights[1].flew} m vs ${flights[0].flew} m)`);
+    assert.deepEqual(errors, []);
+});

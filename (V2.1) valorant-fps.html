@@ -21462,6 +21462,8 @@
                         gravity: 0,
                         spawnAt: 0,
                         detonateAt: 0,
+                        fuseT0: 0,          // V2.1: the fuse's clock is fuseT0 + flightMs (simulated)
+                        flightMs: 0,
                         mesh: mesh,
                         mat: projMat // V1.7 fix: newer kits recolour through proj.mat
                     });
@@ -30172,14 +30174,19 @@
 
             // --- Pool Acquisition Helpers ---
             acquireProjectile: function() {
+                // V2.1: a projectile's fuse runs on its own simulated flight time from here (see stepSimulation)
                 for (let i = 0; i < this.projectiles.length; i++) {
                     if (!this.projectiles[i].inUse) {
                         this.projectiles[i].inUse = true;
+                        this.projectiles[i].fuseT0 = performance.now();
+                        this.projectiles[i].flightMs = 0;
                         return this.projectiles[i];
                     }
                 }
                 const p = this.projectiles[0];
                 p.inUse = true;
+                p.fuseT0 = performance.now();
+                p.flightMs = 0;
                 return p;
             },
 
@@ -30749,6 +30756,12 @@
                 for (let i = 0; i < this.projectiles.length; i++) {
                     const proj = this.projectiles[i];
                     if (!proj.inUse) continue;
+                    // V2.1: the fuse counts the projectile's own simulated time, as its flight does. On the wall
+                    // clock, a cast just before a long frame (the simulation catches up at most four ticks a
+                    // frame and drops the rest) burned the whole fuse at once: the projectile popped where it
+                    // was thrown, never seen. At a steady frame rate the two clocks agree within a tick
+                    proj.flightMs += dt * 1000;
+                    const fuseNow = proj.fuseT0 + proj.flightMs;
 
                     proj.velocity.y -= proj.gravity * dt;
                     const nextX = proj.position.x + proj.velocity.x * dt;
@@ -30781,7 +30794,7 @@
                         proj.velocity.y = Math.max(AGENT_TUNING.yoru.q.bounceMinUpMps, Math.abs(proj.velocity.y) * AGENT_TUNING.yoru.q.bounceUpMult);
                         proj.velocity.x *= AGENT_TUNING.yoru.q.bounceXZMult;
                         proj.velocity.z *= AGENT_TUNING.yoru.q.bounceXZMult;
-                        proj.detonateAt = now + AGENT_TUNING.yoru.q.bounceFuseMs;
+                        proj.detonateAt = fuseNow + AGENT_TUNING.yoru.q.bounceFuseMs;
                         soundFX.yoruRift();
                         continue;
                     }
@@ -30793,12 +30806,12 @@
                         proj.velocity.y = Math.max(AGENT_TUNING.neon.q.bounceMinUpMps, Math.abs(proj.velocity.y) * AGENT_TUNING.neon.q.bounceUpMult);
                         proj.velocity.x *= AGENT_TUNING.neon.q.bounceXZMult;
                         proj.velocity.z *= AGENT_TUNING.neon.q.bounceXZMult;
-                        proj.detonateAt = now + AGENT_TUNING.neon.q.bounceFuseMs;
+                        proj.detonateAt = fuseNow + AGENT_TUNING.neon.q.bounceFuseMs;
                         continue;
                     }
 
                     proj.mesh.position.copy(proj.position);
-                    if (impacted || now >= proj.detonateAt) {
+                    if (impacted || fuseNow >= proj.detonateAt) {
                         this.detonateProjectile(proj, now);
                     }
                 }
