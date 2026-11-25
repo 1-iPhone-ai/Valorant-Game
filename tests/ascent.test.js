@@ -388,10 +388,11 @@ test('Ascent: all 8 modes start cleanly, with the player and bots on open floor'
 });
 
 // The maps not rebuilt yet, read the same way from V1.7 and from this build (V2.1: Bind, Haven,
-// Icebox and Lotus have their own layouts now; tests/bind-haven.test.js and icebox-lotus.test.js cover them)
+// Icebox, Lotus and Split have their own layouts now; tests/bind-haven.test.js, icebox-lotus.test.js and
+// split-skyline.test.js cover them)
 const FINGERPRINT = async (evaluate, frames) => {
     const out = {};
-    for (const map of ['split', 'skyline']) {
+    for (const map of ['skyline']) {
         await evaluate((m) => tacticalDirector.cycleMapPreset(m), map);
         await frames(2);
         out[map] = await evaluate(() => {

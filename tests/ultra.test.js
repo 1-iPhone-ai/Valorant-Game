@@ -240,20 +240,20 @@ test('Ultra Realism on another map and time of day: no Ascent detail, light reba
     await evaluate(() => { window.updateEnemies = () => {}; setQualitySettings('ultraRealism'); ultraPrep.finish(); });
     await frames(2);
     const ascentKey = await evaluate(() => ultraLight.bakedKey);
-    // V2.1: a map not rebuilt yet (Bind, Haven, Icebox and Lotus have their own detail now, checked below)
-    await evaluate(() => { rebuildMapPreset('split'); ultraPrep.finish(); });
+    // V2.1: a map not rebuilt yet (Bind, Haven, Icebox, Lotus and Split have their own detail now, checked below)
+    await evaluate(() => { rebuildMapPreset('skyline'); ultraPrep.finish(); });
     await frames(3);
     const bind = await evaluate(() => ({ map: game.mapPreset, decor: ultraDecor.count, shown: ultraDecor.group.visible, vol: ultraU.uVolOn.value, key: ultraLight.bakedKey, plaster: ultraU.uPlaster.value, matOn: ultraU.uMatOn.value }));
-    assert.equal(bind.map, 'split');
+    assert.equal(bind.map, 'skyline');
     assert.equal(bind.decor, 0, 'the Ascent detail is Ascent only');
     assert.equal(bind.shown, false);
     assert.equal(bind.vol, 1, 'the light is baked for this map');
     assert.notEqual(bind.key, ascentKey);
     assert.equal(bind.plaster, 0);
     assert.equal(bind.matOn, 1);
-    // V2.1: Bind, Haven, Icebox and Lotus build their own detail (lamps included); Bind and Haven plaster their
-    // tall walls (Icebox's corrugated steel and Lotus's rock-cut stone are not plastered)
-    for (const [m, plaster] of [['bind', 1], ['haven', 1], ['icebox', 0], ['lotus', 0]]) {
+    // V2.1: Bind, Haven, Icebox, Lotus and Split build their own detail (lamps included); Bind and Haven plaster
+    // their tall walls (Icebox's corrugated steel, Lotus's rock-cut stone and Split's tiled blocks are not plastered)
+    for (const [m, plaster] of [['bind', 1], ['haven', 1], ['icebox', 0], ['lotus', 0], ['split', 0]]) {
         await evaluate((m) => { rebuildMapPreset(m); ultraPrep.finish(); }, m);
         await frames(2);
         const own = await evaluate(() => ({ map: game.mapPreset, decor: ultraDecor.count, meshes: ultraDecor.meshes.length, lamps: ultraDecor.lamps.length, shown: ultraDecor.group.visible, plaster: ultraU.uPlaster.value, key: ultraLight.bakedKey }));
