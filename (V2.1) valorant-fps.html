@@ -10219,7 +10219,7 @@
             icebox: {
                 id: 'icebox',
                 name: 'ICEBOX',
-                subtitle: 'Arctic Kingdom Container Port & Sniper Nests',
+                subtitle: 'Arctic Container Port, Crane Cab & Rope Ascenders [F]',   // V2.1: its own layout
                 skyColor: 0x0f1e2e,
                 // V1.7 lighting mood: cold white-blue sun, ice-blue/container-orange accents
                 sunColor: 0xdcecff,
@@ -10228,32 +10228,170 @@
                 accentB: 0xf97316,
                 floorColor: 0x334155,
                 wallColor: 0x1e293b,
+                // V2.1: Icebox's own layout, an original polar freight terminal: warehouses and
+                // container stacks round a rail yard. Attackers west, defenders east, A north (-Z),
+                // B south (+Z), as on Ascent. A is reached along Reefer Row (a long, narrow run on the
+                // north edge that comes into A through its north wall) and from the Rail Yard (mid)
+                // through the Signal Box; B along the Fuel Depot (the south edge) and from the yard
+                // through the Weigh Station, which drops into B through its north wall. Defenders hold
+                // Gantry Walk (A), the Net Shed (B) and the Harbour Gate into the yard; the Customs Yard
+                // off their spawn is a dead end kept clear for the range and the aim trainer. The most
+                // vertical map: the Crane Cab (A's heaven) and three rope ascenders onto two-high
+                // container stacks (in the yard and on both sites). Every lane has a 3.5 m chokepoint;
+                // buildings are 8-10 m and never thinner than 3 m between two open areas.
+                plan: {
+                    atkSpawn: [-49.5, -37, -10, 10],
+                    defSpawn: [37, 49.5, -10, 10],
+                    rowW: [-47, -41, -48, -10],
+                    rowN: [-47, 8, -48, -44],
+                    aSite: [2, 18, -44, -28],
+                    yardIn: [-37, -27, -4, 4],
+                    yard: [-27, -7, -12, 12],
+                    signal: [-21, -15, -32, -12],
+                    signalE: [-15, 2, -32, -27],
+                    weigh: [-13, -7, 12, 22],
+                    weighE: [-7, 10, 18, 22],
+                    weighS: [4, 10, 22, 28],
+                    bSite: [2, 18, 28, 44],
+                    fuelW: [-47, -41, 10, 46],
+                    fuelS: [-47, 2, 40, 46],
+                    gantryN: [42, 48, -38, -10],
+                    gantryW: [18, 48, -36, -31],
+                    netS: [42, 48, 10, 34],
+                    netW: [18, 48, 29, 34],
+                    gateE: [26, 37, -2, 4],
+                    gateJog: [20, 26, -8, 4],
+                    gateW: [-7, 20, -8, -2],
+                    customs: [22, 36, -27, -12],
+                    customsIn: [32, 37, -12, -6]
+                },
+                // V2.1: High Detail surface types by colour (the rest by shape)
+                surf: { 0xdfe6ec: 'metal', 0xa3412a: 'metal', 0x1e3a8a: 'metal', 0x0f766e: 'metal', 0x64748b: 'metal', 0xc2410c: 'metal',
+                    0x475569: 'metal', 0x5b6676: 'metal', 0x2f3b4a: 'metal', 0x8b6a43: 'wood', 0x9aa3ad: 'concrete' },
                 build: function() {
-                    // Central Boiler & Tube Shipping Container Stack
-                    createBox(0, 3.5, -2, 10, 7, 18, 0x0284c7);
-                    createBox(0, 8.5, -2, 8, 3, 14, 0xf97316);
-                    // B-Yellow & Kingdom Blue Angled Shipping Containers
-                    createBox(-22, 3, -14, 6, 6, 14, 0xeab308);
-                    createBox(22, 3, -14, 6, 6, 14, 0x0284c7);
-                    createBox(-22, 3, 16, 14, 6, 6, 0xf97316);
-                    createBox(22, 3, 16, 14, 6, 6, 0x0f766e);
-                    // Elevated Snow Ramps & Belt Nests
-                    createBox(-11, 1.5, -12, 8, 3, 6, 0x475569);
-                    createBox(11, 1.5, -12, 8, 3, 6, 0x475569);
-                    createBox(-34, 2.5, 0, 8, 5, 12, 0x1e293b);
-                    createBox(34, 2.5, 0, 8, 5, 12, 0x1e293b);
-                    // Arctic Ice Silos
-                    createCylinder(-14, 5, 6, 1.3, 10, 0x38bdf8);
-                    createCylinder(14, 5, 6, 1.3, 10, 0x38bdf8);
-                    // Radianite Snow Crates
-                    createBox(-8, 1.2, 24, 3, 2.4, 3, 0x38bdf8);
-                    createBox(8, 1.2, -24, 3, 2.4, 3, 0xf97316);
+                    const P = this.plan;
+                    // V2.1: corrugated warehouse blocks round the plan's open floor (the shared helper)
+                    buildPlanBuildings(P, { walls: [0x8c9cad, 0x7b8c9e, 0x98a8b8, 0x6e7f91], parapet: 0x2c3a4a });
+                    const CH = 0x9aa3ad, BEAM = 0x2f3b4a, SB = 0x3a4656;
+                    const REEFER = 0xdfe6ec, RUST = 0xa3412a, NAVY = 0x1e3a8a, TEAL = 0x0f766e, GREY = 0x64748b, ORANGE = 0xc2410c;
+                    const CRATE = 0x8b6a43, DECK = 0x475569, STEP = 0x5b6676;
+                    // Chokepoints: 3.5 m gaps in every lane, under a steel beam
+                    planBox(-22, -18, -48, -47.5, 0, 8, CH); planBox(-22, -18, -47.5, -44, 5.5, 8, BEAM);                                                // Reefer Row
+                    planBox(-34, -30, -4, -1.75, 0, 8, CH); planBox(-34, -30, 1.75, 4, 0, 8, CH); planBox(-34, -30, -1.75, 1.75, 5, 8, BEAM);           // into the Rail Yard
+                    planBox(-21, -19.75, -24, -20, 0, 8, CH); planBox(-16.25, -15, -24, -20, 0, 8, CH); planBox(-19.75, -16.25, -24, -20, 4.5, 8, BEAM); // Signal Box
+                    planBox(-13, -11.75, 14, 18, 0, 8, CH); planBox(-8.25, -7, 14, 18, 0, 8, CH); planBox(-11.75, -8.25, 14, 18, 4.5, 8, BEAM);         // Weigh Station
+                    planBox(-30, -26, 40, 41.25, 0, 8, CH); planBox(-30, -26, 44.75, 46, 0, 8, CH); planBox(-30, -26, 41.25, 44.75, 5, 8, BEAM);         // Fuel Depot
+                    planBox(28, 31, -36, -35.25, 0, 8, CH); planBox(28, 31, -31.75, -31, 0, 8, CH); planBox(28, 31, -35.25, -31.75, 5, 8, BEAM);         // Gantry Walk
+                    planBox(28, 31, 29, 29.75, 0, 8, CH); planBox(28, 31, 33.25, 34, 0, 8, CH); planBox(28, 31, 29.75, 33.25, 5, 8, BEAM);               // Net Shed
+                    planBox(3, 7, -8, -6.75, 0, 8, CH); planBox(3, 7, -3.25, -2, 0, 8, CH); planBox(3, 7, -6.75, -3.25, 5, 8, BEAM);                     // Harbour Gate
+                    // Spawn walls with ways round both ends, and crates beyond both ways round: no line from
+                    // a lane runs on through a spawn into another lane
+                    planBox(-46.5, -39.5, 0, 2, 0, 6, SB); planBox(-49.5, -46.5, -7, -5, 0, 3, CRATE); planBox(-42.5, -37, -7, -5, 0, 3, CRATE); planBox(-42.5, -37, 5, 7, 0, 3, CRATE);
+                    planBox(40, 46.5, -2, 0, 0, 6, SB); planBox(46, 49.5, 6, 8, 0, 3, CRATE); planBox(37, 42.5, 6, 8, 0, 3, CRATE);
+                    // The Rail Yard: a two-high container row down the middle (no line runs from the Signal
+                    // Box across the yard into the Weigh Station or the Harbour Gate), a reefer on the north wall
+                    planBox(-23, -16, -1.2, 1.2, 0, 2.6, RUST); planBox(-16, -9, -1.2, 1.2, 0, 2.6, NAVY);
+                    planBox(-23, -16, -1.2, 1.2, 2.6, 5.2, TEAL); planBox(-16, -9, -1.2, 1.2, 2.6, 5.2, GREY);
+                    planBox(-15, -9, -12, -9.6, 0, 2.6, REEFER);
+                    // A site (16 x 16, x 2..18). Entrances: Reefer Row through the north wall, the Signal Box
+                    // from the west, Gantry Walk from the east. The Crane Cab (heaven) is a 3 m deck in the
+                    // north-east corner under the crane, up six 0.5 m steps along the north wall, with a
+                    // landing on its south side and a chest-high rail facing the site.
+                    planBox(13, 18, -44, -40, 0, 3, DECK); planBox(13, 14.5, -40, -38, 0, 3, DECK);
+                    for (let k = 1; k <= 6; k++) planBox(6 + k, 7 + k, -44, -41.5, 0, k * 0.5, STEP);
+                    planBox(14.5, 18, -40.25, -40, 3, 4.1, BEAM); planBox(14.25, 14.5, -40, -38, 3, 4.1, BEAM);
+                    planBox(8.5, 11, -37.5, -34.25, 0, 2.6, NAVY); planBox(8.5, 11, -34.25, -31, 0, 2.6, RUST);   // a two-high stack
+                    planBox(8.5, 11, -37.5, -31, 2.6, 5.2, REEFER);
+                    planBox(2, 6, -38.5, -33.5, 0, 1.3, CRATE); planBox(2, 6, -38.5, -33.5, 1.3, 2.6, CRATE);        // crates inside the west door
+                    planBox(14, 18, -32.5, -28, 0, 2.6, REEFER);                                                    // a reefer end, south-east
+                    planBox(2, 18, -28.2, -28, 3, 3.3, this.accentA); planBox(17.8, 18, -31, -28.2, 3, 3.3, this.accentA);   // site trim
+                    // B site (16 x 16, x 2..18). Entrances: the Fuel Depot from the west, the Weigh Station
+                    // through the north wall, the Net Shed from the east (north-east corner).
+                    planBox(9, 11.5, 33, 35.75, 0, 2.6, TEAL); planBox(9, 11.5, 35.75, 38.5, 0, 2.6, ORANGE);       // a two-high stack
+                    planBox(9, 11.5, 33, 38.5, 2.6, 5.2, NAVY);
+                    planBox(2, 6, 33, 37, 0, 1.3, CRATE); planBox(2, 6, 33, 37, 1.3, 2.6, CRATE);                    // crates inside the west side
+                    planBox(13, 15.5, 28, 31.5, 0, 2.6, GREY);                                                      // a container end by the north door
+                    planBox(14.5, 17, 35, 38.5, 0, 2.6, REEFER);                                                    // a reefer end
+                    planBox(2, 18, 43.8, 44, 3, 3.3, this.accentB); planBox(2, 2.2, 28, 40, 3, 3.3, this.accentB);  // site trim
+                    // Lane cover, against the walls (every way through stays 2.5 m or wider)
+                    planBox(-40, -38, 44.5, 46, 0, 1.2, CRATE); planBox(-12, -10, 40, 41.4, 0, 1.2, CRATE);          // Fuel Depot
+                    planBox(-47, -45.5, -30, -28, 0, 1.2, CRATE);                                                   // Reefer Row
+                    planBox(-21, -19.6, -30, -28, 0, 1.1, CRATE);                                                   // Signal Box
+                    planBox(46.6, 48, -26, -24, 0, 1.1, CRATE); planBox(46.6, 48, 22, 24, 0, 1.1, CRATE);            // Gantry Walk, Net Shed
+                    planBox(14, 16, -8, -6.8, 0, 1.0, CRATE);                                                       // Harbour Gate
+                    // The Signal Box and the Weigh Station are covered: steel roofs 6.5 m up with skylight slots
+                    for (const zz of [[-32, -27], [-26, -19], [-18, -12]]) planBox(-21, -15, zz[0], zz[1], 6.5, 7, BEAM);
+                    planBox(-15, -4, -32, -27, 6.5, 7, BEAM);
+                    for (const xx of [[-7, -1], [0, 10]]) planBox(xx[0], xx[1], 18, 22, 6.5, 7, BEAM);
+                    // Landmarks above the roofs: the gantry crane over A (legs in the solid blocks north and
+                    // south of the site, the bridge and its operator cab high over the Crane Cab deck), and
+                    // the fuel tanks behind the Fuel Depot (inside a solid block: nothing at street level changes)
+                    for (const lx of [9, 16.5]) { planBox(lx - 0.5, lx + 0.5, -47, -46, 0, 15, ORANGE); planBox(lx - 0.5, lx + 0.5, -26, -25, 0, 15, ORANGE); }
+                    planBox(8.5, 17, -47, -46, 15, 16, ORANGE); planBox(8.5, 17, -26, -25, 15, 16, ORANGE);
+                    planBox(9, 10, -47, -25, 15.6, 16.4, ORANGE); planBox(15.5, 16.5, -47, -25, 15.6, 16.4, ORANGE);
+                    planBox(13, 17, -43.5, -40.5, 11, 14.5, GREY);                                                  // the operator cab
+                    for (const t of [[-34, 30], [-26, 30], [-34, 22]]) createCylinder(t[0], 6, t[1], 3.2, 12, REEFER);
+                },
+                // V2.1: High Detail props for the container port (decor only: no colliders, nothing in the
+                // way at player height): corrugation ribs on every container, hazard stripes on the
+                // chokepoints, snow along the wall bases, frost on the decks, pallets and chains, light masts
+                hiDecor: function(add, rnd) {
+                    // Containers: ribs down both long faces (x0, x1, z0, z1, y0, y1, colour)
+                    const conts = [
+                        [-23, -16, -1.2, 1.2, 0, 2.6, 0xa3412a], [-16, -9, -1.2, 1.2, 0, 2.6, 0x1e3a8a], [-23, -16, -1.2, 1.2, 2.6, 5.2, 0x0f766e], [-16, -9, -1.2, 1.2, 2.6, 5.2, 0x64748b],
+                        [-15, -9, -12, -9.6, 0, 2.6, 0xdfe6ec],
+                        [8.5, 11, -37.5, -34.25, 0, 2.6, 0x1e3a8a], [8.5, 11, -34.25, -31, 0, 2.6, 0xa3412a], [8.5, 11, -37.5, -31, 2.6, 5.2, 0xdfe6ec], [14, 18, -32.5, -28, 0, 2.6, 0xdfe6ec],
+                        [9, 11.5, 33, 35.75, 0, 2.6, 0x0f766e], [9, 11.5, 35.75, 38.5, 0, 2.6, 0xc2410c], [9, 11.5, 33, 38.5, 2.6, 5.2, 0x1e3a8a],
+                        [13, 15.5, 28, 31.5, 0, 2.6, 0x64748b], [14.5, 17, 35, 38.5, 0, 2.6, 0xdfe6ec]
+                    ];
+                    for (const c of conts) {
+                        const alongX = (c[1] - c[0]) >= (c[3] - c[2]), h = c[5] - c[4] - 0.24, y = (c[4] + c[5]) / 2;
+                        const tint = new THREE.Color(c[6]).multiplyScalar(0.82).getHex();
+                        if (alongX) {
+                            for (let x = c[0] + 0.3; x < c[1] - 0.2; x += 0.55) for (const z of [c[2] - 0.025, c[3] + 0.025]) add('box', x, y, z, 0.07, h, 0.05, tint, 1, MAP_SURF.metal);
+                        } else {
+                            for (let z = c[2] + 0.3; z < c[3] - 0.2; z += 0.55) for (const x of [c[0] - 0.025, c[1] + 0.025]) add('box', x, y, z, 0.05, h, 0.07, tint, 1, MAP_SURF.metal);
+                        }
+                        // the top and bottom rails
+                        const cx = (c[0] + c[1]) / 2, cz = (c[2] + c[3]) / 2, sx = c[1] - c[0] + 0.06, sz = c[3] - c[2] + 0.06;
+                        add('box', cx, c[5] - 0.06, cz, sx, 0.12, sz, 0x2b3440, 1, MAP_SURF.metal);
+                        add('box', cx, c[4] + 0.06, cz, sx, 0.12, sz, 0x2b3440, 1, MAP_SURF.metal);
+                    }
+                    // Hazard stripes on the chokepoint jambs (amber and black bands, 1.6 m up)
+                    const jambs = [[-34, -30, -4, -1.75], [-34, -30, 1.75, 4], [-21, -19.75, -24, -20], [-16.25, -15, -24, -20], [-13, -11.75, 14, 18], [-8.25, -7, 14, 18],
+                        [-30, -26, 40, 41.25], [-30, -26, 44.75, 46], [28, 31, -36, -35.25], [28, 31, -31.75, -31], [28, 31, 29, 29.75], [28, 31, 33.25, 34], [3, 7, -8, -6.75], [3, 7, -3.25, -2]];
+                    for (const j of jambs) {
+                        const cx = (j[0] + j[1]) / 2, cz = (j[2] + j[3]) / 2;
+                        for (let k = 0; k < 5; k++) add('box', cx, 0.4 + k * 0.32, cz, j[1] - j[0] + 0.04, 0.16, j[3] - j[2] + 0.04, k % 2 ? 0x111418 : 0xd97706, 1, MAP_SURF.concrete);
+                    }
+                    // Snow banked along the wall bases of the lanes, and frost on the open decks
+                    const snowAlong = (x0, x1, z0, z1) => {
+                        for (let t = 0; t < 1; t += 0.12) {
+                            const x = x0 + (x1 - x0) * (t + rnd() * 0.08), z = z0 + (z1 - z0) * (t + rnd() * 0.08);
+                            add('box', x, 0.05, z, 0.6 + rnd() * 0.8, 0.1, 0.4 + rnd() * 0.3, 0xeef3f8, 1.05, 0);
+                        }
+                    };
+                    snowAlong(-46.6, -46.6, -46, -12); snowAlong(-41.4, -41.4, -40, -12); snowAlong(-45, 6, -47.6, -47.6);
+                    snowAlong(-46.6, -46.6, 12, 44); snowAlong(-45, 0, 45.6, 45.6); snowAlong(47.6, 47.6, -36, -12); snowAlong(47.6, 47.6, 12, 32);
+                    snowAlong(-26.6, -26.6, -11, 11); snowAlong(-7.4, -7.4, 3, 11); snowAlong(22.4, 22.4, -26, -13);
+                    for (let i = 0; i < 26; i++) add('box', -26 + rnd() * 18, 0.02, -11 + rnd() * 22, 0.8 + rnd() * 1.6, 0.03, 0.8 + rnd() * 1.6, 0xdbe6ef, 1, 0);
+                    // Pallets and coiled chain against the walls
+                    for (const p of [[-46, -20], [-46, 20], [-26, -9], [-8, 9], [47, -16], [47, 16], [23, -24], [35, -14], [3, -29], [3, 42.5]]) {
+                        add('box', p[0], 0.07, p[1], 1.2, 0.14, 1.0, 0x7a5a3a, 1, MAP_SURF.wood);
+                        add('box', p[0], 0.2, p[1], 1.1, 0.06, 0.9, 0x8b6a43, 1, MAP_SURF.wood);
+                    }
+                    // Light masts against the walls: a pole, a cross-arm and two lamp heads, 8 m up
+                    for (const m of [[-26.7, -11.7], [-7.3, 11.7], [2.3, -43.7], [17.7, 43.7], [36.3, -26.7], [47.7, 9.6], [-36.7, -9.6], [-46.7, 45.7]]) {
+                        add('cylinder', m[0], 4, m[1], 0.11, 8, 0.11, 0x39424e, 1, MAP_SURF.metal);
+                        add('box', m[0], 8.05, m[1], 1.4, 0.1, 0.12, 0x39424e, 1, MAP_SURF.metal);
+                        for (const s of [-0.6, 0.6]) add('box', m[0] + s, 7.9, m[1], 0.34, 0.16, 0.28, 0xf1f5f9, 1.4, 0);
+                    }
                 }
             },
             lotus: {
                 id: 'lotus',
                 name: 'LOTUS',
-                subtitle: 'Ancient Indian Rock-Cut Temple & Rotating Stone Doors [F]',
+                subtitle: 'Cliff Temple, Three Sites & Rotating Stone Doors [F]',   // V2.1: its own layout
                 skyColor: 0x1c141d,
                 // V1.7 lighting mood: warm amber sun, teal/amber temple accents
                 sunColor: 0xffc98a,
@@ -10262,35 +10400,179 @@
                 accentB: 0xf59e0b,
                 floorColor: 0x4a3525,
                 wallColor: 0x2d1e17,
+                // V2.1: Lotus's own layout, an original temple cut into a cliff, with THREE spike sites.
+                // Attackers west, defenders east; A north (-Z), B in the centre (the smallest, nearest
+                // the defenders), C south (+Z). From the Outer Court (mid) the attackers take Lion Gate to
+                // A and Serpent Gate to C, both through a rotating stone door [F], and the Torch Passage
+                // (a carved tunnel with a dogleg) to B; the Scree Path (north edge) and the River Walk
+                // (south edge, past the Lotus Pool in its bend) are the long ways to A and C. Incense Walk
+                // joins A and B behind a breakable wall; Ash Walk joins B and C. Defenders take the
+                // Monks' Stair to A and the Relic Store to C, and reach B down the Bell Loft and the
+                // Water Stair. The Pilgrim Hall, a dead end off the court, holds the range and the aim
+                // trainer. Every lane has a 3.5 m chokepoint; buildings are 8-10 m and never thinner
+                // than 3 m between two open areas.
+                plan: {
+                    atkSpawn: [-49.5, -37, -10, 10],
+                    defSpawn: [37, 49.5, -10, 10],
+                    courtIn: [-37, -31, -3, 3],
+                    court: [-31, -15, -10, 10],
+                    lionN: [-29, -23, -34, -10],
+                    lionE: [-23, 6, -34, -28],
+                    screeW: [-47, -41, -47, -10],
+                    screeN: [-47, -6, -47, -41],
+                    screeE: [-6, 6, -44, -38],
+                    aSite: [6, 22, -44, -28],
+                    torch1: [-15, -3, -6, -2],
+                    torchJog: [-3, 3, -6, 6],
+                    torch2: [3, 16, 2, 6],
+                    bSite: [16, 30, -7, 7],
+                    incense: [18, 22, -28, -7],
+                    bellLoft: [22, 42, -22, -17],
+                    ash: [18, 22, 7, 28],
+                    waterStair: [22, 42, 19, 24],
+                    serpS: [-23, -17, 10, 34],
+                    serpE: [-17, 6, 28, 34],
+                    riverW: [-47, -41, 10, 47],
+                    riverS: [-47, -14, 41, 47],
+                    riverBend: [-14, -8, 38, 47],
+                    riverE: [-8, 6, 38, 43],
+                    cSite: [6, 22, 28, 44],
+                    monkN: [42, 48, -38, -10],
+                    monkW: [22, 48, -33, -28],
+                    relicS: [42, 48, 10, 38],
+                    relicW: [22, 48, 28, 33],
+                    pilgrim: [-38, -26, 14, 34],
+                    pilgrimIn: [-31, -27, 10, 14]
+                },
+                // V2.1: High Detail surface types by colour (the rest by shape)
+                surf: { 0x6b4a36: 'stone', 0x4a3020: 'stone', 0x5a3a28: 'stone', 0x9a7458: 'stone', 0xc8a27c: 'stone', 0xa88466: 'stone', 0x6b4f2a: 'wood', 0x8c6a2f: 'metal' },
                 build: function() {
-                    // Central Lotus Sanctum Step-Pyramid & Rose-Gold Shrine
-                    createBox(0, 3.5, 0, 14, 7, 14, 0x7c2d12);
-                    createBox(0, 8.2, 0, 10, 2.5, 10, 0xb45309);
-                    createBox(0, 10.5, 0, 6, 2.2, 6, 0xf43f5e);
-                    // Temple Courtyards & Sandstone Archways (Framing West/East Rotating Doors at x = -18 / +18, z = 0)
-                    createBox(-18, 3.5, -14, 4.5, 7, 16, 0x573b26);
-                    createBox(-18, 3.5, 14, 4.5, 7, 16, 0x573b26);
-                    createBox(18, 3.5, -14, 4.5, 7, 16, 0x573b26);
-                    createBox(18, 3.5, 14, 4.5, 7, 16, 0x573b26);
-                    // Overgrown Emerald Terraces
-                    createBox(-32, 2.2, -20, 9, 4.4, 9, 0x065f46);
-                    createBox(32, 2.2, -20, 9, 4.4, 9, 0x065f46);
-                    createBox(-32, 2.2, 20, 9, 4.4, 9, 0x9f1239);
-                    createBox(32, 2.2, 20, 9, 4.4, 9, 0x9f1239);
-                    // Carved Lotus Pillars
-                    createCylinder(-10, 5, -18, 1.25, 10, 0xd97706);
-                    createCylinder(10, 5, -18, 1.25, 10, 0xd97706);
-                    createCylinder(-10, 5, 18, 1.25, 10, 0x10b981);
-                    createCylinder(10, 5, 18, 1.25, 10, 0x10b981);
-                    // Radianite Relic Crates
-                    createBox(-8, 1.2, -28, 3, 2.4, 3, 0xf43f5e);
-                    createBox(8, 1.2, 28, 3, 2.4, 3, 0x10b981);
+                    const P = this.plan;
+                    // V2.1: rock-cut blocks round the plan's open floor (the shared helper)
+                    buildPlanBuildings(P, { walls: [0x8a5a3c, 0x7a4e34, 0x96644a, 0x6e452e], parapet: 0x3b2418 });
+                    const CH = 0x6b4a36, LT = 0x4a3020, SB = 0x5a3a28, STONE = 0x9a7458, PALE = 0xc8a27c, STEP = 0xa88466, WOOD = 0x6b4f2a, BRONZE = 0x8c6a2f;
+                    // Chokepoints: 3.5 m gaps in every lane, under a carved lintel
+                    planBox(-35, -33, -3, -1.75, 0, 8, CH); planBox(-35, -33, 1.75, 3, 0, 8, CH); planBox(-35, -33, -1.75, 1.75, 5, 8, LT);         // into the Outer Court
+                    planBox(-30, -26, -47, -45.75, 0, 8, CH); planBox(-30, -26, -42.25, -41, 0, 8, CH); planBox(-30, -26, -45.75, -42.25, 5, 8, LT); // Scree Path
+                    planBox(-30, -26, 41, 42.25, 0, 8, CH); planBox(-30, -26, 45.75, 47, 0, 8, CH); planBox(-30, -26, 42.25, 45.75, 5, 8, LT);       // River Walk
+                    planBox(-10, -8, -6, -5.5, 0, 8, CH); planBox(-10, -8, -5.5, -2, 4.2, 8, LT);                                                   // Torch Passage
+                    planBox(-8, -6, -34, -32.75, 0, 8, CH); planBox(-8, -6, -29.25, -28, 0, 8, CH); planBox(-8, -6, -32.75, -29.25, 5, 8, LT);       // Lion Gate (east run)
+                    planBox(-8, -6, 28, 29.25, 0, 8, CH); planBox(-8, -6, 32.75, 34, 0, 8, CH); planBox(-8, -6, 29.25, 32.75, 5, 8, LT);             // Serpent Gate (east run)
+                    planBox(18, 18.5, -14, -12, 0, 8, CH); planBox(18.5, 22, -14, -12, 4.2, 8, LT);                                                  // Incense Walk
+                    planBox(21.5, 22, 12, 14, 0, 8, CH); planBox(18, 21.5, 12, 14, 4.2, 8, LT);                                                      // Ash Walk
+                    planBox(30, 33, -33, -32.25, 0, 8, CH); planBox(30, 33, -28.75, -28, 0, 8, CH); planBox(30, 33, -32.25, -28.75, 5, 8, LT);       // Monks' Stair
+                    planBox(30, 33, 28, 28.75, 0, 8, CH); planBox(30, 33, 32.25, 33, 0, 8, CH); planBox(30, 33, 28.75, 32.25, 5, 8, LT);             // Relic Store
+                    planBox(34, 36, -22, -21.25, 0, 8, CH); planBox(34, 36, -17.75, -17, 0, 8, CH); planBox(34, 36, -21.25, -17.75, 5, 8, LT);       // Bell Loft
+                    planBox(34, 36, 19, 19.75, 0, 8, CH); planBox(34, 36, 23.25, 24, 0, 8, CH); planBox(34, 36, 19.75, 23.25, 5, 8, LT);             // Water Stair
+                    // Carved frames over the rotating stone doors (the doors themselves turn: layout.doors)
+                    planBox(-29, -23, -22.6, -21.4, 6.8, 8, LT); planBox(-23, -17, 21.4, 22.6, 6.8, 8, LT);
+                    // Spawn walls with ways round both ends, and crates beyond both ways round
+                    planBox(-46.5, -39.5, -4, -2, 0, 6, SB); planBox(-49.5, -46, 3, 5, 0, 3, WOOD); planBox(-42.5, -37, 3, 5, 0, 3, WOOD);
+                    planBox(40, 46.5, 2, 4, 0, 6, SB); planBox(46, 49.5, -5, -3, 0, 3, WOOD); planBox(37, 42.5, -5, -3, 0, 3, WOOD);
+                    // The Outer Court: a carved elephant on a plinth in the middle (no line runs from Lion
+                    // Gate across the court into Serpent Gate or down the Torch Passage)
+                    planBox(-27, -19, -3, 3, 0, 3, PALE);
+                    planBox(-25.5, -20, -1.6, 1.6, 3, 5.4, STONE); planBox(-27.2, -25.5, -1.1, 1.1, 3.9, 5.8, STONE);
+                    createCylinder(-27.6, 4.3, 0, 0.28, 2.2, STONE);
+                    planBox(-27.8, -26.2, -0.85, -0.65, 4.0, 4.2, PALE); planBox(-27.8, -26.2, 0.65, 0.85, 4.0, 4.2, PALE);   // tusks
+                    // A site (16 x 16, x 6..22). Entrances: Lion Gate and the Scree Path from the west, the
+                    // Monks' Stair at the south-east corner, Incense Walk from B (south). The Sun Terrace
+                    // (heaven) is a 3 m terrace in the north-east, up five 0.5 m steps along the north wall;
+                    // its south edge is open, a drop back into the site.
+                    planBox(16, 22, -44, -38, 0, 3, PALE);
+                    for (let k = 1; k <= 5; k++) planBox(10 + k, 11 + k, -44, -41.5, 0, k * 0.5, STEP);
+                    planBox(11, 15, -39, -36, 0, 3.2, STONE); planBox(10.8, 15.2, -39.2, -35.8, 3.2, 3.6, PALE);   // the carved shrine
+                    planBox(11, 15, -33, -28, 0, 2.8, STONE);                                                       // a fallen colossus
+                    planBox(6, 8, -37, -35, 0, 2.2, PALE);                                                          // the stone lion on its plinth
+                    planBox(6, 22, -28.2, -28, 3, 3.3, this.accentA); planBox(21.8, 22, -38, -33, 3, 3.3, this.accentA);   // site trim
+                    // C site: A's mirror image, with the Moon Terrace where A has the Sun Terrace
+                    planBox(16, 22, 38, 44, 0, 3, PALE);
+                    for (let k = 1; k <= 5; k++) planBox(10 + k, 11 + k, 41.5, 44, 0, k * 0.5, STEP);
+                    planBox(11, 15, 36, 39, 0, 3.2, STONE); planBox(10.8, 15.2, 35.8, 39.2, 3.2, 3.6, PALE);
+                    planBox(11, 15, 28, 33, 0, 2.8, STONE);
+                    planBox(6, 8, 35, 37, 0, 2.2, PALE);
+                    planBox(6, 22, 28, 28.2, 3, 3.3, this.accentB); planBox(21.8, 22, 33, 38, 3, 3.3, this.accentB);
+                    // B site (14 x 14, the smallest), the Stone Grove: an altar along the west wall and two
+                    // square pillars before it. Entrances: the Torch Passage (west), Incense Walk (north),
+                    // Ash Walk (south).
+                    planBox(16, 24, -2.5, 2.5, 0, 3, STONE); planBox(16, 24.2, -2.7, 2.7, 3, 3.4, PALE);
+                    planBox(26.4, 27.6, -0.6, 0.6, 0, 8, PALE); planBox(25.9, 27.1, 3.9, 5.1, 0, 8, PALE);
+                    planBox(26.1, 27.9, -0.9, 0.9, 8, 8.4, BRONZE); planBox(25.6, 27.4, 3.6, 5.4, 8, 8.4, BRONZE);
+                    planBox(16, 30, 6.8, 7, 3, 3.3, BRONZE);                                                        // site trim
+                    // Lane cover, against the walls (every way through stays 2.5 m or wider)
+                    planBox(-47, -45, -30, -28, 0, 1.2, WOOD); planBox(-47, -45, 26, 28, 0, 1.2, WOOD);             // Scree Path, River Walk
+                    planBox(46, 48, -26, -24, 0, 1.1, STONE); planBox(46, 48, 24, 26, 0, 1.1, STONE);               // Monks' Stair, Relic Store
+                    // Covered ways: carved stone roofs 6 m up over the Torch Passage, Incense Walk and Ash
+                    // Walk, with light slots
+                    for (const xx of [[-15, -9], [-8, -3]]) planBox(xx[0], xx[1], -6, -2, 6, 6.6, LT);
+                    planBox(-3, 3, -6, 6, 6, 6.6, LT);
+                    for (const xx of [[3, 9], [10, 16]]) planBox(xx[0], xx[1], 2, 6, 6, 6.6, LT);
+                    for (const zz of [[-28, -22], [-21, -15], [-11, -7]]) planBox(18, 22, zz[0], zz[1], 6, 6.6, LT);
+                    for (const zz of [[7, 11], [15, 21], [22, 28]]) planBox(18, 22, zz[0], zz[1], 6, 6.6, LT);
+                    // Landmarks above the roofs (inside solid blocks: nothing at street level changes): a
+                    // stepped spire over the Stone Grove, and the carved cliff face behind the attackers' side
+                    planBox(31, 36, -2.5, 2.5, 0, 12, PALE); planBox(31.5, 35.5, -2, 2, 12, 14, STONE);
+                    planBox(32, 35, -1.5, 1.5, 14, 16, PALE); planBox(32.5, 34.5, -1, 1, 16, 17.5, STONE);
+                    createCylinder(33.5, 18.4, 0, 0.35, 1.8, BRONZE);
+                    planBox(-40, -31, -31, -13, 0, 15, 0x6e452e); planBox(-39, -32, -29, -15, 15, 17, 0x7a4e34);
+                },
+                // V2.1: High Detail props for the cliff temple (decor only: no colliders, nothing in the
+                // way at player height): carved friezes along the lanes, bronze bells under the lintels,
+                // creepers on the cliff walls, oil lamps in wall niches, and the Lotus Pool in the River
+                // Walk's bend
+                hiDecor: function(add, rnd) {
+                    const LEAF = [0x2f6b3a, 0x3c7d44, 0x285a33], FRIEZE = 0x5a3a28, BRONZE = 0x8c6a2f, FLAME = 0xffb347;
+                    // Friezes: a carved band 3.6 m up on the long lane walls (x0, z0, x1, z1, which side)
+                    const frieze = (x0, z0, x1, z1, nx, nz) => {
+                        const len = Math.hypot(x1 - x0, z1 - z0), cx = (x0 + x1) / 2 + nx * 0.04, cz = (z0 + z1) / 2 + nz * 0.04;
+                        const sx = nx ? 0.06 : len, sz = nx ? len : 0.06;
+                        add('box', cx, 3.6, cz, sx, 0.5, sz, FRIEZE, 1, MAP_SURF.stone);
+                        for (let t = 0.6; t < len - 0.4; t += 1.2) {
+                            const x = x0 + (x1 - x0) * t / len + nx * 0.07, z = z0 + (z1 - z0) * t / len + nz * 0.07;
+                            add('box', x, 3.6, z, nx ? 0.05 : 0.5, 0.36, nx ? 0.5 : 0.05, 0xc8a27c, 1, MAP_SURF.stone);
+                        }
+                    };
+                    frieze(-41, -40, -41, -12, -1, 0); frieze(-41, 12, -41, 40, -1, 0); frieze(-44, -41, -8, -41, 0, -1); frieze(-44, 41, -16, 41, 0, 1);
+                    frieze(-23, -32, -23, -12, -1, 0); frieze(-17, 12, -17, 32, -1, 0); frieze(42, -36, 42, -12, 1, 0); frieze(42, 12, 42, 36, 1, 0);
+                    // Bronze bells under the lintels (chokepoints and the stone doors' frames)
+                    const bell = (x, z, top) => {
+                        add('box', x, top - 0.25, z, 0.04, 0.5, 0.04, 0x2b2620, 1, 0);
+                        add('cylinder', x, top - 0.72, z, 0.26, 0.5, 0.26, BRONZE, 1.1, MAP_SURF.metal);
+                        add('cylinder', x, top - 0.99, z, 0.32, 0.06, 0.32, BRONZE, 1.1, MAP_SURF.metal);
+                    };
+                    for (const p of [[-34, 0], [-28, -44], [-28, 44], [-7, -31], [-7, 31], [31.5, -30.5], [31.5, 30.5], [35, -19.5], [35, 21.5]]) bell(p[0], p[1], 5);
+                    for (const p of [[-26, -22], [-20, 22]]) bell(p[0], p[1], 6.8);
+                    for (const p of [[-9, -4], [20, -13], [20, 13]]) bell(p[0], p[1], 4.2);
+                    // Creepers hanging down the cliff walls of the lanes
+                    for (let i = 0; i < 70; i++) {
+                        const side = rnd() < 0.5 ? -1 : 1;
+                        const z = side * (12 + rnd() * 26), x = rnd() < 0.5 ? -41.05 : -46.95;
+                        const len = 1.2 + rnd() * 2.6;
+                        add('box', x, 8 - len / 2, z, 0.05, len, 0.18 + rnd() * 0.2, LEAF[i % 3], 1, MAP_SURF.wood);
+                    }
+                    for (let i = 0; i < 40; i++) {
+                        const x = -44 + rnd() * 36, z = rnd() < 0.5 ? -46.95 : 46.95, len = 1 + rnd() * 2.2;
+                        add('box', x, 8 - len / 2, z, 0.18 + rnd() * 0.2, len, 0.05, LEAF[i % 3], 1, MAP_SURF.wood);
+                    }
+                    // Oil lamps in niches: a dark niche, a bronze dish and a flame
+                    const lamp = (x, z, nx, nz) => {
+                        add('box', x + nx * 0.03, 2.3, z + nz * 0.03, nx ? 0.06 : 0.5, 0.6, nx ? 0.5 : 0.06, 0x1d1410, 1, 0);
+                        add('cylinder', x + nx * 0.15, 2.08, z + nz * 0.15, 0.14, 0.05, 0.14, BRONZE, 1, MAP_SURF.metal);
+                        add('box', x + nx * 0.15, 2.2, z + nz * 0.15, 0.05, 0.14, 0.05, FLAME, 1.6, 0);
+                    };
+                    for (const z of [-36, -20, 20, 36]) { lamp(-41, z, -1, 0); lamp(42, z, 1, 0); }
+                    for (const x of [-38, -20, -12]) { lamp(x, -41, 0, -1); lamp(x, 41, 0, 1); }
+                    for (const x of [-14, 0]) { lamp(x, -34, 0, 1); lamp(x, 34, 0, -1); }
+                    // The Lotus Pool in the River Walk's bend: still water and lotus pads
+                    add('box', -11, 0.025, 45.2, 5.4, 0.03, 3.2, 0x1f5f6a, 1, 0);
+                    for (let i = 0; i < 9; i++) add('cylinder', -13.2 + rnd() * 4.4, 0.05, 44 + rnd() * 2.4, 0.22 + rnd() * 0.12, 0.02, 0.22 + rnd() * 0.12, LEAF[i % 3], 1, 0);
+                    for (let i = 0; i < 4; i++) add('cylinder', -12.8 + rnd() * 3.6, 0.12, 44.3 + rnd() * 1.8, 0.09, 0.12, 0.09, 0xf2a7c3, 1.2, 0);
                 }
             },
             split: {
                 id: 'split',
                 name: 'SPLIT',
-                subtitle: 'Tokyo Cyber-Plaza, Heaven Towers & Vertical Ziplines [F]',
+                subtitle: 'Neon City Plaza on Two Levels, Rope Ascenders [F]',   // V2.1: its own layout
                 skyColor: 0x090d16,
                 // V1.7 lighting mood: cool neon night sun, magenta/cyan signage accents
                 sunColor: 0xc7d2fe,
@@ -10299,30 +10581,175 @@
                 accentB: 0x06b6d4,
                 floorColor: 0x1e2433,
                 wallColor: 0x111827,
+                // V2.1: Split's own layout, an original neon city plaza on two levels. Attackers west,
+                // defenders east, A north (-Z), B south (+Z), as on Ascent. From the Crossing (mid, a
+                // scramble plaza round a ticket block) the attackers take the Underpass (a covered
+                // passage with the Vent Loft in its corner) to A and the Game Arcade to B; Tram Walk (the
+                // north edge) and the Car Park (the south edge) are the long ways round. Defenders come
+                // down Neon Alley (A) and Ramen Row (B) and hold the Concourse into the Crossing; the
+                // Shrine Garden off their spawn is a dead end kept clear for the range and the aim
+                // trainer. Each site has a deck at the back up a flight of steps (its heaven, on the
+                // defenders' side). Rope ascenders [F] climb from the Underpass onto the Vent Loft and
+                // from the Crossing onto the ticket block's roof. Every lane has a 3.5 m chokepoint;
+                // buildings are 8-10 m and never thinner than 3 m between two open areas.
+                plan: {
+                    atkSpawn: [-49.5, -37, -10, 10],
+                    defSpawn: [37, 49.5, -10, 10],
+                    crossIn: [-37, -27, -3, 3],
+                    crossing: [-27, -7, -9, 9],
+                    tramN: [-47, -41, -34, -10],
+                    tramJog: [-47, -26, -40, -34],
+                    tramE: [-26, -20, -46, -34],
+                    tramIn: [-20, 3, -46, -41],
+                    under: [-16, -10, -29, -9],
+                    underE: [-16, 8, -29, -24],
+                    aSite: [3, 19, -46, -29],
+                    parkS: [-47, -41, 10, 36],
+                    parkJog: [-47, -26, 36, 42],
+                    parkE: [-26, -20, 36, 46],
+                    parking: [-20, 3, 40, 46],
+                    arcade: [-24, -18, 9, 29],
+                    arcadeE: [-24, 8, 24, 29],
+                    bSite: [3, 19, 29, 46],
+                    neonN: [42, 48, -38, -10],
+                    neonW: [19, 48, -38, -33],
+                    ramenS: [42, 48, 10, 38],
+                    ramenW: [19, 48, 33, 38],
+                    concE: [24, 37, -3, 3],
+                    concJog: [18, 24, -3, 10],
+                    concW: [-7, 18, 4, 10],
+                    garden: [22, 36, -27, -12],
+                    gardenIn: [32, 37, -12, -6]
+                },
+                // V2.1: High Detail surface types by colour (the rest by shape)
+                surf: { 0x4a5468: 'concrete', 0x1f2937: 'metal', 0x334155: 'concrete', 0x3f4a5f: 'metal', 0x1e1b4b: 'concrete', 0x312e81: 'metal',
+                    0x0f766e: 'metal', 0x3b4260: 'concrete', 0xbe185d: 'metal', 0x0e7490: 'metal', 0x0284c7: 'metal', 0x6b4f2a: 'wood', 0x8b6a43: 'wood' },
                 build: function() {
-                    // Central Cyber Vent & Crown Tower
-                    createBox(0, 4.5, 0, 12, 9, 12, 0x1e1b4b);
-                    createBox(0, 10, 0, 15, 2, 15, 0x0284c7);
-                    // West A-Heaven & East B-Heaven Elevated Sniper Decks (Accessible via Vertical Ascender Ziplines!)
-                    createBox(-24, 3.6, -6, 10, 7.2, 14, 0x312e81);
-                    createBox(24, 3.6, 6, 10, 7.2, 14, 0x0f766e);
-                    // Lower Cyber Alleyways & Neon Signage Walls
-                    createBox(-20, 2.5, 16, 12, 5, 5, 0xbe185d);
-                    createBox(20, 2.5, -16, 12, 5, 5, 0x0284c7);
-                    createBox(-35, 3, 0, 6, 6, 16, 0x1e293b);
-                    createBox(35, 3, 0, 6, 6, 16, 0x1e293b);
-                    // Kingdom Neo-Tokyo Towers
-                    createCylinder(-11, 5.5, -16, 1.1, 11, 0xec4899);
-                    createCylinder(11, 5.5, 16, 1.1, 11, 0x06b6d4);
-                    // Radianite Tech Crates
-                    createBox(-9, 1.2, 25, 3, 2.4, 3, 0xec4899);
-                    createBox(9, 1.2, -25, 3, 2.4, 3, 0xeab308);
+                    const P = this.plan;
+                    // V2.1: dark tiled city blocks round the plan's open floor (the shared helper)
+                    buildPlanBuildings(P, { walls: [0x2b3245, 0x343c52, 0x262c3d, 0x3b4459], parapet: 0x161b28 });
+                    const CH = 0x4a5468, BEAM = 0x1f2937, SB = 0x334155, BAR = 0x3f4a5f, BLOCK = 0x1e1b4b, STEP = 0x3b4260;
+                    const DECKA = 0x312e81, DECKB = 0x0f766e, KIOSKA = 0xbe185d, KIOSKB = 0x0e7490, VEND = 0x0284c7, NEWS = 0x6b4f2a, CRATE = 0x8b6a43;
+                    // Chokepoints: 3.5 m gaps in every lane, under a steel beam
+                    planBox(-47, -45.75, -24, -20, 0, 8, CH); planBox(-42.25, -41, -24, -20, 0, 8, CH); planBox(-45.75, -42.25, -24, -20, 5, 8, BEAM);     // Tram Walk
+                    planBox(-34, -30, -3, -1.75, 0, 8, CH); planBox(-34, -30, 1.75, 3, 0, 8, CH); planBox(-34, -30, -1.75, 1.75, 5, 8, BEAM);             // into the Crossing
+                    planBox(-16, -14.75, -22, -18, 0, 8, CH); planBox(-11.25, -10, -22, -18, 0, 8, CH); planBox(-14.75, -11.25, -22, -18, 4.5, 8, BEAM);   // Underpass
+                    planBox(-47, -45.75, 20, 24, 0, 8, CH); planBox(-42.25, -41, 20, 24, 0, 8, CH); planBox(-45.75, -42.25, 20, 24, 5, 8, BEAM);         // Car Park
+                    planBox(-24, -22.75, 18, 22, 0, 8, CH); planBox(-19.25, -18, 18, 22, 0, 8, CH); planBox(-22.75, -19.25, 18, 22, 4.5, 8, BEAM);      // Game Arcade
+                    planBox(28, 31, -38, -37.25, 0, 8, CH); planBox(28, 31, -33.75, -33, 0, 8, CH); planBox(28, 31, -37.25, -33.75, 5, 8, BEAM);        // Neon Alley
+                    planBox(28, 31, 33, 33.75, 0, 8, CH); planBox(28, 31, 37.25, 38, 0, 8, CH); planBox(28, 31, 33.75, 37.25, 5, 8, BEAM);              // Ramen Row
+                    planBox(3, 7, 4, 5.25, 0, 8, CH); planBox(3, 7, 8.75, 10, 0, 8, CH); planBox(3, 7, 5.25, 8.75, 5, 8, BEAM);                         // Concourse
+                    // Spawn walls with ways round both ends: no line from a lane runs on through a spawn into
+                    // another lane. The defenders' tall wall is short of their spawn point, so neither site's
+                    // way out of the spawn is the long way round
+                    planBox(-46.5, -39.5, -4, -2, 0, 6, SB); planBox(-49.5, -46, 3, 5, 0, 3, BAR); planBox(-42.5, -37, 3, 5, 0, 3, BAR);
+                    planBox(42.5, 46.5, 2, 4, 0, 6, SB); planBox(46, 49.5, -5, -3, 0, 3, BAR); planBox(37, 42.5, -5, -3, 0, 3, BAR); planBox(37, 40, 5, 7, 0, 3, BAR);
+                    // The Crossing: the ticket block in the middle of the scramble (a rope climbs onto its roof
+                    // from the west)
+                    planBox(-19, -13, -2, 2, 0, 5.2, BLOCK);
+                    // The Underpass: covered (steel roof slabs 6.5 m up, skylight slots between them), with the
+                    // Vent Loft in its corner, a 3 m deck with a rope up its east side and a chest-high rail
+                    // facing the way back to the Crossing
+                    planBox(-16, -13, -29, -26, 0, 3, DECKA);
+                    planBox(-16, -13, -26.25, -26, 3, 4.1, BEAM);
+                    for (const zz of [[-29, -24], [-23, -16], [-15, -9]]) planBox(-16, -10, zz[0], zz[1], 6.5, 7, BEAM);
+                    for (const xx of [[-10, -3], [-2, 8]]) planBox(xx[0], xx[1], -29, -24, 6.5, 7, BEAM);
+                    // A site (16 x 17, x 3..19). Entrances: Tram Walk from the west (north-west corner), the
+                    // Underpass from the south (south-west corner), Neon Alley from the east (the defenders'
+                    // way back). The Capsule Deck (heaven) is a 3 m deck in the north-east corner, up five
+                    // 0.5 m steps along the north wall, with a chest-high rail facing the site. Cover: a ticket
+                    // kiosk, a bank of vending machines and a news kiosk, placed so that no spot on the site
+                    // sees all three entrances and no line runs on through the site from Tram Walk or the
+                    // Underpass into Neon Alley
+                    planBox(14, 19, -46, -42, 0, 3, DECKA);
+                    for (let k = 1; k <= 5; k++) planBox(8 + k, 9 + k, -46, -43.5, 0, k * 0.5, STEP);
+                    planBox(14.5, 19, -42.25, -42, 3, 4.1, BEAM);
+                    planBox(13.5, 16, -39.5, -33.5, 0, 2.6, KIOSKA);
+                    planBox(7.5, 11, -39, -36, 0, 2.4, VEND);
+                    planBox(8, 10.5, -33.5, -29, 0, 2.4, NEWS);
+                    planBox(10.5, 19, -29.2, -29, 3, 3.3, this.accentA); planBox(18.8, 19, -33, -29.2, 3, 3.3, this.accentA);   // site trim
+                    // B site: A's plan mirrored. The Car Park from the west, the Game Arcade from the north
+                    // (north-west corner), Ramen Row from the east; the Sky Lounge (heaven) in the south-east corner
+                    planBox(14, 19, 42, 46, 0, 3, DECKB);
+                    for (let k = 1; k <= 5; k++) planBox(8 + k, 9 + k, 43.5, 46, 0, k * 0.5, STEP);
+                    planBox(14.5, 19, 42, 42.25, 3, 4.1, BEAM);
+                    planBox(13.5, 16, 33.5, 39.5, 0, 2.6, KIOSKB);
+                    planBox(7.5, 11, 36, 39, 0, 2.4, VEND);
+                    planBox(8, 10.5, 29, 33.5, 0, 2.4, NEWS);
+                    planBox(10.5, 19, 29, 29.2, 3, 3.3, this.accentB); planBox(18.8, 19, 29.2, 33, 3, 3.3, this.accentB);       // site trim
+                    // Lane cover, against the walls (every way through stays 2.5 m or wider)
+                    planBox(-38, -36.6, -40, -38.6, 0, 1.2, CRATE); planBox(-38, -36.6, 40.6, 42, 0, 1.2, CRATE);   // Tram Walk, Car Park
+                    planBox(46.6, 48, -26, -24, 0, 1.1, CRATE); planBox(46.6, 48, 24, 26, 0, 1.1, CRATE);            // Neon Alley, Ramen Row
+                    planBox(12, 13.4, 8.6, 10, 0, 1.0, CRATE);                                                       // Concourse
+                    // Landmarks above the roofs (inside solid blocks: nothing at street level changes): two neon
+                    // sign towers and a billboard on legs over the block between the Concourse and Ramen Row
+                    createCylinder(-30, 8, -20, 1.1, 16, this.accentA);
+                    createCylinder(30, 8, 20, 1.1, 16, this.accentB);
+                    planBox(28.5, 29, 21, 21.5, 0, 16, BEAM); planBox(35, 35.5, 21, 21.5, 0, 16, BEAM); planBox(28, 36, 21, 21.4, 11, 16, this.accentA);
+                },
+                // V2.1: High Detail props for the neon plaza (decor only: no colliders, nothing in the way at
+                // player height): zebra crossings round the ticket block, neon sign boards on the lane walls,
+                // a string of paper lanterns down Ramen Row, strip lights under the Underpass roof, cables
+                // overhead, manhole covers and rain puddles
+                hiDecor: function(add, rnd) {
+                    const NEON = [0xff3ea5, 0x22d3ee, 0xfbbf24, 0xa78bfa, 0x34d399, 0xf97316];
+                    // Zebra crossings on all four sides of the ticket block
+                    for (let x = -26; x <= -8; x += 1) for (const z of [-5.5, 5.5]) add('box', x, 0.012, z, 0.5, 0.02, 2.6, 0xe5e7eb, 1.05, 0);
+                    for (let z = -8; z <= 8; z += 1) for (const x of [-23, -10]) if (Math.abs(z) > 2.6) add('box', x, 0.012, z, 2.6, 0.02, 0.5, 0xe5e7eb, 1.05, 0);
+                    // Sign boards on the walls: [x, z, wall normal x, z, width, height, centre height]
+                    const signs = [
+                        [-47, -30, 1, 0, 0.8, 2.6, 4.2], [-47, -16, 1, 0, 2.6, 0.9, 3.6], [-44, -40, 0, 1, 2.4, 0.9, 3.8], [-32, -40, 0, 1, 0.8, 2.6, 4.4], [-26, -43, 1, 0, 0.8, 2.4, 4.0],
+                        [-14, -46, 0, 1, 3.0, 1.0, 3.8], [-4, -46, 0, 1, 0.8, 2.6, 4.4], [-16, -14, 1, 0, 0.7, 2.2, 3.8], [-10, -12, -1, 0, 2.4, 0.8, 3.4], [-2, -24, 0, -1, 2.8, 0.8, 3.6],
+                        [-24, -9, 0, 1, 2.8, 1.0, 4.0], [-20, -9, 0, 1, 0.8, 2.8, 4.6], [-8.5, -9, 0, 1, 0.8, 2.6, 4.4], [-14, 9, 0, -1, 3.0, 1.0, 4.0], [-10, 9, 0, -1, 0.8, 2.8, 4.6],
+                        [-27, -6, 1, 0, 0.8, 2.6, 4.4], [-27, 6, 1, 0, 2.4, 0.9, 3.8], [-7, -5, -1, 0, 0.8, 2.8, 4.6], [-24, 14, 1, 0, 0.8, 2.4, 4.0], [-18, 13, -1, 0, 2.2, 0.8, 3.6],
+                        [-6, 24, 0, 1, 2.8, 0.9, 3.8], [-12, 29, 0, -1, 0.8, 2.6, 4.4], [0, 29, 0, -1, 3.0, 1.0, 4.0], [-47, 16, 1, 0, 2.6, 0.9, 3.6], [-47, 30, 1, 0, 0.8, 2.6, 4.2],
+                        [-32, 42, 0, -1, 0.8, 2.6, 4.4], [-26, 44, 1, 0, 0.8, 2.4, 4.0], [-14, 46, 0, -1, 3.0, 1.0, 3.8], [-4, 46, 0, -1, 0.8, 2.6, 4.4], [48, -30, -1, 0, 0.8, 2.6, 4.4],
+                        [48, -16, -1, 0, 2.6, 0.9, 3.6], [24, -38, 0, 1, 2.6, 0.9, 3.8], [38, -38, 0, 1, 0.8, 2.6, 4.4], [48, 16, -1, 0, 2.6, 0.9, 3.6], [48, 30, -1, 0, 0.8, 2.6, 4.4],
+                        [24, 38, 0, -1, 2.6, 0.9, 3.8], [38, 38, 0, -1, 0.8, 2.6, 4.4], [-2, 4, 0, 1, 2.8, 0.9, 3.8], [12, 4, 0, 1, 0.8, 2.6, 4.4], [0, 10, 0, -1, 0.8, 2.6, 4.4],
+                        [14, 10, 0, -1, 2.6, 0.9, 4.0], [30, -3, 0, 1, 2.8, 1.0, 4.0], [3, -36, 1, 0, 0.8, 2.6, 4.4], [19, -44, -1, 0, 2.4, 0.9, 5.2], [19, -31, -1, 0, 0.8, 2.2, 4.6],
+                        [3, 36, 1, 0, 0.8, 2.6, 4.4], [19, 44, -1, 0, 2.4, 0.9, 5.2], [19, 31, -1, 0, 0.8, 2.2, 4.6]
+                    ];
+                    signs.forEach((s, i) => {
+                        const [x, z, nx, nz, w, h, y] = s, hex = NEON[i % NEON.length];
+                        const sx = nx ? 0.1 : w + 0.12, sz = nx ? w + 0.12 : 0.1;
+                        add('box', x + nx * 0.05, y, z + nz * 0.05, sx, h + 0.12, sz, 0x111827, 1, MAP_SURF.metal);
+                        add('box', x + nx * 0.11, y, z + nz * 0.11, nx ? 0.02 : w, h, nx ? w : 0.02, hex, 1.9, 0);
+                    });
+                    // Paper lanterns on a wire down Ramen Row, 4.6 m up
+                    add('box', 33.5, 4.6, 35.5, 29, 0.03, 0.03, 0x1f2937, 1, MAP_SURF.metal);
+                    for (let x = 20.5; x <= 46.5; x += 2.6) {
+                        add('cylinder', x, 4.2, 35.5, 0.24, 0.5, 0.24, 0xdc2626, 1.5, 0);
+                        add('cylinder', x, 4.48, 35.5, 0.14, 0.06, 0.14, 0x111827, 1, MAP_SURF.metal);
+                    }
+                    // Strip lights under the Underpass roof
+                    for (const z of [-27, -20, -12]) add('box', -13, 6.45, z, 0.25, 0.05, 2.0, 0xe0f2fe, 1.8, 0);
+                    for (const x of [-8, -4, 0, 4]) add('box', x, 6.45, -26.5, 2.0, 0.05, 0.25, 0xe0f2fe, 1.8, 0);
+                    // Glowing edges on both site decks and a departures board round the ticket block
+                    add('box', 16.75, 2.9, -41.97, 4.5, 0.08, 0.04, 0xec4899, 1.8, 0);
+                    add('box', 16.75, 2.9, 41.97, 4.5, 0.08, 0.04, 0x06b6d4, 1.8, 0);
+                    for (const [x, z, alongX] of [[-16, -2.04, true], [-16, 2.04, true], [-19.04, 0, false], [-12.96, 0, false]]) {
+                        const len = alongX ? 5.4 : 3.4;
+                        add('box', x, 4.1, z, alongX ? len : 0.06, 0.9, alongX ? 0.06 : len, 0x0b1020, 1, MAP_SURF.metal);
+                        add('box', x, 4.1, z, alongX ? len - 0.3 : 0.08, 0.6, alongX ? 0.08 : len - 0.3, 0xfbbf24, 1.7, 0);
+                    }
+                    // Cables strung across the lanes between the roofs
+                    for (const c of [[-44, -27, 6.2, 0.03], [-44, 27, 6.2, 0.03], [-36, -37, 0.03, 6.2], [-36, 39, 0.03, 6.2], [-17, 0, 0.03, 18.2], [-17, -6, 20.2, 0.03],
+                        [10, 7, 0.03, 6.2], [45, -18, 6.2, 0.03], [45, 18, 6.2, 0.03], [-8, -43.5, 0.03, 5.2], [-8, 43, 0.03, 6.2]]) add('box', c[0], 7.5, c[1], c[2], 0.03, c[3], 0x0f172a, 1, MAP_SURF.metal);
+                    // Manhole covers and rain puddles
+                    for (const m of [[-44, -14], [-44, 14], [-36, -37], [-36, 39], [-13, -12], [-21, 12], [-8, -43.5], [-8, 43], [45, -30], [45, 30], [30, 0], [10, 7]]) {
+                        add('cylinder', m[0], 0.012, m[1], 0.42, 0.02, 0.42, 0x2b2f38, 1, MAP_SURF.metal);
+                    }
+                    for (let i = 0; i < 18; i++) {
+                        const spots = [[-44, -30], [-30, -37], [-16, -43.5], [-13, -16], [-24, 4], [-10, -4], [-21, 16], [-30, 39], [-16, 43], [-44, 30], [0, 26.5], [0, -26.5], [12, 7], [26, 0], [45, -24], [45, 24], [38, -35.5], [38, 35.5]];
+                        const p = spots[i];
+                        add('box', p[0] + (rnd() - 0.5) * 1.5, 0.008, p[1] + (rnd() - 0.5) * 1.0, 1.2 + rnd() * 1.6, 0.01, 0.8 + rnd() * 1.0, 0x0b1220, 1, 0);
+                    }
                 }
             },
             skyline: {
                 id: 'skyline',
                 name: 'SKYLINE',
-                subtitle: 'Neon Rooftop City at Night, Skybridges & Billboards',
+                subtitle: 'Neon Rooftops at Night: Helipad, Skybridge & Billboards',   // V2.1: its own layout
                 skyColor: 0x0b0a1f,
                 // Night city: cool moonlight, magenta/cyan neon accents
                 sunColor: 0xa9b8ff,
@@ -10331,64 +10758,161 @@
                 accentB: 0x22e6ff,
                 floorColor: 0x1b1e2b,
                 wallColor: 0x121624,
+                // V2.1: Skyline's own layout, an original rooftop map. Attackers west, defenders east, A
+                // north (-Z), B south (+Z), as on Ascent. A is the Helipad (open and exposed, with the
+                // helipad block and the Control Booth, its heaven), reached through the A Lobby and up A
+                // Stairs along the north edge, or by the Alley from mid. B is the Server Roof (tight lanes
+                // between cooling units, the Billboard deck its heaven, the giant billboard over it),
+                // reached through the B Lobby along the south edge, or by the Alley. Mid is the Skybridge:
+                // two stair towers with a bridge across the street between them, and the Alley running
+                // on beneath it; the attackers come in past the Water Tower, the defenders through the
+                // Vent Farm, where the range and the aim trainer are. Defenders reach A along the vent farm
+                // walkway and B under the billboard. Rooftop edges are walls: nobody falls off. Every lane
+                // has a 3.5 m chokepoint; buildings are 8-10 m and never thinner than 3 m between two
+                // open areas.
+                plan: {
+                    atkSpawn: [-49.5, -37, -10, 10],
+                    defSpawn: [37, 49.5, -10, 10],
+                    lobbyAIn: [-47, -41, -30, -10],
+                    lobbyA: [-47, -35, -46, -30],
+                    stairsA: [-35, -10, -46, -40],
+                    aSite: [-10, 12, -46, -28],
+                    waterIn: [-37, -31, -3, 3],
+                    water: [-31, -18, -8, 8],
+                    waterOut: [-18, -15, -3, 3],
+                    plaza: [-15, 11, -9, 9],
+                    alleyN: [5, 11, -28, -9],
+                    alleyS: [-9, -3, 9, 24],
+                    alleySJ: [-9, 9, 24, 30],
+                    ventOut: [11, 14, 1, 7],
+                    vent: [14, 28, -8, 8],
+                    ventIn: [28, 37, -3, 3],
+                    lobbyBIn: [-47, -41, 10, 30],
+                    lobbyB: [-47, -35, 30, 46],
+                    bLane: [-35, 3, 40, 46],
+                    bSite: [3, 19, 30, 46],
+                    linkAN: [42, 48, -40, -10],
+                    linkAW: [12, 48, -40, -34],
+                    linkBS: [42, 48, 10, 38],
+                    linkBW: [19, 48, 32, 38]
+                },
+                // V2.1: High Detail surface types by colour (the rest by shape)
+                surf: { 0x2e3448: 'concrete', 0x1a1f30: 'metal', 0x262a3d: 'concrete', 0x334155: 'concrete', 0x1f2437: 'concrete', 0x2a3049: 'metal', 0x23283a: 'metal',
+                    0x475569: 'metal', 0x3f4a5c: 'metal', 0x4c5672: 'metal', 0x64748b: 'metal', 0x101522: 'metal', 0x3b3f58: 'metal', 0x1e2433: 'metal' },
+                // V2.1: where the city decor (tacticalEnhancements.buildSkylineCity3D) puts the neon faces on
+                // the billboards, the tubes under the skybridge, the water tower's legs, the helipad's H and
+                // ring, and the antenna masts with their blinking lights
+                landmarks: {
+                    billboards: [{ x0: 4.2, x1: 17.8, z: 47.55, y0: 9.4, y1: 17.6, nz: -1 }, { x0: -46.4, x1: -35.6, z: -47.55, y0: 9.4, y1: 15.6, nz: 1 }],
+                    bridge: { x0: -1.5, x1: 1.5, z0: -3, z1: 3, y: 3.55 },
+                    waterTower: { x: -26.5, z: -5.5, half: 2.6, top: 4.8 },
+                    helipad: { x: 3.5, y: 3.02, z: -35 },
+                    masts: [[2.5, -8.5, 4], [-2.5, 8.5, 4], [11.6, -45.6, 6.3], [18.2, 47.8, 18]]
+                },
                 build: function() {
-                    // Stairs: solid 1 m steps rising towards (dx, dz) from the start point
-                    const stairs = (x, z, dx, dz, count, width, hex) => {
-                        for (let i = 0; i < count; i++) {
-                            const h = i + 1;
-                            const cx = x + dx * i * 1.2, cz = z + dz * i * 1.2;
-                            createBox(cx, h / 2, cz, dx ? 1.2 : width, h, dz ? 1.2 : width, hex);
-                        }
-                    };
-                    // Central helipad block with steps up its east side
-                    createBox(0, 1.5, 0, 10, 3, 8, 0x262a3d);
-                    stairs(6.8, 0, -1, 0, 2, 3.2, 0x2e3448);
-                    // West water tower: base, overhead deck (legs and tank are decor)
-                    createBox(-18, 0.6, -6, 3, 1.2, 3, 0x334155);
-                    createBox(-18, 5, -6, 6.4, 0.4, 6.4, 0x1e2433);
-                    createCylinder(-18, 8.4, -6, 2.7, 6, 0x3b3f58);
-                    // East vent farm: AC units and exhaust stacks
-                    createBox(17, 1, 5, 3, 2, 2.2, 0x475569);
-                    createBox(20.5, 1, 8, 2.2, 2, 3, 0x475569);
-                    createBox(16.5, 0.6, 10, 2.4, 1.2, 2, 0x3f4a5c);
-                    createCylinder(20, 3, 3.5, 0.6, 6, 0x64748b);
-                    createCylinder(14.5, 2.5, 7.5, 0.5, 5, 0x64748b);
-                    // Raised side decks with steps, and the billboards standing on them
-                    createBox(-35, 1.1, 0, 10, 2.2, 18, 0x23283a);
-                    createBox(35, 1.1, 0, 10, 2.2, 18, 0x23283a);
-                    for (const sx of [-1, 1]) {
-                        createBox(28.5 * sx, 0.375, 0, 1, 0.75, 4, 0x2e3448);
-                        createBox(29.5 * sx, 0.75, 0, 1, 1.5, 4, 0x2e3448);
+                    const P = this.plan;
+                    // V2.1: dark city blocks round the plan's open floor (the shared helper)
+                    buildPlanBuildings(P, { walls: [0x1d2233, 0x23293d, 0x1a1f2e, 0x2a3148], parapet: 0x10131c });
+                    const CH = 0x2e3448, BEAM = 0x1a1f30, SB = 0x262a3d, BAR = 0x334155, TOWER = 0x1f2437, BRIDGE = 0x2a3049, DECK = 0x23283a;
+                    const UNIT = 0x475569, UNIT2 = 0x3f4a5c, CRATE = 0x4c5672, STACK = 0x64748b, FRAME = 0x101522, TANK = 0x3b3f58, TDECK = 0x1e2433;
+                    // Chokepoints: 3.5 m gaps in every lane, under a steel beam
+                    planBox(-47, -45.75, -24, -20, 0, 8, CH); planBox(-42.25, -41, -24, -20, 0, 8, CH); planBox(-45.75, -42.25, -24, -20, 5, 8, BEAM);   // A Lobby
+                    planBox(-47, -45.75, 20, 24, 0, 8, CH); planBox(-42.25, -41, 20, 24, 0, 8, CH); planBox(-45.75, -42.25, 20, 24, 5, 8, BEAM);       // B Lobby
+                    planBox(-35, -32, -3, -1.75, 0, 8, CH); planBox(-35, -32, 1.75, 3, 0, 8, CH); planBox(-35, -32, -1.75, 1.75, 5, 8, BEAM);         // into the Water Tower yard
+                    planBox(5, 6.25, -21, -17, 0, 8, CH); planBox(9.75, 11, -21, -17, 0, 8, CH); planBox(6.25, 9.75, -21, -17, 5, 8, BEAM);           // the Alley to A
+                    planBox(-9, -7.75, 15, 19, 0, 8, CH); planBox(-4.25, -3, 15, 19, 0, 8, CH); planBox(-7.75, -4.25, 15, 19, 5, 8, BEAM);           // the Alley to B
+                    planBox(31, 34, -3, -1.75, 0, 8, CH); planBox(31, 34, 1.75, 3, 0, 8, CH); planBox(31, 34, -1.75, 1.75, 5, 8, BEAM);               // into the Vent Farm
+                    planBox(28, 31, -40, -38.75, 0, 8, CH); planBox(28, 31, -35.25, -34, 0, 8, CH); planBox(28, 31, -38.75, -35.25, 5, 8, BEAM);      // the vent farm walkway to A
+                    planBox(28, 31, 32, 33.25, 0, 8, CH); planBox(28, 31, 36.75, 38, 0, 8, CH); planBox(28, 31, 33.25, 36.75, 5, 8, BEAM);            // under the billboard to B
+                    // Spawn walls with ways round both ends: no line from a lane runs on through a spawn into
+                    // another lane
+                    planBox(-46.5, -39.5, -4, -2, 0, 6, SB); planBox(-49.5, -46, 3, 5, 0, 3, BAR); planBox(-42.5, -37, 3, 5, 0, 3, BAR);
+                    planBox(42.5, 46.5, 2, 4, 0, 6, SB); planBox(46, 49.5, -5, -3, 0, 3, BAR); planBox(37, 42.5, -5, -3, 0, 3, BAR); planBox(37, 40, 5, 7, 0, 3, BAR);
+                    // Mid: the Skybridge. Two 4 m stair towers stand against the Alley's north and south walls;
+                    // the bridge spans the 6 m street between them and the Alley runs on beneath it. Each team
+                    // has its own way up: the north tower's steps face the attackers' half of the Alley, the
+                    // south tower's the defenders'
+                    planBox(-3, 3, -9, -3, 0, 4, TOWER); planBox(-3, 3, 3, 9, 0, 4, TOWER);
+                    for (let i = 0; i < 3; i++) {
+                        planBox(-6.6 + 1.2 * i, -5.4 + 1.2 * i, -8.5, -5.5, 0, i + 1, CH);
+                        planBox(5.4 - 1.2 * i, 6.6 - 1.2 * i, 5.5, 8.5, 0, i + 1, CH);
                     }
-                    createBox(-38.5, 7, 0, 0.5, 5, 12, 0x101522);
-                    createBox(38.5, 7, 0, 0.5, 5, 12, 0x101522);
-                    createCylinder(-38.5, 3.5, -4.5, 0.25, 4, 0x1e2433);
-                    createCylinder(-38.5, 3.5, 4.5, 0.25, 4, 0x1e2433);
-                    createCylinder(38.5, 3.5, -4.5, 0.25, 4, 0x1e2433);
-                    createCylinder(38.5, 3.5, 4.5, 0.25, 4, 0x1e2433);
-                    // North and south skybridges between stair towers (walk under or across)
-                    for (const zs of [-1, 1]) {
-                        const z = 38 * zs;
-                        createBox(-14, 2, z, 6, 4, 6, 0x1f2437);
-                        createBox(14, 2, z, 6, 4, 6, 0x1f2437);
-                        createBox(0, 3.8, z, 22, 0.4, 3, 0x2a3049);
-                        createBox(0, 4.55, z - 1.4, 22, 1.1, 0.2, 0x1a1f30);    // railings
-                        createBox(0, 4.55, z + 1.4, 22, 1.1, 0.2, 0x1a1f30);
-                        stairs(-14, z - zs * 6, 0, zs, 3, 3, 0x2e3448);
-                        stairs(14, z - zs * 6, 0, zs, 3, 3, 0x2e3448);
+                    planBox(-1.5, 1.5, -3, 3, 3.6, 4, BRIDGE);
+                    planBox(-1.5, -1.3, -3, 3, 4, 5.1, BEAM); planBox(1.3, 1.5, -3, 3, 4, 5.1, BEAM);   // its railings
+                    // The water tower in the Water Tower yard: a base, its deck overhead (the legs are decor)
+                    // and the tank on top
+                    planBox(-28, -25, -7, -4, 0, 1.2, BAR);
+                    planBox(-29.7, -23.3, -8.7, -2.3, 4.8, 5.2, TDECK);
+                    createCylinder(-26.5, 8.4, -5.5, 2.7, 6, TANK);
+                    // The vent farm: air-con units and exhaust stacks round the Vent Farm yard (a chest-high
+                    // condenser to climb onto), and a row of units along the Alley's east wall north of the way
+                    // in from the yard, which comes in south of the bridge (no line runs from it up the Alley to A)
+                    planBox(15, 18, -8, -5.8, 0, 2, UNIT); planBox(24, 27, 5.8, 8, 0, 2.2, UNIT); planBox(25.8, 28, -8, -5, 0, 2, UNIT2); planBox(9, 11, -8, -5, 0, 2, UNIT2); planBox(9, 11, -5, 0, 0, 2, UNIT);
+                    createCylinder(16, 3.5, -7, 0.45, 7, STACK); createCylinder(26.9, 3.5, -6.5, 0.45, 7, STACK);
+                    // A: the Helipad (22 x 18, x -10..12), open and exposed. Entrances: A Stairs from the west
+                    // (north-west corner), the Alley from the south (south-east corner), the vent farm walkway
+                    // from the east. The helipad block (3 m, two steps up its west side) stands east of centre;
+                    // the Control Booth (heaven) is a 3 m deck in the north-east corner, up five 0.5 m steps
+                    // along the north wall, with a roof on posts and a chest-high rail facing the site. Cover:
+                    // two crate stacks and a fuel cart, placed so that no spot on the site sees all three
+                    // entrances and no line runs on through the site from one lane into another
+                    planBox(0, 7, -38, -32, 0, 3, SB);
+                    planBox(-2.4, -1.2, -36.5, -33.5, 0, 1, CH); planBox(-1.2, 0, -36.5, -33.5, 0, 2, CH);
+                    planBox(7, 12, -46, -41, 0, 3, DECK);
+                    for (let k = 1; k <= 5; k++) planBox(1 + k, 2 + k, -46, -43.5, 0, k * 0.5, CH);
+                    planBox(7.25, 12, -41.25, -41, 3, 4.1, BEAM); planBox(7, 7.25, -43.5, -41, 3, 4.1, BEAM);
+                    for (const [px, pz] of [[7.15, -45.85], [11.85, -45.85], [7.15, -41.15], [11.85, -41.15]]) planBox(px - 0.15, px + 0.15, pz - 0.15, pz + 0.15, 3, 6, BEAM);
+                    planBox(7, 12, -46, -41, 6, 6.3, FRAME);
+                    planBox(-6.5, -1.5, -42.5, -40, 0, 2.6, CRATE); planBox(5, 8, -41, -38, 0, 2.4, UNIT2); planBox(-7.5, -5, -40, -36, 0, 2.4, CRATE);
+                    // B: the Server Roof (16 x 16, x 3..19), tight lanes between four cooling units. Entrances:
+                    // the B Lobby from the west (south-west corner), the Alley from the north (north-west
+                    // corner), the way under the billboard from the east. The Billboard deck (heaven) is a 3 m
+                    // deck in the south-east corner, up five 0.5 m steps along the south wall, with a
+                    // chest-high rail facing the site
+                    planBox(14, 19, 41, 46, 0, 3, DECK);
+                    for (let k = 1; k <= 5; k++) planBox(8 + k, 9 + k, 43.5, 46, 0, k * 0.5, CH);
+                    planBox(14.5, 19, 41, 41.25, 3, 4.1, BEAM);
+                    planBox(8.5, 13.5, 40.5, 43, 0, 2.6, UNIT); planBox(5.5, 8, 33, 37.5, 0, 2.6, UNIT); planBox(6.5, 9.5, 37.5, 40.5, 0, 2.6, UNIT2); planBox(10.5, 13, 30, 33.5, 0, 2.6, UNIT);
+                    // Landmarks above the roofs (inside solid blocks: nothing at street level changes): the giant
+                    // billboard over the Server Roof and a second one over the A Lobby (their neon faces are
+                    // city decor)
+                    planBox(4, 4.6, 47.6, 48.2, 0, 18, FRAME); planBox(17.4, 18, 47.6, 48.2, 0, 18, FRAME); planBox(3.6, 18.4, 47.6, 48, 9, 18, FRAME);
+                    planBox(-46, -45.4, -48.2, -47.6, 0, 16, FRAME); planBox(-36.6, -36, -48.2, -47.6, 0, 16, FRAME); planBox(-46.4, -35.6, -48, -47.6, 9, 16, FRAME);
+                },
+                // V2.1: High Detail props for the rooftops (decor only: no colliders, nothing in the way at
+                // player height): landing markings round the helipad block, neon strips on the lane walls, a
+                // fire-escape stair up the wall of A Stairs, floor grates in the vent farm, cable trays on the
+                // Server Roof, safety stripes on the deck edges and rain puddles
+                hiDecor: function(add, rnd) {
+                    const NEON = [0xff2bd6, 0x22e6ff, 0xa78bfa, 0xfbbf24];
+                    // Landing markings: a yellow box round the helipad block, and chevrons towards it
+                    for (const [x, z, sx, sz] of [[3.5, -38.6, 8.2, 0.25], [3.5, -31.4, 8.2, 0.25], [7.6, -35, 0.25, 7.4]]) add('box', x, 0.012, z, sx, 0.02, sz, 0xfacc15, 1.15, 0);
+                    for (let i = 0; i < 3; i++) add('box', 10.2 - i * 0.9, 0.012, -35, 0.25, 0.02, 1.6, 0xfacc15, 1.15, 0);
+                    // Neon strips along the lane walls, 3.2 m up: [x, z, wall normal x, z, length]
+                    const strips = [[-22.5, -46, 0, 1, 20], [-16, 46, 0, -1, 22], [30, -38, 0, 1, 14], [38, 38, 0, -1, 14], [-24.5, -8, 0, 1, 12], [-24.5, 8, 0, -1, 12],
+                        [21, -8, 0, 1, 8], [-47, -38, 1, 0, 12], [-47, 38, 1, 0, 12], [48, -24, -1, 0, 20], [48, 24, -1, 0, 20], [-15, 6, 1, 0, 5]];
+                    strips.forEach((s, i) => {
+                        const [x, z, nx, nz, len] = s;
+                        add('box', x + nx * 0.06, 3.2, z + nz * 0.06, nx ? 0.06 : len, 0.12, nx ? len : 0.06, NEON[i % NEON.length], 1.9, 0);
+                    });
+                    // A fire-escape stair up the north wall of A Stairs: stringers and treads, flush on the wall
+                    for (let k = 0; k < 8; k++) add('box', -30 + k * 0.7, 0.9 + k * 0.62, -45.92, 0.7, 0.06, 0.12, 0x334155, 1, MAP_SURF.metal);
+                    add('box', -27.55, 3.1, -45.95, 5.8, 0.08, 0.06, 0x1e293b, 1, MAP_SURF.metal);
+                    // Floor grates in the vent farm
+                    for (const [x, z] of [[20, -3], [20, 3], [23, 0], [17, 0]]) {
+                        add('box', x, 0.01, z, 1.6, 0.02, 1.0, 0x111827, 1, MAP_SURF.metal);
+                        for (let k = -2; k <= 2; k++) add('box', x + k * 0.3, 0.02, z, 0.05, 0.02, 0.95, 0x374151, 1, MAP_SURF.metal);
                     }
-                    // Cover around A (north) and B (south)
-                    createBox(-6, 0.6, -25, 2.4, 1.2, 1.2, 0x3f4a5c);
-                    createBox(6.5, 1, -18.5, 2, 2, 2, 0x4c5672);
-                    createBox(-4, 0.6, -29, 4, 1.2, 0.8, 0x2e3448);
-                    createBox(6, 0.6, 25, 2.4, 1.2, 1.2, 0x3f4a5c);
-                    createBox(-6.5, 1, 18.5, 2, 2, 2, 0x4c5672);
-                    createBox(4.5, 0.6, 29.5, 4, 1.2, 0.8, 0x2e3448);
-                    // Rooftop access huts in the corners of the flanks
-                    createBox(-26, 1.75, -22, 5, 3.5, 4, 0x262a3d);
-                    createBox(26, 1.75, 22, 5, 3.5, 4, 0x262a3d);
-                    createBox(26, 1, -24, 3, 2, 3, 0x334155);
-                    createBox(-26, 1, 24, 3, 2, 3, 0x334155);
+                    // Cable trays along the Server Roof's cooling units
+                    for (const [x, z, sx, sz] of [[8.75, 32.7, 6.5, 0.3], [9.8, 35.2, 0.3, 4.4], [11.1, 39.9, 5.2, 0.3]]) add('box', x, 0.06, z, sx, 0.12, sz, 0x1f2937, 1, MAP_SURF.metal);
+                    // Safety stripes on the deck edges (the Control Booth, the Billboard deck, the skybridge towers)
+                    for (const [x, y, z, sx, sz] of [[9.5, 3.01, -40.9, 5, 0.12], [16.5, 3.01, 41.1, 5, 0.12], [0, 4.01, -3.1, 6, 0.12], [0, 4.01, 3.1, 6, 0.12]]) {
+                        for (let k = 0; k < 8; k++) add('box', x - sx / 2 + sx * (k + 0.5) / 8, y, z, sx / 8 * 0.9, 0.02, sz, k % 2 ? 0x111418 : 0xfacc15, 1.1, 0);
+                    }
+                    // Rain puddles
+                    const spots = [[-44, -14], [-41, -42], [-28, -43], [-16, -43], [-4, -30], [9, -30], [-24, 4], [-12, -6], [8, 4], [20, 2], [-6, 21], [0, 27],
+                        [4.5, 44], [15, 32], [-44, 14], [-41, 40], [-28, 43], [-12, 43], [45, -22], [38, -35], [45, 22], [38, 35]];
+                    for (const p of spots) add('box', p[0] + (rnd() - 0.5) * 1.2, 0.008, p[1] + (rnd() - 0.5) * 0.8, 1.0 + rnd() * 1.6, 0.01, 0.7 + rnd() * 1.0, 0x0b1020, 1, 0);
                 }
             }
         };
@@ -10621,6 +11145,264 @@
             propSafe: true,
             checkTargets: true
         };
+        // V2.1: Icebox's callouts (the Crane Cab is the raised deck in A's north-east corner)
+        function iceboxZoneName(x, y, z) {
+            const P = MAP_PRESETS.icebox.plan;
+            const any = (...ks) => ks.some((k) => _inPlanRect(P[k], x, z));
+            if (any('aSite')) return (y > 3.6 && x >= 13 && z <= -38) ? 'CRANE CAB' : 'A SITE';
+            if (any('bSite')) return 'B SITE';
+            if (any('rowW', 'rowN')) return 'REEFER ROW';
+            if (any('yard', 'yardIn')) return 'RAIL YARD';
+            if (any('signal', 'signalE')) return 'SIGNAL BOX';
+            if (any('weigh', 'weighE', 'weighS')) return 'WEIGH STATION';
+            if (any('fuelW', 'fuelS')) return 'FUEL DEPOT';
+            if (any('gantryN', 'gantryW')) return 'GANTRY WALK';
+            if (any('netS', 'netW')) return 'NET SHED';
+            if (any('gateE', 'gateJog', 'gateW')) return 'HARBOUR GATE';
+            if (any('customs', 'customsIn')) return 'CUSTOMS YARD';
+            if (any('atkSpawn')) return 'ATTACKER SPAWN';
+            if (any('defSpawn')) return 'DEFENDER SPAWN';
+            return 'ICEBOX';
+        }
+        // V2.1: Icebox's layout: two sites, route lengths within 10% of Ascent's, defenders about
+        // 1.5 s ahead. The spawn points sit a few metres off the spawns' centres (attackers north,
+        // defenders south), which evens the two sites' margins.
+        const ICEBOX_LAYOUT = {
+            sites: { A: { x: 14.5, z: -36 }, B: { x: 7.5, z: 40.5 } },
+            spawns: { attack: { x: -40, z: -2, yaw: -Math.PI / 2 }, defend: { x: 43, z: 5, yaw: Math.PI / 2 } },
+            // The Customs Yard (the range and aim-trainer court)
+            start: { x: 29, z: -14, yaw: 0 },
+            bootStart: { x: 29, z: -14, yaw: 0 },
+            botSpawns: [[-44, -25, 'rusher'], [6, -41, 'sniper'], [-44, 25, 'armored'], [5, 31, 'standard'], [-18, -16, 'rusher'], [45, -22, 'armored']],
+            botSpawnsLow: [[-44, -25, 'rusher'], [5, 31, 'armored']],
+            // Open spots all over the map (lanes, sites, the yard, links, both spawns, the Customs Yard)
+            respawnSpots: [[-44, -25], [-36, -46], [-10, -46], [-18, -16], [-6, -29.5], [6, -41], [15, -35], [4, -30.5], [38, -33.5], [45, -22],
+                [-44, 25], [-36, 43], [-10, 43], [-10, 20], [0, 20], [7, 25], [5, 31], [8.5, 41], [16, 32.5], [38, 31.5], [45, 20],
+                [-20, -7], [-12, 7], [-25, 6], [12, -5], [23, -5], [29, -20], [-44, -8.5], [44, 9]],
+            orbs: [{ x: -12, z: -7, name: 'RAIL YARD ORB' }, { x: 45, z: 22, name: 'NET SHED ORB' }],
+            zoneName: iceboxZoneName,
+            // (alternating sites: on a low-end device with only two bots, one holds each site)
+            matchDefend: () => [[15, -35.5], [12, 41.5], [6, -41], [16, 32.5], [23, -5]],
+            // Attacking bots stack north of the spawn wall, clear of it and the crates
+            matchAttack: (o) => [[o.x, o.z], [o.x + 2.5, o.z + 1], [o.x - 3, o.z + 0.5], [o.x - 2, o.z - 6.5], [o.x + 1, o.z - 6.5]],
+            // Retake: you come in from the defender side, down Gantry Walk (A) or the Net Shed (B)
+            retake: {
+                A: { player: { x: 45, z: -14, yaw: 0 }, guards: [[14.5, -36, 'armored'], [16.5, -34, 'standard'], [6, -41, 'rusher'], [12, -29.5, 'sniper'], [7.25, -36, 'armored'], [4, -30, 'standard']] },
+                B: { player: { x: 45, z: 14, yaw: Math.PI }, guards: [[8.5, 41, 'armored'], [12, 41.5, 'standard'], [5, 31, 'rusher'], [16.5, 32.5, 'sniper'], [7.5, 35, 'armored'], [13, 39.5, 'standard']] }
+            },
+            // The Customs Yard is kept clear for the range and the aim trainer
+            range: { player: { x: 29, z: -14 }, lanesX: [24, 26, 28, 30, 32, 34], lanesZ: [-21, -22.5, -24] },
+            aim: { x: 29, z: -14 },
+            // No glass or barrels in the Customs Yard or either spawn (the spawn points sit off centre)
+            propKeepOut: [[22, 36, -27, -12], [-49.5, -37, -10, 10], [37, 49.5, -10, 10]],
+            // Practice targets: open air in the long east-west lanes, 10 m clear either side
+            targetSpots: [[-34, 3.5, -46], [-5, 3.5, -46], [-34, 3.5, 43], [-12, 3.5, 43], [12, 3, -5], [36, 3.5, -33.5]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.6,
+            propSafe: true,
+            checkTargets: true,
+            // Rope ascenders [F]: hold F (or jump) at the cable to climb onto a two-high container stack
+            ropes: [
+                { name: 'RAIL YARD ASCENDER', x: -24.4, z: 0, topY: 5.4, exit: { x: -21.6, z: 0 } },
+                { name: 'A STACK ASCENDER', x: 7.3, z: -34.25, topY: 5.4, exit: { x: 9.75, z: -34.25 } },
+                { name: 'B STACK ASCENDER', x: 7.5, z: 35.75, topY: 5.4, exit: { x: 10.25, z: 35.75 } }
+            ]
+        };
+        // V2.1: Lotus's callouts (the Sun and Moon Terraces are the raised spots on A and C)
+        function lotusZoneName(x, y, z) {
+            const P = MAP_PRESETS.lotus.plan;
+            const any = (...ks) => ks.some((k) => _inPlanRect(P[k], x, z));
+            if (any('aSite')) return (y > 3.6 && x >= 16 && z <= -38) ? 'SUN TERRACE' : 'A SITE';
+            if (any('bSite')) return 'B SITE';
+            if (any('cSite')) return (y > 3.6 && x >= 16 && z >= 38) ? 'MOON TERRACE' : 'C SITE';
+            if (any('lionN', 'lionE')) return 'LION GATE';
+            if (any('screeW', 'screeN', 'screeE')) return 'SCREE PATH';
+            if (any('court', 'courtIn')) return 'OUTER COURT';
+            if (any('torch1', 'torchJog', 'torch2')) return 'TORCH PASSAGE';
+            if (any('incense')) return 'INCENSE WALK';
+            if (any('bellLoft')) return 'BELL LOFT';
+            if (any('ash')) return 'ASH WALK';
+            if (any('waterStair')) return 'WATER STAIR';
+            if (any('serpS', 'serpE')) return 'SERPENT GATE';
+            if (any('riverBend')) return 'LOTUS POOL';
+            if (any('riverW', 'riverS', 'riverE')) return 'RIVER WALK';
+            if (any('monkN', 'monkW')) return 'MONKS STAIR';
+            if (any('relicS', 'relicW')) return 'RELIC STORE';
+            if (any('pilgrim', 'pilgrimIn')) return 'PILGRIM HALL';
+            if (any('atkSpawn')) return 'ATTACKER SPAWN';
+            if (any('defSpawn')) return 'DEFENDER SPAWN';
+            return 'LOTUS';
+        }
+        // V2.1: Lotus's layout: three sites. B is the smallest and the nearest to the defenders; route
+        // lengths are within 20% of Ascent's (B's and C's against Ascent's B), defenders 1-2 s ahead with
+        // both stone doors open (each round starts with them open).
+        const LOTUS_LAYOUT = {
+            sites: { A: { x: 9, z: -41 }, B: { x: 21, z: 4.5 }, C: { x: 9, z: 41 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 45, z: 0, yaw: Math.PI / 2 } },
+            // The Pilgrim Hall (the range and aim-trainer hall)
+            start: { x: -32, z: 30, yaw: 0 },
+            bootStart: { x: -32, z: 30, yaw: 0 },
+            botSpawns: [[-44, -25, 'rusher'], [9, -41, 'sniper'], [-44, 25, 'armored'], [9, 41, 'standard'], [-27.5, -15, 'rusher'], [45, -22, 'armored']],
+            botSpawnsLow: [[-44, -25, 'rusher'], [9, 41, 'armored']],
+            // Open spots all over the map (lanes, sites, the court, links, both spawns)
+            respawnSpots: [[-44, -25], [-36, -44], [-12, -44], [-27.5, -15], [-12, -31], [9, -41], [18, -35], [8.5, -31], [36, -30.5], [45, -22],
+                [-44, 25], [-36, 44], [-11, 41], [-21.5, 16], [-12, 31], [9, 41], [18, 35], [8.5, 31], [36, 30.5], [45, 22],
+                [-23, -7], [-17, 7], [-9, -4], [0, 0], [21, 4.5], [28.5, -5], [20, -18], [20, 18], [30, -19.5], [30, 21.5], [-42, -7], [44, 7]],
+            orbs: [{ x: -17, z: -7, name: 'OUTER COURT ORB' }, { x: 30, z: -19.5, name: 'BELL LOFT ORB' }],
+            zoneName: lotusZoneName,
+            // Defenders (when you attack): two at A, one at B, two at C
+            matchDefend: () => [[18, -35], [8.5, -31], [21, 4.5], [18, 35], [8.5, 31]],
+            // Attacking bots stack south of the spawn wall, clear of it and the crates
+            matchAttack: (o) => [[o.x, o.z + 1.5], [o.x + 2.5, o.z + 1], [o.x - 3, o.z + 1.5], [o.x - 2, o.z + 7.5], [o.x + 2, o.z + 8]],
+            // Retake: you come in from the defender side, down the Monks' Stair (A), the Bell Loft (B)
+            // or the Relic Store (C)
+            retake: {
+                A: { player: { x: 45, z: -14, yaw: 0 }, guards: [[9, -41, 'armored'], [18, -35, 'standard'], [8.5, -31, 'rusher'], [19, -30, 'sniper'], [13, -34.5, 'armored'], [7.5, -40, 'standard']] },
+                B: { player: { x: 40, z: -19.5, yaw: Math.PI / 2 }, guards: [[21, 4.5, 'armored'], [28.5, 1.5, 'standard'], [20, -5, 'rusher'], [28.5, -5, 'sniper'], [24, 5.5, 'armored'], [17.5, 5, 'standard']] },
+                C: { player: { x: 45, z: 14, yaw: Math.PI }, guards: [[9, 41, 'armored'], [18, 35, 'standard'], [8.5, 31, 'rusher'], [19, 30, 'sniper'], [13, 34.5, 'armored'], [7.5, 40, 'standard']] }
+            },
+            // The Pilgrim Hall is kept clear for the range and the aim trainer
+            range: { player: { x: -32, z: 31 }, lanesX: [-36.5, -35, -33, -31, -29.5, -28], lanesZ: [19, 20.5, 22] },
+            aim: { x: -32, z: 31 },
+            // No glass or barrels in the Pilgrim Hall or either spawn
+            propKeepOut: [[-38, -26, 14, 34], [-49.5, -37, -10, 10], [37, 49.5, -10, 10]],
+            // Practice targets: open air in the long east-west lanes, 10 m clear either side
+            targetSpots: [[-33, 3.5, -44], [-33, 3.5, 44], [-8, 3, -31], [-8, 3, 31], [9, 3, 4], [36, 3.5, -30.5]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.6,
+            propSafe: true,
+            checkTargets: true,
+            // Rotating stone doors [F]: a pivot in the middle of a 6 m lane; open, the slab stands along
+            // the lane (2.6 m to pass on either side); shut, it closes the lane. Slow and loud.
+            doors: [
+                { name: 'LION GATE', x: -26, z: -22, len: 6, axis: 'z' },
+                { name: 'SERPENT GATE', x: -20, z: 22, len: 6, axis: 'z' }
+            ],
+            // A breakable wall across Incense Walk (A - B): solid until shot to pieces, back each round
+            breakWall: { name: 'INCENSE WALL', x0: 18, x1: 22, z0: -26, z1: -25, h: 4.2, hp: 350 }
+        };
+        // V2.1: Split's callouts (the Capsule Deck and the Sky Lounge are the raised spots on A and B; the
+        // Vent Loft and the Ticket Roof are reached by rope)
+        function splitZoneName(x, y, z) {
+            const P = MAP_PRESETS.split.plan;
+            const any = (...ks) => ks.some((k) => _inPlanRect(P[k], x, z));
+            if (any('aSite')) return (y > 3.6 && x >= 14 && z <= -42) ? 'CAPSULE DECK' : 'A SITE';
+            if (any('bSite')) return (y > 3.6 && x >= 14 && z >= 42) ? 'SKY LOUNGE' : 'B SITE';
+            if (any('under', 'underE')) return (y > 3.6 && x <= -13 && z <= -26) ? 'VENT LOFT' : 'UNDERPASS';
+            if (any('crossing', 'crossIn')) return (y > 5.8 && x >= -19 && x <= -13 && z >= -2 && z <= 2) ? 'TICKET ROOF' : 'THE CROSSING';
+            if (any('tramN', 'tramJog', 'tramE', 'tramIn')) return 'TRAM WALK';
+            if (any('arcade', 'arcadeE')) return 'GAME ARCADE';
+            if (any('parkS', 'parkJog', 'parkE', 'parking')) return 'CAR PARK';
+            if (any('neonN', 'neonW')) return 'NEON ALLEY';
+            if (any('ramenS', 'ramenW')) return 'RAMEN ROW';
+            if (any('concE', 'concJog', 'concW')) return 'CONCOURSE';
+            if (any('garden', 'gardenIn')) return 'SHRINE GARDEN';
+            if (any('atkSpawn')) return 'ATTACKER SPAWN';
+            if (any('defSpawn')) return 'DEFENDER SPAWN';
+            return 'SPLIT';
+        }
+        // V2.1: Split's layout: two sites, route lengths within 10% of Ascent's at A and 5% at B, defenders
+        // about 1.6 s ahead at both
+        const SPLIT_LAYOUT = {
+            sites: { A: { x: 11, z: -42 }, B: { x: 11, z: 42 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } },
+            // The Shrine Garden (the range and aim-trainer court)
+            start: { x: 29, z: -14, yaw: 0 },
+            bootStart: { x: 29, z: -14, yaw: 0 },
+            botSpawns: [[-44, -28, 'rusher'], [6, -41, 'sniper'], [-44, 28, 'armored'], [5, 32, 'standard'], [-13, -14, 'rusher'], [45, -22, 'armored']],
+            botSpawnsLow: [[-44, -28, 'rusher'], [5, 32, 'armored']],
+            // Open spots all over the map (lanes, sites, the Crossing, links, both spawns, the Shrine Garden)
+            respawnSpots: [[-44, -28], [-36, -37], [-23, -40], [-10, -43.5], [-13, -14], [-4, -26.5], [6, -41], [16, -31], [5.5, -31], [38, -35.5], [45, -22],
+                [-44, 28], [-36, 39], [-23, 40], [-10, 43], [-21, 14], [-4, 26.5], [6, 41], [16, 31], [5.5, 31], [38, 35.5], [45, 22],
+                [-22, -6], [-10, 6], [-24, 6], [12, 7], [21, 2], [29, -20], [-44, -8], [44, 8]],
+            orbs: [{ x: -10, z: 6, name: 'CROSSING ORB' }, { x: 45, z: 22, name: 'RAMEN ROW ORB' }],
+            zoneName: splitZoneName,
+            // (alternating sites: on a low-end device with only two bots, one holds each site)
+            matchDefend: () => [[12, -40.5], [12, 40.5], [17.5, -31], [17.5, 31], [21, 0]],
+            // Attacking bots stack round the spawn point, clear of the spawn walls
+            matchAttack: (o) => [[o.x, o.z], [o.x + 2.5, o.z + 1], [o.x - 3, o.z + 0.5], [o.x - 2, o.z - 6.5], [o.x + 1, o.z - 6.5]],
+            // Retake: you come in from the defender side, down Neon Alley (A) or Ramen Row (B)
+            retake: {
+                A: { player: { x: 45, z: -14, yaw: 0 }, guards: [[11, -42, 'armored'], [12, -40.5, 'standard'], [6, -41, 'rusher'], [17.5, -31, 'sniper'], [5.5, -36, 'armored'], [12, -31, 'standard']] },
+                B: { player: { x: 45, z: 14, yaw: Math.PI }, guards: [[11, 42, 'armored'], [12, 40.5, 'standard'], [6, 41, 'rusher'], [17.5, 31, 'sniper'], [5.5, 36, 'armored'], [12, 31, 'standard']] }
+            },
+            // The Shrine Garden is kept clear for the range and the aim trainer
+            range: { player: { x: 29, z: -14 }, lanesX: [24, 26, 28, 30, 32, 34], lanesZ: [-21, -22.5, -24] },
+            aim: { x: 29, z: -14 },
+            // No glass or barrels in the Shrine Garden or either spawn
+            propKeepOut: [[22, 36, -27, -12], [-49.5, -37, -10, 10], [37, 49.5, -10, 10]],
+            // Practice targets: open air in the long east-west lanes, 10 m clear either side
+            targetSpots: [[-35, 3.5, -37], [-8.5, 3.5, -43.5], [-35, 3.5, 39], [-8.5, 3.5, 43], [6, 3, 7], [36, 3.5, -35.5]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.6,
+            propSafe: true,
+            checkTargets: true,
+            // Rope ascenders [F]: hold F (or jump) at the cable to climb onto the Vent Loft or the Ticket Roof
+            ropes: [
+                { name: 'UNDERPASS ASCENDER', x: -12.1, z: -27.5, topY: 3.2, exit: { x: -14.5, z: -27.5 } },
+                { name: 'CROSSING ASCENDER', x: -20.4, z: 0, topY: 5.4, exit: { x: -17.6, z: 0 } }
+            ]
+        };
+        // V2.1: Skyline's callouts (the Control Booth and the Billboard deck are the raised spots on A and B;
+        // the Skybridge is the bridge and its two towers over the Alley)
+        function skylineZoneName(x, y, z) {
+            const P = MAP_PRESETS.skyline.plan;
+            const any = (...ks) => ks.some((k) => _inPlanRect(P[k], x, z));
+            if (any('aSite')) return (y > 3.6 && x >= 7 && z <= -41) ? 'CONTROL BOOTH' : 'HELIPAD';
+            if (any('bSite')) return (y > 3.6 && x >= 14 && z >= 41) ? 'BILLBOARD' : 'SERVER ROOF';
+            if (any('plaza') && y > 3.6 && x >= -3 && x <= 3) return 'SKYBRIDGE';
+            if (any('plaza', 'alleyN', 'alleyS', 'alleySJ')) return 'ALLEY';
+            if (any('water', 'waterIn', 'waterOut')) return 'WATER TOWER';
+            if (any('vent', 'ventIn', 'ventOut', 'linkAN', 'linkAW')) return 'VENT FARM';
+            if (any('lobbyAIn', 'lobbyA')) return 'A LOBBY';
+            if (any('stairsA')) return 'A STAIRS';
+            if (any('lobbyBIn', 'lobbyB', 'bLane')) return 'B LOBBY';
+            if (any('linkBS', 'linkBW')) return 'BILLBOARD';
+            if (any('atkSpawn')) return 'ATTACKER SPAWN';
+            if (any('defSpawn')) return 'DEFENDER SPAWN';
+            return 'SKYLINE';
+        }
+        // V2.1: Skyline's layout: two sites, route lengths within 10% of Ascent's, defenders 1.3 s ahead at A
+        // and 1.7 s at B
+        const SKYLINE_LAYOUT = {
+            sites: { A: { x: -6.5, z: -31.5 }, B: { x: 12.5, z: 36.5 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } },
+            // The Vent Farm (the range and aim-trainer yard)
+            start: { x: 16, z: 0, yaw: -Math.PI / 2 },
+            bootStart: { x: 16, z: 0, yaw: -Math.PI / 2 },
+            botSpawns: [[-44, -28, 'rusher'], [-4, -31, 'sniper'], [-44, 28, 'armored'], [4.5, 31.5, 'standard'], [-12, 0, 'rusher'], [45, -22, 'armored']],
+            botSpawnsLow: [[-44, -28, 'rusher'], [4.5, 31.5, 'armored']],
+            // Open spots all over the map (lanes, sites, the Alley, the yards, links, both spawns)
+            respawnSpots: [[-44, -28], [-41, -38], [-28, -43], [-16, -43], [-4, -31], [9.5, -30], [-8, -44], [8, -24], [-12, -5], [-12, 5], [7.5, -3.5], [8, 5], [-24, 4], [-24, -2],
+                [20, 0], [22, 6], [-6, 21], [0, 27], [4.5, 31.5], [15, 32], [4, 44], [17, 38.5], [-44, 28], [-41, 38], [-28, 43], [-12, 43], [45, -22], [38, -37], [45, 22], [38, 35],
+                [-44, -8], [44, 8]],
+            orbs: [{ x: -12, z: 5, name: 'ALLEY ORB' }, { x: 45, z: 22, name: 'BILLBOARD ORB' }],
+            zoneName: skylineZoneName,
+            // (alternating sites: on a low-end device with only two bots, one holds each site)
+            matchDefend: () => [[-4, -31], [15, 37], [9.5, -30], [4.5, 31.5], [20, 0]],
+            // Attacking bots stack round the spawn point, clear of the spawn walls
+            matchAttack: (o) => [[o.x, o.z], [o.x + 2.5, o.z + 1], [o.x - 3, o.z + 0.5], [o.x - 2, o.z - 6.5], [o.x + 1, o.z - 6.5]],
+            // Retake: you come in from the defender side, along the vent farm walkway (A) or under the billboard (B)
+            retake: {
+                A: { player: { x: 45, z: -14, yaw: 0 }, guards: [[-6.5, -31.5, 'armored'], [-3, -30.5, 'standard'], [-8.5, -38, 'rusher'], [9.5, -30, 'sniper'], [-4, -44.5, 'armored'], [3.5, -42.5, 'standard']] },
+                B: { player: { x: 45, z: 14, yaw: Math.PI }, guards: [[12.5, 36.5, 'armored'], [15, 37, 'standard'], [4.5, 31.5, 'rusher'], [17, 38.5, 'sniper'], [4, 44, 'armored'], [15, 32, 'standard']] }
+            },
+            // The Vent Farm's middle is clear for the range and the aim trainer
+            range: { player: { x: 16, z: 0 }, lanesX: [19, 20.5, 22, 23.5, 25, 26.5], lanesZ: [-3, 0, 3] },
+            aim: { x: 16, z: 0 },
+            // No glass or barrels in the Vent Farm or either spawn
+            propKeepOut: [[14, 28, -8, 8], [-49.5, -37, -10, 10], [37, 49.5, -10, 10]],
+            // Practice targets: open air in the long east-west lanes, 10 m clear either side
+            targetSpots: [[-22.5, 3.5, -43], [-24, 3.5, 43], [-6, 3.5, 43], [24, 3.5, -37], [33, 3.5, 35], [-24, 3.5, 0]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.6,
+            propSafe: true,
+            checkTargets: true
+        };
 
         function mapLayout() {
             const p = (typeof game !== 'undefined' && MAP_PRESETS[game.mapPreset]) || MAP_PRESETS.ascent;
@@ -10641,7 +11423,10 @@
         MAP_PRESETS.ascent.layout = ASCENT_LAYOUT;
         MAP_PRESETS.bind.layout = BIND_LAYOUT;   // V2.1
         MAP_PRESETS.haven.layout = HAVEN_LAYOUT; // V2.1
-        for (const id of ['icebox', 'lotus', 'split', 'skyline']) MAP_PRESETS[id].layout = LEGACY_LAYOUT;
+        MAP_PRESETS.icebox.layout = ICEBOX_LAYOUT;   // V2.1
+        MAP_PRESETS.lotus.layout = LOTUS_LAYOUT;     // V2.1
+        MAP_PRESETS.split.layout = SPLIT_LAYOUT;     // V2.1
+        MAP_PRESETS.skyline.layout = SKYLINE_LAYOUT; // V2.1: every map has its own layout now (LEGACY_LAYOUT is only mapLayout's fallback)
 
         // Create map elements from active MAP_PRESETS entry
         function createMap() {
@@ -10710,6 +11495,8 @@
             // V1.8: this map's sites and ult orbs (props keep clear of them)
             if (typeof tacticalDirector !== 'undefined' && tacticalDirector.applyMapLayout) tacticalDirector.applyMapLayout();
             breakables.build();
+            // V2.1: this map's doors and breakable wall, before the walk grid is built round them
+            if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.lotusDoors) tacticalEnhancements.placeMapMechanics();
             navGrid.build();   // V1.8: bots route all the time now, so build it here, not mid-fight
             relocateBlockedTargets();
             ultraRealism.onMapBuilt();
@@ -13391,8 +14178,14 @@
                 this.owner.clear();
                 // Rebuilt on first use: the map's colliders enter the collision index after this
                 navGrid.blocked = null;
+                // V2.1: clear of this map's stone doors (the whole square each one turns through) and its
+                // breakable wall too (they are not map pieces, and are put in place after this)
+                const L = mapLayout(), keepOut = [];
+                for (const d of (L.doors || [])) keepOut.push([d.x - d.len / 2, d.x + d.len / 2, d.z - d.len / 2, d.z + d.len / 2]);
+                if (L.breakWall) keepOut.push([L.breakWall.x0, L.breakWall.x1, L.breakWall.z0, L.breakWall.z1]);
                 const blocked = (x, z) => {
                     if (Math.abs(x) > 47 || Math.abs(z) > 47) return true;
+                    for (const k of keepOut) if (x > k[0] - 0.7 && x < k[1] + 0.7 && z > k[2] - 0.7 && z < k[3] + 0.7) return true;
                     for (const p of mapPieces) {
                         const b = p.bounds;
                         if (b.min.y > 1.2) continue;
@@ -17734,7 +18527,13 @@
                     const piece = cell[i];
                     if (piece.disabled || piece.shotStamp === this.stamp) continue;
                     piece.shotStamp = this.stamp;
-                    if (rayHitsAabb(ray, piece.bounds, range)) raycastLeaf(piece.proxy);
+                    if (!rayHitsAabb(ray, piece.bounds, range)) continue;
+                    const before = _shotHits.length;
+                    raycastLeaf(piece.proxy);
+                    // V2.1: a ray that meets a box face exactly on the diagonal between its two triangles can
+                    // slip through the triangle test (a floating-point crack), and see or shoot through a
+                    // solid wall: a map box the ray plainly enters from outside counts its entry face
+                    if (_shotHits.length === before && piece.shape === 'box') pushBoxEntryHit(ray, piece, range);
                 }
             },
             
@@ -17799,6 +18598,31 @@
             return true;
         }
         
+        // V2.1: the face where a ray enters an axis-aligned map box, as a raycast hit (only used when the
+        // triangle test missed a box the ray plainly passes through: see envShotIndex.visitCell). Nothing
+        // when the ray starts inside the box, runs along a face or an edge, or is out of reach
+        function pushBoxEntryHit(ray, piece, range) {
+            const proxy = piece.proxy;
+            if (!proxy.layers.test(raycaster.layers)) return;
+            const o = ray.origin, d = ray.direction, b = piece.bounds;
+            let tmin = -Infinity, tmax = Infinity, axis = null, sgn = 0;
+            for (let i = 0; i < 3; i++) {
+                const a = RAY_AXES[i];
+                if (Math.abs(d[a]) < 1e-12) {
+                    if (o[a] <= b.min[a] || o[a] >= b.max[a]) return;
+                    continue;
+                }
+                let t1 = (b.min[a] - o[a]) / d[a], t2 = (b.max[a] - o[a]) / d[a], s = -1;
+                if (t1 > t2) { const t = t1; t1 = t2; t2 = t; s = 1; }
+                if (t1 > tmin) { tmin = t1; axis = a; sgn = s; }
+                if (t2 < tmax) tmax = t2;
+            }
+            if (axis === null || tmin <= 1e-6 || tmax - tmin <= 1e-4 || tmin < raycaster.near || tmin > Math.min(range, raycaster.far)) return;
+            const normal = new THREE.Vector3();
+            normal[axis] = sgn;
+            _shotHits.push({ distance: tmin, point: ray.at(tmin, new THREE.Vector3()), object: proxy, face: { a: 0, b: 1, c: 2, normal: normal, materialIndex: 0 }, faceIndex: 0 });
+        }
+
         function rayHitsSphere(ray, c, radius, range) {
             const o = ray.origin, d = ray.direction;
             const ox = c.x - o.x, oy = c.y - o.y, oz = c.z - o.z;
@@ -20638,6 +21462,8 @@
                         gravity: 0,
                         spawnAt: 0,
                         detonateAt: 0,
+                        fuseT0: 0,          // V2.1: the fuse's clock is fuseT0 + flightMs (simulated)
+                        flightMs: 0,
                         mesh: mesh,
                         mat: projMat // V1.7 fix: newer kits recolour through proj.mat
                     });
@@ -29348,14 +30174,19 @@
 
             // --- Pool Acquisition Helpers ---
             acquireProjectile: function() {
+                // V2.1: a projectile's fuse runs on its own simulated flight time from here (see stepSimulation)
                 for (let i = 0; i < this.projectiles.length; i++) {
                     if (!this.projectiles[i].inUse) {
                         this.projectiles[i].inUse = true;
+                        this.projectiles[i].fuseT0 = performance.now();
+                        this.projectiles[i].flightMs = 0;
                         return this.projectiles[i];
                     }
                 }
                 const p = this.projectiles[0];
                 p.inUse = true;
+                p.fuseT0 = performance.now();
+                p.flightMs = 0;
                 return p;
             },
 
@@ -29925,6 +30756,12 @@
                 for (let i = 0; i < this.projectiles.length; i++) {
                     const proj = this.projectiles[i];
                     if (!proj.inUse) continue;
+                    // V2.1: the fuse counts the projectile's own simulated time, as its flight does. On the wall
+                    // clock, a cast just before a long frame (the simulation catches up at most four ticks a
+                    // frame and drops the rest) burned the whole fuse at once: the projectile popped where it
+                    // was thrown, never seen. At a steady frame rate the two clocks agree within a tick
+                    proj.flightMs += dt * 1000;
+                    const fuseNow = proj.fuseT0 + proj.flightMs;
 
                     proj.velocity.y -= proj.gravity * dt;
                     const nextX = proj.position.x + proj.velocity.x * dt;
@@ -29957,7 +30794,7 @@
                         proj.velocity.y = Math.max(AGENT_TUNING.yoru.q.bounceMinUpMps, Math.abs(proj.velocity.y) * AGENT_TUNING.yoru.q.bounceUpMult);
                         proj.velocity.x *= AGENT_TUNING.yoru.q.bounceXZMult;
                         proj.velocity.z *= AGENT_TUNING.yoru.q.bounceXZMult;
-                        proj.detonateAt = now + AGENT_TUNING.yoru.q.bounceFuseMs;
+                        proj.detonateAt = fuseNow + AGENT_TUNING.yoru.q.bounceFuseMs;
                         soundFX.yoruRift();
                         continue;
                     }
@@ -29969,12 +30806,12 @@
                         proj.velocity.y = Math.max(AGENT_TUNING.neon.q.bounceMinUpMps, Math.abs(proj.velocity.y) * AGENT_TUNING.neon.q.bounceUpMult);
                         proj.velocity.x *= AGENT_TUNING.neon.q.bounceXZMult;
                         proj.velocity.z *= AGENT_TUNING.neon.q.bounceXZMult;
-                        proj.detonateAt = now + AGENT_TUNING.neon.q.bounceFuseMs;
+                        proj.detonateAt = fuseNow + AGENT_TUNING.neon.q.bounceFuseMs;
                         continue;
                     }
 
                     proj.mesh.position.copy(proj.position);
-                    if (impacted || now >= proj.detonateAt) {
+                    if (impacted || fuseNow >= proj.detonateAt) {
                         this.detonateProjectile(proj, now);
                     }
                 }
@@ -35158,11 +35995,10 @@
                 }
 
                 // 7B. Map Interactables (Bind Teleporters, Lotus Doors, Split Ziplines), Bot Hazards, Wingman Allies & 3D Tactical Pings
-                if (game.mapPreset === 'bind') {
-                    const tpCoords = [
-                        { x: -34, z: 0, col: '#f59e0b' },
-                        { x: 34, z: 0, col: '#38bdf8' }
-                    ];
+                // V2.1: the teleporter pads and rope ascenders where this map's layout puts them
+                const mapL = mapLayout();
+                const tpCoords = (mapL.teleporters || []).map((t) => ({ x: t.from.x, z: t.from.z, col: '#' + t.color.toString(16).padStart(6, '0') }));
+                if (tpCoords.length) {
                     for (let t = 0; t < tpCoords.length; t++) {
                         const tp = tpCoords[t];
                         ctx.strokeStyle = tp.col;
@@ -35173,9 +36009,10 @@
                         ctx.fill();
                         ctx.stroke();
                     }
-                } else if (game.mapPreset === 'lotus' && typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.lotusDoors) {
+                } else if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.lotusDoors && mapL.doors) {   // V2.1: from the layout
                     for (let d = 0; d < tacticalEnhancements.lotusDoors.length; d++) {
                         const door = tacticalEnhancements.lotusDoors[d];
+                        if (!door.cfg) continue;
                         ctx.strokeStyle = door.isOpen ? '#10b981' : '#f43f5e';
                         ctx.fillStyle = 'rgba(28, 20, 29, 0.9)';
                         ctx.lineWidth = 2.0;
@@ -35184,17 +36021,24 @@
                         ctx.fill();
                         ctx.stroke();
                     }
-                } else if (game.mapPreset === 'split' && typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.splitZiplines) {
-                    for (let zIdx = 0; zIdx < tacticalEnhancements.splitZiplines.length; zIdx++) {
-                        const zip = tacticalEnhancements.splitZiplines[zIdx];
-                        ctx.strokeStyle = '#ffd166';
-                        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-                        ctx.lineWidth = 1.8;
-                        ctx.beginPath();
-                        ctx.arc((zip.x - px) * scale, (zip.z - pz) * scale, 4.0, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.stroke();
-                    }
+                }
+                const bw = typeof tacticalEnhancements !== 'undefined' ? tacticalEnhancements.breakWall : null;
+                if (bw && bw.cfg && !bw.broken) {
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo((bw.cfg.x0 - px) * scale, ((bw.cfg.z0 + bw.cfg.z1) / 2 - pz) * scale);
+                    ctx.lineTo((bw.cfg.x1 - px) * scale, ((bw.cfg.z0 + bw.cfg.z1) / 2 - pz) * scale);
+                    ctx.stroke();
+                }
+                for (const rp of (mapL.ropes || [])) {
+                    ctx.strokeStyle = '#ffd166';
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                    ctx.lineWidth = 1.8;
+                    ctx.beginPath();
+                    ctx.arc((rp.x - px) * scale, (rp.z - pz) * scale, 4.0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
                 }
                 if (typeof tacticalDirector !== 'undefined' && tacticalDirector.botHazardsPool) {
                     for (let h = 0; h < tacticalDirector.botHazardsPool.length; h++) {
@@ -38420,6 +39264,8 @@
                     if (firstEnvHit && firstEnvOwner && firstEnvOwner.iceWall && typeof agentSystem !== 'undefined') {
                         agentSystem.damageIceWall(firstEnvOwner.iceWall, baseDamage);
                     }
+                    // V2.1: ...and a map's breakable wall
+                    if (firstEnvHit && firstEnvOwner && firstEnvOwner.breakWall) tacticalEnhancements.damageBreakWall(firstEnvOwner.breakWall, baseDamage, firstEnvHit.point);
                     // Glass breaks wherever the bullet crosses it before stopping; a barrel takes the hit
                     const envStop = firstEnvHit ? firstEnvHit.distance : WEAPON_RANGE;
                     breakables.shatterAlong(raycaster.ray.origin, raycaster.ray.direction, Math.min(envStop, barrelDist));
@@ -41404,7 +42250,11 @@
         const ULTRA_MAP_STYLE = {
             ascent: { floorAlbedo: 0x8a8274, plaster: 1.3, decor: '_buildAscent', roof: 0xb4583c },
             bind: { floorAlbedo: 0x9c7f5c, plaster: 1.2, decor: '_buildBind', roof: 0xd0a878 },
-            haven: { floorAlbedo: 0x6f7178, plaster: 1.15, decor: '_buildHaven', roof: 0x8a6a2a }
+            haven: { floorAlbedo: 0x6f7178, plaster: 1.15, decor: '_buildHaven', roof: 0x8a6a2a },
+            icebox: { floorAlbedo: 0x7a838e, plaster: 0, decor: '_buildIcebox', roof: 0x5a6b7c },
+            lotus: { floorAlbedo: 0x7a5a44, plaster: 0, decor: '_buildLotus', roof: 0x8a5a3c },
+            split: { floorAlbedo: 0x5d6472, plaster: 0, decor: '_buildSplit', roof: 0x3a4256 },
+            skyline: { floorAlbedo: 0x565b6e, plaster: 0, decor: '_buildSkyline', roof: 0x2a3148 }
         };
         function ultraMapStyle() { return (typeof game !== 'undefined' && ULTRA_MAP_STYLE[game.mapPreset]) || null; }
         const ultraU = {
@@ -42397,7 +43247,297 @@
                     }
                 });
                 K.finish();
+            },
+            // V2.1: Icebox (container port): corrugated cladding (vertical ribs) and a snow cap on the
+            // warehouse blocks, a steel rail round the roof edges, roller doors low on the long walls,
+            // sodium wall lamps (their light is baked), condenser units on the big roofs, and a steel
+            // frame over the passages
+            _buildIcebox: function () {
+                const K = this._kit(), S = K.S, L = K.L;
+                const RIB = 0x66778a, SNOW = 0xeef3f8, RAIL = 0x2c3a4a, DOOR = 0x4b5a6b, SLAT = 0x3a4757, FRAME = 0x23303d, UNIT = 0x5b6676, STRIPE = 0xd97706;
+                let bi = 0, doorsN = 0;
+                for (const T of K.tall) {
+                    const b = T.b, top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    bi++;
+                    // Snow on the flat roof, and a rail round the edges with open air beyond
+                    K.add(L.box, cx, top + 0.07, cz, T.sx + 0.04, 0.14, T.sz + 0.04, SNOW, S.roof, K.q0, 1.1);
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0;
+                        const [qx, qz] = K.pt(f, (f.a0 + f.a1) / 2, 0.3);
+                        if (!K.inside(qx, top - 0.5, qz, 0)) K.onFace(L.boxCast, f, (f.a0 + f.a1) / 2, top + 0.55, -0.1, flen, 0.08, 0.08, RAIL, S.metal);
+                        // Corrugation: a rib every metre up the wall (not where a neighbour hides the face)
+                        for (let a = f.a0 + 0.5; a <= f.a1 - 0.5; a += 1.0) {
+                            const [rx, rz] = K.pt(f, a, 0.12);
+                            if (K.inside(rx, 1.5, rz, 0)) continue;
+                            K.onFace(L.box, f, a, top / 2 + 0.15, 0.03, 0.08, top - 0.5, 0.06, RIB, S.metal);
+                        }
+                    }
+                    if (T.w < 3.5) continue;
+                    // A roller door on the long walls of every other block: frame, slatted shutter, a
+                    // hazard stripe at the foot; a wall lamp beside some of them
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0;
+                        if (flen < 9 || (bi % 2) || doorsN >= 24) continue;
+                        const a = (f.a0 + f.a1) / 2;
+                        const [dx, dz] = K.pt(f, a, 0.4);
+                        if (K.inside(dx, 1.5, dz, 0.2)) continue;
+                        K.onFace(L.boxCast, f, a, 1.85, 0.06, 4.0, 3.7, 0.12, FRAME, S.metal);
+                        K.onFace(L.box, f, a, 1.7, 0.1, 3.5, 3.3, 0.05, DOOR, S.metal);
+                        for (let y = 0.35; y < 3.3; y += 0.32) K.onFace(L.box, f, a, y, 0.13, 3.5, 0.05, 0.03, SLAT, S.metal);
+                        K.onFace(L.box, f, a, 0.12, 0.13, 3.5, 0.12, 0.03, STRIPE, S.metal);
+                        doorsN++;
+                        const la = a + 2.9;
+                        const [lx, lz] = K.pt(f, la, 0.6);
+                        if (la < f.a1 - 0.4 && !K.inside(lx, 4.2, lz, 0.2)) K.lampAt(f, la, 4.2);
+                    }
+                    // Condenser units and a vent on the bigger roofs
+                    if (T.w >= 6 && T.len >= 8 && (bi % 3) === 0) {
+                        const ox = T.alongX ? T.len * 0.22 : 0, oz = T.alongX ? 0 : T.len * 0.22;
+                        K.add(L.boxCast, cx + ox, top + 0.85, cz + oz, 2.2, 1.3, 1.4, UNIT, S.metal);
+                        K.add(L.box, cx + ox, top + 1.52, cz + oz, 2.0, 0.04, 1.2, 0x3a4757, S.metal);
+                        K.add(L.cyl, cx - ox, top + 0.9, cz - oz, 0.35, 1.5, 0.35, UNIT, S.metal);
+                        K.add(L.cyl, cx - ox, top + 1.7, cz - oz, 0.5, 0.12, 0.5, RAIL, S.metal);
+                    }
+                }
+                // Steel frames over the passages: posts, a beam with a hazard band, a sodium lamp under it
+                K.passages((ax, oth, A, B, gap, o0, o1, mid) => {
+                    const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                    const oc = (o0 + o1) / 2;
+                    for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                        const [jx, jz] = P2(u + us * 0.06, oc);
+                        const [sx, sz] = P2(0.12, 0.3);
+                        K.add(L.box, jx, 2.2, jz, sx, 4.4, sz, FRAME, S.metal);
+                    }
+                    const [lx, lz] = P2(mid, oc);
+                    const [w1, w2] = P2(gap + 0.24, 0.3);
+                    K.add(L.boxCast, lx, 4.5, lz, w1, 0.3, w2, FRAME, S.metal);
+                    const [g1, g2] = P2(gap + 0.24, 0.32);
+                    K.add(L.box, lx, 4.32, lz, g1, 0.06, g2, STRIPE, S.metal);
+                });
+                K.finish();
+            },
+            // V2.1: Lotus (cliff temple): a carved cornice and a plinth band on the rock-cut blocks,
+            // pilasters with lamp niches between them on the long walls (their light is baked), small
+            // stepped shrines on the bigger roofs, and carved frames with a teal band over the passages
+            _buildLotus: function () {
+                const K = this._kit(), S = K.S, L = K.L;
+                const CORNICE = 0x6b4a36, PLINTH = 0x5a3a28, PILASTER = 0x9a7458, NICHE = 0x1d1410, TEAL = 0x14b8a6, PALE = 0xc8a27c, BRONZE = 0x8c6a2f;
+                let bi = 0, shrines = 0;
+                for (const T of K.tall) {
+                    const b = T.b, top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    bi++;
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0, mid = (f.a0 + f.a1) / 2;
+                        const [qx, qz] = K.pt(f, mid, 0.4);
+                        if (K.inside(qx, 2, qz, 0)) continue;
+                        // A cornice under the roof edge and a plinth band at the foot
+                        K.onFace(L.boxCast, f, mid, top - 0.35, 0.12, flen + 0.2, 0.5, 0.24, CORNICE, S.stone);
+                        K.onFace(L.box, f, mid, 0.3, 0.06, flen, 0.6, 0.12, PLINTH, S.stone);
+                        if (flen < 6 || T.w < 3.5) continue;
+                        // Pilasters every 4 m; a niche with a lamp in every other bay
+                        const n = Math.floor(flen / 4);
+                        for (let i = 0; i <= n; i++) {
+                            const a = f.a0 + (flen - n * 4) / 2 + i * 4;
+                            const [px, pz] = K.pt(f, a, 0.3);
+                            if (K.inside(px, 2, pz, 0.1)) continue;
+                            K.onFace(L.box, f, a, top / 2, 0.08, 0.5, top - 0.9, 0.16, PILASTER, S.stone);
+                            if (i < n && (i % 2) === 0) {
+                                const na = a + 2;
+                                K.onFace(L.box, f, na, 2.4, 0.01, 0.8, 1.2, 0.02, NICHE, S.stone);
+                                K.onFace(L.boxCast, f, na, 1.75, 0.1, 0.9, 0.08, 0.2, PALE, S.stone);
+                                const [lx, lz] = K.pt(f, na, 0.6);
+                                if (!K.inside(lx, 3.4, lz, 0.2)) K.lampAt(f, na, 3.4);
+                            }
+                        }
+                    }
+                    // A little stepped shrine on every third big roof
+                    if (T.w >= 6 && T.len >= 8 && (bi % 3) === 0 && shrines < 10) {
+                        K.add(L.boxCast, cx, top + 0.5, cz, 2.6, 1.0, 2.6, PALE, S.stone);
+                        K.add(L.boxCast, cx, top + 1.3, cz, 1.8, 0.6, 1.8, PILASTER, S.stone);
+                        K.add(L.cone, cx, top + 2.0, cz, 1.3, 0.8, 1.3, PALE, S.stone);
+                        K.add(L.cyl, cx, top + 2.6, cz, 0.08, 0.5, 0.08, BRONZE, S.metal);
+                        shrines++;
+                    }
+                }
+                // Carved frames over the passages: jambs, a lintel and a teal band
+                K.passages((ax, oth, A, B, gap, o0, o1, mid) => {
+                    const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                    for (const [oe, sgn] of [[o0, 1], [o1, -1]]) {
+                        const oc = oe + sgn * 0.18;
+                        for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                            const [jx, jz] = P2(u + us * 0.05, oc);
+                            const [sx, sz] = P2(0.1, 0.36);
+                            K.add(L.box, jx, 1.9, jz, sx, 3.8, sz, PILASTER, S.stone);
+                        }
+                        const [lx, lz] = P2(mid, oc);
+                        const [w1, w2] = P2(gap + 0.2, 0.38);
+                        K.add(L.boxCast, lx, 3.95, lz, w1, 0.3, w2, CORNICE, S.stone);
+                        const [g1, g2] = P2(gap + 0.2, 0.4);
+                        K.add(L.box, lx, 4.16, lz, g1, 0.1, g2, TEAL, S.stone);
+                    }
+                });
+                K.finish();
+            },
+            // V2.1: Split (neon city plaza): a cornice line and a tiled band on the city blocks, lit shop
+            // fronts behind half-open roller shutters at street level, vertical neon sign boards and wall
+            // lamps (their light is baked), air-con units and water tanks on the bigger roofs, and steel
+            // frames with a neon band over the passages
+            _buildSplit: function () {
+                const K = this._kit(), S = K.S, L = K.L;
+                const CORNICE = 0x1c2230, TILE = 0x4b5568, SHUTTER = 0x3a4252, SLAT = 0x2a3140, GLASS = 0x0f1a2a, AC = 0x5b6676, TANK = 0x6b7280, FRAME = 0x1f2633;
+                const NEON = [0xff3ea5, 0x22d3ee, 0xfbbf24, 0xa78bfa, 0x34d399], WARM = [0xffd59e, 0xbfdbfe];
+                let bi = 0, shops = 0, boards = 0, wins = 0;
+                for (const T of K.tall) {
+                    const b = T.b, top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    bi++;
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0, mid = (f.a0 + f.a1) / 2;
+                        const [qx, qz] = K.pt(f, mid, 0.4);
+                        if (K.inside(qx, 2, qz, 0)) continue;
+                        // A cornice under the roof edge and a tiled band at the first floor
+                        K.onFace(L.boxCast, f, mid, top - 0.3, 0.1, flen + 0.1, 0.4, 0.2, CORNICE, S.metal);
+                        K.onFace(L.box, f, mid, 3.4, 0.04, flen, 0.18, 0.08, TILE, S.stone);
+                        if (flen < 6 || T.w < 3.5) continue;
+                        // Shop fronts every 6 m: glass behind a half-open roller shutter, under a lit fascia
+                        const n = Math.floor(flen / 6);
+                        for (let i = 0; i < n && shops < 60; i++) {
+                            const a = f.a0 + (flen - n * 6) / 2 + 3 + i * 6;
+                            const [sx, sz] = K.pt(f, a, 0.3);
+                            if (K.inside(sx, 1.2, sz, 0.15)) continue;
+                            K.onFace(L.box, f, a, 1.25, 0.02, 3.6, 2.5, 0.04, GLASS, S.window);
+                            K.onFace(L.box, f, a, 2.2, 0.05, 3.6, 0.9, 0.06, SHUTTER, S.metal);
+                            for (let y = 1.85; y < 2.6; y += 0.22) K.onFace(L.box, f, a, y, 0.09, 3.6, 0.04, 0.03, SLAT, S.metal);
+                            K.onFace(L.boxCast, f, a, 2.85, 0.1, 3.9, 0.4, 0.2, FRAME, S.metal);
+                            K.onFace(L.box, f, a, 2.85, 0.21, 3.6, 0.26, 0.02, NEON[(bi + i) % NEON.length], S.lamp);
+                            shops++;
+                            // A vertical sign board beside every other shop, and a wall lamp by some of them
+                            if ((i + bi) % 2 === 0 && boards < 30 && top > 7) {
+                                const [bx, bz] = K.pt(f, a + 1.6, 0.3);
+                                if (!K.inside(bx, 5.4, bz, 0.15)) {
+                                    K.onFace(L.boxCast, f, a + 1.6, 5.4, 0.14, 0.7, 3.2, 0.12, FRAME, S.metal);
+                                    K.onFace(L.box, f, a + 1.6, 5.4, 0.21, 0.56, 3.0, 0.03, NEON[(bi + i + 2) % NEON.length], S.lamp);
+                                    boards++;
+                                }
+                            }
+                            const la = a - 2.2;
+                            const [lx, lz] = K.pt(f, la, 0.6);
+                            if ((i % 2) === 1 && la > f.a0 + 0.4 && !K.inside(lx, 4.2, lz, 0.2)) K.lampAt(f, la, 4.2);
+                        }
+                        // The floors above: rows of small apartment windows, most of them lit
+                        for (let y = 5.2; y < top - 1.2 && wins < 520; y += 2.2) {
+                            const m = Math.floor((flen - 1) / 2);
+                            for (let i = 0; i < m; i++) {
+                                const lit = ((i * 5 + bi * 3 + Math.round(y * 2)) % 4) !== 0;
+                                K.onFace(L.box, f, f.a0 + 1.5 + i * 2, y, 0.02, 0.9, 1.0, 0.03, lit ? WARM[(i + bi) % 2] : GLASS, S.window);
+                                wins++;
+                            }
+                        }
+                    }
+                    // Air-con units and a water tank on the bigger roofs
+                    if (T.w >= 6 && T.len >= 8 && (bi % 3) === 0) {
+                        const ox = T.alongX ? T.len * 0.22 : 0, oz = T.alongX ? 0 : T.len * 0.22;
+                        K.add(L.boxCast, cx + ox, top + 0.6, cz + oz, 1.6, 1.2, 1.0, AC, S.metal);
+                        K.add(L.box, cx + ox, top + 1.22, cz + oz, 1.4, 0.04, 0.8, 0x3a4757, S.metal);
+                        K.add(L.cyl, cx - ox, top + 1.4, cz - oz, 0.9, 2.0, 0.9, TANK, S.metal);
+                        K.add(L.dome, cx - ox, top + 2.4, cz - oz, 0.9, 0.35, 0.9, TANK, S.metal);
+                    }
+                }
+                // Steel frames over the passages, with a neon band
+                K.passages((ax, oth, A, B, gap, o0, o1, mid) => {
+                    const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                    const oc = (o0 + o1) / 2;
+                    for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                        const [jx, jz] = P2(u + us * 0.06, oc);
+                        const [sx, sz] = P2(0.12, 0.3);
+                        K.add(L.box, jx, 2.2, jz, sx, 4.4, sz, FRAME, S.metal);
+                    }
+                    const [lx, lz] = P2(mid, oc);
+                    const [w1, w2] = P2(gap + 0.24, 0.3);
+                    K.add(L.boxCast, lx, 4.5, lz, w1, 0.3, w2, FRAME, S.metal);
+                    const [g1, g2] = P2(gap + 0.24, 0.32);
+                    K.add(L.box, lx, 4.32, lz, g1, 0.06, g2, NEON[1], S.lamp);
+                });
+                K.finish();
+            },
+            // V2.1: Skyline (neon rooftops at night): bands of lit office windows up the facades, a neon
+            // trim under the roof edge, a steel parapet rail round every roof (nobody falls off), roof-top
+            // air-con units, water tanks and antenna masts, wall lamps by the lane walls (their light is
+            // baked), and steel frames with a neon band over the passages
+            _buildSkyline: function () {
+                const K = this._kit(), S = K.S, L = K.L;
+                const RAIL = 0x2a3148, MULLION = 0x161b29, WIN = [0x9ec5ff, 0xffd59e, 0xf5a9e1], TRIM = [0xff2bd6, 0x22e6ff], AC = 0x475569, TANK = 0x3b3f58, MAST = 0x334155, FRAME = 0x1a1f30;
+                let bi = 0, windows = 0, units = 0;
+                for (const T of K.tall) {
+                    const b = T.b, top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    bi++;
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0, mid = (f.a0 + f.a1) / 2;
+                        const [qx, qz] = K.pt(f, mid, 0.4);
+                        if (K.inside(qx, 2, qz, 0)) continue;
+                        // The parapet rail on the roof edge, and a neon trim under it
+                        const [rx, rz] = K.pt(f, mid, 0.3);
+                        if (!K.inside(rx, top - 0.5, rz, 0)) K.onFace(L.boxCast, f, mid, top + 0.55, -0.1, flen, 0.08, 0.08, RAIL, S.metal);
+                        K.onFace(L.box, f, mid, top - 0.6, 0.04, flen, 0.1, 0.05, TRIM[bi % 2], S.lamp);
+                        if (flen < 6 || T.w < 3.5) continue;
+                        // Bands of office windows above head height: a dark mullion strip with lit panes in it
+                        for (let y = 4.2; y < top - 1.4 && windows < 900; y += 2.2) {
+                            K.onFace(L.box, f, mid, y, 0.02, flen - 0.8, 1.1, 0.04, MULLION, S.window);
+                            const n = Math.floor((flen - 1.2) / 1.4);
+                            for (let i = 0; i < n; i++) {
+                                if (((i * 7 + bi * 3 + Math.round(y)) % 5) === 0) continue;
+                                const a = f.a0 + 0.6 + 0.7 + i * 1.4;
+                                K.onFace(L.box, f, a, y, 0.035, 1.0, 0.8, 0.02, WIN[(i + bi) % 3], S.window);
+                                windows++;
+                            }
+                        }
+                        // Lobby glass at street level, flush on the wall, under a neon lintel
+                        for (let a = f.a0 + 1.5; a < f.a1 - 1.2; a += 3) {
+                            const [gx, gz] = K.pt(f, a, 0.3);
+                            if (K.inside(gx, 1.2, gz, 0.1)) continue;
+                            K.onFace(L.box, f, a, 1.3, 0.02, 2.4, 2.2, 0.03, MULLION, S.window);
+                            K.onFace(L.box, f, a, 2.55, 0.03, 2.4, 0.1, 0.04, TRIM[(bi + 1) % 2], S.lamp);
+                        }
+                        // A wall lamp on the longer walls
+                        const la = f.a0 + flen * 0.3;
+                        const [lx, lz] = K.pt(f, la, 0.6);
+                        if (flen >= 10 && !K.inside(lx, 3.4, lz, 0.2)) K.lampAt(f, la, 3.4);
+                    }
+                    // Air-con units, a water tank and an antenna mast on the bigger roofs
+                    if (T.w >= 6 && T.len >= 8 && units < 24) {
+                        const ox = T.alongX ? T.len * 0.25 : 0, oz = T.alongX ? 0 : T.len * 0.25;
+                        if ((bi % 2) === 0) {
+                            K.add(L.boxCast, cx + ox, top + 0.6, cz + oz, 1.8, 1.2, 1.2, AC, S.metal);
+                            K.add(L.box, cx + ox, top + 1.22, cz + oz, 1.6, 0.04, 1.0, 0x3a4757, S.metal);
+                            units++;
+                        }
+                        if ((bi % 3) === 0) {
+                            K.add(L.cyl, cx - ox, top + 1.2, cz - oz, 0.8, 1.6, 0.8, TANK, S.metal);
+                            K.add(L.dome, cx - ox, top + 2.0, cz - oz, 0.8, 0.3, 0.8, TANK, S.metal);
+                        } else if ((bi % 3) === 1) {
+                            K.add(L.cyl, cx - ox, top + 2.5, cz - oz, 0.06, 5, 0.06, MAST, S.metal);
+                            K.add(L.box, cx - ox, top + 4.2, cz - oz, 1.2, 0.06, 0.06, MAST, S.metal);
+                        }
+                    }
+                }
+                // Steel frames over the passages, with a neon band
+                K.passages((ax, oth, A, B, gap, o0, o1, mid) => {
+                    const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                    const oc = (o0 + o1) / 2;
+                    for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                        const [jx, jz] = P2(u + us * 0.06, oc);
+                        const [sx, sz] = P2(0.12, 0.3);
+                        K.add(L.box, jx, 2.2, jz, sx, 4.4, sz, FRAME, S.metal);
+                    }
+                    const [lx, lz] = P2(mid, oc);
+                    const [w1, w2] = P2(gap + 0.24, 0.3);
+                    K.add(L.boxCast, lx, 4.5, lz, w1, 0.3, w2, FRAME, S.metal);
+                    const [g1, g2] = P2(gap + 0.24, 0.32);
+                    K.add(L.box, lx, 4.32, lz, g1, 0.06, g2, TRIM[1], S.lamp);
+                });
+                K.finish();
             }
+
+
         };
         // ---- Ultra Realism: baked light and a near shadow cascade ----
         // 1. A 100 x 12 x 100 volume (1 m cells over the arena) baked per map and time
@@ -45686,6 +46826,7 @@
                 // V1.7: a new round ends any replay and starts fresh round stats
                 replayDirector.stop();
                 breakables.reset();
+                if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.resetMapMechanics) tacticalEnhancements.resetMapMechanics();   // V2.1: doors open, wall whole
                 this.rs = { kills: [], dmg: 0, killer: null };
                 this.round++;
                 agentStrip.show(); // V1.9: each Match / Ranked / Spike Rush round shows the agent strip for 4 s
@@ -50742,11 +51883,9 @@
             careerModalOpen: false,
             activeCareerTab: 'overview',
 
-            // 3. Lotus Rotating Doors & Split Vertical Ziplines
+            // 3. Lotus Rotating Doors (V2.1: rope ascenders come from each map's layout, below)
             lotusGroup: null,
             lotusDoors: [],
-            splitGroup: null,
-            splitZiplines: [],
             lastInteractFAt: 0,
             lastZiplineSoundAt: 0,
 
@@ -50772,7 +51911,7 @@
             init: function() {
                 this.loadCareerIfEnabled();
                 this.buildLotusDoors3D();
-                this.buildSplitZiplines3D();
+                this.buildLayoutRopes3D();   // V2.1
                 this.buildSkylineCity3D();
                 this.buildWingmanBots3D();
                 this.pingGroup = new THREE.Group();
@@ -51245,125 +52384,249 @@
             // =============================================
             // 3. LOTUS Rotating Stone Doors [F] & SPLIT Vertical Ascender Ziplines [F]
             // =============================================
+            // V2.1: rotating stone doors from the map's layout (layout.doors: the pivot x, z, the slab's
+            // length across its lane, and the lane's axis). A pool of rigs, placed when the layout changes.
+            // A door is solid: shut, it closes its lane to players, bots (the walk grid is refreshed, so
+            // they route round) and bullets; it turns slowly and loudly on [F], blocking its whole square
+            // while it turns. Every round starts with the doors open.
             buildLotusDoors3D: function() {
                 this.lotusGroup = new THREE.Group();
                 this.lotusDoors = [];
-                const doorConfigs = [
-                    { id: 'A', name: 'WEST LOTUS ROTATING DOOR (A-RUBBLE)', x: -18, z: 0 },
-                    { id: 'C', name: 'EAST LOTUS ROTATING DOOR (C-MOUND)',  x: 18,  z: 0 }
-                ];
-
-                for (let i = 0; i < doorConfigs.length; i++) {
-                    const cfg = doorConfigs[i];
+                const slabGeo = new THREE.BoxGeometry(1, 6.6, 0.8);       // x is scaled to the door's length
+                const slabMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.75, metalness: 0.25 });
+                const crystalGeo = new THREE.OctahedronGeometry(0.65, 0);
+                const ringGeo = new THREE.RingGeometry(2.9, 3.2, 40);
+                ringGeo.rotateX(-Math.PI / 2);
+                for (let i = 0; i < 4; i++) {
                     const pivot = new THREE.Group();
-                    pivot.position.set(cfg.x, 0, cfg.z);
-
-                    // Ancient Carved Monolith Slab
-                    const slabGeo = new THREE.BoxGeometry(3.8, 6.6, 10.5);
-                    const slabMat = new THREE.MeshStandardMaterial({
-                        color: 0x7c2d12,
-                        roughness: 0.75,
-                        metalness: 0.25
-                    });
-                    const slabMesh = new THREE.Mesh(slabGeo, slabMat);
-                    slabMesh.position.y = 3.3;
-                    pivot.add(slabMesh);
-
-                    // Glowing Lotus Crystal Core on both faces
-                    const crystalGeo = new THREE.OctahedronGeometry(0.65, 0);
-                    const crystalMat = new THREE.MeshBasicMaterial({
-                        color: 0xf43f5e
-                    });
-                    const crystalMesh = new THREE.Mesh(crystalGeo, crystalMat);
-                    crystalMesh.position.set(0, 3.3, 0);
-                    crystalMesh.scale.set(3.4, 1.2, 1.2);
-                    pivot.add(crystalMesh);
-
-                    // Floor Rotation Track Ring
-                    const ringGeo = new THREE.RingGeometry(4.8, 5.4, 32);
-                    ringGeo.rotateX(-Math.PI / 2);
-                    const ringMat = new THREE.MeshBasicMaterial({
-                        color: 0xf43f5e,
-                        transparent: true,
-                        opacity: 0.65,
-                        side: THREE.DoubleSide
-                    });
-                    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-                    ringMesh.position.y = 0.06;
-                    pivot.add(ringMesh);
-
+                    const slab = new THREE.Mesh(slabGeo, slabMat);
+                    slab.position.y = 3.3;
+                    pivot.add(slab);
+                    // A glowing crystal set in both faces (green open, red shut)
+                    const crystalMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+                    const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+                    crystal.position.set(0, 3.3, 0);
+                    crystal.scale.set(1.2, 1.2, 1.4);
+                    pivot.add(crystal);
+                    // The floor track it turns on
+                    const ringMat = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.position.y = 0.06;
+                    pivot.add(ring);
+                    pivot.visible = false;
                     this.lotusGroup.add(pivot);
-                    this.lotusDoors.push({
-                        id: cfg.id,
-                        name: cfg.name,
-                        x: cfg.x,
-                        z: cfg.z,
-                        pivot: pivot,
-                        crystalMat: crystalMat,
-                        ringMat: ringMat,
-                        isOpen: false,
-                        currentAngle: 0,
-                        targetAngle: 0
-                    });
+                    const rec = createColliderRecord('static', null);
+                    const shot = { bounds: new THREE.Box3(), proxy: slab, disabled: true, shotStamp: 0 };
+                    const door = { pivot: pivot, slab: slab, crystalMat: crystalMat, ringMat: ringMat, cfg: null, name: '', x: 0, z: 0,
+                        isOpen: true, turning: false, currentAngle: 0, targetAngle: 0, openAngle: 0, closedAngle: 0, rec: rec, shot: shot };
+                    shootableOwners.set(slab, { kind: 'env', lotusDoor: door });
+                    this.lotusDoors.push(door);
                 }
-                this.lotusGroup.visible = false;
                 scene.add(this.lotusGroup);
+                this.buildBreakWall3D();
+                this.placeMapMechanics();
             },
 
-            buildSplitZiplines3D: function() {
-                this.splitGroup = new THREE.Group();
-                this.splitZiplines = [];
-                const zipConfigs = [
-                    { id: 'A-HEAVEN', name: 'WEST A-HEAVEN ASCENDER', x: -18.2, z: -6, topY: 7.4 },
-                    { id: 'B-HEAVEN', name: 'EAST B-HEAVEN ASCENDER', x: 18.2,  z: 6,  topY: 7.4 },
-                    { id: 'MID-WEST', name: 'CENTRAL VENT WEST ASCENDER', x: -6.8, z: 0, topY: 11.2 },
-                    { id: 'MID-EAST', name: 'CENTRAL VENT EAST ASCENDER', x: 6.8,  z: 0, topY: 11.2 }
-                ];
+            // A door's footprint: 'open' (the slab along its lane), 'shut' (across it) or 'turning' (the
+            // square it sweeps)
+            _doorBox: function(d, state) {
+                const c = d.cfg, h = c.len / 2, t = 0.4;
+                if (state === 'turning') return [c.x - h, c.x + h, c.z - h, c.z + h];
+                const alongZ = (state === 'open') === (c.axis === 'z');
+                return alongZ ? [c.x - t, c.x + t, c.z - h, c.z + h] : [c.x - h, c.x + h, c.z - t, c.z + t];
+            },
+            _doorSolid: function(d, state) {
+                const b = this._doorBox(d, state), r = d.rec;
+                if (r.indexed) collisionIndex.remove(r);
+                r.minX = b[0]; r.maxX = b[1]; r.minZ = b[2]; r.maxZ = b[3]; r.minY = 0; r.maxY = 6.6;
+                r.anchorX = d.cfg.x; r.anchorZ = d.cfg.z;
+                collisionIndex.insert(r);
+                const h = d.cfg.len / 2 + 1;
+                if (typeof navGrid !== 'undefined' && navGrid.refreshArea) navGrid.refreshArea(d.cfg.x - h, d.cfg.z - h, d.cfg.x + h, d.cfg.z + h);
+            },
+            _doorColour: function(d) {
+                const hex = d.isOpen ? 0x10b981 : 0xf43f5e;
+                d.crystalMat.color.setHex(hex).convertSRGBToLinear();
+                d.ringMat.color.setHex(hex).convertSRGBToLinear();
+            },
 
-                for (let i = 0; i < zipConfigs.length; i++) {
-                    const cfg = zipConfigs[i];
-                    const g = new THREE.Group();
-                    g.position.set(cfg.x, 0, cfg.z);
-
-                    // Glowing Yellow Ascender Cable
-                    const ropeGeo = new THREE.CylinderGeometry(0.09, 0.09, cfg.topY + 1.2, 10);
-                    const ropeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
-                    const ropeMesh = new THREE.Mesh(ropeGeo, ropeMat);
-                    ropeMesh.position.y = (cfg.topY + 1.2) * 0.5;
-                    g.add(ropeMesh);
-
-                    // Top motorized winch housing
-                    const winchGeo = new THREE.BoxGeometry(0.9, 0.6, 0.9);
-                    const winchMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, emissive: 0x0284c7, emissiveIntensity: 0.5 });
-                    const winchMesh = new THREE.Mesh(winchGeo, winchMat);
-                    winchMesh.position.y = cfg.topY + 1.2;
-                    g.add(winchMesh);
-
-                    // Floor Zipline Beacon Ring
-                    const padGeo = new THREE.RingGeometry(1.1, 1.5, 24);
-                    padGeo.rotateX(-Math.PI / 2);
-                    const padMat = new THREE.MeshBasicMaterial({
-                        color: 0xfacc15,
-                        transparent: true,
-                        opacity: 0.75,
-                        side: THREE.DoubleSide
-                    });
-                    const padMesh = new THREE.Mesh(padGeo, padMat);
-                    padMesh.position.y = 0.06;
-                    g.add(padMesh);
-
-                    this.splitGroup.add(g);
-                    this.splitZiplines.push({
-                        id: cfg.id,
-                        name: cfg.name,
-                        x: cfg.x,
-                        z: cfg.z,
-                        topY: cfg.topY,
-                        padMesh: padMesh
-                    });
+            // V2.1: a breakable wall from the map's layout (layout.breakWall): solid to players, bots and
+            // bullets until shot to pieces, then gone for the rest of the round (the walk grid is
+            // refreshed both ways). Back at each round's start.
+            buildBreakWall3D: function() {
+                const mat = new THREE.MeshStandardMaterial({ color: 0x8a5a3c, roughness: 0.75, metalness: 0.25 });
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+                mesh.visible = false;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+                const w = { mesh: mesh, mat: mat, cfg: null, hp: 0, broken: false, rec: createColliderRecord('static', null),
+                    shot: { bounds: new THREE.Box3(), proxy: mesh, disabled: true, shotStamp: 0 } };
+                shootableOwners.set(mesh, { kind: 'env', breakWall: w });
+                this.breakWall = w;
+            },
+            _wallSolid: function(w, on) {
+                const c = w.cfg;
+                if (w.rec.indexed) collisionIndex.remove(w.rec);
+                if (on) {
+                    w.rec.minX = c.x0; w.rec.maxX = c.x1; w.rec.minZ = c.z0; w.rec.maxZ = c.z1; w.rec.minY = 0; w.rec.maxY = c.h;
+                    w.rec.anchorX = (c.x0 + c.x1) / 2; w.rec.anchorZ = (c.z0 + c.z1) / 2;
+                    collisionIndex.insert(w.rec);
                 }
-                this.splitGroup.visible = false;
-                scene.add(this.splitGroup);
+                w.shot.disabled = !on;
+                if (typeof navGrid !== 'undefined' && navGrid.refreshArea) navGrid.refreshArea(c.x0 - 1, c.z0 - 1, c.x1 + 1, c.z1 + 1);
+            },
+
+            // Into the shot index once (a map rebuild clears it; a new round does not)
+            _shotPut: function(piece) {
+                const I = envShotIndex, b = piece.bounds;
+                const cell = I.cells.get((I.cellCoord(b.min.x) + 512) * 1024 + (I.cellCoord(b.min.z) + 512));
+                if (!cell || cell.indexOf(piece) < 0) I.insert(piece);
+            },
+            // Put this map's doors and breakable wall in place (all open / intact), or take them away
+            placeMapMechanics: function() {
+                const L = mapLayout();
+                this._mechLayout = L;
+                const doors = L.doors || [];
+                this.lotusDoors.forEach((d, i) => {
+                    const cfg = doors[i] || null;
+                    if (d.rec.indexed) collisionIndex.remove(d.rec);
+                    d.shot.disabled = true;
+                    d.cfg = cfg;
+                    d.pivot.visible = !!cfg;
+                    if (!cfg) return;
+                    d.name = cfg.name; d.x = cfg.x; d.z = cfg.z;
+                    d.closedAngle = cfg.axis === 'z' ? 0 : Math.PI / 2;
+                    d.openAngle = cfg.axis === 'z' ? Math.PI / 2 : 0;
+                    d.isOpen = true; d.turning = false;
+                    d.currentAngle = d.targetAngle = d.openAngle;
+                    d.pivot.position.set(cfg.x, 0, cfg.z);
+                    d.pivot.rotation.y = d.currentAngle;
+                    d.slab.scale.x = cfg.len;
+                    d.pivot.updateMatrixWorld(true);
+                    const h = cfg.len / 2;
+                    d.shot.bounds.min.set(cfg.x - h, 0, cfg.z - h);
+                    d.shot.bounds.max.set(cfg.x + h, 6.6, cfg.z + h);
+                    this._shotPut(d.shot);
+                    d.shot.disabled = false;
+                    this._doorColour(d);
+                    this._doorSolid(d, 'open');
+                });
+                const w = this.breakWall, wc = L.breakWall || null;
+                if (w) {
+                    if (w.rec.indexed) collisionIndex.remove(w.rec);
+                    w.shot.disabled = true;
+                    w.cfg = wc;
+                    w.mesh.visible = !!wc;
+                    if (wc) {
+                        w.mesh.position.set((wc.x0 + wc.x1) / 2, wc.h / 2, (wc.z0 + wc.z1) / 2);
+                        w.mesh.scale.set(wc.x1 - wc.x0, wc.h, wc.z1 - wc.z0);
+                        w.mesh.updateMatrixWorld(true);
+                        w.shot.bounds.min.set(wc.x0, 0, wc.z0);
+                        w.shot.bounds.max.set(wc.x1, wc.h, wc.z1);
+                        this._shotPut(w.shot);
+                        w.hp = wc.hp; w.broken = false;
+                        w.mat.color.setHex(0x8a5a3c).convertSRGBToLinear();
+                        this._wallSolid(w, true);
+                    }
+                }
+            },
+            // A new round: doors open, the wall whole again
+            resetMapMechanics: function() {
+                if (this.lotusDoors) this.placeMapMechanics();
+            },
+            damageBreakWall: function(w, dmg, point) {
+                if (!w || !w.cfg || w.broken) return;
+                w.hp -= dmg;
+                // It darkens as it cracks
+                const k = Math.max(0, w.hp / w.cfg.hp);
+                w.mat.color.setHex(0x8a5a3c).convertSRGBToLinear().multiplyScalar(0.45 + 0.55 * k);
+                if (w.hp > 0) return;
+                w.broken = true;
+                w.mesh.visible = false;
+                this._wallSolid(w, false);
+                const c = w.cfg, cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
+                if (typeof createHitEffect === 'function') for (let i = 0; i < 6; i++) createHitEffect(new THREE.Vector3(c.x0 + (c.x1 - c.x0) * Math.random(), 0.4 + Math.random() * (c.h - 0.6), cz), true);
+                this.playStoneDoorTurn(0.9);
+                showNotification(c.name + ' SMASHED: THE WAY THROUGH IS OPEN', 2200);
+            },
+            // The doors' grind: two detuned saws and a rumble for the length of the turn, then a thud (louder
+            // and longer than the old click)
+            playStoneDoorTurn: function(secs) {
+                try {
+                    soundFX.init();
+                    if (!soundFX.ctx || soundFX.muted) return;
+                    const ctx = soundFX.ctx, now = ctx.currentTime, out = soundFX.masterGain || ctx.destination;
+                    for (const f of [61, 64.5, 41]) {
+                        const osc = ctx.createOscillator(), g = ctx.createGain();
+                        osc.type = f < 50 ? 'triangle' : 'sawtooth';
+                        osc.frequency.setValueAtTime(f, now);
+                        osc.frequency.linearRampToValueAtTime(f * 0.82, now + secs);
+                        g.gain.setValueAtTime(0.001, now);
+                        g.gain.linearRampToValueAtTime(f < 50 ? 0.34 : 0.2, now + 0.12);
+                        g.gain.setValueAtTime(f < 50 ? 0.34 : 0.2, now + secs - 0.15);
+                        g.gain.exponentialRampToValueAtTime(0.001, now + secs + 0.05);
+                        osc.connect(g); g.connect(out);
+                        osc.start(now); osc.stop(now + secs + 0.08);
+                    }
+                    const thud = ctx.createOscillator(), tg = ctx.createGain();
+                    thud.type = 'sine';
+                    thud.frequency.setValueAtTime(90, now + secs);
+                    thud.frequency.exponentialRampToValueAtTime(38, now + secs + 0.35);
+                    tg.gain.setValueAtTime(0.001, now + secs);
+                    tg.gain.linearRampToValueAtTime(0.45, now + secs + 0.02);
+                    tg.gain.exponentialRampToValueAtTime(0.001, now + secs + 0.4);
+                    thud.connect(tg); tg.connect(out);
+                    thud.start(now + secs); thud.stop(now + secs + 0.42);
+                } catch (e) {}
+            },
+
+            // V2.1: rope ascenders from the map's layout (layout.ropes: the cable's foot x, z, the deck
+            // height topY, and the exit point on the deck). A pool of rigs, placed when the layout
+            // changes, like the teleporter pads. Icebox and Split use them (Split's four ascenders were
+            // hardcoded for its old open arena).
+            ropeGroup: null,
+            layoutRopes: [],
+            _ropeLayout: null,
+            buildLayoutRopes3D: function() {
+                this.ropeGroup = new THREE.Group();
+                this.layoutRopes = [];
+                const cableGeo = new THREE.CylinderGeometry(0.09, 0.09, 1, 10);
+                const winchGeo = new THREE.BoxGeometry(0.9, 0.6, 0.9);
+                const padGeo = new THREE.RingGeometry(1.1, 1.5, 24);
+                padGeo.rotateX(-Math.PI / 2);
+                const cableMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+                const winchMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, emissive: 0x0284c7, emissiveIntensity: 0.5 });
+                const padMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.75, side: THREE.DoubleSide });
+                for (let i = 0; i < 6; i++) {
+                    const g = new THREE.Group();
+                    const cable = new THREE.Mesh(cableGeo, cableMat);
+                    const winch = new THREE.Mesh(winchGeo, winchMat);
+                    const pad = new THREE.Mesh(padGeo, padMat);
+                    pad.position.y = 0.06;
+                    g.add(cable); g.add(winch); g.add(pad);
+                    g.visible = false;
+                    this.ropeGroup.add(g);
+                    this.layoutRopes.push({ group: g, cable: cable, winch: winch, pad: pad, rope: null });
+                }
+                scene.add(this.ropeGroup);
+                this.placeLayoutRopes();
+            },
+            placeLayoutRopes: function() {
+                if (!this.ropeGroup) return;
+                const L = mapLayout(), ropes = L.ropes || [];
+                this._ropeLayout = L;
+                this.layoutRopes.forEach((r, i) => {
+                    const rope = ropes[i] || null;
+                    r.rope = rope;
+                    r.group.visible = !!rope;
+                    if (!rope) return;
+                    const h = rope.topY + 1.2;
+                    r.group.position.set(rope.x, 0, rope.z);
+                    r.cable.scale.set(1, h, 1);
+                    r.cable.position.y = h / 2;
+                    r.winch.position.y = h;
+                });
             },
 
             // SKYLINE: the city around the rooftop arena. Distant towers with lit
@@ -51414,39 +52677,50 @@
                 add(lit[0], 0xffc46b);
                 add(lit[1], 0x7dd3fc);
                 add(lit[2], 0xf472b6);
-                // Billboard faces on the deck frames (x = +-38.5), framed ad panels
-                const magenta = [part(0.06, 4.4, 11.4, -38.2, 7, 0), part(0.06, 4.4, 11.4, 38.2, 7, 0)];
+                // V2.1: the landmark details sit where Skyline's own build puts its landmarks
+                // (MAP_PRESETS.skyline.landmarks; they were on the old open arena's skybridges, side decks,
+                // water tower and helipad). Neon faces on the billboards: a magenta panel, cyan ad blocks
+                // and a yellow strip
+                const LM = MAP_PRESETS.skyline.landmarks;
+                const magenta = [], cyan = [], strip = [];
+                for (const bb of LM.billboards) {
+                    const w = bb.x1 - bb.x0, h = bb.y1 - bb.y0, cx = (bb.x0 + bb.x1) / 2, cy = (bb.y0 + bb.y1) / 2;
+                    magenta.push(part(w, h, 0.06, cx, cy, bb.z));
+                    cyan.push(part(w * 0.45, h * 0.45, 0.08, cx - w * 0.2, cy + h * 0.15, bb.z + bb.nz * 0.03));
+                    cyan.push(part(w * 0.3, h * 0.22, 0.08, cx + w * 0.25, cy - h * 0.25, bb.z + bb.nz * 0.03));
+                    strip.push(part(w * 0.8, 0.5, 0.09, cx, bb.y0 + h * 0.12, bb.z + bb.nz * 0.04));
+                }
                 add(magenta, 0xff2bd6);
-                add([part(0.08, 2.2, 6, -38.15, 7.6, -2), part(0.08, 1.2, 4, -38.15, 5.6, 2.6), part(0.08, 2.2, 6, 38.15, 7.6, 2), part(0.08, 1.2, 4, 38.15, 5.6, -2.6)], 0x22e6ff);
-                add([part(0.09, 0.5, 9, -38.1, 6.0, -1), part(0.09, 0.5, 9, 38.1, 6.0, 1)], 0xfef08a);
-                // Neon tubes along the outer walls and under the skybridges
-                const tubes = [];
+                add(cyan, 0x22e6ff);
+                add(strip, 0xfef08a);
+                // Neon tubes along the outer walls and under the skybridge
+                const tubes = [], BR = LM.bridge;
                 for (const sgn of [-1, 1]) {
                     tubes.push(part(0.12, 0.12, 96, 49.4 * sgn, 3.2, 0));
                     tubes.push(part(96, 0.12, 0.12, 0, 3.2, 49.4 * sgn));
-                    tubes.push(part(22, 0.08, 0.08, 0, 3.55, 38 * sgn - 1.5));
-                    tubes.push(part(22, 0.08, 0.08, 0, 3.55, 38 * sgn + 1.5));
                 }
+                for (const x of [BR.x0 + 0.1, BR.x1 - 0.1]) tubes.push(part(0.08, 0.08, BR.z1 - BR.z0, x, BR.y, (BR.z0 + BR.z1) / 2));
                 add(tubes, 0x22e6ff);
                 // Water tower legs, helipad "H" and ring
-                const legs = [];
-                for (const [lx, lz] of [[-2.6, -2.6], [2.6, -2.6], [-2.6, 2.6], [2.6, 2.6]]) legs.push(part(0.3, 4.8, 0.3, -18 + lx, 2.4, -6 + lz));
+                const legs = [], WT = LM.waterTower, HP = LM.helipad;
+                for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) legs.push(part(0.3, WT.top, 0.3, WT.x + lx * WT.half, WT.top / 2, WT.z + lz * WT.half));
                 add(legs, 0x1e2433);
-                add([part(0.6, 0.04, 4, -1.2, 3.02, 0), part(0.6, 0.04, 4, 1.2, 3.02, 0), part(1.8, 0.04, 0.6, 0, 3.02, 0)], 0xfacc15);
+                add([part(0.6, 0.04, 4, HP.x - 1.2, HP.y, HP.z), part(0.6, 0.04, 4, HP.x + 1.2, HP.y, HP.z), part(1.8, 0.04, 0.6, HP.x, HP.y, HP.z)], 0xfacc15);
                 const ringGeo = new THREE.RingGeometry(2.9, 3.2, 40);
                 ringGeo.rotateX(-Math.PI / 2);
                 const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-                ring.position.set(0, 3.02, 0);
+                ring.position.set(HP.x, HP.y, HP.z);
                 g.add(ring);
-                // Antenna masts on the stair towers, with blinking red lights
+                // Antenna masts (on the skybridge towers, the Control Booth's roof and the giant billboard),
+                // with blinking red lights
                 const masts = [];
                 this.skylineBeacons = [];
                 const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2030 });
                 const beaconGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
-                for (const [mx, mz] of [[-14, -38], [14, -38], [-14, 38], [14, 38]]) {
-                    masts.push(part(0.14, 5, 0.14, mx + 2, 6.5, mz + 2));
+                for (const [mx, mz, base] of LM.masts) {
+                    masts.push(part(0.14, 5, 0.14, mx, base + 2.5, mz));
                     const b = new THREE.Mesh(beaconGeo, beaconMat);
-                    b.position.set(mx + 2, 9.1, mz + 2);
+                    b.position.set(mx, base + 5.1, mz);
                     g.add(b);
                     this.skylineBeacons.push(b);
                 }
@@ -51460,8 +52734,6 @@
             },
 
             onMapChanged: function(mapId) {
-                if (this.lotusGroup) this.lotusGroup.visible = (mapId === 'lotus');
-                if (this.splitGroup) this.splitGroup.visible = (mapId === 'split');
                 if (this.skylineGroup) this.skylineGroup.visible = (mapId === 'skyline');
                 if (typeof progression !== 'undefined' && progression.sprayMesh) progression.hideSpray();
             },
@@ -51479,49 +52751,60 @@
                 const py = characterController.position.y;
                 const pz = characterController.position.z;
 
-                // A) LOTUS Rotating Stone Doors ([F] within 6m)
-                if (game.mapPreset === 'lotus' && this.lotusGroup && this.lotusGroup.visible) {
+                // A) V2.1: the rotating stone doors from the map's layout ([F] within 4 m of the pivot): a
+                // quarter turn takes about 2.4 s and blocks the door's square until it is done
+                if (this.lotusDoors && this._mechLayout !== mapLayout()) this.placeMapMechanics();
+                if (this.lotusDoors) {
                     for (let i = 0; i < this.lotusDoors.length; i++) {
                         const door = this.lotusDoors[i];
+                        if (!door.cfg) continue;
                         const dist = Math.hypot(px - door.x, pz - door.z);
-                        if (dist <= 6.2 && game.keys.f && (now - this.lastInteractFAt) > 650) {
+                        if (!door.turning && dist <= 4.2 && game.keys.f && (now - this.lastInteractFAt) > 650) {
                             this.lastInteractFAt = now;
                             door.isOpen = !door.isOpen;
-                            door.targetAngle = door.isOpen ? (Math.PI * 0.5) : 0;
-                            const colHex = door.isOpen ? 0x10b981 : 0xf43f5e;
-                            door.crystalMat.color.setHex(colHex).convertSRGBToLinear();
-                            door.ringMat.color.setHex(colHex).convertSRGBToLinear();
-                            this.playStoneDoorSound();
-                            showNotification(`${door.name}: ${door.isOpen ? 'ROTATING OPEN [PASSAGE UNLOCKED]' : 'ROTATING CLOSED [PASSAGE SEALED]'}`, 2000);
+                            door.targetAngle = door.isOpen ? door.openAngle : door.closedAngle;
+                            door.turning = true;
+                            this._doorSolid(door, 'turning');
+                            this._doorColour(door);
+                            this.playStoneDoorTurn(2.4);
+                            showNotification(`${door.name}: ${door.isOpen ? 'ROTATING OPEN [PASSAGE UNLOCKED]' : 'ROTATING SHUT [PASSAGE SEALED]'}`, 2000);
                         }
-                        // Smoothly interpolate door rotation
-                        const diff = door.targetAngle - door.currentAngle;
-                        if (Math.abs(diff) > 0.005) {
-                            door.currentAngle += Math.sign(diff) * Math.min(Math.abs(diff), delta * 2.2);
+                        if (door.turning) {
+                            const diff = door.targetAngle - door.currentAngle;
+                            const step = delta * 0.655;
+                            if (Math.abs(diff) <= step) {
+                                door.currentAngle = door.targetAngle;
+                                door.turning = false;
+                                this._doorSolid(door, door.isOpen ? 'open' : 'shut');
+                            } else door.currentAngle += Math.sign(diff) * step;
                             door.pivot.rotation.y = door.currentAngle;
+                            door.pivot.updateMatrixWorld(true);   // shots and sight test the slab where it is now
                         }
                     }
                 }
 
-                // B) SPLIT Vertical Ascender Ziplines (Hold [F] or [Space] near cable to hoist up to Heaven!)
-                if (game.mapPreset === 'split' && this.splitGroup && this.splitGroup.visible) {
-                    for (let i = 0; i < this.splitZiplines.length; i++) {
-                        const zip = this.splitZiplines[i];
-                        zip.padMesh.rotation.z += delta * 1.8;
-                        const dist = Math.hypot(px - zip.x, pz - zip.z);
-                        if (dist <= 2.65 && (game.keys.f || game.keys.space) && py < zip.topY + 1.4) {
-                            characterController.position.y = Math.min(zip.topY + 1.75, py + delta * 13.5);
+                // B) V2.1: rope ascenders from the map's layout (Icebox, Split): hold F (or jump) at a cable
+                // to hoist up, stepping off onto the deck at the layout's exit point
+                if (this.ropeGroup) {
+                    if (this._ropeLayout !== mapLayout()) this.placeLayoutRopes();
+                    for (let i = 0; i < this.layoutRopes.length; i++) {
+                        const r = this.layoutRopes[i], rope = r.rope;
+                        if (!rope) continue;
+                        r.pad.rotation.y += delta * 1.8;
+                        const dist = Math.hypot(px - rope.x, pz - rope.z);
+                        if (dist <= 2.65 && (game.keys.f || game.keys.space) && py < rope.topY + 1.4) {
+                            characterController.position.y = Math.min(rope.topY + 1.75, py + delta * 13.5);
                             characterController.velocity.y = 0;
-                            characterController.isGrounded = false;
+                            characterController.grounded = false;
                             if (now - this.lastZiplineSoundAt > 240) {
                                 this.lastZiplineSoundAt = now;
                                 this.playZiplineSound();
                             }
-                            if (characterController.position.y >= zip.topY + 1.5) {
-                                // Step onto the elevated platform deck!
-                                const stepX = zip.x < -12 ? zip.x - 2.2 : (zip.x > 12 ? zip.x + 2.2 : (zip.x < 0 ? zip.x + 2.0 : zip.x - 2.0));
-                                characterController.position.x = stepX;
-                                showNotification(`ASCENDED VIA ${zip.name}!`, 1500);
+                            if (characterController.position.y >= rope.topY + 1.5) {
+                                characterController.position.x = rope.exit.x;
+                                characterController.position.z = rope.exit.z;
+                                characterController.prevSimPosition.copy(characterController.position);
+                                showNotification(`ASCENDED VIA ${rope.name}!`, 1500);
                             }
                         }
                     }

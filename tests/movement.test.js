@@ -10,11 +10,14 @@ after(closeBrowser);
 const HELPERS = () => {
     window.updateEnemies = () => {};
     const cc = characterController;
-    // A sprint and slide cover 50-100 m: the open band at z = 32 on Lotus is clear for 96 m
-    // (Ascent, and since V2.1 Bind and Haven, are walled lanes, nothing that long); props off
+    // Sprint and slide runs need 60-85 m of straight floor (a 40-tick sprint alone covers 50 m).
+    // V2.1: every map is walled lanes now (Lotus's old open band is gone, Icebox's longest
+    // straight is 52 m), so these runs start on Icebox's Reefer Row with the walls taken out of
+    // the collision index: open floor, the same movement code; props off
     window.__openBand = () => {
-        tacticalDirector.cycleMapPreset('lotus');
+        tacticalDirector.cycleMapPreset('icebox');
         game.userSettings.breakables = false; breakables.applyEnabled();
+        collisionIndex.cells.clear();
     };
     window.__mv = {
         place(x, z, yaw) {
@@ -40,7 +43,7 @@ test('slide: crouch while sprinting slides low and fast, ends on its own, has a 
         const cc = characterController, mv = __mv, out = {};
         const sprintTop = cc.terminalSpeed(cc.sprintSpeed);
         // Sprint east along an open lane, then crouch
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setSprinting(true);
         mv.tick(40);
         out.sprint = mv.speed();
@@ -54,7 +57,7 @@ test('slide: crouch while sprinting slides low and fast, ends on its own, has a 
         mv.tick(60);
         out.ended = cc.slideTimer === 0;
         // Crouch-walking the same 20 ticks covers far less ground
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setCrouching(true);
         mv.tick(30);
         const x1 = cc.position.x;
@@ -62,13 +65,13 @@ test('slide: crouch while sprinting slides low and fast, ends on its own, has a 
         out.crouchDist = cc.position.x - x1;
         out.noSlideFromWalk = cc.slideStarts === 1;
         // Cooldown: an immediate second slide is refused
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setSprinting(true); mv.tick(40);
         cc.setCrouching(true); cc.setCrouching(false); cc.setSprinting(true); mv.tick(2);
         cc.setCrouching(true);
         out.cooldown = cc.slideStarts === 2 && cc.slideTimer === 0;
         // Jumping out of a slide keeps the speed in the air
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setSprinting(true); mv.tick(40);
         cc.setCrouching(true); mv.tick(5);
         game.keys.space = true; jumpQueued = true; mv.tick(1); game.keys.space = false;
@@ -78,7 +81,7 @@ test('slide: crouch while sprinting slides low and fast, ends on its own, has a 
         out.walkTop = cc.terminalSpeed(cc.walkSpeed);
         // Setting off: crouching while sprinting is just a crouch
         document.querySelector('#setting-slide-pills [data-slide="off"]').click();
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setSprinting(true); mv.tick(40);
         const before = cc.slideStarts;
         cc.setCrouching(true);
@@ -104,7 +107,7 @@ test('slide: crouch while sprinting slides low and fast, ends on its own, has a 
     const tilt = await evaluate(() => {
         const cc = characterController, mv = __mv;
         const z0 = camera.rotation.z;
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setSprinting(true); mv.tick(40);
         cc.setCrouching(true);
         let max = 0;
@@ -127,7 +130,7 @@ test('mantle: jumping into a chest-high ledge climbs onto it; too high or Mantle
     const r = await evaluate(() => {
         tacticalDirector.cycleMapPreset('skyline');
         const cc = characterController, mv = __mv, out = {};
-        // Run at the east deck (top 2.2 m, no steps at z = 6) and jump into it
+        // Run at the Vent Farm's chest-high condenser (top 2.2 m, x 24..27, z 5.8..8) and jump into it
         const jumpInto = (x, z, yaw) => {
             mv.place(x, z, yaw);
             game.keys.w = true;
@@ -144,24 +147,24 @@ test('mantle: jumping into a chest-high ledge climbs onto it; too high or Mantle
             mv.tick(20);
             return { mantled, foot: mv.foot(), x: +cc.position.x.toFixed(2) };
         };
-        out.deck = jumpInto(27.5, 6, -Math.PI / 2);
+        out.deck = jumpInto(21.5, 7, -Math.PI / 2);
         out.count = cc.mantleCount;
-        // The helipad (3 m) is out of reach
-        out.helipad = jumpInto(8.5, 3, Math.PI / 2);
+        // The helipad block (3 m, east face at x = 7) is out of reach
+        out.helipad = jumpInto(9.5, -35, Math.PI / 2);
         // Without pushing forward into it, no mantle: jump straight up next to the deck
-        mv.place(29.4, 6, -Math.PI / 2);
+        mv.place(23.4, 7, -Math.PI / 2);
         game.keys.space = true; jumpQueued = true; mv.tick(1); game.keys.space = false;
         mv.tick(40);
         out.noPush = { count: cc.mantleCount, foot: mv.foot() };
         // Mantle Off
         document.querySelector('#setting-mantle-pills [data-mantle="off"]').click();
-        out.off = jumpInto(27.5, 6, -Math.PI / 2);
+        out.off = jumpInto(21.5, 7, -Math.PI / 2);
         document.querySelector('#setting-mantle-pills [data-mantle="on"]').click();
         return out;
     });
-    assert.ok(r.deck.mantled, 'climbs the 2.2 m deck');
+    assert.ok(r.deck.mantled, 'climbs the 2.2 m condenser');
     assert.equal(r.deck.foot, 2.2, 'standing on top');
-    assert.ok(r.deck.x > 30, 'on the deck, not at its edge');
+    assert.ok(r.deck.x > 24, 'on top, not at its edge');
     assert.equal(r.count, 1);
     assert.equal(r.helipad.mantled, false, 'a 3 m block is too high');
     assert.equal(r.helipad.foot, 0);
@@ -178,19 +181,19 @@ test('air movement: momentum carries further in the air than on the ground, you 
     const r = await evaluate(() => {
         const cc = characterController, mv = __mv, out = {};
         // Coast on the ground: release W at full sprint
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setSprinting(true); mv.tick(40);
         game.keys.w = false; let x0 = cc.position.x; mv.tick(4);
         out.groundCoast = cc.position.x - x0;
         // Coast in the air: jump at full sprint, release W
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setSprinting(true); mv.tick(40);
         const takeoff = mv.speed();
         game.keys.space = true; jumpQueued = true; mv.tick(1); game.keys.space = false;
         game.keys.w = false; x0 = cc.position.x; mv.tick(4);
         out.airCoast = cc.position.x - x0;
         // Never faster than at takeoff or top speed on foot, even holding W and strafing
-        mv.place(-30, 32, -Math.PI / 2);
+        mv.place(-44, -46, -Math.PI / 2);
         game.keys.w = true; cc.setSprinting(true); mv.tick(40);
         game.keys.space = true; jumpQueued = true; mv.tick(1); game.keys.space = false;
         game.keys.d = true;
