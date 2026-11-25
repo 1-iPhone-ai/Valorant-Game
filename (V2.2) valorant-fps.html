@@ -21267,6 +21267,103 @@
                 x: { look: ['groundZone', 'blast'], spawnAheadM: 3.5, lifetimeMs: 5200, waveCount: 6, firstWaveMs: 260, waveIntervalMs: 460,
                     waveStartM: 3.5, waveSpacingM: 4.2, hitDepthM: 3.6, hitHalfWidthM: 5.8,
                     blindMs: 3400, slowMs: 4200, revealMs: 5000, damage: 125 }
+            },
+            chamber: {
+                // C Trademark: a trap; an enemy near it sets it off: slow, reveal, damage, and Sage's slow zone (castChamberTrademark, step 2S)
+                c: { look: ['deployable', 'groundZone'], spawnAheadM: 2.5, lifetimeMs: 24000, triggerRadiusM: 11.0, fuseMs: 650,
+                    radiusM: 6.5, slowMs: 4500, revealMs: 5000, damage: 40 },
+                // Q Headhunter: one heavy pistol shot per charge (castChamberHeadhunter)
+                q: { look: ['beam'], revealMs: 3500, damage: 75, headMult: 3.0, legMult: 0.85 },
+                // E Rendezvous: an anchor where you look; press E again to teleport to it (castChamberRendezvous, triggerChamberRendezvousTeleport)
+                e: { look: ['deployable', 'self'], rangeM: 12.0, wallRayM: 22.0, minRangeM: 1.2, maxRangeM: 20.0, wallGapM: 0.8,
+                    lifetimeMs: 28000, intangibleMs: 850, shieldHp: 15 },
+                // X Tour De Force: a sniper on left-click or X; a kill leaves Sage's slow zone; kills heal (fireChamberTourDeForce, shoot)
+                x: { look: ['beam', 'groundZone'], roundCount: 5, fireIntervalMs: 500, damage: 185, headMult: 2.0, legMult: 1.0, endDelayMs: 600,
+                    killHealHp: 20, killShieldHp: 15 }
+            },
+            cypher: {
+                // C Trapwire: tethers and reveals an enemy who walks into it, then concusses enemies around it (castCypherTrapwire, step 2H)
+                c: { look: ['deployable', 'flash'], spawnAheadM: 2.8, lifetimeMs: 20000, radiusM: 3.6, maxHeightDiffM: 2.8,
+                    tetherSlowMs: 900, tetherRevealMs: 2200, fuseMs: 900, blastPadM: 1.2, slowMs: 3500, revealMs: 5000, blindMs: 3000, damage: 45 },
+                // Q Cyber Cage: a thrown smoke (castSmokeProjectile) that slows and reveals enemies inside it (the smoke loop in updateRender)
+                q: { look: ['projectile', 'smoke'], fuseSec: 0.55, radiusM: 5.0, lifetimeMs: 9500,
+                    slowMs: 450, revealMs: 850 },
+                // E Spycam: a camera where you look that shoots tracking darts at enemies it sees (castCypherSpycam, step 2I)
+                e: { look: ['deployable'], rangeM: 18.0, minRangeM: 1.5, wallGapM: 0.55, minHeightM: 2.2, maxHeightM: 11.5, aimLiftM: 0.5,
+                    lifetimeMs: 18000, firstDartMs: 250, scanRangeM: 32, eyeHeightM: 0.65, enemyAimHeightM: 1.25, dartIntervalMs: 1800,
+                    revealMs: 4000, slowMs: 1500, damage: 20 },
+                // X Neural Theft: reveals and slows every enemy, then a second pulse shocks them (step 2J); its extra speed is shared, in movement
+                x: { look: ['pulse'], slowMs: 3500, secondPulseMs: 3200, pulseRevealMs: 7000, pulseSlowMs: 2500, pulseBlindMs: 1800, pulseDamage: 25 }
+            },
+            deadlock: {
+                // C GravNet: a grenade; its net pulls enemies in, slows, reveals and hurts them (castDeadlockGravNet, spawnDeadlockGravNet, step 2RR)
+                c: { look: ['projectile', 'groundZone'], spawnAheadM: 0.7, speedMps: 24.5, upSpeedMps: 2.6, gravity: 14.5, fuseMs: 1650,
+                    radiusM: 6.5, lifetimeMs: 5500, firstTickMs: 100, slowMs: 4500, revealMs: 4500, damage: 25,
+                    tickMs: 250, pullMinDistM: 0.8, pullStepM: 0.42, tickSlowMs: 650, tickRevealMs: 700, damagePerTick: 4 },
+                // Q Sonic Sensor: concusses the enemies around it when one walks into its area (castDeadlockSonicSensor, step 2SS)
+                q: { look: ['deployable', 'blast'], rangeM: 24.0, radiusM: 11.5, lifetimeMs: 26000, fuseMs: 420, blastRadiusM: 6.8,
+                    blindMs: 4500, slowMs: 5000, revealMs: 5000, damage: 40 },
+                // E Barrier Mesh: an X of walls that pushes enemies off its arms and shocks them (castDeadlockBarrierMesh, step 2TT)
+                e: { look: ['wall'], rangeM: 26.0, halfLengthM: 5.8, lifetimeMs: 9500, firstTickMs: 100, tickMs: 250,
+                    armHalfWidthM: 1.35, pushOutM: 1.45, slowMs: 500, revealMs: 650, damagePerTick: 5 },
+                // X Annihilation: a cocoon reels in the enemy nearest your aim, then kills them (spawnDeadlockAnnihilation, step 2UU)
+                x: { look: ['beam', 'blast'], enemyAimHeightM: 1.0, rangeM: 45, aimBias: 1.2, pullAheadM: 2.5, reelMs: 2200,
+                    reelBlindMs: 600, reelSlowMs: 600, reelRevealMs: 800, damage: 180,
+                    splashRadiusM: 5.5, splashSlowMs: 3500, splashRevealMs: 4000, splashDamage: 65 }
+            },
+            killjoy: {
+                // C Nanoswarm: a grenade; its zone burns and reveals enemies (spawnMollyZone and the ground-zone step, shared with Brimstone, Viper)
+                c: { look: ['projectile', 'groundZone'], spawnAheadM: 1.0, speedMps: 26, upSpeedMps: 2.3, gravity: 15.5, fuseMs: 1500,
+                    radiusM: 5.0, lifetimeMs: 6000, damagePerTick: 9, revealMs: 2200 },
+                // Q Alarmbot: a rover that chases the nearest enemy and explodes, leaving it vulnerable (castRazeBoomBot, step 2E; shared with Raze)
+                q: { look: ['deployable', 'blast'], speedMps: 6.5, lifetimeMs: 12000, lockRangeM: 16, chaseSpeedMps: 13.5,
+                    radiusM: 5.6, maxDamage: 55, revealMs: 6000 },
+                // E Turret: shoots the nearest enemy it can see (castKilljoyTurret, step 2F)
+                e: { look: ['deployable'], spawnAheadM: 2.4, lifetimeMs: 18000, firstFireMs: 350, rangeM: 28, eyeHeightM: 0.85, enemyAimHeightM: 1.2,
+                    fireIntervalMs: 620, slowMs: 1400, revealMs: 2200, damage: 16 },
+                // X Lockdown: a dome that slows, reveals and blinds enemies inside it, for AGENT_DEFS.killjoy.abilities.x.durationMs (step 2G)
+                x: { look: ['deployable', 'groundZone'], spawnAheadM: 1.8, radiusM: 26, tickMs: 450, slowMs: 1200, revealMs: 1600, blindMs: 950 }
+            },
+            sage: {
+                // C Barrier Orb: a wall ahead of you, or under you when you look down, to stand on (castSageBarrierOrb; shots: damageIceWall)
+                c: { look: ['wall'], selfBoostPitchRad: -0.26, selfBoostAheadM: 0.55, spawnAheadM: 3.4, lengthM: 4.8, thicknessM: 1.15, heightM: 2.3,
+                    healthHp: 400, lifetimeMs: 14000, boostPadM: 0.45, boostUpSpeedPerTick: 0.08 },
+                // Q Slow Orb: an orb; its zone slows enemies (spawnSlowZone, step 2B; Chamber's Trademark and Tour De Force spawn this zone too)
+                q: { look: ['projectile', 'groundZone'], spawnAheadM: 1.0, speedMps: 27, upSpeedMps: 2.2, gravity: 15.0, fuseMs: 1600,
+                    radiusM: 5.8, lifetimeMs: 7500, firstTickMs: 50, tickMs: 150, slowMs: 400 },
+                // E Healing Orb: heals you at once, then a few times more (castSageHealingOrb, step 0)
+                e: { look: ['self'], healHp: 20, tickCount: 5, firstTickMs: 600, tickMs: 550, healPerTickHp: 8 },
+                // X Resurrection: full health and armor; a fatal hit revives you (the revive is in tryPhoenixRebirth, shared with KAY/O and Clove)
+                x: { look: ['self'], reviveCount: 1, healthHp: 100, shieldHp: 50 }
+            },
+            veto: {
+                // C Crosscut: an anchor; press C again to teleport to it and shock enemies there (castVetoCrosscut, triggerVetoCrosscutTeleport)
+                c: { look: ['deployable', 'self'], rangeM: 28.0, lifetimeMs: 22000, armorHp: 15,
+                    radiusM: 5.5, slowMs: 4000, revealMs: 4000, damage: 30 },
+                // Q Chokehold: a glob; its zone snares, blinds and decays enemies (castVetoChokehold, spawnVetoChokehold, step 2MMM)
+                q: { look: ['projectile', 'groundZone'], spawnAheadM: 0.72, speedMps: 24.5, upSpeedMps: 2.5, gravity: 14.0, fuseMs: 1600,
+                    radiusM: 6.4, lifetimeMs: 6500, firstTickMs: 450, slowMs: 5000, revealMs: 4500, blindMs: 1800, damage: 28,
+                    tickMs: 220, tickSlowMs: 950, tickRevealMs: 950, damagePerTick: 5 },
+                // E Interceptor: a drone that zaps enemies it sees and clears your blind (castVetoInterceptor, step 2NNN)
+                e: { look: ['deployable'], rangeM: 24.0, heightM: 1.65, radiusM: 12.5, lifetimeMs: 12000, firstZapMs: 350, zapIntervalMs: 650,
+                    cleanseRadiusM: 14.0, slowMs: 2200, revealMs: 2500, blindMs: 1200, damage: 22 },
+                // X Evolution: full health and armor; for AGENT_DEFS.veto.abilities.x.durationMs an aura heals you and hits enemies (step 2OOO)
+                x: { look: ['self', 'pulse'], healthHp: 100, shieldHp: 50, firstTickMs: 200, tickMs: 500, healPerTickHp: 6, shieldPerTickHp: 5,
+                    radiusM: 9.0, slowMs: 1200, revealMs: 1500, damagePerTick: 10 }
+            },
+            vyse: {
+                // C Shear: a trap; an enemy who walks over it raises a wall and gives you armor (castVyseShear, step 2BBB)
+                c: { look: ['deployable', 'wall'], rangeM: 26.0, halfLengthM: 4.5, lifetimeMs: 26000, triggerRadiusM: 3.4, wallLifetimeMs: 7800,
+                    slowMs: 3500, revealMs: 4500, damage: 30, shieldHp: 15, wallHalfWidthM: 1.25, wallPushOutM: 1.3, wallSlowMs: 500 },
+                // Q Arc Rose: a flower that flashes when you press Q again or an enemy comes near (castVyseArcRose, detonateVyseArcRose, step 2CCC)
+                q: { look: ['deployable', 'flash'], rangeM: 28.0, heightM: 0.55, lifetimeMs: 24000, triggerRadiusM: 4.2, flashRadiusM: 22,
+                    blindMs: 3800, revealMs: 3800, slowMs: 2500 },
+                // E Razorvine: a grenade; its thorns slow, reveal and hurt enemies (castVyseRazorvine, spawnVyseRazorvine, step 2DDD)
+                e: { look: ['projectile', 'groundZone'], spawnAheadM: 0.72, speedMps: 24.5, upSpeedMps: 2.6, gravity: 14.5, fuseMs: 1700,
+                    radiusM: 6.5, lifetimeMs: 7500, firstTickMs: 100, tickMs: 250, slowMs: 700, revealMs: 800, damagePerTick: 7 },
+                // X Steel Garden: a field that erupts after a moment and hits enemies in it, for AGENT_DEFS.vyse.abilities.x.durationMs (step 2EEE)
+                x: { look: ['groundZone', 'blast'], shieldHp: 50, radiusM: 24.0, fuseMs: 1100,
+                    blindMs: 4800, slowMs: 7500, revealMs: 8000, damage: 60 }
             }
         };
         
@@ -21818,6 +21915,7 @@
                     });
                 }
 
+                // V2.2: Sage's numbers are in AGENT_TUNING.sage
                 // 3B. Pooled Sage Slow Orb Crystalline Frost Zones (3)
                 for (let i = 0; i < 3; i++) {
                     const group = new THREE.Group();
@@ -21851,7 +21949,7 @@
                     this.slowZones.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 5.8,
+                        radius: AGENT_TUNING.sage.q.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -21861,6 +21959,7 @@
                     });
                 }
 
+                // V2.2: Sage's numbers are in AGENT_TUNING.sage
                 // 3C. Pooled Sage Barrier Orb 3D Destructible Jade Ice Walls (2)
                 for (let i = 0; i < 2; i++) {
                     const wallGroup = new THREE.Group();
@@ -21886,12 +21985,12 @@
                         mat: wallMat,
                         collider: null,
                         shotPiece: null,
-                        health: 400,
-                        maxHealth: 400,
+                        health: AGENT_TUNING.sage.c.healthHp,
+                        maxHealth: AGENT_TUNING.sage.c.healthHp,
                         startAt: 0,
                         expireAt: 0,
-                        sizeX: 4.8,
-                        sizeY: 2.3,
+                        sizeX: AGENT_TUNING.sage.c.lengthM,
+                        sizeY: AGENT_TUNING.sage.c.heightM,
                         sizeZ: 1.1
                     });
                 }
@@ -22357,6 +22456,7 @@
                     });
                 }
 
+                // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy
                 // Killjoy Autonomous Sentinel Turrets (2)
                 const turretBaseGeo = new THREE.CylinderGeometry(0.32, 0.58, 0.65, 12);
                 const turretHeadGeo = new THREE.BoxGeometry(0.62, 0.42, 0.78);
@@ -22413,7 +22513,7 @@
                         expireAt: 0,
                         nextFireAt: 0,
                         lastShotAt: 0,
-                        range: 28,
+                        range: AGENT_TUNING.killjoy.e.rangeM,
                         group: tGroup,
                         headGroup: headGroup,
                         headMat: headMat,
@@ -22421,6 +22521,7 @@
                     });
                 }
 
+                // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy
                 // Killjoy Lockdown Stasis Dome Beacon
                 const ldGroup = new THREE.Group();
                 ldGroup.visible = false;
@@ -22465,7 +22566,7 @@
                 this.kjLockdown = {
                     active: false,
                     position: new THREE.Vector3(),
-                    radius: 26,
+                    radius: AGENT_TUNING.killjoy.x.radiusM,
                     startAt: 0,
                     expireAt: 0,
                     nextPulseAt: 0,
@@ -22477,6 +22578,7 @@
                     ringMat: ldRingMat
                 };
 
+                // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
                 // 8D. Cypher Trapwires (3), Cypher Spycams (2), Brimstone Stim Beacons (2), & Brimstone Orbital Strike Laser
                 const wirePostGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.68, 10);
                 const wireBeamGeo = new THREE.CylinderGeometry(0.04, 0.04, 5.2, 8);
@@ -22531,7 +22633,7 @@
                         triggered: false,
                         detonateAt: 0,
                         position: new THREE.Vector3(),
-                        radius: 3.6,
+                        radius: AGENT_TUNING.cypher.c.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         group: wGroup,
@@ -22541,6 +22643,7 @@
                     });
                 }
 
+                // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
                 // Cypher Surveillance Spycams (2)
                 const camBodyGeo = new THREE.BoxGeometry(0.46, 0.34, 0.56);
                 const camLensGeo = new THREE.SphereGeometry(0.17, 12, 10);
@@ -22587,7 +22690,7 @@
                         startAt: 0,
                         expireAt: 0,
                         nextDartAt: 0,
-                        range: 32,
+                        range: AGENT_TUNING.cypher.e.scanRangeM,
                         group: cGroup,
                         lensMat: lensMat,
                         auraMesh: auraMesh
@@ -23037,6 +23140,7 @@
                     coreMat: nbCoreMat
                 };
 
+                // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
                 // Chamber Trademark Autonomous Scanning Traps (2)
                 const tmBaseGeo = new THREE.CylinderGeometry(0.45, 0.55, 0.18, 14);
                 const tmRotorGeo = new THREE.OctahedronGeometry(0.32, 0);
@@ -23072,7 +23176,7 @@
                         triggered: false,
                         detonateAt: 0,
                         position: new THREE.Vector3(),
-                        radius: 11.0,
+                        radius: AGENT_TUNING.chamber.c.triggerRadiusM,
                         startAt: 0,
                         expireAt: 0,
                         group: tmGroup,
@@ -24093,6 +24197,7 @@
                     });
                 }
 
+                // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
                 // Deadlock GravNets (2), Sonic Sensors (2), Barrier Mesh Forcefields (2), & Annihilation Cocoon (1)
                 const gnDomeGeo = new THREE.SphereGeometry(1, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.5);
                 for (let i = 0; i < 2; i++) {
@@ -24126,7 +24231,7 @@
                     this.deadlockGravNets.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 6.5,
+                        radius: AGENT_TUNING.deadlock.c.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -24166,7 +24271,7 @@
                         triggered: false,
                         detonateAt: 0,
                         position: new THREE.Vector3(),
-                        radius: 11.5,
+                        radius: AGENT_TUNING.deadlock.q.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         group: dsGroup,
@@ -24221,7 +24326,7 @@
                         inUse: false,
                         position: new THREE.Vector3(),
                         yaw: 0,
-                        radius: 5.8,
+                        radius: AGENT_TUNING.deadlock.e.halfLengthM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -24625,6 +24730,7 @@
                     trimMat: cdTrimMat
                 };
 
+                // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
                 // 8L. Vyse Pooled 3D Liquid-Metal Sentinel Meshes (Shear [C], Arc Rose [Q], Razorvine [E], Steel Garden [X])
                 const vsCoreGeo = new THREE.OctahedronGeometry(0.45, 0);
                 const vsWallGeo = new THREE.BoxGeometry(9.0, 3.2, 0.42);
@@ -24769,7 +24875,7 @@
                     this.vyseRazorvines.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 6.5,
+                        radius: AGENT_TUNING.vyse.e.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -24826,7 +24932,7 @@
                     active: false,
                     erupted: false,
                     position: new THREE.Vector3(),
-                    radius: 24.0,
+                    radius: AGENT_TUNING.vyse.x.radiusM,
                     startAt: 0,
                     eruptAt: 0,
                     expireAt: 0,
@@ -25147,6 +25253,7 @@
                     trimMat: cpTrimMat
                 };
 
+                // V2.2: Veto's numbers are in AGENT_TUNING.veto
                 // 8O. Veto Pooled 3D Bio-Mutant Sentinel Meshes (Crosscut [C], Chokehold [Q], Interceptor [E], Evolution [X])
                 const vcGroup = new THREE.Group();
                 vcGroup.visible = false;
@@ -25233,7 +25340,7 @@
                     this.vetoChokeholds.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 6.4,
+                        radius: AGENT_TUNING.veto.q.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -25281,7 +25388,7 @@
                     this.vetoInterceptors.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 12.5,
+                        radius: AGENT_TUNING.veto.e.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         nextZapAt: 0,
@@ -26085,6 +26192,7 @@
             },
 
             // --- Deadlock Nanowire Sentinel Abilities (GravNet [C], Sonic Sensor [Q], Barrier Mesh [E], Annihilation [X]) ---
+            // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
             castDeadlockGravNet: function(now) {
                 const proj = this.acquireProjectile();
                 camera.updateMatrixWorld();
@@ -26092,11 +26200,11 @@
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 proj.type = 'gravnet';
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 0.7);
-                proj.velocity.copy(_abilityForward).multiplyScalar(24.5);
-                proj.velocity.y += 2.6;
-                proj.gravity = 14.5;
-                proj.detonateAt = now + 1650;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.deadlock.c.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.deadlock.c.speedMps);
+                proj.velocity.y += AGENT_TUNING.deadlock.c.upSpeedMps;
+                proj.gravity = AGENT_TUNING.deadlock.c.gravity;
+                proj.detonateAt = now + AGENT_TUNING.deadlock.c.fuseMs;
                 proj.mat.color.setHex(0x38bdf8).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -26104,6 +26212,7 @@
                 showNotification("GRAVNET THROWN — Deploys 6.5m Nanowire Gravity Field on Impact!", 1600);
             },
 
+            // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
             spawnDeadlockGravNet: function(x, y, z, now) {
                 let gn = this.deadlockGravNets[0];
                 for (let i = 0; i < this.deadlockGravNets.length; i++) {
@@ -26111,10 +26220,10 @@
                 }
                 gn.inUse = true;
                 gn.position.set(x, Math.max(0.02, y), z);
-                gn.radius = 6.5;
+                gn.radius = AGENT_TUNING.deadlock.c.radiusM;
                 gn.startAt = now;
-                gn.expireAt = now + 5500;
-                gn.nextTickAt = now + 100;
+                gn.expireAt = now + AGENT_TUNING.deadlock.c.lifetimeMs;
+                gn.nextTickAt = now + AGENT_TUNING.deadlock.c.firstTickMs;
                 gn.domeMesh.scale.set(gn.radius, gn.radius * 0.42, gn.radius);
                 gn.ringMesh.scale.set(gn.radius, 1, gn.radius);
                 gn.group.position.copy(gn.position);
@@ -26132,9 +26241,9 @@
                     const dz = e.mesh.position.z - z;
                     if (dx * dx + dz * dz <= rSq) {
                         caught++;
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 4500);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 4500);
-                        damageEnemyActor(e, 25, now, nowMs, "GravNet Impact", false);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.c.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.c.revealMs);
+                        damageEnemyActor(e, AGENT_TUNING.deadlock.c.damage, now, nowMs, "GravNet Impact", false);
                     }
                 }
                 if (caught > 0) {
@@ -26142,8 +26251,9 @@
                 }
             },
 
+            // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
             castDeadlockSonicSensor: function(now) {
-                const hit = this.getAimGroundPoint(24.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.deadlock.q.rangeM);
                 let ds = this.deadlockSensors[0];
                 for (let i = 0; i < this.deadlockSensors.length; i++) {
                     if (!this.deadlockSensors[i].inUse) { ds = this.deadlockSensors[i]; break; }
@@ -26152,9 +26262,9 @@
                 ds.triggered = false;
                 ds.detonateAt = 0;
                 ds.position.set(hit.x, Math.max(0.02, hit.y), hit.z);
-                ds.radius = 11.5;
+                ds.radius = AGENT_TUNING.deadlock.q.radiusM;
                 ds.startAt = now;
-                ds.expireAt = now + 26000;
+                ds.expireAt = now + AGENT_TUNING.deadlock.q.lifetimeMs;
                 ds.ringMesh.scale.set(ds.radius, 1, ds.radius);
                 ds.group.position.copy(ds.position);
                 ds.group.visible = true;
@@ -26162,8 +26272,9 @@
                 showNotification("SONIC SENSOR DEPLOYED — Monitors 11.5m Sector for Enemy Footsteps/Gunfire!", 1800);
             },
 
+            // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
             castDeadlockBarrierMesh: function(now) {
-                const hit = this.getAimGroundPoint(26.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.deadlock.e.rangeM);
                 let db = this.deadlockBarriers[0];
                 for (let i = 0; i < this.deadlockBarriers.length; i++) {
                     if (!this.deadlockBarriers[i].inUse) { db = this.deadlockBarriers[i]; break; }
@@ -26171,10 +26282,10 @@
                 db.inUse = true;
                 db.position.set(hit.x, Math.max(0.02, hit.y), hit.z);
                 db.yaw = camera.rotation.y;
-                db.radius = 5.8;
+                db.radius = AGENT_TUNING.deadlock.e.halfLengthM;
                 db.startAt = now;
-                db.expireAt = now + 9500;
-                db.nextTickAt = now + 100;
+                db.expireAt = now + AGENT_TUNING.deadlock.e.lifetimeMs;
+                db.nextTickAt = now + AGENT_TUNING.deadlock.e.firstTickMs;
                 db.group.position.copy(db.position);
                 db.group.rotation.y = db.yaw;
                 db.group.visible = true;
@@ -26183,6 +26294,7 @@
                 showNotification("BARRIER MESH DEPLOYED — 5.8m X-Forcefield Repels & Shocks Enemies while Bullets Pass Through!", 2000);
             },
 
+            // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
             spawnDeadlockAnnihilation: function(now) {
                 const dc = this.deadlockCocoon;
                 if (!dc) return;
@@ -26197,12 +26309,12 @@
                     const e = enemyObjects[i];
                     if (!e.isActive || e.hit) continue;
                     const dx = e.mesh.position.x - _abilityOrigin.x;
-                    const dy = (e.mesh.position.y + 1.0) - _abilityOrigin.y;
+                    const dy = (e.mesh.position.y + AGENT_TUNING.deadlock.x.enemyAimHeightM) - _abilityOrigin.y;
                     const dz = e.mesh.position.z - _abilityOrigin.z;
                     const dist = Math.hypot(dx, dy, dz);
-                    if (dist > 45) continue;
+                    if (dist > AGENT_TUNING.deadlock.x.rangeM) continue;
                     const dot = (dx * _abilityForward.x + dy * _abilityForward.y + dz * _abilityForward.z) / Math.max(0.01, dist);
-                    const score = dist * (1.2 - dot);
+                    const score = dist * (AGENT_TUNING.deadlock.x.aimBias - dot);
                     if (score < bestScore) {
                         bestScore = score;
                         bestEnemy = e;
@@ -26218,12 +26330,12 @@
                 dc.active = true;
                 dc.targetEnemy = bestEnemy;
                 dc.capturePos.set(bestEnemy.mesh.position.x, 0, bestEnemy.mesh.position.z);
-                const pullX = Math.max(-44, Math.min(44, characterController.position.x + _abilityForward.x * 2.5));
-                const pullZ = Math.max(-44, Math.min(44, characterController.position.z + _abilityForward.z * 2.5));
+                const pullX = Math.max(-44, Math.min(44, characterController.position.x + _abilityForward.x * AGENT_TUNING.deadlock.x.pullAheadM));
+                const pullZ = Math.max(-44, Math.min(44, characterController.position.z + _abilityForward.z * AGENT_TUNING.deadlock.x.pullAheadM));
                 dc.pullTargetPos.set(pullX, 0, pullZ);
                 dc.position.copy(dc.capturePos);
                 dc.startAt = now;
-                dc.executeAt = now + 2200;
+                dc.executeAt = now + AGENT_TUNING.deadlock.x.reelMs;
                 dc.cocoonMesh.position.set(dc.position.x, 1.15, dc.position.z);
                 dc.group.visible = true;
                 this.spawnFlashBurst(dc.capturePos.x, 1.15, dc.capturePos.z, 0x38bdf8, 4.2, 340, now);
@@ -26475,8 +26587,9 @@
             },
 
             // --- Vyse Liquid-Metal Sentinel Abilities (Shear [C], Arc Rose [Q], Razorvine [E], Steel Garden [X]) ---
+            // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
             castVyseShear: function(now) {
-                const hit = this.getAimGroundPoint(26.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.vyse.c.rangeM);
                 let vs = this.vyseShears[0];
                 for (let i = 0; i < this.vyseShears.length; i++) {
                     if (!this.vyseShears[i].inUse) { vs = this.vyseShears[i]; break; }
@@ -26486,7 +26599,7 @@
                 const fwdZ = -Math.cos(yaw);
                 const perpX = -fwdZ;
                 const perpZ = fwdX;
-                const halfLen = 4.5;
+                const halfLen = AGENT_TUNING.vyse.c.halfLengthM;
 
                 vs.inUse = true;
                 vs.popped = false;
@@ -26495,7 +26608,7 @@
                 vs.startPos.set(hit.x - perpX * halfLen, vs.position.y, hit.z - perpZ * halfLen);
                 vs.endPos.set(hit.x + perpX * halfLen, vs.position.y, hit.z + perpZ * halfLen);
                 vs.startAt = now;
-                vs.expireAt = now + 26000;
+                vs.expireAt = now + AGENT_TUNING.vyse.c.lifetimeMs;
                 vs.coreMesh.visible = true;
                 vs.wallMesh.visible = false;
                 vs.crestMesh.visible = false;
@@ -26516,16 +26629,17 @@
                 return false;
             },
 
+            // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
             castVyseArcRose: function(now) {
-                const hit = this.getAimGroundPoint(28.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.vyse.q.rangeM);
                 let vr = this.vyseArcRoses[0];
                 for (let i = 0; i < this.vyseArcRoses.length; i++) {
                     if (!this.vyseArcRoses[i].inUse) { vr = this.vyseArcRoses[i]; break; }
                 }
                 vr.inUse = true;
-                vr.position.set(hit.x, Math.max(0.55, hit.y + 0.55), hit.z);
+                vr.position.set(hit.x, Math.max(AGENT_TUNING.vyse.q.heightM, hit.y + AGENT_TUNING.vyse.q.heightM), hit.z);
                 vr.startAt = now;
-                vr.expireAt = now + 24000;
+                vr.expireAt = now + AGENT_TUNING.vyse.q.lifetimeMs;
                 vr.group.position.copy(vr.position);
                 vr.group.visible = true;
                 soundFX.vyseRose();
@@ -26534,6 +26648,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
             detonateVyseArcRose: function(now) {
                 let targetRose = null;
                 for (let i = 0; i < this.vyseArcRoses.length; i++) {
@@ -26558,10 +26673,10 @@
                     const e = enemyObjects[i];
                     if (!e.isActive || e.hit) continue;
                     const dSq = e.mesh.position.distanceToSquared(targetRose.position);
-                    if (dSq <= 22 * 22) {
-                        this.applyEnemyBlind(e, now, 3800);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 3800);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 2500);
+                    if (dSq <= AGENT_TUNING.vyse.q.flashRadiusM * AGENT_TUNING.vyse.q.flashRadiusM) {
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.vyse.q.blindMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.vyse.q.revealMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.vyse.q.slowMs);
                         blindedCount++;
                     }
                 }
@@ -26573,6 +26688,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
             castVyseRazorvine: function(now) {
                 const proj = this.acquireProjectile();
                 camera.updateMatrixWorld();
@@ -26580,11 +26696,11 @@
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 proj.type = 'razorvine';
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 0.72);
-                proj.velocity.copy(_abilityForward).multiplyScalar(24.5);
-                proj.velocity.y += 2.6;
-                proj.gravity = 14.5;
-                proj.detonateAt = now + 1700;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.vyse.e.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.vyse.e.speedMps);
+                proj.velocity.y += AGENT_TUNING.vyse.e.upSpeedMps;
+                proj.gravity = AGENT_TUNING.vyse.e.gravity;
+                proj.detonateAt = now + AGENT_TUNING.vyse.e.fuseMs;
                 proj.mat.color.setHex(0xc084fc).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -26592,6 +26708,7 @@
                 showNotification("RAZORVINE NEST THROWN — Unfurls 6.5m Metallic Thorn Field on Impact!", 1700);
             },
 
+            // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
             spawnVyseRazorvine: function(x, y, z, now) {
                 let rv = this.vyseRazorvines[0];
                 for (let i = 0; i < this.vyseRazorvines.length; i++) {
@@ -26599,10 +26716,10 @@
                 }
                 rv.inUse = true;
                 rv.position.set(x, Math.max(0.02, y), z);
-                rv.radius = 6.5;
+                rv.radius = AGENT_TUNING.vyse.e.radiusM;
                 rv.startAt = now;
-                rv.expireAt = now + 7500;
-                rv.nextTickAt = now + 100;
+                rv.expireAt = now + AGENT_TUNING.vyse.e.lifetimeMs;
+                rv.nextTickAt = now + AGENT_TUNING.vyse.e.firstTickMs;
                 rv.discMesh.scale.set(rv.radius, 1, rv.radius);
                 rv.ringMesh.scale.set(rv.radius, 1, rv.radius);
                 rv.group.position.copy(rv.position);
@@ -26611,6 +26728,7 @@
                 this.spawnWindRing(x, y + 0.1, z, 0xc084fc, 6.5, now);
             },
 
+            // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
             spawnVyseSteelGarden: function(now) {
                 const sg = this.vyseSteelGarden;
                 if (!sg) return;
@@ -26619,10 +26737,10 @@
                 sg.active = true;
                 sg.erupted = false;
                 sg.position.set(px, 0.04, pz);
-                sg.radius = 24.0;
+                sg.radius = AGENT_TUNING.vyse.x.radiusM;
                 sg.startAt = now;
-                sg.eruptAt = now + 1100;
-                sg.expireAt = now + 9000;
+                sg.eruptAt = now + AGENT_TUNING.vyse.x.fuseMs;
+                sg.expireAt = now + AGENT_DEFS.vyse.abilities.x.durationMs;
                 sg.discMesh.scale.set(sg.radius, 1, sg.radius);
                 sg.ringMesh.scale.set(sg.radius, 1, sg.radius);
                 sg.group.position.copy(sg.position);
@@ -27026,15 +27144,16 @@
                 return Boolean(this.vetoCrosscutAnchor && this.vetoCrosscutAnchor.active && now < this.vetoCrosscutAnchor.expireAt);
             },
 
+            // V2.2: Veto's numbers are in AGENT_TUNING.veto
             castVetoCrosscut: function(now) {
                 const vc = this.vetoCrosscutAnchor;
                 if (!vc) return;
-                const hit = this.getAimGroundPoint(28.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.veto.c.rangeM);
                 const floorY = this.findSupportFloorY(hit.x, hit.y + 1.5, hit.z);
                 vc.active = true;
                 vc.position.set(hit.x, Math.max(0.02, floorY), hit.z);
                 vc.startAt = now;
-                vc.expireAt = now + 22000;
+                vc.expireAt = now + AGENT_TUNING.veto.c.lifetimeMs;
                 vc.group.position.copy(vc.position);
                 vc.group.visible = true;
                 soundFX.vetoCrosscut();
@@ -27043,6 +27162,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Veto's numbers are in AGENT_TUNING.veto
             triggerVetoCrosscutTeleport: function(now) {
                 const vc = this.vetoCrosscutAnchor;
                 if (!vc || !vc.active) return;
@@ -27063,7 +27183,7 @@
 
                 this.dashFxUntil = now + 520;
                 this.playerBlindUntil = 0;
-                game.armor = Math.min(50, (game.armor || 0) + 15);
+                game.armor = Math.min(50, (game.armor || 0) + AGENT_TUNING.veto.c.armorHp);
                 updateHealthHUD();
 
                 soundFX.vetoCrosscut();
@@ -27071,7 +27191,7 @@
                 this.spawnWindRing(targetX, targetY + 0.15, targetZ, 0x34d399, 5.8, now);
 
                 const nowMs = Date.now();
-                const rSq = 5.5 * 5.5;
+                const rSq = AGENT_TUNING.veto.c.radiusM * AGENT_TUNING.veto.c.radiusM;
                 let hitCount = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -27080,9 +27200,9 @@
                     const dz = e.mesh.position.z - targetZ;
                     if (dx * dx + dz * dz <= rSq) {
                         hitCount++;
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 4000);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 4000);
-                        damageEnemyActor(e, 30, now, nowMs, "Crosscut Vortex", false);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.veto.c.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.veto.c.revealMs);
+                        damageEnemyActor(e, AGENT_TUNING.veto.c.damage, now, nowMs, "Crosscut Vortex", false);
                     }
                 }
                 if (hitCount > 0) {
@@ -27093,6 +27213,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Veto's numbers are in AGENT_TUNING.veto
             castVetoChokehold: function(now) {
                 const proj = this.acquireProjectile();
                 camera.updateMatrixWorld();
@@ -27100,11 +27221,11 @@
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 proj.type = 'chokehold';
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 0.72);
-                proj.velocity.copy(_abilityForward).multiplyScalar(24.5);
-                proj.velocity.y += 2.5;
-                proj.gravity = 14.0;
-                proj.detonateAt = now + 1600;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.veto.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.veto.q.speedMps);
+                proj.velocity.y += AGENT_TUNING.veto.q.upSpeedMps;
+                proj.gravity = AGENT_TUNING.veto.q.gravity;
+                proj.detonateAt = now + AGENT_TUNING.veto.q.fuseMs;
                 proj.mat.color.setHex(0x10b981).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -27112,6 +27233,7 @@
                 showNotification("CHOKEHOLD MUTATION GLOB THROWN — Spawns 6.4m Bio-Snare & Decay Zone on Impact!", 1750);
             },
 
+            // V2.2: Veto's numbers are in AGENT_TUNING.veto
             spawnVetoChokehold: function(x, y, z, now) {
                 let ch = this.vetoChokeholds[0];
                 for (let i = 0; i < this.vetoChokeholds.length; i++) {
@@ -27119,10 +27241,10 @@
                 }
                 ch.inUse = true;
                 ch.position.set(x, Math.max(0.02, y), z);
-                ch.radius = 6.4;
+                ch.radius = AGENT_TUNING.veto.q.radiusM;
                 ch.startAt = now;
-                ch.expireAt = now + 6500;
-                ch.nextTickAt = now + 450;
+                ch.expireAt = now + AGENT_TUNING.veto.q.lifetimeMs;
+                ch.nextTickAt = now + AGENT_TUNING.veto.q.firstTickMs;
                 ch.discMesh.scale.set(ch.radius, 1, ch.radius);
                 ch.ringMesh.scale.set(ch.radius, 1, ch.radius);
                 ch.group.position.copy(ch.position);
@@ -27132,7 +27254,7 @@
                 this.spawnWindRing(x, y + 0.1, z, 0x34d399, 6.4, now);
 
                 const nowMs = Date.now();
-                const rSq = 6.4 * 6.4;
+                const rSq = AGENT_TUNING.veto.q.radiusM * AGENT_TUNING.veto.q.radiusM;
                 let hitCount = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -27141,10 +27263,10 @@
                     const dz = e.mesh.position.z - z;
                     if (dx * dx + dz * dz <= rSq) {
                         hitCount++;
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 5000);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 4500);
-                        this.applyEnemyBlind(e, now, 1800);
-                        damageEnemyActor(e, 28, now, nowMs, "Chokehold Snare", false);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.veto.q.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.veto.q.revealMs);
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.veto.q.blindMs);
+                        damageEnemyActor(e, AGENT_TUNING.veto.q.damage, now, nowMs, "Chokehold Snare", false);
                     }
                 }
                 if (hitCount > 0) {
@@ -27152,19 +27274,20 @@
                 }
             },
 
+            // V2.2: Veto's numbers are in AGENT_TUNING.veto
             castVetoInterceptor: function(now) {
-                const hit = this.getAimGroundPoint(24.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.veto.e.rangeM);
                 const floorY = this.findSupportFloorY(hit.x, hit.y + 1.5, hit.z);
                 let vi = this.vetoInterceptors[0];
                 for (let i = 0; i < this.vetoInterceptors.length; i++) {
                     if (!this.vetoInterceptors[i].inUse) { vi = this.vetoInterceptors[i]; break; }
                 }
                 vi.inUse = true;
-                vi.position.set(hit.x, Math.max(0.02, floorY) + 1.65, hit.z);
-                vi.radius = 12.5;
+                vi.position.set(hit.x, Math.max(0.02, floorY) + AGENT_TUNING.veto.e.heightM, hit.z);
+                vi.radius = AGENT_TUNING.veto.e.radiusM;
                 vi.startAt = now;
-                vi.expireAt = now + 12000;
-                vi.nextZapAt = now + 350;
+                vi.expireAt = now + AGENT_TUNING.veto.e.lifetimeMs;
+                vi.nextZapAt = now + AGENT_TUNING.veto.e.firstZapMs;
                 vi.ringMesh.scale.set(vi.radius, 1, vi.radius);
                 vi.group.position.copy(vi.position);
                 vi.group.visible = true;
@@ -27174,13 +27297,14 @@
                 showNotification("INTERCEPTOR DRONE DEPLOYED (12s) — Zaps Hostiles in 12.5m & Cleanses Blinds!", 2000);
             },
 
+            // V2.2: Veto's numbers are in AGENT_TUNING.veto
             spawnVetoEvolution: function(now) {
                 const ve = this.vetoEvolutionAura;
                 if (!ve) return;
                 ve.active = true;
                 ve.startAt = now;
-                ve.expireAt = now + 12000;
-                ve.nextPulseAt = now + 200;
+                ve.expireAt = now + AGENT_DEFS.veto.abilities.x.durationMs;
+                ve.nextPulseAt = now + AGENT_TUNING.veto.x.firstTickMs;
                 ve.group.position.set(characterController.position.x, 0.04, characterController.position.z);
                 ve.group.visible = true;
                 this.spawnWindRing(characterController.position.x, 0.25, characterController.position.z, 0x10b981, 10.0, now);
@@ -28310,12 +28434,13 @@
             },
 
             // --- Chamber Sharpshooter Sentinel Abilities (Trademark [C], Headhunter [Q], Rendezvous [E], Tour De Force [X]) ---
+            // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
             castChamberTrademark: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const tx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 2.5));
-                const tz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 2.5));
+                const tx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.chamber.c.spawnAheadM));
+                const tz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.chamber.c.spawnAheadM));
                 const floorY = this.findSupportFloorY(tx, characterController.position.y + 1.0, tz);
 
                 let tm = this.trademarks[0];
@@ -28327,7 +28452,7 @@
                 tm.detonateAt = 0;
                 tm.position.set(tx, floorY, tz);
                 tm.startAt = now;
-                tm.expireAt = now + 24000;
+                tm.expireAt = now + AGENT_TUNING.chamber.c.lifetimeMs;
                 tm.rotorMat.color.setHex(0xf59e0b).convertSRGBToLinear();
                 tm.ringMat.color.setHex(0xfbbf24).convertSRGBToLinear();
                 tm.ringMesh.scale.set(2.2, 1, 2.2);
@@ -28339,6 +28464,7 @@
                 showNotification("TRADEMARK TRAP DEPLOYED! Scans 11m & Detonates a 6.5m Slow + Vulnerable Field!", 1700);
             },
 
+            // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
             castChamberHeadhunter: function(now) {
                 camera.updateMatrixWorld();
                 _abilityOrigin.copy(camera.position);
@@ -28404,33 +28530,34 @@
                 let hitHead = false;
                 if (hitEnemy) {
                     hitHead = (hitZone === 'head');
-                    hitEnemy.revealedUntil = Math.max(hitEnemy.revealedUntil, now + 3500);
+                    hitEnemy.revealedUntil = Math.max(hitEnemy.revealedUntil, now + AGENT_TUNING.chamber.q.revealMs);
                     createHitEffect(hitPoint || hitEnemy.mesh.position, false);
-                    damageEnemyActor(hitEnemy, 75, now, nowMs, "Headhunter", hitZone, 3.0, 0.85);
+                    damageEnemyActor(hitEnemy, AGENT_TUNING.chamber.q.damage, now, nowMs, "Headhunter", hitZone, AGENT_TUNING.chamber.q.headMult, AGENT_TUNING.chamber.q.legMult);
                 } else if (hitTarget) {
                     createHitEffect(hitPoint || hitTarget.mesh.position, false);
-                    damageTargetActor(hitTarget, 75, now, nowMs, "Headhunter", hitLeaf || hitTarget.leaves[0]);
+                    damageTargetActor(hitTarget, AGENT_TUNING.chamber.q.damage, now, nowMs, "Headhunter", hitLeaf || hitTarget.leaves[0]);
                 }
                 if (typeof tacticalDirector !== 'undefined') {
                     tacticalDirector.recordShot(!!(hitEnemy || hitTarget), hitHead);
                 }
             },
 
+            // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
             castChamberRendezvous: function(now) {
                 camera.updateMatrixWorld();
                 _abilityOrigin.copy(camera.position);
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
-                let placeDist = 12.0;
+                let placeDist = AGENT_TUNING.chamber.e.rangeM;
                 const savedFar = raycaster.far;
                 raycaster.ray.origin.copy(_abilityOrigin);
                 raycaster.ray.direction.copy(_abilityForward);
-                raycaster.far = 22.0;
+                raycaster.far = AGENT_TUNING.chamber.e.wallRayM;
                 _shotHits.length = 0;
-                envShotIndex.raycast(raycaster.ray, 22.0);
+                envShotIndex.raycast(raycaster.ray, AGENT_TUNING.chamber.e.wallRayM);
                 if (_shotHits.length > 0) {
                     _shotHits.sort(compareHitDistance);
-                    placeDist = Math.max(1.2, Math.min(20.0, _shotHits[0].distance - 0.8));
+                    placeDist = Math.max(AGENT_TUNING.chamber.e.minRangeM, Math.min(AGENT_TUNING.chamber.e.maxRangeM, _shotHits[0].distance - AGENT_TUNING.chamber.e.wallGapM));
                 }
                 _shotHits.length = 0;
                 raycaster.far = savedFar;
@@ -28443,7 +28570,7 @@
                     this.chamberAnchor.active = true;
                     this.chamberAnchor.position.set(ax, floorY, az);
                     this.chamberAnchor.startAt = now;
-                    this.chamberAnchor.expireAt = now + 28000;
+                    this.chamberAnchor.expireAt = now + AGENT_TUNING.chamber.e.lifetimeMs;
                     this.chamberAnchor.group.position.copy(this.chamberAnchor.position);
                     this.chamberAnchor.group.visible = true;
                 }
@@ -28453,6 +28580,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
             triggerChamberRendezvousTeleport: function(now) {
                 if (!this.chamberAnchor || !this.chamberAnchor.active) return;
                 const originX = characterController.position.x;
@@ -28472,10 +28600,10 @@
                 characterController.velocity.set(0, 0, 0);
 
                 // Brief 0.85s Golden Phase Invulnerability + +15 Shield restore on snap!
-                this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + 850);
+                this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + AGENT_TUNING.chamber.e.intangibleMs);
                 this.dashFxUntil = now + 380;
                 game.maxShield = Math.max(game.maxShield || 25, 50);
-                game.shield = Math.min(50, (game.shield || 0) + 15);
+                game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.chamber.e.shieldHp);
                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
 
                 this.chamberAnchor.active = false;
@@ -28486,6 +28614,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
             fireChamberTourDeForce: function(now) {
                 if (game.ultChargesLeft <= 0) return;
                 game.ultChargesLeft--;
@@ -28557,11 +28686,11 @@
                     const ez = hitEnemy.mesh.position.z;
                     createHitEffect(hitPoint || hitEnemy.mesh.position, false);
                     // Tour De Force deals 185 base damage (1-shot kill anywhere on the body!) and spawns a Trademark Slow Field at the victim's position!
-                    damageEnemyActor(hitEnemy, 185, now, nowMs, "Tour De Force", hitZone, 2.0, 1.0);
+                    damageEnemyActor(hitEnemy, AGENT_TUNING.chamber.x.damage, now, nowMs, "Tour De Force", hitZone, AGENT_TUNING.chamber.x.headMult, AGENT_TUNING.chamber.x.legMult);
                     this.spawnSlowZone(ex, this.findSupportFloorY(ex, ey + 0.5, ez), ez, now);
                 } else if (hitTarget) {
                     createHitEffect(hitPoint || hitTarget.mesh.position, false);
-                    damageTargetActor(hitTarget, 185, now, nowMs, "Tour De Force", hitLeaf || hitTarget.leaves[0]);
+                    damageTargetActor(hitTarget, AGENT_TUNING.chamber.x.damage, now, nowMs, "Tour De Force", hitLeaf || hitTarget.leaves[0]);
                 }
 
                 if (typeof tacticalDirector !== 'undefined') {
@@ -28569,7 +28698,7 @@
                 }
 
                 if (game.ultChargesLeft <= 0) {
-                    game.ultActiveUntil = Math.min(game.ultActiveUntil, now + 600);
+                    game.ultActiveUntil = Math.min(game.ultActiveUntil, now + AGENT_TUNING.chamber.x.endDelayMs);
                 } else {
                     showNotification(`TOUR DE FORCE FIRED! (${game.ultChargesLeft} Golden Rounds left)`, 1400);
                 }
@@ -28733,12 +28862,13 @@
             },
 
             // --- Cypher Surveillance Sentinel Abilities (Trapwire [C], Cyber Cage [Q], Spycam [E], Neural Theft [X]) ---
+            // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
             castCypherTrapwire: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const wx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 2.8));
-                const wz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 2.8));
+                const wx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.cypher.c.spawnAheadM));
+                const wz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.cypher.c.spawnAheadM));
                 const floorY = this.findSupportFloorY(wx, characterController.position.y + 1.0, wz);
 
                 let wire = this.trapwires[0];
@@ -28750,7 +28880,7 @@
                 wire.detonateAt = 0;
                 wire.position.set(wx, floorY, wz);
                 wire.startAt = now;
-                wire.expireAt = now + 20000;
+                wire.expireAt = now + AGENT_TUNING.cypher.c.lifetimeMs;
                 wire.beamMat.color.setHex(0x38bdf8).convertSRGBToLinear();
                 wire.ringMat.color.setHex(0x38bdf8).convertSRGBToLinear();
                 wire.group.position.copy(wire.position);
@@ -28761,19 +28891,21 @@
                 showNotification("TRAPWIRE ANCHORED! Tethers, Reveals & Concusses Hostiles Crossing the Beam!", 1700);
             },
 
+            // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
             castCypherCyberCage: function(now) {
                 // Digital Data Cage (cyan-white 0x38bdf8, 5.0m radius, 9.5s duration)
-                this.castSmokeProjectile(now, 0x38bdf8, 0.55, 5.0, 9500);
+                this.castSmokeProjectile(now, 0x38bdf8, AGENT_TUNING.cypher.q.fuseSec, AGENT_TUNING.cypher.q.radiusM, AGENT_TUNING.cypher.q.lifetimeMs);
                 soundFX.cypherWire();
                 showNotification("CYBER CAGE TRIGGERED! Blocks Vision, Slows & Pings Enemies Inside!", 1600);
             },
 
+            // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
             castCypherSpycam: function(now) {
                 camera.updateMatrixWorld();
                 _abilityOrigin.copy(camera.position);
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
-                let camDist = 18.0;
+                let camDist = AGENT_TUNING.cypher.e.rangeM;
                 const savedFar = raycaster.far;
                 raycaster.ray.origin.copy(_abilityOrigin);
                 raycaster.ray.direction.copy(_abilityForward);
@@ -28782,7 +28914,7 @@
                 envShotIndex.raycast(raycaster.ray, camDist);
                 if (_shotHits.length > 0) {
                     _shotHits.sort(compareHitDistance);
-                    camDist = Math.max(1.5, _shotHits[0].distance - 0.55);
+                    camDist = Math.max(AGENT_TUNING.cypher.e.minRangeM, _shotHits[0].distance - AGENT_TUNING.cypher.e.wallGapM);
                 }
                 _shotHits.length = 0;
                 raycaster.far = savedFar;
@@ -28790,7 +28922,7 @@
                 const cx = Math.max(-46, Math.min(46, _abilityOrigin.x + _abilityForward.x * camDist));
                 const cz = Math.max(-46, Math.min(46, _abilityOrigin.z + _abilityForward.z * camDist));
                 const floorY = this.findSupportFloorY(cx, _abilityOrigin.y + 1.5, cz);
-                const cy = Math.max(floorY + 2.2, Math.min(11.5, _abilityOrigin.y + _abilityForward.y * camDist + 0.5));
+                const cy = Math.max(floorY + AGENT_TUNING.cypher.e.minHeightM, Math.min(AGENT_TUNING.cypher.e.maxHeightM, _abilityOrigin.y + _abilityForward.y * camDist + AGENT_TUNING.cypher.e.aimLiftM));
 
                 let cam = this.spycams[0];
                 for (let i = 0; i < this.spycams.length; i++) {
@@ -28799,8 +28931,8 @@
                 cam.inUse = true;
                 cam.position.set(cx, cy, cz);
                 cam.startAt = now;
-                cam.expireAt = now + 18000;
-                cam.nextDartAt = now + 250;
+                cam.expireAt = now + AGENT_TUNING.cypher.e.lifetimeMs;
+                cam.nextDartAt = now + AGENT_TUNING.cypher.e.firstDartMs;
                 cam.group.position.copy(cam.position);
                 cam.group.lookAt(characterController.position.x, cy - 0.8, characterController.position.z);
                 cam.group.visible = true;
@@ -28914,6 +29046,7 @@
             },
 
             // V1.9.1: Raze's numbers come from AGENT_TUNING.raze (the Alarmbot side is Killjoy's, unchanged)
+            // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy (the Alarmbot side of this method)
             castRazeBoomBot: function(now, isAlarmbot = false) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
@@ -28930,10 +29063,10 @@
                 bot.isAlarmbot = isAlarmbot;
                 bot.locked = false;
                 bot.position.set(spawnX, floorY, spawnZ);
-                const speed = isAlarmbot ? 6.5 : AGENT_TUNING.raze.c.speedMps;
+                const speed = isAlarmbot ? AGENT_TUNING.killjoy.q.speedMps : AGENT_TUNING.raze.c.speedMps;
                 bot.velocity.set(fwdX * speed, 0, fwdZ * speed);
                 bot.startAt = now;
-                bot.expireAt = now + (isAlarmbot ? 12000 : AGENT_TUNING.raze.c.lifetimeMs);
+                bot.expireAt = now + (isAlarmbot ? AGENT_TUNING.killjoy.q.lifetimeMs : AGENT_TUNING.raze.c.lifetimeMs);
                 bot.bodyMat.color.setHex(isAlarmbot ? 0xfacc15 : 0xfb923c).convertSRGBToLinear();
                 bot.bodyMat.emissive.setHex(isAlarmbot ? 0x854d0e : 0x9a3412).convertSRGBToLinear();
                 bot.domeMat.color.setHex(isAlarmbot ? 0xe879f9 : 0xfef08a).convertSRGBToLinear();
@@ -29029,17 +29162,18 @@
             },
 
             // --- Killjoy Tech Sentinel Abilities (Nanoswarm [C], Alarmbot [Q], Turret [E], Lockdown [X]) ---
+            // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy
             castKilljoyNanoswarm: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'nanoswarm';
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.0);
-                proj.velocity.copy(_abilityForward).multiplyScalar(26);
-                proj.velocity.y += 2.3;
-                proj.gravity = 15.5;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.killjoy.c.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.killjoy.c.speedMps);
+                proj.velocity.y += AGENT_TUNING.killjoy.c.upSpeedMps;
+                proj.gravity = AGENT_TUNING.killjoy.c.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 1500;
+                proj.detonateAt = now + AGENT_TUNING.killjoy.c.fuseMs;
                 proj.mesh.material.color.setHex(0xfacc15).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -29051,12 +29185,13 @@
                 this.castRazeBoomBot(now, true);
             },
 
+            // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy
             castKilljoyTurret: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const tx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 2.4));
-                const tz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 2.4));
+                const tx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.killjoy.e.spawnAheadM));
+                const tz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.killjoy.e.spawnAheadM));
                 const floorY = this.findSupportFloorY(tx, characterController.position.y + 1.2, tz);
 
                 let turret = this.kjTurrets[0];
@@ -29066,8 +29201,8 @@
                 turret.inUse = true;
                 turret.position.set(tx, floorY, tz);
                 turret.startAt = now;
-                turret.expireAt = now + 18000;
-                turret.nextFireAt = now + 350;
+                turret.expireAt = now + AGENT_TUNING.killjoy.e.lifetimeMs;
+                turret.nextFireAt = now + AGENT_TUNING.killjoy.e.firstFireMs;
                 turret.lastShotAt = 0;
                 turret.group.position.copy(turret.position);
                 turret.headGroup.rotation.set(0, yaw + Math.PI, 0);
@@ -29153,11 +29288,12 @@
                 showNotification("RECON BOLT DEPLOYED — Scanning area!", 1500);
             },
 
+            // V2.2: Sage's numbers are in AGENT_TUNING.sage
             castSageHealingOrb: function(now) {
-                this.healPlayer(20, now);
+                this.healPlayer(AGENT_TUNING.sage.e.healHp, now);
                 this.sageHealSession.active = true;
-                this.sageHealSession.ticksLeft = 5;
-                this.sageHealSession.nextTickAt = now + 600;
+                this.sageHealSession.ticksLeft = AGENT_TUNING.sage.e.tickCount;
+                this.sageHealSession.nextTickAt = now + AGENT_TUNING.sage.e.firstTickMs;
                 this.healFxUntil = now + 3200;
                 soundFX.revive();
                 showNotification("SAGE HEALING ORB ACTIVE (+60 HP Radiant Mend)", 1800);
@@ -29210,17 +29346,18 @@
                 showNotification("SHOCK BOLT!", 1100);
             },
 
+            // V2.2: Sage's numbers are in AGENT_TUNING.sage
             castSageSlowOrb: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'slow';
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.0);
-                proj.velocity.copy(_abilityForward).multiplyScalar(27);
-                proj.velocity.y += 2.2;
-                proj.gravity = 15.0;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.sage.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.sage.q.speedMps);
+                proj.velocity.y += AGENT_TUNING.sage.q.upSpeedMps;
+                proj.gravity = AGENT_TUNING.sage.q.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 1600;
+                proj.detonateAt = now + AGENT_TUNING.sage.q.fuseMs;
                 proj.mesh.material.color.setHex(0x10b981).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -29441,6 +29578,7 @@
                 showNotification("HOT HANDS MOLLY OUT!", 1200);
             },
 
+            // V2.2: Sage's numbers are in AGENT_TUNING.sage
             castSageBarrierOrb: function(now) {
                 // Determine placement: if looking down (pitch < -0.28), place underfoot to boost player upward!
                 // Otherwise place 3.4m ahead aligned perpendicular to the player's cardinal aim axis.
@@ -29448,8 +29586,8 @@
                 const pitch = camera.rotation.x;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const selfBoost = pitch < -0.26;
-                const dist = selfBoost ? 0.55 : 3.4;
+                const selfBoost = pitch < AGENT_TUNING.sage.c.selfBoostPitchRad;
+                const dist = selfBoost ? AGENT_TUNING.sage.c.selfBoostAheadM : AGENT_TUNING.sage.c.spawnAheadM;
 
                 const wx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * dist));
                 const wz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * dist));
@@ -29457,9 +29595,9 @@
 
                 // Orient wall perpendicular to look direction (axis-aligned for crisp AABB collision & wall-boosting)
                 const widerAlongX = Math.abs(fwdZ) >= Math.abs(fwdX);
-                const sizeX = widerAlongX ? 4.8 : 1.15;
-                const sizeZ = widerAlongX ? 1.15 : 4.8;
-                const sizeY = 2.3;
+                const sizeX = widerAlongX ? AGENT_TUNING.sage.c.lengthM : AGENT_TUNING.sage.c.thicknessM;
+                const sizeZ = widerAlongX ? AGENT_TUNING.sage.c.thicknessM : AGENT_TUNING.sage.c.lengthM;
+                const sizeY = AGENT_TUNING.sage.c.heightM;
 
                 let wall = this.iceWalls[0];
                 for (let i = 0; i < this.iceWalls.length; i++) {
@@ -29470,10 +29608,10 @@
                 }
 
                 wall.inUse = true;
-                wall.health = 400;
-                wall.maxHealth = 400;
+                wall.health = AGENT_TUNING.sage.c.healthHp;
+                wall.maxHealth = AGENT_TUNING.sage.c.healthHp;
                 wall.startAt = now;
-                wall.expireAt = now + 14000;
+                wall.expireAt = now + AGENT_TUNING.sage.c.lifetimeMs;
                 wall.sizeX = sizeX;
                 wall.sizeY = sizeY;
                 wall.sizeZ = sizeZ;
@@ -29519,11 +29657,11 @@
                 // If player is standing inside the Ice Wall footprint when cast, boost player onto top of the wall!
                 const px = characterController.position.x;
                 const pz = characterController.position.z;
-                if (px >= wallBounds.min.x - 0.45 && px <= wallBounds.max.x + 0.45 &&
-                    pz >= wallBounds.min.z - 0.45 && pz <= wallBounds.max.z + 0.45) {
+                if (px >= wallBounds.min.x - AGENT_TUNING.sage.c.boostPadM && px <= wallBounds.max.x + AGENT_TUNING.sage.c.boostPadM &&
+                    pz >= wallBounds.min.z - AGENT_TUNING.sage.c.boostPadM && pz <= wallBounds.max.z + AGENT_TUNING.sage.c.boostPadM) {
                     characterController.position.y = wallBounds.max.y + characterController.height;
                     characterController.prevSimPosition.y = characterController.position.y;
-                    characterController.velocity.y = 0.08;
+                    characterController.velocity.y = AGENT_TUNING.sage.c.boostUpSpeedPerTick;
                     characterController.grounded = true;
                     showNotification("BARRIER ORB BOOST! Elevated onto Jade Ice Wall!", 1800);
                 } else {
@@ -29601,11 +29739,12 @@
                     game.ultChargesLeft = AGENT_TUNING.sova.x.shotCount;
                     this.revealAllEnemies(now, def.abilities.x.durationMs);
                     showNotification("HUNTER'S FURY! 3 Wall-Piercing Railgun Blasts Ready (Click or Press X to fire)", 3400);
+                // V2.2: Sage's numbers are in AGENT_TUNING.sage
                 } else if (agentId === 'sage') {
-                    game.ultChargesLeft = 1;
-                    game.health = 100;
+                    game.ultChargesLeft = AGENT_TUNING.sage.x.reviveCount;
+                    game.health = AGENT_TUNING.sage.x.healthHp;
                     game.maxShield = 50;
-                    game.shield = 50;
+                    game.shield = AGENT_TUNING.sage.x.shieldHp;
                     if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                     this.healFxUntil = now + 1200;
                     showNotification("RESURRECTION AEGIS ACTIVE! Full 100 HP + 50 Armor & Self-Revive on Fatal Hit for 16s!", 3400);
@@ -29658,13 +29797,14 @@
                     }
                     soundFX.blastPack();
                     showNotification("HERE COMES THE PARTY! 2 Showstopper Rockets Ready (Left-Click or Press X to fire)!", 3400);
+                // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy
                 } else if (agentId === 'killjoy') {
                     game.ultChargesLeft = 0;
                     const yaw = camera.rotation.y;
                     const fwdX = -Math.sin(yaw);
                     const fwdZ = -Math.cos(yaw);
-                    const lx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 1.8));
-                    const lz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 1.8));
+                    const lx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.killjoy.x.spawnAheadM));
+                    const lz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.killjoy.x.spawnAheadM));
                     const floorY = this.findSupportFloorY(lx, characterController.position.y + 1.0, lz);
 
                     if (this.kjLockdown) {
@@ -29686,16 +29826,17 @@
                     }
                     soundFX.lockdown();
                     showNotification("LOCKDOWN INITIATED! 26m Stasis Dome Detains, Slows & Reveals All Enemies in Range!", 3500);
+                // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
                 } else if (agentId === 'cypher') {
                     game.ultChargesLeft = 0;
                     this.revealAllEnemies(now, def.abilities.x.durationMs);
                     for (let i = 0; i < enemyObjects.length; i++) {
                         const e = enemyObjects[i];
                         if (e.isActive && !e.hit) {
-                            e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
+                            e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.cypher.x.slowMs);
                         }
                     }
-                    this.cypherSecondPulseAt = now + 3200;
+                    this.cypherSecondPulseAt = now + AGENT_TUNING.cypher.x.secondPulseMs;
                     const st = this.stateByAgent.cypher;
                     if (st) {
                         st.c.charges = st.c.maxCharges; st.c.rechargeEnd = 0;
@@ -29803,9 +29944,10 @@
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.4, characterController.position.z, 0x00f5d4, 5.5, 420, now);
                     soundFX.neonOverdrive();
                     showNotification("OY! I'M PISSED! OVERDRIVE ACTIVE — Left-Click to fire 400 DPS Bio-Electric Lightning Beam!", 3600);
+                // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
                 } else if (agentId === 'chamber') {
                     // Tour De Force: Summon Golden Anti-Materiel Sniper Rifle with 5 One-Shot-Kill Golden Rounds!
-                    game.ultChargesLeft = 5;
+                    game.ultChargesLeft = AGENT_TUNING.chamber.x.roundCount;
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.4, characterController.position.z, 0xf59e0b, 4.8, 380, now);
                     soundFX.chamberSnap();
                     showNotification("THEY ARE SO DEAD! TOUR DE FORCE READY (5 One-Shot Golden Sniper Rounds — Press Left-Click or [X])!", 3600);
@@ -29954,11 +30096,12 @@
                     this.spawnAstraCosmicDivide(now);
                     soundFX.astraDivide();
                     showNotification("WORLD DIVIDED! COSMIC DIVIDE BARRIER DEPLOYED (Infinite Bullet-Blocking & Vision Wall + All Stars Refreshed)!", 3600);
+                // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
                 } else if (agentId === 'vyse') {
                     // Steel Garden: Erupt a 24m Torrent of Liquid Metal Thorns that JAMS enemy primary weapons for 8.0s!
                     game.ultChargesLeft = 0;
                     game.maxShield = Math.max(game.maxShield || 25, 50);
-                    game.shield = 50;
+                    game.shield = AGENT_TUNING.vyse.x.shieldHp;
                     if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                     const st = this.stateByAgent.vyse;
                     if (st) {
@@ -29998,12 +30141,13 @@
                     this.spawnWaylayConvergentPaths(now);
                     soundFX.waylayUlt();
                     showNotification("LIGHTS OUT! CONVERGENT PATHS ACTIVE (26m Prismatic Afterimage Shockwave + Prismatic Haste + 50 Armor)!", 3600);
+                // V2.2: Veto's numbers are in AGENT_TUNING.veto
                 } else if (agentId === 'veto') {
                     // Evolution: Trigger peak Bio-Mutation — 100 HP + 50 Armor, Combat Stim, Continuous Bio-Regen, & Complete Debuff Immunity!
                     game.ultChargesLeft = 0;
-                    game.health = 100;
+                    game.health = AGENT_TUNING.veto.x.healthHp;
                     game.maxShield = 50;
-                    game.shield = 50;
+                    game.shield = AGENT_TUNING.veto.x.shieldHp;
                     healthFill.style.width = '100%';
                     healthValue.textContent = game.health;
                     if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
@@ -30383,10 +30527,11 @@
                         const st = this.stateByAgent.neon;
                         if (st) { st.e.charges = st.e.maxCharges; st.e.rechargeEnd = 0; }
                     } else if (game.ultAgent === 'chamber') {
+                        // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
                         // Kills during Tour De Force heal +20 HP and restore +15 Armor!
-                        this.healPlayer(20, now);
+                        this.healPlayer(AGENT_TUNING.chamber.x.killHealHp, now);
                         game.maxShield = Math.max(game.maxShield || 25, 50);
-                        game.shield = Math.min(50, (game.shield || 0) + 15);
+                        game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.chamber.x.killShieldHp);
                         if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                     } else if (game.ultAgent === 'kayo') {
                         // Kills during NULL/cmd extend overload by +2.0s, heal +25 HP, and top up ammo!
@@ -30581,6 +30726,7 @@
             },
 
             // V2.2: Brimstone's (Incendiary) and Viper's (Snake Bite) numbers are in AGENT_TUNING.brimstone.q / AGENT_TUNING.viper.c (their sides of this method only)
+            // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy (the Nanoswarm side of this method)
             spawnMollyZone: function(x, y, z, now, isNanoswarm = false, isIncendiary = false, isSnakeBite = false) {
                 let item = this.mollies[0];
                 for (let i = 0; i < this.mollies.length; i++) {
@@ -30591,9 +30737,9 @@
                 item.isIncendiary = isIncendiary;
                 item.isSnakeBite = isSnakeBite;
                 item.position.set(x, Math.max(0.02, y), z);
-                item.radius = isIncendiary ? AGENT_TUNING.brimstone.q.radiusM : (isSnakeBite ? AGENT_TUNING.viper.c.radiusM : (isNanoswarm ? 5.0 : AGENT_TUNING.phoenix.c.radiusM));
+                item.radius = isIncendiary ? AGENT_TUNING.brimstone.q.radiusM : (isSnakeBite ? AGENT_TUNING.viper.c.radiusM : (isNanoswarm ? AGENT_TUNING.killjoy.c.radiusM : AGENT_TUNING.phoenix.c.radiusM));
                 item.startAt = now;
-                item.expireAt = now + (isIncendiary ? AGENT_TUNING.brimstone.q.lifetimeMs : (isSnakeBite ? AGENT_TUNING.viper.c.lifetimeMs : (isNanoswarm ? 6000 : AGENT_TUNING.phoenix.c.lifetimeMs)));
+                item.expireAt = now + (isIncendiary ? AGENT_TUNING.brimstone.q.lifetimeMs : (isSnakeBite ? AGENT_TUNING.viper.c.lifetimeMs : (isNanoswarm ? AGENT_TUNING.killjoy.c.lifetimeMs : AGENT_TUNING.phoenix.c.lifetimeMs)));
                 item.nextTickAt = now + 100;
                 item.discMat.color.setHex(isSnakeBite ? 0x22c55e : (isNanoswarm ? 0xfacc15 : (isIncendiary ? 0xef4444 : 0xff5500))).convertSRGBToLinear();
                 item.crownMat.color.setHex(isSnakeBite ? 0x86efac : (isNanoswarm ? 0xe879f9 : (isIncendiary ? 0xf97316 : 0xff7b00))).convertSRGBToLinear();
@@ -30603,6 +30749,7 @@
                 soundFX.molly();
             },
 
+            // V2.2: Sage's numbers are in AGENT_TUNING.sage (Chamber's Trademark and Tour De Force spawn this zone too)
             spawnSlowZone: function(x, y, z, now) {
                 let item = this.slowZones[0];
                 for (let i = 0; i < this.slowZones.length; i++) {
@@ -30610,10 +30757,10 @@
                 }
                 item.inUse = true;
                 item.position.set(x, Math.max(0.02, y), z);
-                item.radius = 5.8;
+                item.radius = AGENT_TUNING.sage.q.radiusM;
                 item.startAt = now;
-                item.expireAt = now + 7500;
-                item.nextTickAt = now + 50;
+                item.expireAt = now + AGENT_TUNING.sage.q.lifetimeMs;
+                item.nextTickAt = now + AGENT_TUNING.sage.q.firstTickMs;
                 item.group.position.copy(item.position);
                 item.group.scale.set(item.radius, 1, item.radius);
                 item.group.visible = true;
@@ -31040,11 +31187,12 @@
             stepSimulation: function(dt, timeMs) {
                 const now = gameNow();   // V2.2: this step's game time (it was the real clock)
 
+                // V2.2: Sage's numbers are in AGENT_TUNING.sage
                 // 0. Step Sage Healing Orb over-time ticks
                 if (this.sageHealSession.active && now >= this.sageHealSession.nextTickAt) {
-                    this.healPlayer(8, now);
+                    this.healPlayer(AGENT_TUNING.sage.e.healPerTickHp, now);
                     this.sageHealSession.ticksLeft--;
-                    this.sageHealSession.nextTickAt = now + 550;
+                    this.sageHealSession.nextTickAt = now + AGENT_TUNING.sage.e.tickMs;
                     if (this.sageHealSession.ticksLeft <= 0) {
                         this.sageHealSession.active = false;
                     }
@@ -31133,6 +31281,7 @@
                 }
 
                 // V2.2: Brimstone's (Incendiary) and Viper's (Snake Bite) numbers are in AGENT_TUNING.brimstone.q / AGENT_TUNING.viper.c (their sides of this step only)
+                // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy (the Nanoswarm side of this step)
                 // 2. Step Incendiary Molly, Brimstone Incendiary, Viper Snake Bite & Killjoy Nanoswarm Ground Zones (AoE DoT + Vulnerable Reveal + Phoenix passive heal)
                 const nowMs = Date.now();
                 for (let i = 0; i < this.mollies.length; i++) {
@@ -31146,7 +31295,7 @@
                     if (now >= m.nextTickAt) {
                         m.nextTickAt = now + 200; // 5 ticks per second
                         const rSq = m.radius * m.radius;
-                        const tickDmg = m.isIncendiary ? AGENT_TUNING.brimstone.q.damagePerTick : (m.isSnakeBite ? AGENT_TUNING.viper.c.damagePerTick : (m.isNanoswarm ? 9 : AGENT_TUNING.phoenix.c.damagePerTick));
+                        const tickDmg = m.isIncendiary ? AGENT_TUNING.brimstone.q.damagePerTick : (m.isSnakeBite ? AGENT_TUNING.viper.c.damagePerTick : (m.isNanoswarm ? AGENT_TUNING.killjoy.c.damagePerTick : AGENT_TUNING.phoenix.c.damagePerTick));
                         const zoneLabel = m.isIncendiary ? "Incendiary" : (m.isSnakeBite ? "Snake Bite" : (m.isNanoswarm ? "Nanoswarm" : "Hot Hands Molly"));
 
                         // Damage enemies standing in zone
@@ -31160,7 +31309,7 @@
                                 e.burningUntil = now + 350;
                                 e.slowedUntil = Math.max(e.slowedUntil, now + 450);
                                 if (m.isNanoswarm || m.isSnakeBite) {
-                                    e.revealedUntil = Math.max(e.revealedUntil, now + (m.isSnakeBite ? AGENT_TUNING.viper.c.revealMs : 2200));
+                                    e.revealedUntil = Math.max(e.revealedUntil, now + (m.isSnakeBite ? AGENT_TUNING.viper.c.revealMs : AGENT_TUNING.killjoy.c.revealMs));
                                 }
                                 damageEnemyActor(e, tickDmg, now, nowMs, zoneLabel, false);
                             }
@@ -31202,6 +31351,7 @@
                     }
                 }
 
+                // V2.2: Sage's numbers are in AGENT_TUNING.sage
                 // 2B. Step Sage Slow Orb Frost Zones (65% movement slow to enemies)
                 for (let i = 0; i < this.slowZones.length; i++) {
                     const sz = this.slowZones[i];
@@ -31212,7 +31362,7 @@
                         continue;
                     }
                     if (now >= sz.nextTickAt) {
-                        sz.nextTickAt = now + 150;
+                        sz.nextTickAt = now + AGENT_TUNING.sage.q.tickMs;
                         const rSq = sz.radius * sz.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -31220,7 +31370,7 @@
                             const dx = e.mesh.position.x - sz.position.x;
                             const dz = e.mesh.position.z - sz.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 400);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.sage.q.slowMs);
                             }
                         }
                     }
@@ -31285,6 +31435,7 @@
                     }
                 }
 
+                // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy (the Alarmbot side of this step)
                 // 2E. Step Raze Boom Bots & Killjoy Alarmbots (Homing Rover + Proximity Detonation)
                 for (let i = 0; i < this.boomBots.length; i++) {
                     const bot = this.boomBots[i];
@@ -31296,7 +31447,7 @@
                     }
 
                     // Search for closest enemy within lock-on range (18m Boom Bot / 16m Alarmbot)
-                    const lockRangeSq = bot.isAlarmbot ? (16 * 16) : (AGENT_TUNING.raze.c.lockRangeM * AGENT_TUNING.raze.c.lockRangeM);
+                    const lockRangeSq = bot.isAlarmbot ? (AGENT_TUNING.killjoy.q.lockRangeM * AGENT_TUNING.killjoy.q.lockRangeM) : (AGENT_TUNING.raze.c.lockRangeM * AGENT_TUNING.raze.c.lockRangeM);
                     let targetEnemy = null;
                     let bestDistSq = lockRangeSq;
                     for (let j = 0; j < enemyObjects.length; j++) {
@@ -31319,7 +31470,7 @@
                         const dx = targetEnemy.mesh.position.x - bot.position.x;
                         const dz = targetEnemy.mesh.position.z - bot.position.z;
                         const dist = Math.max(0.01, Math.hypot(dx, dz));
-                        const chaseSpeed = bot.isAlarmbot ? 13.5 : AGENT_TUNING.raze.c.chaseSpeedMps;
+                        const chaseSpeed = bot.isAlarmbot ? AGENT_TUNING.killjoy.q.chaseSpeedMps : AGENT_TUNING.raze.c.chaseSpeedMps;
                         bot.velocity.x = (dx / dist) * chaseSpeed;
                         bot.velocity.z = (dz / dist) * chaseSpeed;
 
@@ -31328,7 +31479,7 @@
                             bot.group.visible = false;
                             if (bot.isAlarmbot) {
                                 soundFX.shock();
-                                this.detonateExplosionAoE(bot.position.x, bot.position.y, bot.position.z, 5.6, 55, "Alarmbot", 0xfacc15, 6000, now);
+                                this.detonateExplosionAoE(bot.position.x, bot.position.y, bot.position.z, AGENT_TUNING.killjoy.q.radiusM, AGENT_TUNING.killjoy.q.maxDamage, "Alarmbot", 0xfacc15, AGENT_TUNING.killjoy.q.revealMs, now);
                                 showNotification("ALARMBOT DETONATED! Hostiles Vulnerable (+20% DMG) & Revealed for 6s!", 1800);
                             } else {
                                 soundFX.blastPack();
@@ -31370,6 +31521,7 @@
                     bot.group.position.copy(bot.position);
                 }
 
+                // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy
                 // 2F. Step Killjoy Autonomous Sentinel Turrets (Auto-Targeting & 3-Round Burst Fire)
                 for (let i = 0; i < this.kjTurrets.length; i++) {
                     const turret = this.kjTurrets[i];
@@ -31382,11 +31534,11 @@
 
                     let bestEnemy = null;
                     let bestDist = turret.range;
-                    _abilityOrigin.set(turret.position.x, turret.position.y + 0.85, turret.position.z);
+                    _abilityOrigin.set(turret.position.x, turret.position.y + AGENT_TUNING.killjoy.e.eyeHeightM, turret.position.z);
                     for (let j = 0; j < enemyObjects.length; j++) {
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit) continue;
-                        _abilityTempVec.set(e.mesh.position.x, e.mesh.position.y + 1.2, e.mesh.position.z);
+                        _abilityTempVec.set(e.mesh.position.x, e.mesh.position.y + AGENT_TUNING.killjoy.e.enemyAimHeightM, e.mesh.position.z);
                         const dist = _abilityOrigin.distanceTo(_abilityTempVec);
                         if (dist <= bestDist && this.hasWallLineOfSight(_abilityOrigin, _abilityTempVec, dist)) {
                             bestDist = dist;
@@ -31400,24 +31552,25 @@
                         turret.headGroup.rotation.y = Math.atan2(dx, dz);
 
                         if (now >= turret.nextFireAt) {
-                            turret.nextFireAt = now + 620;
+                            turret.nextFireAt = now + AGENT_TUNING.killjoy.e.fireIntervalMs;
                             turret.lastShotAt = now;
                             soundFX.turretFire();
-                            bestEnemy.slowedUntil = Math.max(bestEnemy.slowedUntil, now + 1400);
-                            bestEnemy.revealedUntil = Math.max(bestEnemy.revealedUntil, now + 2200);
+                            bestEnemy.slowedUntil = Math.max(bestEnemy.slowedUntil, now + AGENT_TUNING.killjoy.e.slowMs);
+                            bestEnemy.revealedUntil = Math.max(bestEnemy.revealedUntil, now + AGENT_TUNING.killjoy.e.revealMs);
                             createHitEffect(bestEnemy.mesh.position, false);
-                            damageEnemyActor(bestEnemy, 16, now, nowMs, "Sentinel Turret", false);
+                            damageEnemyActor(bestEnemy, AGENT_TUNING.killjoy.e.damage, now, nowMs, "Sentinel Turret", false);
                         }
                     }
                 }
 
+                // V2.2: Killjoy's numbers are in AGENT_TUNING.killjoy
                 // 2G. Step Killjoy Lockdown Stasis Dome (Continuous 26m Detain, Slow & Reveal)
                 if (this.kjLockdown && this.kjLockdown.active) {
                     if (now >= this.kjLockdown.expireAt) {
                         this.kjLockdown.active = false;
                         this.kjLockdown.group.visible = false;
                     } else if (now >= this.kjLockdown.nextPulseAt) {
-                        this.kjLockdown.nextPulseAt = now + 450;
+                        this.kjLockdown.nextPulseAt = now + AGENT_TUNING.killjoy.x.tickMs;
                         const rSq = this.kjLockdown.radius * this.kjLockdown.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -31425,14 +31578,15 @@
                             const dx = e.mesh.position.x - this.kjLockdown.position.x;
                             const dz = e.mesh.position.z - this.kjLockdown.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 1200);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 1600);
-                                this.applyEnemyBlind(e, now, 950);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.killjoy.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.killjoy.x.revealMs);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.killjoy.x.blindMs);
                             }
                         }
                     }
                 }
 
+                // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
                 // 2H. Step Cypher Trapwires (Laser Tripwire Tether + 900ms Concussive Detonation)
                 for (let i = 0; i < this.trapwires.length; i++) {
                     const wire = this.trapwires[i];
@@ -31448,18 +31602,18 @@
                         wire.group.visible = false;
                         soundFX.shock();
                         this.spawnFlashBurst(wire.position.x, wire.position.y + 0.9, wire.position.z, 0x38bdf8, 4.8, 360, now);
-                        const blastRSq = (wire.radius + 1.2) * (wire.radius + 1.2);
+                        const blastRSq = (wire.radius + AGENT_TUNING.cypher.c.blastPadM) * (wire.radius + AGENT_TUNING.cypher.c.blastPadM);
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit) continue;
                             const dx = e.mesh.position.x - wire.position.x;
                             const dz = e.mesh.position.z - wire.position.z;
                             if (dx * dx + dz * dz <= blastRSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 5000);
-                                this.applyEnemyBlind(e, now, 3000);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.cypher.c.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.cypher.c.revealMs);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.cypher.c.blindMs);
                                 createHitEffect(e.mesh.position, false);
-                                damageEnemyActor(e, 45, now, nowMs, "Trapwire Concuss", false);
+                                damageEnemyActor(e, AGENT_TUNING.cypher.c.damage, now, nowMs, "Trapwire Concuss", false);
                             }
                         }
                         showNotification("TRAPWIRE CONCUSS DETONATED! Hostiles Stunned, Revealed & Damaged (45 DMG)!", 1700);
@@ -31473,12 +31627,12 @@
                         const dx = e.mesh.position.x - wire.position.x;
                         const dz = e.mesh.position.z - wire.position.z;
                         const dy = Math.abs(e.mesh.position.y - wire.position.y);
-                        if (dx * dx + dz * dz <= rSq && dy <= 2.8) {
-                            e.slowedUntil = Math.max(e.slowedUntil, now + 900);
-                            e.revealedUntil = Math.max(e.revealedUntil, now + 2200);
+                        if (dx * dx + dz * dz <= rSq && dy <= AGENT_TUNING.cypher.c.maxHeightDiffM) {
+                            e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.cypher.c.tetherSlowMs);
+                            e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.cypher.c.tetherRevealMs);
                             if (!wire.triggered) {
                                 wire.triggered = true;
-                                wire.detonateAt = now + 900;
+                                wire.detonateAt = now + AGENT_TUNING.cypher.c.fuseMs;
                                 soundFX.cypherWire();
                                 showNotification("TRAPWIRE SNARED HOSTILE! Tethered & Revealed — Detonating in 0.9s!", 1500);
                             }
@@ -31486,6 +31640,7 @@
                     }
                 }
 
+                // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
                 // 2I. Step Cypher Surveillance Spycams (Auto-Scan & Tracking Recon Darts)
                 for (let i = 0; i < this.spycams.length; i++) {
                     const cam = this.spycams[i];
@@ -31498,11 +31653,11 @@
 
                     let bestEnemy = null;
                     let bestDist = cam.range;
-                    _abilityOrigin.set(cam.position.x, cam.position.y + 0.65, cam.position.z);
+                    _abilityOrigin.set(cam.position.x, cam.position.y + AGENT_TUNING.cypher.e.eyeHeightM, cam.position.z);
                     for (let j = 0; j < enemyObjects.length; j++) {
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit) continue;
-                        _abilityTempVec.set(e.mesh.position.x, e.mesh.position.y + 1.25, e.mesh.position.z);
+                        _abilityTempVec.set(e.mesh.position.x, e.mesh.position.y + AGENT_TUNING.cypher.e.enemyAimHeightM, e.mesh.position.z);
                         const dist = _abilityOrigin.distanceTo(_abilityTempVec);
                         if (dist <= bestDist && this.hasWallLineOfSight(_abilityOrigin, _abilityTempVec, dist)) {
                             bestDist = dist;
@@ -31516,18 +31671,19 @@
                         cam.group.rotation.y = Math.atan2(dx, dz);
 
                         if (now >= cam.nextDartAt) {
-                            cam.nextDartAt = now + 1800;
+                            cam.nextDartAt = now + AGENT_TUNING.cypher.e.dartIntervalMs;
                             cam.lastDartAt = now;
                             soundFX.spycamDart();
-                            bestEnemy.revealedUntil = Math.max(bestEnemy.revealedUntil, now + 4000);
-                            bestEnemy.slowedUntil = Math.max(bestEnemy.slowedUntil, now + 1500);
+                            bestEnemy.revealedUntil = Math.max(bestEnemy.revealedUntil, now + AGENT_TUNING.cypher.e.revealMs);
+                            bestEnemy.slowedUntil = Math.max(bestEnemy.slowedUntil, now + AGENT_TUNING.cypher.e.slowMs);
                             createHitEffect(bestEnemy.mesh.position, false);
-                            damageEnemyActor(bestEnemy, 20, now, nowMs, "Spycam Recon Dart", false);
+                            damageEnemyActor(bestEnemy, AGENT_TUNING.cypher.e.damage, now, nowMs, "Spycam Recon Dart", false);
                             showNotification("SPYCAM RECON DART TAGGED HOSTILE! (4s X-Ray + Vulnerable)", 1300);
                         }
                     }
                 }
 
+                // V2.2: Cypher's numbers are in AGENT_TUNING.cypher
                 // 2J. Step Cypher Neural Theft 2nd Global Shock Pulse
                 if (this.cypherSecondPulseAt > 0 && now >= this.cypherSecondPulseAt) {
                     this.cypherSecondPulseAt = 0;
@@ -31536,11 +31692,11 @@
                     for (let j = 0; j < enemyObjects.length; j++) {
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit) continue;
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 7000);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 2500);
-                        this.applyEnemyBlind(e, now, 1800);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.cypher.x.pulseRevealMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.cypher.x.pulseSlowMs);
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.cypher.x.pulseBlindMs);
                         createHitEffect(e.mesh.position, false);
-                        damageEnemyActor(e, 25, now, nowMs, "Neural Theft Shock", false);
+                        damageEnemyActor(e, AGENT_TUNING.cypher.x.pulseDamage, now, nowMs, "Neural Theft Shock", false);
                         shockedCount++;
                     }
                     if (shockedCount > 0) {
@@ -31850,6 +32006,7 @@
                     }
                 }
 
+                // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
                 // 2S. Step Chamber Trademark Autonomous Scanning Traps (11m Lock-On -> 650ms Windup -> 6.5m Slow Field + 40 Damage + 5s Vulnerable X-Ray)
                 for (let i = 0; i < this.trademarks.length; i++) {
                     const tm = this.trademarks[i];
@@ -31865,9 +32022,9 @@
                             if (!e.isActive || e.hit) continue;
                             const dx = e.mesh.position.x - tm.position.x;
                             const dz = e.mesh.position.z - tm.position.z;
-                            if (dx * dx + dz * dz <= 11.0 * 11.0) {
+                            if (dx * dx + dz * dz <= AGENT_TUNING.chamber.c.triggerRadiusM * AGENT_TUNING.chamber.c.triggerRadiusM) {
                                 tm.triggered = true;
-                                tm.detonateAt = now + 650;
+                                tm.detonateAt = now + AGENT_TUNING.chamber.c.fuseMs;
                                 soundFX.alarmLock();
                                 showNotification("TRADEMARK TRIGGERED! Destabilizing Slow Field in 0.65s!", 1600);
                                 break;
@@ -31884,11 +32041,11 @@
                             if (!e.isActive || e.hit) continue;
                             const dx = e.mesh.position.x - tm.position.x;
                             const dz = e.mesh.position.z - tm.position.z;
-                            if (dx * dx + dz * dz <= 6.5 * 6.5) {
+                            if (dx * dx + dz * dz <= AGENT_TUNING.chamber.c.radiusM * AGENT_TUNING.chamber.c.radiusM) {
                                 slowedCount++;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 4500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 5000);
-                                damageEnemyActor(e, 40, now, nowMs, "Trademark", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.chamber.c.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.chamber.c.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.chamber.c.damage, now, nowMs, "Trademark", false);
                             }
                         }
                         if (slowedCount > 0) {
@@ -32778,6 +32935,7 @@
                     }
                 }
 
+                // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
                 // 2RR. Step Deadlock GravNet Nanowire Gravity Fields (crouch-slows, pulls toward center, reveals & ticks 16 DPS)
                 for (let i = 0; i < this.deadlockGravNets.length; i++) {
                     const gn = this.deadlockGravNets[i];
@@ -32788,7 +32946,7 @@
                         continue;
                     }
                     if (now >= gn.nextTickAt) {
-                        gn.nextTickAt = now + 250;
+                        gn.nextTickAt = now + AGENT_TUNING.deadlock.c.tickMs;
                         const rSq = gn.radius * gn.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -32798,19 +32956,20 @@
                             const d2 = dx * dx + dz * dz;
                             if (d2 <= rSq) {
                                 const dist = Math.sqrt(d2) || 1;
-                                if (dist > 0.8) {
-                                    e.mesh.position.x += (dx / dist) * 0.42;
-                                    e.mesh.position.z += (dz / dist) * 0.42;
+                                if (dist > AGENT_TUNING.deadlock.c.pullMinDistM) {
+                                    e.mesh.position.x += (dx / dist) * AGENT_TUNING.deadlock.c.pullStepM;
+                                    e.mesh.position.z += (dz / dist) * AGENT_TUNING.deadlock.c.pullStepM;
                                     e.transformDirty = true;
                                 }
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 650);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 700);
-                                damageEnemyActor(e, 4, now, nowMs, "GravNet Nanowire", true);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.c.tickSlowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.c.tickRevealMs);
+                                damageEnemyActor(e, AGENT_TUNING.deadlock.c.damagePerTick, now, nowMs, "GravNet Nanowire", true);
                             }
                         }
                     }
                 }
 
+                // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
                 // 2SS. Step Deadlock Sonic Sensors (acoustic trip-sensor -> 450ms windup -> 6.8m 40 DMG Concussive Blast)
                 for (let i = 0; i < this.deadlockSensors.length; i++) {
                     const ds = this.deadlockSensors[i];
@@ -32829,7 +32988,7 @@
                             const dz = e.mesh.position.z - ds.position.z;
                             if (dx * dx + dz * dz <= rSq) {
                                 ds.triggered = true;
-                                ds.detonateAt = now + 420;
+                                ds.detonateAt = now + AGENT_TUNING.deadlock.q.fuseMs;
                                 soundFX.deadlockSensor();
                                 showNotification("SONIC SENSOR TRIPPED! Detonating concussive blast...", 1300);
                                 break;
@@ -32841,7 +33000,7 @@
                         soundFX.deadlockSensor();
                         this.spawnFlashBurst(ds.position.x, 0.9, ds.position.z, 0x38bdf8, 6.8, 340, now);
                         this.spawnWindRing(ds.position.x, 0.3, ds.position.z, 0x38bdf8, 6.8, 320, now);
-                        const blastRSq = 6.8 * 6.8;
+                        const blastRSq = AGENT_TUNING.deadlock.q.blastRadiusM * AGENT_TUNING.deadlock.q.blastRadiusM;
                         let stunned = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -32849,10 +33008,10 @@
                             const dx = e.mesh.position.x - ds.position.x;
                             const dz = e.mesh.position.z - ds.position.z;
                             if (dx * dx + dz * dz <= blastRSq) {
-                                e.blindedUntil = Math.max(e.blindedUntil, now + 4500);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 5000);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 5000);
-                                damageEnemyActor(e, 40, now, nowMs, "Sonic Sensor Concuss", false);
+                                e.blindedUntil = Math.max(e.blindedUntil, now + AGENT_TUNING.deadlock.q.blindMs);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.q.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.q.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.deadlock.q.damage, now, nowMs, "Sonic Sensor Concuss", false);
                                 stunned++;
                             }
                         }
@@ -32862,6 +33021,7 @@
                     }
                 }
 
+                // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
                 // 2TT. Step Deadlock Barrier Mesh X-Forcefield (repels enemy movement across X-arms & shocks 18 DPS)
                 for (let i = 0; i < this.deadlockBarriers.length; i++) {
                     const db = this.deadlockBarriers[i];
@@ -32872,7 +33032,7 @@
                         continue;
                     }
                     const canShock = now >= db.nextTickAt;
-                    if (canShock) db.nextTickAt = now + 250;
+                    if (canShock) db.nextTickAt = now + AGENT_TUNING.deadlock.e.tickMs;
                     const cosY = Math.cos(db.yaw);
                     const sinY = Math.sin(db.yaw);
                     for (let j = 0; j < enemyObjects.length; j++) {
@@ -32883,27 +33043,28 @@
                         const localX = dx * cosY - dz * sinY;
                         const localZ = dx * sinY + dz * cosY;
                         if (Math.abs(localX) <= db.radius && Math.abs(localZ) <= db.radius) {
-                            if (Math.abs(localZ) < 1.35) {
-                                const pushZ = (localZ >= 0 ? 1.45 : -1.45) - localZ;
+                            if (Math.abs(localZ) < AGENT_TUNING.deadlock.e.armHalfWidthM) {
+                                const pushZ = (localZ >= 0 ? AGENT_TUNING.deadlock.e.pushOutM : -AGENT_TUNING.deadlock.e.pushOutM) - localZ;
                                 e.mesh.position.x += pushZ * sinY;
                                 e.mesh.position.z += pushZ * cosY;
                                 e.transformDirty = true;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 650);
-                                if (canShock) damageEnemyActor(e, 5, now, nowMs, "Barrier Mesh", true);
-                            } else if (Math.abs(localX) < 1.35) {
-                                const pushX = (localX >= 0 ? 1.45 : -1.45) - localX;
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.e.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.e.revealMs);
+                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", true);
+                            } else if (Math.abs(localX) < AGENT_TUNING.deadlock.e.armHalfWidthM) {
+                                const pushX = (localX >= 0 ? AGENT_TUNING.deadlock.e.pushOutM : -AGENT_TUNING.deadlock.e.pushOutM) - localX;
                                 e.mesh.position.x += pushX * cosY;
                                 e.mesh.position.z -= pushX * sinY;
                                 e.transformDirty = true;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 650);
-                                if (canShock) damageEnemyActor(e, 5, now, nowMs, "Barrier Mesh", true);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.e.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.e.revealMs);
+                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", true);
                             }
                         }
                     }
                 }
 
+                // V2.2: Deadlock's numbers are in AGENT_TUNING.deadlock
                 // 2UU. Step Deadlock Annihilation Nanowire Cocoon (reels captured target along tether over 2.2s -> 180 DMG execution)
                 if (this.deadlockCocoon && this.deadlockCocoon.active) {
                     const dc = this.deadlockCocoon;
@@ -32915,18 +33076,18 @@
                         this.spawnFlashBurst(dc.position.x, 1.15, dc.position.z, 0x38bdf8, 5.5, 380, now);
                         this.spawnWindRing(dc.position.x, 0.35, dc.position.z, 0x38bdf8, 5.8, 360, now);
                         if (tEnemy && tEnemy.isActive && !tEnemy.hit) {
-                            damageEnemyActor(tEnemy, 180, now, nowMs, "Annihilation Execution", false);
+                            damageEnemyActor(tEnemy, AGENT_TUNING.deadlock.x.damage, now, nowMs, "Annihilation Execution", false);
                         }
-                        const splashRSq = 5.5 * 5.5;
+                        const splashRSq = AGENT_TUNING.deadlock.x.splashRadiusM * AGENT_TUNING.deadlock.x.splashRadiusM;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit || e === tEnemy) continue;
                             const dx = e.mesh.position.x - dc.position.x;
                             const dz = e.mesh.position.z - dc.position.z;
                             if (dx * dx + dz * dz <= splashRSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 4000);
-                                damageEnemyActor(e, 65, now, nowMs, "Annihilation Implosion", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.x.splashSlowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.x.splashRevealMs);
+                                damageEnemyActor(e, AGENT_TUNING.deadlock.x.splashDamage, now, nowMs, "Annihilation Implosion", false);
                             }
                         }
                         showNotification("ANNIHILATION IMPLOSION! Nanowire Cocoon Executed Target (180 DMG)!", 2100);
@@ -32935,9 +33096,9 @@
                         dc.position.lerpVectors(dc.capturePos, dc.pullTargetPos, frac);
                         tEnemy.mesh.position.set(dc.position.x, 0, dc.position.z);
                         tEnemy.transformDirty = true;
-                        tEnemy.blindedUntil = Math.max(tEnemy.blindedUntil, now + 600);
-                        tEnemy.slowedUntil = Math.max(tEnemy.slowedUntil, now + 600);
-                        tEnemy.revealedUntil = Math.max(tEnemy.revealedUntil, now + 800);
+                        tEnemy.blindedUntil = Math.max(tEnemy.blindedUntil, now + AGENT_TUNING.deadlock.x.reelBlindMs);
+                        tEnemy.slowedUntil = Math.max(tEnemy.slowedUntil, now + AGENT_TUNING.deadlock.x.reelSlowMs);
+                        tEnemy.revealedUntil = Math.max(tEnemy.revealedUntil, now + AGENT_TUNING.deadlock.x.reelRevealMs);
                         dc.cocoonMesh.position.set(dc.position.x, 1.15, dc.position.z);
                         const remDist = dc.position.distanceTo(dc.pullTargetPos);
                         dc.beamMesh.position.lerpVectors(dc.position, dc.pullTargetPos, 0.5);
@@ -33208,6 +33369,7 @@
                     }
                 }
 
+                // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
                 // 2BBB. Step Vyse Shear Liquid-Metal Wall Traps (triggers when enemy enters 3.2m -> pops 7.2m Indestructible Metallic Wall & grants +15 Armor)
                 for (let i = 0; i < this.vyseShears.length; i++) {
                     const vs = this.vyseShears[i];
@@ -33223,20 +33385,20 @@
                             if (!e.isActive || e.hit) continue;
                             const dx = e.mesh.position.x - vs.position.x;
                             const dz = e.mesh.position.z - vs.position.z;
-                            if (dx * dx + dz * dz <= 3.4 * 3.4) {
+                            if (dx * dx + dz * dz <= AGENT_TUNING.vyse.c.triggerRadiusM * AGENT_TUNING.vyse.c.triggerRadiusM) {
                                 vs.popped = true;
                                 vs.poppedAt = now;
-                                vs.expireAt = now + 7800;
+                                vs.expireAt = now + AGENT_TUNING.vyse.c.wallLifetimeMs;
                                 vs.wallMesh.visible = true;
                                 vs.crestMesh.visible = true;
                                 vs.coreMesh.visible = false;
                                 soundFX.vyseShear();
                                 this.spawnWindRing(vs.position.x, vs.position.y + 0.15, vs.position.z, 0xc084fc, 4.8, now);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 4500);
-                                damageEnemyActor(e, 30, now, nowMs, "Shear Metallic Trap", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.vyse.c.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.vyse.c.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.vyse.c.damage, now, nowMs, "Shear Metallic Trap", false);
                                 game.maxShield = Math.max(game.maxShield || 25, 50);
-                                game.shield = Math.min(50, (game.shield || 0) + 15);
+                                game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.vyse.c.shieldHp);
                                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                                 showNotification("SHEAR TRAP ERUPTED! Hostile Isolated Behind Indestructible Metal Wall (+15 Armor)!", 2000);
                                 break;
@@ -33255,17 +33417,18 @@
                             const nx = px - t * segX;
                             const nz = pz - t * segZ;
                             const distSq = nx * nx + nz * nz;
-                            if (distSq <= 1.25 * 1.25) {
+                            if (distSq <= AGENT_TUNING.vyse.c.wallHalfWidthM * AGENT_TUNING.vyse.c.wallHalfWidthM) {
                                 const dist = Math.sqrt(distSq) || 0.1;
-                                e.mesh.position.x += (nx / dist) * (1.3 - dist);
-                                e.mesh.position.z += (nz / dist) * (1.3 - dist);
+                                e.mesh.position.x += (nx / dist) * (AGENT_TUNING.vyse.c.wallPushOutM - dist);
+                                e.mesh.position.z += (nz / dist) * (AGENT_TUNING.vyse.c.wallPushOutM - dist);
                                 e.transformDirty = true;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 500);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.vyse.c.wallSlowMs);
                             }
                         }
                     }
                 }
 
+                // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
                 // 2CCC. Step Vyse Arc Rose Camouflaged Flash Traps (auto-blossoms if enemy steps within 4.2m or manual [Q] re-press)
                 for (let i = 0; i < this.vyseArcRoses.length; i++) {
                     const vr = this.vyseArcRoses[i];
@@ -33280,13 +33443,14 @@
                         if (!e.isActive || e.hit) continue;
                         const dx = e.mesh.position.x - vr.position.x;
                         const dz = e.mesh.position.z - vr.position.z;
-                        if (dx * dx + dz * dz <= 4.2 * 4.2) {
+                        if (dx * dx + dz * dz <= AGENT_TUNING.vyse.q.triggerRadiusM * AGENT_TUNING.vyse.q.triggerRadiusM) {
                             this.detonateVyseArcRose(now, vr);
                             break;
                         }
                     }
                 }
 
+                // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
                 // 2DDD. Step Vyse Razorvine Metallic Bramble Nests (6.5m liquid-metal thorns shred enemies for 28 DPS + 50% slow + reveal)
                 for (let i = 0; i < this.vyseRazorvines.length; i++) {
                     const rv = this.vyseRazorvines[i];
@@ -33297,7 +33461,7 @@
                         continue;
                     }
                     if (now >= rv.nextTickAt) {
-                        rv.nextTickAt = now + 250;
+                        rv.nextTickAt = now + AGENT_TUNING.vyse.e.tickMs;
                         const rSq = rv.radius * rv.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -33305,14 +33469,15 @@
                             const dx = e.mesh.position.x - rv.position.x;
                             const dz = e.mesh.position.z - rv.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 700);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 800);
-                                damageEnemyActor(e, 7, now, nowMs, "Razorvine Thorns", true);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.vyse.e.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.vyse.e.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.vyse.e.damagePerTick, now, nowMs, "Razorvine Thorns", true);
                             }
                         }
                     }
                 }
 
+                // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
                 // 2EEE. Step Vyse Steel Garden Ultimate (1.3s liquid-metal windup -> 24m Metallic Thorn Eruption that Jams Enemy Primary Weapons for 8s)
                 if (this.vyseSteelGarden && this.vyseSteelGarden.active) {
                     const sg = this.vyseSteelGarden;
@@ -33333,10 +33498,10 @@
                             const dz = e.mesh.position.z - sg.position.z;
                             if (dx * dx + dz * dz <= rSq) {
                                 jammed++;
-                                this.applyEnemyBlind(e, now, 4800);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 7500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 8000);
-                                damageEnemyActor(e, 60, now, nowMs, "Steel Garden Jam", false);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.vyse.x.blindMs);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.vyse.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.vyse.x.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.vyse.x.damage, now, nowMs, "Steel Garden Jam", false);
                             }
                         }
                         showNotification(`STEEL GARDEN ERUPTED! ${jammed} ${jammed === 1 ? 'Hostile' : 'Hostiles'} Primary Weapons JAMMED & Exposed (8.0s)!`, 2400);
@@ -33531,6 +33696,7 @@
                     }
                 }
 
+                // V2.2: Veto's numbers are in AGENT_TUNING.veto
                 // 2MMM. Step Veto Chokehold Bio-Snare Zones (6.4m viscous snare trap with Decay + Deafen + Reveal)
                 for (let i = 0; i < this.vetoChokeholds.length; i++) {
                     const ch = this.vetoChokeholds[i];
@@ -33541,7 +33707,7 @@
                         continue;
                     }
                     if (now >= ch.nextTickAt) {
-                        ch.nextTickAt = now + 220;
+                        ch.nextTickAt = now + AGENT_TUNING.veto.q.tickMs;
                         const rSq = ch.radius * ch.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -33549,14 +33715,15 @@
                             const dx = e.mesh.position.x - ch.position.x;
                             const dz = e.mesh.position.z - ch.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 950);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 950);
-                                damageEnemyActor(e, 5, now, nowMs, "Chokehold Decay", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.veto.q.tickSlowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.veto.q.tickRevealMs);
+                                damageEnemyActor(e, AGENT_TUNING.veto.q.damagePerTick, now, nowMs, "Chokehold Decay", false);
                             }
                         }
                     }
                 }
 
+                // V2.2: Veto's numbers are in AGENT_TUNING.veto
                 // 2NNN. Step Veto Interceptor Bio-Nullifier Drones (12.5m LOS enemy zap & player debuff cleanse)
                 for (let i = 0; i < this.vetoInterceptors.length; i++) {
                     const vi = this.vetoInterceptors[i];
@@ -33567,9 +33734,9 @@
                         continue;
                     }
                     if (now >= vi.nextZapAt) {
-                        vi.nextZapAt = now + 650;
+                        vi.nextZapAt = now + AGENT_TUNING.veto.e.zapIntervalMs;
                         // Cleanse player flash/blind if within 14m of an active Interceptor
-                        if (characterController.position.distanceToSquared(vi.position) <= 14.0 * 14.0) {
+                        if (characterController.position.distanceToSquared(vi.position) <= AGENT_TUNING.veto.e.cleanseRadiusM * AGENT_TUNING.veto.e.cleanseRadiusM) {
                             this.playerBlindUntil = 0;
                         }
                         const rSq = vi.radius * vi.radius;
@@ -33582,10 +33749,10 @@
                             const dSq = dx * dx + dz * dz;
                             if (dSq <= rSq && this.hasWallLineOfSight(vi.position, e.mesh.position, Math.sqrt(dSq))) {
                                 zapped++;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 2200);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 2500);
-                                this.applyEnemyBlind(e, now, 1200);
-                                damageEnemyActor(e, 22, now, nowMs, "Interceptor Zap", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.veto.e.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.veto.e.revealMs);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.veto.e.blindMs);
+                                damageEnemyActor(e, AGENT_TUNING.veto.e.damage, now, nowMs, "Interceptor Zap", false);
                                 this.spawnFlashBurst(e.mesh.position.x, e.mesh.position.y + 1.1, e.mesh.position.z, 0x10b981, 2.2, 220, now);
                             }
                         }
@@ -33596,6 +33763,7 @@
                     }
                 }
 
+                // V2.2: Veto's numbers are in AGENT_TUNING.veto
                 // 2OOO. Step Veto Evolution Bio-Mutant Overload Aura (debuff immunity + bio-regen + 9m suppression pulse)
                 if (this.vetoEvolutionAura && this.vetoEvolutionAura.active) {
                     const ea = this.vetoEvolutionAura;
@@ -33606,25 +33774,25 @@
                         // Complete immunity to enemy flashes/blinds while Evolution is active
                         this.playerBlindUntil = 0;
                         if (now >= ea.nextPulseAt) {
-                            ea.nextPulseAt = now + 500;
-                            this.healPlayer(6, now);
+                            ea.nextPulseAt = now + AGENT_TUNING.veto.x.tickMs;
+                            this.healPlayer(AGENT_TUNING.veto.x.healPerTickHp, now);
                             game.maxShield = Math.max(game.maxShield || 25, 50);
                             if ((game.shield || 0) < 50) {
-                                game.shield = Math.min(50, (game.shield || 0) + 5);
+                                game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.veto.x.shieldPerTickHp);
                                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                             }
                             const px = characterController.position.x;
                             const pz = characterController.position.z;
-                            const rSq = 9.0 * 9.0;
+                            const rSq = AGENT_TUNING.veto.x.radiusM * AGENT_TUNING.veto.x.radiusM;
                             for (let j = 0; j < enemyObjects.length; j++) {
                                 const e = enemyObjects[j];
                                 if (!e.isActive || e.hit) continue;
                                 const dx = e.mesh.position.x - px;
                                 const dz = e.mesh.position.z - pz;
                                 if (dx * dx + dz * dz <= rSq) {
-                                    e.slowedUntil = Math.max(e.slowedUntil, now + 1200);
-                                    e.revealedUntil = Math.max(e.revealedUntil, now + 1500);
-                                    damageEnemyActor(e, 10, now, nowMs, "Evolution Bio-Pulse", false);
+                                    e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.veto.x.slowMs);
+                                    e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.veto.x.revealMs);
+                                    damageEnemyActor(e, AGENT_TUNING.veto.x.damagePerTick, now, nowMs, "Evolution Bio-Pulse", false);
                                 }
                             }
                         }
@@ -33870,6 +34038,7 @@
                         playerInSmoke = true;
                     }
 
+                    // V2.2: Cypher's numbers are in AGENT_TUNING.cypher (the Cyber Cage side of this debuff)
                     // Omen Dark Cover, Cypher Cyber Cage, Clove Ruse & Astra Nebula debuff: enemies inside sphere are slowed & revealed
                     if (s.isDarkCover || s.isCyberCage || s.isRuseSmoke || s.isNebulaSmoke) {
                         const rSq = (s.radius + 0.6) * (s.radius + 0.6);
@@ -33879,8 +34048,8 @@
                             const dx = e.mesh.position.x - s.position.x;
                             const dz = e.mesh.position.z - s.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + (s.isCyberCage ? 450 : 280));
-                                e.revealedUntil = Math.max(e.revealedUntil, now + (s.isCyberCage ? 850 : 520));
+                                e.slowedUntil = Math.max(e.slowedUntil, now + (s.isCyberCage ? AGENT_TUNING.cypher.q.slowMs : 280));
+                                e.revealedUntil = Math.max(e.revealedUntil, now + (s.isCyberCage ? AGENT_TUNING.cypher.q.revealMs : 520));
                             }
                         }
                     }
@@ -39268,10 +39437,11 @@
                     return;
                 }
 
+                // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
                 // If Chamber's Tour De Force Ultimate has golden rounds remaining, Left Click fires the 1-Shot Golden Sniper Rifle!
                 if (ultActive && game.ultAgent === 'chamber' && game.ultChargesLeft > 0) {
                     const nowMs = Date.now();
-                    if (nowMs - game.lastShot < 500) return;
+                    if (nowMs - game.lastShot < AGENT_TUNING.chamber.x.fireIntervalMs) return;
                     game.lastShot = nowMs;
                     agentSystem.fireChamberTourDeForce(abilityNow);
                     return;
