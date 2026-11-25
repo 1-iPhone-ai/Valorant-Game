@@ -19,7 +19,7 @@ test('ability effects kit: bursts, rings, smokes and fire zones emit particles t
     const step = (n) => evaluate((n) => { for (let i = 0; i < n; i++) __fxUpdate(1 / 60, performance.now()); }, n);
 
     // An ability flash burst (used by most kits): sparks, a glow flash, smoke for a big one
-    await evaluate(() => agentSystem.spawnFlashBurst(0, 1.2, 20, 0xff5500, 4.5, 400, performance.now()));
+    await evaluate(() => agentSystem.spawnFlashBurst(0, 1.2, 20, 0xff5500, 4.5, 400, gameNow()));
     let a = await alive(evaluate);
     assert.ok(a.sparks >= 20 && a.glow === 1 && a.smoke >= 3, `burst: ${JSON.stringify(a)}`);
     await step(240);
@@ -27,13 +27,13 @@ test('ability effects kit: bursts, rings, smokes and fire zones emit particles t
     assert.deepEqual([a.add, a.smoke], [0, 0], 'everything expires');
 
     // Ground rings (dashes, stomps): dust and a few sparks
-    await evaluate(() => agentSystem.spawnWindRing(0, 0.3, 20, 0x38f6ff, 3, performance.now()));
+    await evaluate(() => agentSystem.spawnWindRing(0, 0.3, 20, 0x38f6ff, 3, gameNow()));
     a = await alive(evaluate);
     assert.ok(a.smoke >= 5 && a.sparks >= 4, `ring: ${JSON.stringify(a)}`);
     await step(240);
 
     // Smoke grenade: rolling puffs; fire zone: embers every frame
-    await evaluate(() => agentSystem.spawnSmokeSphere(4, 1, 18, 0x38f6ff, 3.5, 8000, performance.now()));
+    await evaluate(() => agentSystem.spawnSmokeSphere(4, 1, 18, 0x38f6ff, 3.5, 8000, gameNow()));
     a = await alive(evaluate);
     assert.ok(a.smoke >= 16, `smoke cloud: ${JSON.stringify(a)}`);
     await evaluate(() => { for (let i = 0; i < 60; i++) fxKit.embers(-4, 0.02, 21, 0xff7b00, 4.5, 1 / 60); });
@@ -47,7 +47,7 @@ test('ability effects kit: bursts, rings, smokes and fire zones emit particles t
 
     // Low quality: no extra effects
     await evaluate(() => { setQualitySettings('low'); for (const r of fxKit.parts) r.alive = false; for (const r of fxKit.smokes) r.alive = false; });
-    await evaluate(() => agentSystem.spawnFlashBurst(0, 1.2, 20, 0xff5500, 4.5, 400, performance.now()));
+    await evaluate(() => agentSystem.spawnFlashBurst(0, 1.2, 20, 0xff5500, 4.5, 400, gameNow()));
     a = await alive(evaluate);
     assert.deepEqual([a.add, a.smoke], [0, 0], 'off on Low');
     await evaluate(() => setQualitySettings('high'));

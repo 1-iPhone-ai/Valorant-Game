@@ -18003,18 +18003,19 @@
             const knifeMult = weapon.isMelee ? (weapon.speedBoost || weapon.moveSpeedMultiplier || 1.25) : ((gunMove > 1 && game.adsActive) ? 1.0 : gunMove);
             const adsMoveMult = (game.adsActive && !weapon.isMelee) ? (game.activeWeapon === 'sniper' ? (game.sniperVariant === 'marshal' ? 0.85 : 0.68) : 0.84) : 1.0;
             let ultMoveMult = 1.0;
+            const gNow = gameNow();   // V2.2: ability buffs run on game time
             if (typeof agentSystem !== 'undefined') {
-                if (agentSystem.isUltActive(now) && game.ultAgent === 'neon') {
+                if (agentSystem.isUltActive(gNow) && game.ultAgent === 'neon') {
                     ultMoveMult = AGENT_TUNING.neon.x.speedMult;
-                } else if (now < agentSystem.reynaDismissUntil || now < agentSystem.neonHighGearUntil) {
+                } else if (gNow < agentSystem.reynaDismissUntil || gNow < agentSystem.neonHighGearUntil) {
                     ultMoveMult = 1.45;
-                } else if (now < agentSystem.clovePickMeUpUntil || (agentSystem.isUltActive(now) && game.ultAgent === 'clove')) {
+                } else if (gNow < agentSystem.clovePickMeUpUntil || (agentSystem.isUltActive(gNow) && game.ultAgent === 'clove')) {
                     ultMoveMult = 1.35;
-                } else if (now < agentSystem.brimStimUntil || now < agentSystem.miksHarmonizeUntil) {
+                } else if (gNow < agentSystem.brimStimUntil || gNow < agentSystem.miksHarmonizeUntil) {
                     ultMoveMult = 1.25;
-                } else if (now < agentSystem.isoDoubleTapUntil) {
+                } else if (gNow < agentSystem.isoDoubleTapUntil) {
                     ultMoveMult = AGENT_TUNING.iso.e.speedMult;
-                } else if (agentSystem.isUltActive(now)) {
+                } else if (agentSystem.isUltActive(gNow)) {
                     if (game.ultAgent === 'jett' || game.ultAgent === 'cypher' || game.ultAgent === 'iso') ultMoveMult = 1.15;
                     else if (game.ultAgent === 'reyna' || game.ultAgent === 'viper' || game.ultAgent === 'kayo') ultMoveMult = 1.20;
                 }
@@ -18483,6 +18484,14 @@
         const SIM_MAX_STEPS = 4; // cap catch-up; leftover is clamped, not spiraled
         let simClock = 0; // accumulated 60 Hz clock in ms
         let simAccumulator = 0;
+        // V2.2: game time (ms) for ability timers. It moves only with the 60 Hz steps, so it stands
+        // still while the game is paused (menu, photo mode, a hidden tab) and loses what a long frame
+        // drops, as movement does (simClock is re-synced to the real clock after a pause; this never
+        // is). gameNow() is a step's own time inside a step, and between steps the last step plus the
+        // time waiting to be simulated; it never goes back.
+        let gameClock = performance.now();
+        let gameTime = gameClock;
+        function gameNow() { return gameTime; }
         let simStepsThisFrame = 0;
         
         // Static extent-aware index of map hit proxies (same key scheme as collisionIndex)
@@ -19664,6 +19673,9 @@
         }
 
         function damageTargetActor(target, amount, effectNow, nowMs, sourceLabel, hitLeaf, isWallbang = false, hitPoint = null) {
+            // V2.2: callers pass their own clock (abilities pass game time), so the clocks are read here:
+            // the hit flash on game time (as blinds), the respawn on the real clock
+            const wallNow = performance.now();
             if (!target || target.hit || !target.active) return false;
             const leafIndex = hitLeaf ? Math.max(0, target.leaves.indexOf(hitLeaf)) : 0;
             const leafObj = target.leaves[leafIndex] || target.leaves[0];
@@ -19729,7 +19741,7 @@
                 addCustomKillFeedMessage(`${badgeHtml}You destroyed ${target.type} Target (+${awardedPoints}) with ${sourceLabel}`);
                 animateTargetHit(target);
                 if (game.gameMode !== 'range') {
-                    scheduleActorEvent(target, effectNow + 5000, respawnTarget);
+                    scheduleActorEvent(target, wallNow + 5000, respawnTarget);
                 }
                 agentSystem.onActorEliminated('target', target.mesh.position);
                 return true;
@@ -19737,7 +19749,7 @@
                 showHitMarker(hitMarkerKind);
                 if (leafObj) {
                     leafObj.material.color.set(leafIndex === 3 ? 0xffd166 : 0xffaa00).convertSRGBToLinear();
-                    target.flashUntil[leafIndex] = effectNow + ACTOR_FLASH_MS;
+                    target.flashUntil[leafIndex] = gameNow() + ACTOR_FLASH_MS;
                     target.colorDirty = true;
                 }
                 return false;
@@ -19745,6 +19757,9 @@
         }
 
         function damageEnemyActor(enemy, amount, effectNow, nowMs, sourceLabel, hitZone = 'torso', headMult = 4.0, legMult = 0.85, isWallbang = false, hitPoint = null) {
+            // V2.2: callers pass their own clock (abilities pass game time), so the clocks are read here:
+            // game time for the reveal bonus and the hit flash (as blinds), the real clock for the rest
+            const wallNow = performance.now(), gNow = gameNow();
             if (!enemy || enemy.hit || !enemy.isActive) return false;
             // Support legacy boolean callers (true -> 'head', false -> 'torso')
             if (typeof hitZone === 'boolean') {
@@ -19754,13 +19769,13 @@
             const isHeadshot = (hitZone === 'head');
             const isLegshot = (hitZone === 'legs');
             const zoneMult = isHeadshot ? headMult : (isLegshot ? legMult : 1.0);
-            const vulnMult = (enemy.revealedUntil > effectNow) ? 1.2 : 1.0;
+            const vulnMult = (enemy.revealedUntil > gNow) ? 1.2 : 1.0;
             const finalDamage = Math.max(1, Math.round(amount * zoneMult * vulnMult));
 
-            enemy.lastDamagedAt = effectNow;
+            enemy.lastDamagedAt = wallNow;
             // Evasive combat juke when hit
             enemy.strafeDir = -enemy.strafeDir || 1;
-            enemy.nextStrafeSwitchAt = effectNow + 450;
+            enemy.nextStrafeSwitchAt = wallNow + 450;
 
             let armorAbsorbed = 0;
             if (enemy.armor > 0) {
@@ -19804,7 +19819,7 @@
             }
 
             if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.onEnemyHit) {
-                tacticalEnhancements.onEnemyHit(enemy, hitZone, finalDamage, enemy.health <= 0, isHeadshot, isWallbang, effectNow);
+                tacticalEnhancements.onEnemyHit(enemy, hitZone, finalDamage, enemy.health <= 0, isHeadshot, isWallbang, wallNow);
             }
 
             if (enemy.health <= 0) {
@@ -19823,7 +19838,7 @@
                     // V1.8 Match/Ranked: a flat 200 per kill (as Valorant), so the buy ladder holds
                     tacticalDirector.awardCreds(loadout.mode() === 'economy' ? 200 : (arch.credReward || 250) + (isHeadshot ? 75 : 0) + (isWallbang ? 50 : 0));
                     if (tacticalDirector.registerKill) {
-                        tacticalDirector.registerKill(enemy.mesh.position, isHeadshot, isWallbang, effectNow);
+                        tacticalDirector.registerKill(enemy.mesh.position, isHeadshot, isWallbang, wallNow);
                     }
                 }
 
@@ -19841,13 +19856,13 @@
                 animateEnemyDeath(enemy);
 
                 if (typeof tacticalDirector !== 'undefined' && game.gameMode === 'range' && tacticalDirector.rangeActive) {
-                    tacticalDirector.onRangeBotKilled(enemy, isHeadshot, nowMs, effectNow);
+                    tacticalDirector.onRangeBotKilled(enemy, isHeadshot, nowMs, wallNow);
                 } else {
                     if (game.gameMode !== 'retake' && game.gameMode !== 'match' && game.gameMode !== 'deathmatch') {
-                        scheduleActorEvent(enemy, effectNow + 10000, respawnEnemy);
+                        scheduleActorEvent(enemy, wallNow + 10000, respawnEnemy);
                     }
                     if (typeof tacticalDirector !== 'undefined') {
-                        tacticalDirector.onWaveEnemyKilled(enemy, isHeadshot, effectNow);
+                        tacticalDirector.onWaveEnemyKilled(enemy, isHeadshot, wallNow);
                     }
                 }
                 agentSystem.onActorEliminated('enemy', enemy.mesh.position);
@@ -19862,7 +19877,7 @@
                 enemyTactics.onHit(enemy, performance.now());
                 for (let j = 0; j < enemy.leaves.length; j++) {
                     enemy.leaves[j].material.color.set(flashColor).convertSRGBToLinear();
-                    enemy.flashUntil[j] = effectNow + ACTOR_FLASH_MS;
+                    enemy.flashUntil[j] = gNow + ACTOR_FLASH_MS;
                 }
                 enemy.colorDirty = true;
                 return false;
@@ -25304,7 +25319,7 @@
                 }
 
                 this.refreshAgentTheme();
-                this.syncHud(performance.now(), true);
+                this.syncHud(gameNow(), true);
             },
 
             selectAgent: function(agentId) {
@@ -25312,7 +25327,7 @@
                 game.activeAgent = agentId;
                 const def = AGENT_DEFS[agentId];
                 this.refreshAgentTheme();
-                this.syncHud(performance.now(), true);
+                this.syncHud(gameNow(), true);
                 agentStrip.show(); // V1.9: the agent strip shows for 4 s on an agent change
                 if (typeof tacticalDirector !== 'undefined' && game.agentPickerOpen) {
                     tacticalDirector.renderAgentPickerGrid();
@@ -25330,7 +25345,7 @@
 
             grantFullUltimate: function() {
                 game.ultPoints = game.maxUltPoints;
-                this.syncHud(performance.now(), true);
+                this.syncHud(gameNow(), true);
                 soundFX.ult();
                 showNotification(`${AGENT_DEFS[game.activeAgent].abilities.x.name} READY! Press X to activate`, 2400);
             },
@@ -25393,7 +25408,7 @@
             },
 
             castAbility: function(slotKey) {
-                const now = performance.now();
+                const now = gameNow();   // V2.2: ability timers run on game time (see gameNow)
                 const agentId = game.activeAgent;
                 const def = AGENT_DEFS[agentId];
                 if (!def) return;
@@ -29253,7 +29268,7 @@
                 }, 80);
                 if (wall.health <= 0) {
                     abilityLook.tag = 'sage.c';   // V2.0: the Barrier Orb shatters
-                    this.spawnFlashBurst(wall.group.position.x, wall.group.position.y, wall.group.position.z, 0x34d399, 3.2, 280, performance.now());
+                    this.spawnFlashBurst(wall.group.position.x, wall.group.position.y, wall.group.position.z, 0x34d399, 3.2, 280, gameNow());
                     abilityLook.tag = null;
                     this.deactivateIceWall(wall);
                     soundFX.slowZone();
@@ -29940,7 +29955,7 @@
 
             // Same rules as a kill: no gain while the ult is active, capped at max
             addUltPoint: function(points) {
-                const now = performance.now();
+                const now = gameNow();
                 if (this.isUltActive(now) || game.ultPoints >= game.maxUltPoints) return;
                 game.ultPoints = Math.min(game.maxUltPoints, game.ultPoints + (points || 1));
                 if (game.ultPoints === game.maxUltPoints) {
@@ -29977,7 +29992,7 @@
             },
 
             onActorEliminated: function(kind, worldPos) {
-                const now = performance.now();
+                const now = gameNow();
                 let gainedUltPoint = false;
 
                 // Reyna Soul Harvest Passive: Eliminations spawn a 3D glowing purple Soul Orb at the victim's position!
@@ -30178,14 +30193,14 @@
                 for (let i = 0; i < this.projectiles.length; i++) {
                     if (!this.projectiles[i].inUse) {
                         this.projectiles[i].inUse = true;
-                        this.projectiles[i].fuseT0 = performance.now();
+                        this.projectiles[i].fuseT0 = gameNow();
                         this.projectiles[i].flightMs = 0;
                         return this.projectiles[i];
                     }
                 }
                 const p = this.projectiles[0];
                 p.inUse = true;
-                p.fuseT0 = performance.now();
+                p.fuseT0 = gameNow();
                 p.flightMs = 0;
                 return p;
             },
@@ -30722,7 +30737,7 @@
 
             // --- 60Hz Simulation Step (Projectiles, Molly DoT, Slow Zones, Sage Heal, Reyna Devour/Leer, Omen Paranoia, Recon Pulses) ---
             stepSimulation: function(dt, timeMs) {
-                const now = performance.now();
+                const now = gameNow();   // V2.2: this step's game time (it was the real clock)
 
                 // 0. Step Sage Healing Orb over-time ticks
                 if (this.sageHealSession.active && now >= this.sageHealSession.nextTickAt) {
@@ -35967,9 +35982,9 @@
                     const ez = (e.mesh.position.z - pz) * scale;
                     const distFromCenter = Math.hypot(ex, ez);
 
-                    const isRevealed = e.revealedUntil > now;
+                    const isRevealed = e.revealedUntil > gameNow();   // V2.2: ability effects run on game time
                     const isFiring = (e.lastFiredPingUntil || 0) > now;
-                    const isBlinded = e.blindedUntil > now;
+                    const isBlinded = e.blindedUntil > gameNow();
                     const arch = e.archetypeDef || ENEMY_ARCHETYPES[e.archetype] || ENEMY_ARCHETYPES.standard;
 
                     // Clamp distant priority enemies (e.g. Range Bots or Recon-Revealed enemies) to radar edge
@@ -36610,7 +36625,7 @@
                     const arch = enemy.archetypeDef || ENEMY_ARCHETYPES[enemy.archetype] || ENEMY_ARCHETYPES.standard;
 
                     // Sniper Laser Sight 3D telegraph when Sniper bot has line-of-sight on player
-                    if (enemy.archetype === 'sniper' && enemy.hasSight && enemy.blindedUntil <= now && game.gameMode !== 'range' && laserVerts < 16 * 2) {
+                    if (enemy.archetype === 'sniper' && enemy.hasSight && enemy.blindedUntil <= gameNow() && game.gameMode !== 'range' && laserVerts < 16 * 2) {
                         const base = laserVerts * 3;
                         const dirX = playerPos.x - pos.x;
                         const dirZ = playerPos.z - pos.z;
@@ -36626,7 +36641,7 @@
 
                     // Show floating bar if enemy has LoS, was recently hit, is revealed by Recon, or is in Range mode
                     const recentlyDamaged = (now - (enemy.lastDamagedAt || 0)) < 4800;
-                    const isRevealed = enemy.revealedUntil > now;
+                    const isRevealed = enemy.revealedUntil > gameNow();
                     const showHud = enemy.hasSight || recentlyDamaged || isRevealed || game.gameMode === 'range' || distSq < 18 * 18;
                     if (!showHud || poolIdx >= this.enemyHudPool.length) continue;
 
@@ -36660,7 +36675,7 @@
                     hud.roleEl.style.color = arch.badgeColor;
 
                     // Status tag (BLINDED / LOCKING / RECON / SLOWED)
-                    if (enemy.blindedUntil > now) {
+                    if (enemy.blindedUntil > gameNow()) {
                         hud.statusEl.textContent = '★ BLINDED';
                         hud.statusEl.style.color = '#ffe066';
                     } else if (enemy.archetype === 'sniper' && enemy.hasSight && game.gameMode !== 'range') {
@@ -36669,7 +36684,7 @@
                     } else if (isRevealed) {
                         hud.statusEl.textContent = '◈ RECON';
                         hud.statusEl.style.color = '#38f6ff';
-                    } else if (enemy.slowedUntil > now) {
+                    } else if (enemy.slowedUntil > gameNow()) {
                         hud.statusEl.textContent = '❄ SLOWED';
                         hud.statusEl.style.color = '#7dd3fc';
                     } else {
@@ -37374,7 +37389,7 @@
                 this.updateVitalsHUD();
                 this.updateBuyMenuUI();
                 if (agentSystem && agentSystem.syncHud) {
-                    agentSystem.syncHud(performance.now(), true);
+                    agentSystem.syncHud(gameNow(), true);
                 }
             },
 
@@ -37781,7 +37796,7 @@
                     let defusingBot = null;
                     for (let i = 0; i < enemyObjects.length; i++) {
                         const e = enemyObjects[i];
-                        if (!e.isActive || e.hit || e.blindedUntil > now) continue;
+                        if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;
                         const d = Math.hypot(e.mesh.position.x - sitePos.x, e.mesh.position.z - sitePos.z);
                         if (d <= 4.2) {
                             defusingBot = e;
@@ -38735,7 +38750,7 @@
                 this.updateAceBeams(delta, now);
                 this.updateUltOrbs(delta, now);
                 this.updateBindTeleporters(delta, now);
-                this.updateBotAbilities(delta, now);
+                this.updateBotAbilities(delta, gameNow());   // V2.2: bot abilities run on game time, as yours do
                 if (game.gameMode === 'range') {
                     if (this.rangeActive) {
                         this.updateRangeHUD(now);
@@ -38883,14 +38898,15 @@
                 game.inspectUntil = 0;
 
                 const effectNow = performance.now();
-                const ultActive = agentSystem.isUltActive(effectNow);
+                const abilityNow = gameNow();   // V2.2: ability timers (ultimates, buffs, Yoru's unmask, Iso's orb) run on game time
+                const ultActive = agentSystem.isUltActive(abilityNow);
 
                 // If Sova's Hunter's Fury Ultimate has charges remaining, Left Click fires the wall-piercing energy beam!
                 if (ultActive && game.ultAgent === 'sova' && game.ultChargesLeft > 0) {
                     const nowMs = Date.now();
                     if (nowMs - game.lastShot < 360) return;
                     game.lastShot = nowMs;
-                    agentSystem.fireSovaHunterBeam(effectNow);
+                    agentSystem.fireSovaHunterBeam(abilityNow);
                     return;
                 }
 
@@ -38899,7 +38915,7 @@
                     const nowMs = Date.now();
                     if (nowMs - game.lastShot < AGENT_TUNING.raze.x.fireIntervalMs) return;
                     game.lastShot = nowMs;
-                    agentSystem.fireRazeShowstopper(effectNow);
+                    agentSystem.fireRazeShowstopper(abilityNow);
                     return;
                 }
 
@@ -38908,7 +38924,7 @@
                     const nowMs = Date.now();
                     if (nowMs - game.lastShot < AGENT_TUNING.neon.x.fireIntervalMs) return;
                     game.lastShot = nowMs;
-                    agentSystem.fireNeonOverdriveBeam(effectNow);
+                    agentSystem.fireNeonOverdriveBeam(abilityNow);
                     return;
                 }
 
@@ -38917,24 +38933,24 @@
                     const nowMs = Date.now();
                     if (nowMs - game.lastShot < 500) return;
                     game.lastShot = nowMs;
-                    agentSystem.fireChamberTourDeForce(effectNow);
+                    agentSystem.fireChamberTourDeForce(abilityNow);
                     return;
                 }
 
                 // If Yoru fires while in Dimensional Drift Ultimate, unmask from the rift with a close-range Unmask Flash!
-                if (game.activeAgent === 'yoru' && effectNow < agentSystem.reynaDismissUntil) {
+                if (game.activeAgent === 'yoru' && abilityNow < agentSystem.reynaDismissUntil) {
                     agentSystem.reynaDismissUntil = 0;
-                    if (game.ultAgent === 'yoru') game.ultActiveUntil = effectNow;
+                    if (game.ultAgent === 'yoru') game.ultActiveUntil = abilityNow;
                     soundFX.yoruRift();
-                    agentSystem.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.5, characterController.position.z, 0x3b82f6, 5.2, 360, effectNow);
+                    agentSystem.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.5, characterController.position.z, 0x3b82f6, 5.2, 360, abilityNow);
                     for (let j = 0; j < enemyObjects.length; j++) {
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit) continue;
                         const dx = e.mesh.position.x - characterController.position.x;
                         const dz = e.mesh.position.z - characterController.position.z;
                         if (dx * dx + dz * dz <= AGENT_TUNING.yoru.x.unmaskRadiusM * AGENT_TUNING.yoru.x.unmaskRadiusM) {
-                            agentSystem.applyEnemyBlind(e, effectNow, AGENT_TUNING.yoru.x.unmaskBlindMs);
-                            e.slowedUntil = Math.max(e.slowedUntil, effectNow + AGENT_TUNING.yoru.x.unmaskSlowMs);
+                            agentSystem.applyEnemyBlind(e, abilityNow, AGENT_TUNING.yoru.x.unmaskBlindMs);
+                            e.slowedUntil = Math.max(e.slowedUntil, abilityNow + AGENT_TUNING.yoru.x.unmaskSlowMs);
                         }
                     }
                     showNotification("DIMENSIONAL DRIFT UNMASKED! Nearby Hostiles Rift-Flashed!", 1600);
@@ -38967,7 +38983,7 @@
                 const adsBurst = (!isPistolBurst && def.adsBurst && game.adsActive) ? def.adsBurst : null;   // Bulldog 3, Stinger 4
                 const fireRateMult = (ultActive && (game.ultAgent === 'jett' || game.ultAgent === 'phoenix' || game.ultAgent === 'reyna' || game.ultAgent === 'kayo' || game.ultAgent === 'clove'))
                     ? 0.68
-                    : ((effectNow < agentSystem.neonHighGearUntil || effectNow < agentSystem.clovePickMeUpUntil || effectNow < agentSystem.miksHarmonizeUntil) ? 0.75 : ((effectNow < agentSystem.brimStimUntil || effectNow < agentSystem.isoDoubleTapUntil) ? 0.78 : 1.0));
+                    : ((abilityNow < agentSystem.neonHighGearUntil || abilityNow < agentSystem.clovePickMeUpUntil || abilityNow < agentSystem.miksHarmonizeUntil) ? 0.75 : ((abilityNow < agentSystem.brimStimUntil || abilityNow < agentSystem.isoDoubleTapUntil) ? 0.78 : 1.0));
                 const elapsed = now - prevShotAt;
                 const burstCd = isPistolBurst ? 420 : (adsBurst ? adsBurst.cooldown : 0);
                 // V1.8 spray index: holding the trigger walks along the pattern; a pause
@@ -39146,7 +39162,7 @@
 
                     // Check if shot hits a floating Iso Double Tap Prismatic Energy Orb!
                     if (pIdx === 0 && typeof agentSystem !== 'undefined' && agentSystem.checkShootIsoOrb) {
-                        agentSystem.checkShootIsoOrb(raycaster.ray, effectNow);
+                        agentSystem.checkShootIsoOrb(raycaster.ray, abilityNow);
                     }
                     if (pIdx === 0 && aimTrainer.active) aimTrainer.onShot(raycaster.ray, effectNow);
 
@@ -39859,35 +39875,36 @@
         
         function takeDamage(amount, sourcePos = null, source = null) {
             const now = performance.now();
+            const abilityNow = gameNow();   // V2.2: the ability timers here (Dismiss, Iso's shield, Run It Back) run on game time
             // V1.7 fix: already down and waiting to respawn. Without this, every hit
             // during the 3 s respawn delay counted another death and queued another
             // respawn timer.
             if (game.health <= 0) return;
             // Invulnerability window during Jett/Phoenix dash phase or Reyna/Clove Dismiss intangibility
-            if (characterController.dashTimer > 0 || (typeof agentSystem !== 'undefined' && now < agentSystem.reynaDismissUntil)) return;
+            if (characterController.dashTimer > 0 || (typeof agentSystem !== 'undefined' && abilityNow < agentSystem.reynaDismissUntil)) return;
 
             if (sourcePos && typeof tacticalDirector !== 'undefined') {
                 tacticalDirector.spawnDamageArc(sourcePos);
             }
 
             // Iso Double Tap Prismatic Flow Shield: completely absorbs 100% of the next incoming hit!
-            if (typeof agentSystem !== 'undefined' && agentSystem.isoShieldActive && now < agentSystem.isoDoubleTapUntil) {
+            if (typeof agentSystem !== 'undefined' && agentSystem.isoShieldActive && abilityNow < agentSystem.isoDoubleTapUntil) {
                 agentSystem.isoShieldActive = false;
                 soundFX.isoShieldBreak();
-                agentSystem.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.3, characterController.position.z, 0x8b5cf6, 3.4, 280, now);
+                agentSystem.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.3, characterController.position.z, 0x8b5cf6, 3.4, 280, abilityNow);
                 if (fxShield) {
                     fxShield.classList.add('active');
                     setTimeout(() => { fxShield.classList.remove('active'); }, 260);
                 }
                 showNotification("DOUBLE TAP PRISMATIC SHIELD ABSORBED 100% HIT DAMAGE!", 1700);
-                agentSystem.syncHud(now, true);
+                agentSystem.syncHud(abilityNow, true);
                 return;
             }
 
             const shieldAbsorb = game.shield > 0 ? Math.min(game.shield, Math.ceil(amount * 0.66)) : 0;
             const healthDamage = Math.max(0, amount - shieldAbsorb);
 
-            if (game.health - healthDamage <= 0 && agentSystem.tryPhoenixRebirth(now)) {
+            if (game.health - healthDamage <= 0 && agentSystem.tryPhoenixRebirth(abilityNow)) {
                 return;
             }
 
@@ -40015,6 +40032,7 @@
         function updateEnemies(time, delta) {
             const now = Date.now();
             const perfNow = performance.now();
+            const gNow = gameNow();   // V2.2: ability effects (blind, slow) and bot abilities run on game time
             const playerPosition = characterController.position;
             const activitySq = CONTENT.activityRadius * CONTENT.activityRadius;
             const visibleDistance = Math.min(adaptiveSettings.drawDistance, CONTENT.activityRadius);
@@ -40059,7 +40077,7 @@
                 const oldX = pos.x, oldZ = pos.z, oldRotation = mesh.rotation.y;
 
                 // Blinded / Flash-Stunned enemies wobble disoriented and cannot move or shoot
-                if (enemy.blindedUntil > perfNow) {
+                if (enemy.blindedUntil > gNow) {
                     enemy.tier = 'near';
                     enemy.hasSight = false;
                     mesh.rotation.y += 0.14 * Math.sin(time * 0.02 + enemy.slot);
@@ -40070,8 +40088,8 @@
                 }
 
                 const arch = enemy.archetypeDef || ENEMY_ARCHETYPES[enemy.archetype] || ENEMY_ARCHETYPES.standard;
-                const slowMult = (enemy.slowedUntil > perfNow) ? 0.45 : 1.0;
-                const dashMult = (enemy.dashUntil > perfNow) ? 2.25 : 1.0;
+                const slowMult = (enemy.slowedUntil > gNow) ? 0.45 : 1.0;
+                const dashMult = (enemy.dashUntil > gNow) ? 2.25 : 1.0;
                 const botDiff = (game.userSettings && game.userSettings.botDifficulty) || 'gold';
                 const diffSpeedMult = botDiff === 'iron' ? 0.72 : (botDiff === 'immortal' ? 1.2 : (botDiff === 'radiant' ? 1.38 : 1.0));
                 const diffShotDelayMult = botDiff === 'iron' ? 1.45 : (botDiff === 'immortal' ? 0.78 : (botDiff === 'radiant' ? 0.58 : 1.0));
@@ -40131,7 +40149,7 @@
 
                     // Role-based Enemy Bot Ability AI casting (Rifler Smoke/Recon, Rusher Tailwind Dash/Curveball Flash, Sniper Recon/Rendezvous TP, Juggernaut Incendiary Mortar)
                     if (game.botAbilityAI && typeof tacticalDirector !== 'undefined' && tacticalDirector.tryCastBotAbility) {
-                        tacticalDirector.tryCastBotAbility(enemy, perfNow, distanceToPlayer, nx, nz, perpX, perpZ);
+                        tacticalDirector.tryCastBotAbility(enemy, gNow, distanceToPlayer, nx, nz, perpX, perpZ);
                     }
 
                     // A bot that has reached the spike (to defuse it) or its plant site holds
@@ -40297,9 +40315,10 @@
         // Enemy shoots at player (with strict envShotIndex.raycast() Wall Occlusion)
         function enemyShoot(enemy) {
             const perfNow = performance.now();
-            if (enemy.blindedUntil > perfNow) return;
+            const gNow = gameNow();   // V2.2: ability effects (blind, Dismiss, concuss) run on game time
+            if (enemy.blindedUntil > gNow) return;
             if (game.gameMode === 'range') return;
-            if (typeof agentSystem !== 'undefined' && perfNow < agentSystem.reynaDismissUntil) return;
+            if (typeof agentSystem !== 'undefined' && gNow < agentSystem.reynaDismissUntil) return;
 
             // Low content tier skips 30% of shots. This gameplay rule used to follow the
             // graphics setting; it now follows the fixed content tier.
@@ -40380,7 +40399,7 @@
             
             // 3. Chance to hit player based on distance & archetype accuracy (reduced if enemy is concussed/slowed or player is crouching)
             const distance = length;
-            const concussMult = (enemy.slowedUntil > perfNow) ? 0.5 : 1.0;
+            const concussMult = (enemy.slowedUntil > gNow) ? 0.5 : 1.0;
             const crouchEvasion = characterController.isCrouching ? 0.82 : 1.0;
             const botDiff = (game.userSettings && game.userSettings.botDifficulty) || 'gold';
             const diffAccMult = botDiff === 'iron' ? 0.58 : (botDiff === 'immortal' ? 1.18 : (botDiff === 'radiant' ? 1.38 : 1.0));
@@ -44755,7 +44774,7 @@
                 };
                 this.fogU = THREE.UniformsUtils.clone(THREE.UniformsLib.fog);
                 this.SRC = this.shaderSources();
-                this.frameUniforms(performance.now());
+                this.frameUniforms(gameNow());
             },
 
             // Tileable value noise on a hashed lattice (deterministic, no assets)
@@ -46984,7 +47003,7 @@
                         let planter = null;
                         for (let i = 0; i < enemyObjects.length; i++) {
                             const e = enemyObjects[i];
-                            if (!e.isActive || e.hit || e.blindedUntil > now) continue;
+                            if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;
                             if (Math.hypot(e.mesh.position.x - site.x, e.mesh.position.z - site.z) <= 2.8) { planter = e; break; }
                         }
                         if (planter) {
@@ -47345,7 +47364,7 @@
             _duels: function (now) {
                 const pl = characterController.position;
                 for (const e of enemyObjects) {
-                    if (!e.isActive || e.hit || now < (e.dmNextShotAt || 0) || e.blindedUntil > now) continue;
+                    if (!e.isActive || e.hit || now < (e.dmNextShotAt || 0) || e.blindedUntil > gameNow()) continue;
                     e.dmNextShotAt = now + 500 + Math.random() * 600;
                     const ep = e.mesh.position;
                     const dPlayer = Math.hypot(pl.x - ep.x, pl.z - ep.z);
@@ -47431,7 +47450,7 @@
                 this.overlay.classList.add('visible');
                 document.getElementById('dm-again-btn').addEventListener('click', () => { this.overlay.classList.remove('visible'); this.start(); });
                 document.getElementById('dm-exit-btn').addEventListener('click', () => tacticalDirector.setGameMode('wave'));
-                for (const e of enemyObjects) if (e.isActive && !e.hit) e.blindedUntil = performance.now() + 1e9;
+                for (const e of enemyObjects) if (e.isActive && !e.hit) e.blindedUntil = gameNow() + 1e9;
                 if (document.pointerLockElement) document.exitPointerLock();
                 soundFX.ult();
             }
@@ -47486,7 +47505,7 @@
                 // All abilities full
                 const st = agentSystem.stateByAgent[game.activeAgent];
                 if (st) for (const k of ['c', 'q', 'e']) { st[k].charges = st[k].maxCharges; st[k].rechargeEnd = 0; }
-                agentSystem.syncHud(now, true);
+                agentSystem.syncHud(gameNow(), true);
                 game.creds = 0;
                 // Power-up orbs on open floor
                 for (const o of this.orbs) {
@@ -47524,7 +47543,7 @@
                 tacticalDirector.updateVitalsHUD();
                 healthFill.style.width = `${game.health}%`;
                 healthValue.textContent = game.health;
-                agentSystem.syncHud(now, true);
+                agentSystem.syncHud(gameNow(), true);
                 abilityLights.flash(o.x, 1, o.z, RUSH_ORBS[o.type].color, 6, 2, 400);
                 soundFX.playTone(660, 1320, 0.18, 'sine', 0.12, 0);
                 showNotification(RUSH_ORBS[o.type].label, 1600);
@@ -50912,7 +50931,7 @@
                                 st.cooldownUntil = 0;
                             }
                         });
-                        agentSystem.syncHud(performance.now(), true);
+                        agentSystem.syncHud(gameNow(), true);
                     }
                     showNotification(on ? 'Infinite Ability Charges: ENABLED' : 'Infinite Ability Charges: OFF', 1800);
                     this.saveToStorage();
@@ -50923,7 +50942,7 @@
                     game.userSettings.infiniteUlt = on;
                     if (on) {
                         game.ultPoints = game.maxUltPoints;
-                        if (typeof agentSystem !== 'undefined') agentSystem.syncHud(performance.now(), true);
+                        if (typeof agentSystem !== 'undefined') agentSystem.syncHud(gameNow(), true);
                     }
                     showNotification(on ? 'Infinite Ultimate ([X]): ENABLED' : 'Infinite Ultimate: OFF', 1800);
                     this.saveToStorage();
@@ -53086,7 +53105,7 @@
                 }
 
                 if (spottedEnemy) {
-                    spottedEnemy.revealedUntil = Math.max(spottedEnemy.revealedUntil || 0, now + 4500);
+                    spottedEnemy.revealedUntil = Math.max(spottedEnemy.revealedUntil || 0, gameNow() + 4500);   // V2.2: reveals run on game time
                     this.spawnWorldPing(spottedEnemy.mesh.position.x, spottedEnemy.mesh.position.y + 1.2, spottedEnemy.mesh.position.z, true, '⚠ HOSTILE SPOTTED');
                     return;
                 }
@@ -53526,6 +53545,7 @@
                 frameCount = 0;
                 simAccumulator = 0;
                 simClock = time;
+                gameClock = gameTime;   // V2.2: game time goes on from where it stood
                 characterController.prevSimPosition.copy(characterController.position);
                 previousCallbackCpu = null;
                 previousSimSteps = 0;
@@ -53594,10 +53614,13 @@
             while (simAccumulator >= SIM_DT) {
                 characterController.prevSimPosition.copy(characterController.position);
                 simClock += SIM_DT * 1000;
+                gameClock += SIM_DT * 1000;   // V2.2: game time moves with the steps
+                gameTime = gameClock;
                 stepSimulation(SIM_DT, simClock);
                 simAccumulator -= SIM_DT;
                 simStepsThisFrame++;
             }
+            gameTime = gameClock + simAccumulator * 1000;   // V2.2: between steps
             const now = performance.now();
             if (photoMode.active) photoMode.update(delta, now);
             else presentPlayerCamera(simAccumulator / SIM_DT);
@@ -53623,14 +53646,14 @@
             updateVisibleObjects(time);
             
             runActorEvents(now);
-            updateActorFlashes(now);
+            updateActorFlashes(gameNow());   // V2.2: hit flashes and blind tints run on game time
             
             // Pooled effect lifetimes (trails, decal fades, flash lights, agent abilities) + GPU pack
             updatePooledEffects(now);
-            agentSystem.updateRender(time, now, delta);
+            agentSystem.updateRender(time, gameNow(), delta);   // V2.2: ability visuals follow game time
             tacticalDirector.update(delta, now);
             tacticalEnhancements.update(delta, now);
-            abilityLook.update(now, delta);   // V2.0: High Fidelity ability visuals (does nothing in Classic)
+            abilityLook.update(gameNow(), delta);   // V2.0: High Fidelity ability visuals (does nothing in Classic)
             tacticalRadar.update(now);
             packEnemyBatches();
             packTargetBatches();

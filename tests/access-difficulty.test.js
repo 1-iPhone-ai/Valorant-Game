@@ -37,7 +37,7 @@ test('Reduce Flashes: off by default; on softens screen washes and flashbangs an
     assert.equal(on.saved, true, 'the choice is saved');
 
     // Flashbang overlay: a 0.42 peak shows at no more than 35% of that
-    await evaluate(() => { agentSystem.playerBlindPeak = 0.42; agentSystem.playerBlindUntil = performance.now() + 450; });
+    await evaluate(() => { agentSystem.playerBlindPeak = 0.42; agentSystem.playerBlindUntil = gameNow() + 450; });
     await frames(1);
     const flash = await evaluate(() => parseFloat(document.getElementById('fx-flash').style.opacity) || 0);
     assert.ok(flash <= 0.42 * 0.35 + 0.01, `flashbang overlay softened (${flash})`);
