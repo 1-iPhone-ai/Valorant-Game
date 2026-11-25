@@ -165,6 +165,9 @@ test('Ascent sides and sites: attackers west, defenders east, A north, B south; 
         const cc = characterController;
         cc.position.set(1.75, cc.standHeight, -22);
         cc.prevSimPosition.copy(cc.position);
+        // V2.1: a standing shot. If no frame has run since the walk up the stairs ended, the player is
+        // still moving, and a moving shot takes the rifle's movement error (0.08 rad: it can miss the bot)
+        cc.velocity.set(0, 0, 0);
         camera.position.copy(cc.position);
         camera.lookAt(1.75, 1.25, -29);
         camera.updateMatrixWorld();
