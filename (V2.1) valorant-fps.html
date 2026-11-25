@@ -10724,8 +10724,11 @@
                     resolveEnemyMapCollision(e.mesh.position, 0.72);
                     // V2.1: a bot still inside a building after that push (a walled map has solid
                     // blocks where the last map had floor) moves to this map's nearest respawn spot
-                    const p = e.mesh.position;
-                    if (L.respawnSpots && enemyInsideBox(p, 0.72, collisionIndex.query(p.x - 1, p.z - 1, p.x + 1, p.z + 1, [])) >= 0) {
+                    // V2.1: ...and so does one whose patrol anchor (the spot from the last map it walks a
+                    // circle round while the player is far off) is inside one of this map's buildings
+                    const p = e.mesh.position, c = e.position;
+                    if (L.respawnSpots && (enemyInsideBox(p, 0.72, collisionIndex.query(p.x - 1, p.z - 1, p.x + 1, p.z + 1, [])) >= 0 ||
+                        enemyInsideBox(c, 0.72, collisionIndex.query(c.x - 1, c.z - 1, c.x + 1, c.z + 1, [])) >= 0)) {
                         let best = null, bd = Infinity;
                         for (const s of L.respawnSpots) { const d = Math.hypot(s[0] - p.x, s[1] - p.z); if (d < bd) { bd = d; best = s; } }
                         if (best) activateEnemy(e, best[0], 0, best[1], e.archetype);
@@ -12975,8 +12978,24 @@
                     const dx = d === 0 ? 1 : d === 1 ? -1 : 0, dz = d === 2 ? 1 : d === 3 ? -1 : 0;
                     for (let s = 0.1; s <= 8 && s < best; s += 0.1) {
                         pos.x = ox + dx * s; pos.z = oz + dz * s;
-                        if (Math.abs(pos.x) > 48 || Math.abs(pos.z) > 48) break;
+                        // V2.1: skip, not stop at, a step outside the arena: a bot pushed through a
+                        // map's outer building to the arena wall still finds its way back in
+                        if (Math.abs(pos.x) > 48 || Math.abs(pos.z) > 48) continue;
                         if (enemyInsideBox(pos, radius, wide) < 0) { best = s; bx = pos.x; bz = pos.z; break; }
+                    }
+                }
+                // V2.1: nothing clear along the four axes (a corner where two of a map's outer
+                // buildings meet): look all round, nearest ring first, from the nearest point inside
+                // the arena (only reached when the bot would otherwise be left inside a box)
+                if (best === Infinity) {
+                    const cx = Math.max(-48, Math.min(48, ox)), cz = Math.max(-48, Math.min(48, oz));
+                    const ring = collisionIndex.query(cx - radius - 9, cz - radius - 9, cx + radius + 9, cz + radius + 9, _enemyEscapeScratch);
+                    for (let s = 0.25; s <= 8 && best === Infinity; s += 0.25) {
+                        for (let a = 0; a < 16; a++) {
+                            pos.x = cx + Math.cos(a * Math.PI / 8) * s; pos.z = cz + Math.sin(a * Math.PI / 8) * s;
+                            if (Math.abs(pos.x) > 48 || Math.abs(pos.z) > 48) continue;
+                            if (enemyInsideBox(pos, radius, ring) < 0) { best = s; bx = pos.x; bz = pos.z; break; }
+                        }
                     }
                 }
                 pos.x = bx; pos.z = bz;
@@ -39395,6 +39414,7 @@
                     }
 
                     // Lightweight separation between nearby active enemies so bots don't overlap
+                    let separated = false;   // V2.1
                     for (let j = 0; j < i; j++) {
                         const other = enemyObjects[j];
                         if (!other.isActive || other.hit || other.tier === 'frozen') continue;
@@ -39407,8 +39427,13 @@
                             const push = (minSep - d) * 0.5;
                             pos.x += (ox / d) * push;
                             pos.z += (oz / d) * push;
+                            separated = true;
                         }
                     }
+                    // V2.1: ...but not back into a wall: when the map pushes two bots into the same
+                    // corner, the push apart could shove one of them half into it (a no-op unless the
+                    // push apart left the bot overlapping a box, a pillar or the arena edge)
+                    if (separated) resolveEnemyMapCollision(pos, 0.68);
                 }
                 
                 if (pos.x !== oldX || pos.z !== oldZ || mesh.rotation.y !== oldRotation) {

@@ -439,7 +439,8 @@ test('Bind and Haven: all 8 modes start cleanly, Retake at every site, with the 
         for (const [mode, round] of runs) {
             await evaluate(([m, round]) => { if (round) game.roundNumber = round; tacticalDirector.setGameMode(m); }, [mode, round]);
             await frames(4);
-            out[map + ' ' + mode + (round ? ' ' + round : '')] = await evaluate(() => {
+            const run = map + ' ' + mode + (round ? ' ' + round : '');
+            out[run] = await evaluate(() => {
                 const embedded = (x, z, y0, y1, r) => {
                     for (const p of mapPieces) { const b = p.bounds; if (b.max.y <= y0 + 0.2 || b.min.y >= y1) continue; if (x > b.min.x - r && x < b.max.x + r && z > b.min.z - r && z < b.max.z + r) return true; }
                     return false;
@@ -453,12 +454,34 @@ test('Bind and Haven: all 8 modes start cleanly, Retake at every site, with the 
                     n: bots.length
                 };
             });
+            // ...and through one whole turn of the patrol clock: a bot far from the player walks a 5 m
+            // circle round its spot, and the look above only sees one point of it (96 steps, no shots)
+            out[run].swept = await evaluate(() => {
+                const embedded = (x, z, r) => {
+                    for (const p of mapPieces) { const b = p.bounds; if (b.max.y <= 0.2 || b.min.y >= 1.8) continue; if (x > b.min.x - r && x < b.max.x + r && z > b.min.z - r && z < b.max.z + r) return true; }
+                    return false;
+                };
+                const shoot = enemyShoot;
+                enemyShoot = () => {};
+                const turn = Math.PI * 2 / 0.0005, t0 = performance.now(), hits = new Map();
+                for (let k = 0; k < 96; k++) {
+                    updateEnemies(t0 + k * turn / 96, 1 / 60);
+                    for (const e of enemyObjects) {
+                        if (!e.isActive || e.hit || !embedded(e.mesh.position.x, e.mesh.position.z, 0.3)) continue;
+                        const spot = e.position.x.toFixed(1) + ',' + e.position.z.toFixed(1);
+                        if (!hits.has(spot)) hits.set(spot, [spot, e.mesh.position.x.toFixed(1), e.mesh.position.z.toFixed(1)]);
+                    }
+                }
+                enemyShoot = shoot;
+                return [...hits.values()];
+            });
         }
         await evaluate(() => tacticalDirector.setGameMode('wave'));
     }
     for (const [run, r] of Object.entries(out)) {
         assert.equal(r.player, false, `${run}: the player starts on open floor`);
         assert.deepEqual(r.bots, [], `${run}: no bot starts inside a wall`);
+        assert.deepEqual(r.swept, [], `${run}: no bot ends a tick inside a wall over a whole patrol circle (spot, where)`);
     }
     for (const map of Object.keys(MAPS)) {
         assert.ok(out[map + ' match'].n >= 2 && out[map + ' wave'].n >= 2, `${map}: bots in Wave and Match`);
