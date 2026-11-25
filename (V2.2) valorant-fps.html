@@ -17997,6 +17997,7 @@
             const weapon = game.weapons[game.activeWeapon];
             if (!weapon) return;
 
+            // V2.2: Clove's and Brimstone's speed multipliers are in AGENT_TUNING.clove.c / AGENT_TUNING.brimstone.c (Miks gets them through their timers)
             // 1. Update movement speed multiplier (Tactical Knife grants +25% agility boost; Marshal grants +12% agility; ADS slows slightly)
             // V1.8: a gun's own speed (Marshal +12% unscoped, heavies slower)
             const gunMove = weapon.def && weapon.def.moveMult ? weapon.def.moveMult : 1.0;
@@ -18010,9 +18011,9 @@
                 } else if (gNow < agentSystem.reynaDismissUntil || gNow < agentSystem.neonHighGearUntil) {
                     ultMoveMult = 1.45;
                 } else if (gNow < agentSystem.clovePickMeUpUntil || (agentSystem.isUltActive(gNow) && game.ultAgent === 'clove')) {
-                    ultMoveMult = 1.35;
+                    ultMoveMult = AGENT_TUNING.clove.c.speedMult;
                 } else if (gNow < agentSystem.brimStimUntil || gNow < agentSystem.miksHarmonizeUntil) {
-                    ultMoveMult = 1.25;
+                    ultMoveMult = AGENT_TUNING.brimstone.c.speedMult;
                 } else if (gNow < agentSystem.isoDoubleTapUntil) {
                     ultMoveMult = AGENT_TUNING.iso.e.speedMult;
                 } else if (agentSystem.isUltActive(gNow)) {
@@ -20971,16 +20972,24 @@
                 // X Empress: reveals enemies at the start; kills heal, shield and extend
                 x: { look: ['self'], revealMs: 4500, killHealHp: 55, killShieldHp: 25, killExtendMs: 4500, killExtendCapMs: 16000 }
             },
-            // Omen: only the four numbers that were in ABILITY_TUNING (the rest of Omen is still in its methods)
+            // Omen: c.rangeM, q.travelMs, e.lifetimeMs and x.rangeM came from ABILITY_TUNING (V1.9.1); V2.2 added the rest
             omen: {
+                // C Shrouded Step: teleports you to your aim point, briefly intangible (castOmenShroudedStep; the X blinks use it too)
                 c: { look: ['self'],
-                    rangeM: 15 },                   // Shrouded Step teleport range        [~12.5 m]
+                    rangeM: 15,                     // Shrouded Step teleport range        [~12.5 m]
+                    intangibleMs: 600 },
+                // Q Paranoia: a shadow wave that flies through walls and nearsights the enemies it touches (castOmenParanoia, 2D step)
                 q: { look: ['projectile', 'flash'],
-                    travelMs: 1300 },               // Paranoia travel time (x24 m/s)      [~1.2 s]
+                    travelMs: 1300,                 // Paranoia travel time (x24 m/s)      [~1.2 s]
+                    spawnAheadM: 1.2, speedMps: 24, radiusM: 2.8, enemyAimHeightM: 1.1, blindMs: 3800, slowMs: 3800, revealMs: 3800 },
+                // E Dark Cover: a thrown smoke (castSmokeProjectile, as Jett's and Sova's)
                 e: { look: ['projectile', 'smoke'],
-                    lifetimeMs: 15000 },            // Dark Cover smoke duration           [15 s]
+                    lifetimeMs: 15000,              // Dark Cover smoke duration           [15 s]
+                    fuseSec: 0.8, radiusM: 4.8 },
+                // X From the Shadows: nearsights every enemy, then long Shrouded Steps on X; kills give a step back and heal
                 x: { look: ['self'],
-                    rangeM: 30 }                    // From the Shadows blink range        [whole map]
+                    rangeM: 30,                     // From the Shadows blink range        [whole map]
+                    blinkCount: 2, blindMs: 2800, killBlinkCount: 1, killHealHp: 25 }
             },
             raze: {
                 // C Boom Bot: a rover that chases the nearest enemy and explodes (its code is shared with Killjoy's Alarmbot)
@@ -21057,6 +21066,94 @@
                 // X Convergent Paths: a corridor that erupts after a moment, hitting the enemies in it
                 x: { look: ['groundZone', 'blast'], shieldHp: 50, lengthM: 26.0, halfWidthM: 4.0, fuseMs: 750, lifetimeMs: 8500,
                     endPadM: 1.0, sidePadM: 0.8, blindMs: 3500, slowMs: 5500, revealMs: 6000, damage: 65 }
+            },
+            astra: {
+                // C Gravity Well: a well at your aim point pulls enemies in, then implodes after fuseMs (castAstraGravityWell, 2ZZ step)
+                c: { look: ['groundZone', 'blast'], rangeM: 32.0, radiusM: 6.8, fuseMs: 1800, lifetimeMs: 2450,
+                    firstPullMs: 80, pullTickMs: 90, pullMinDistM: 0.65, pullStepM: 0.36, pullSlowMs: 400, pullRevealMs: 600,
+                    slowMs: 4500, revealMs: 6000, damage: 45 },
+                // Q Nova Pulse: a star at your aim point that concusses after a moment (castAstraNovaPulse, 2AAA step)
+                q: { look: ['blast'], rangeM: 32.0, radiusM: 6.6, fuseMs: 650, lifetimeMs: 1350,
+                    blindMs: 4200, slowMs: 4500, revealMs: 5000, damage: 50 },
+                // E Nebula: a smoke at your aim point, and a small heal (castAstraNebula; its slow and reveal are in updateRender)
+                e: { look: ['smoke'], rangeM: 34.0, heightM: 1.2, radiusM: 4.9, lifetimeMs: 11000, healHp: 10 },
+                // X Cosmic Divide: a long wall across your view that blocks sight and hurts enemies on it, for the ult's durationMs (spawnAstraCosmicDivide, 2AAA step)
+                x: { look: ['wall'], shieldHp: 50, spawnAheadM: 6.5, halfLengthM: 28.0, firstTickMs: 100, tickMs: 250,
+                    hitHalfWidthM: 1.65, slowMs: 800, revealMs: 1200, damagePerTick: 6 }
+            },
+            brimstone: {
+                // C Stim Beacon: a beacon in front of you; casting it and standing near it give the stim and heal (castBrimstoneStimBeacon, 2K step, movement)
+                c: { look: ['deployable', 'groundZone'], spawnAheadM: 2.2, radiusM: 8.5, lifetimeMs: 12000, stimMs: 8000, healHp: 15,
+                    auraStimMs: 1500, tickMs: 1000, healPerTickHp: 3,
+                    speedMult: 1.25 },              // stim move speed (Miks, and the Waylay and Veto ults, also set brimStimUntil); its fire rate is shared with Iso, in shoot
+                // Q Incendiary: a grenade; its fire zone burns enemies (castBrimstoneIncendiary, spawnMollyZone, molly step)
+                q: { look: ['projectile', 'groundZone'], spawnAheadM: 1.05, speedMps: 28, upSpeedMps: 2.6, gravity: 15.5, fuseMs: 1650,
+                    radiusM: 5.6, lifetimeMs: 7500, damagePerTick: 12 },
+                // E Sky Smoke: a thrown smoke (castSmokeProjectile)
+                e: { look: ['projectile', 'smoke'], fuseSec: 0.65, radiusM: 5.2, lifetimeMs: 14000 },
+                // X Orbital Strike: a laser from the sky where you aim, after a windup; it burns enemies under it (activateUltimate, 2L step)
+                x: { look: ['beam', 'groundZone'],
+                    openRangeM: 36.0, rayRangeM: 45.0, // strike distance with nothing in the way; how far the aim ray looks for a wall
+                    wallMaxRangeM: 42.0, wallMinRangeM: 4.0, wallGapM: 0.5, // with a wall: its distance minus wallGapM, clamped
+                    radiusM: 8.2, windupMs: 450, firstTickMs: 450, tickMs: 200, burnMs: 350, slowMs: 600, revealMs: 1200, damagePerTick: 26,
+                    stimMs: 6500 }
+            },
+            clove: {
+                // C Pick-Me-Up: heal, shield and haste for a while (castClovePickMeUp, movement; the fire rate is shared, in shoot)
+                c: { look: ['self'], healHp: 50, shieldHp: 50, hasteMs: 8000,
+                    speedMult: 1.35 },              // haste move speed (also during Clove's ult; Miks gets it through clovePickMeUpUntil)
+                // Q Meddle: a fragment that bursts, hurting, slowing and revealing enemies (castCloveMeddle, spawnCloveMeddleBurst)
+                q: { look: ['projectile', 'blast'], spawnAheadM: 0.7, speedMps: 23.5, upSpeedMps: 2.6, gravity: 13.5, fuseMs: 1600,
+                    radiusM: 6.2, revealMs: 6000, slowMs: 4000, damage: 55 },
+                // E Ruse: a smoke at your aim point (castCloveRuse; its slow and reveal are in updateRender)
+                e: { look: ['smoke'], rangeM: 32.0, radiusM: 4.8, lifetimeMs: 10500 },
+                // X Not Dead Yet: health, shield, a short intangible phase and one revive; with full ult points it also fires when you die (activateUltimate, tryPhoenixRebirth)
+                x: { look: ['self'], reviveCount: 1, healthHp: 100, shieldHp: 50, intangibleMs: 2200,
+                    reviveIntangibleMs: 1800,       // intangible phase when the revive is used (the rest of that revive is shared with Sage and KAY/O)
+                    autoReviveUltMs: 10000,         // ult length after the automatic revive (the cast ult lasts AGENT_DEFS durationMs)
+                    blindRadiusSqM2: 196, blindMs: 3000, slowMs: 3500, revealMs: 4500 }
+            },
+            harbor: {
+                // C Cascade: a water wall that moves forward, slowing, pushing and hurting enemies; press C again to stop it (castHarborCascade, stopHarborCascade, 2VV step)
+                c: { look: ['wall'], spawnAheadM: 1.8, speedMps: 8.5, halfWidthM: 3.4, moveMs: 4500, lifetimeMs: 7500, anchorLifetimeMs: 5000,
+                    hitDepthM: 1.35, hitPadM: 0.6, slowMs: 2600, revealMs: 3000, pushM: 1.4, damage: 25 },
+                // Q Cove: a thrown sphere that becomes a dome; inside it you heal and gain shield, enemies are slowed (castHarborCove, spawnHarborCove, 2WW step)
+                q: { look: ['projectile', 'smoke'], spawnAheadM: 0.75, speedMps: 24.0, upSpeedMps: 2.7, gravity: 14.5, fuseMs: 1700,
+                    radiusM: 5.0, domeHp: 500, lifetimeMs: 10000, firstTickMs: 150, tickMs: 350, healPerTickHp: 4, shieldPerTickHp: 4,
+                    slowMs: 800, revealMs: 900 },
+                // E High Tide: a long water wall in front of you that slows and hurts enemies on it, and a small heal (castHarborHighTide, 2XX step)
+                e: { look: ['wall'], spawnAheadM: 1.6, lengthM: 22.0, lifetimeMs: 12000, firstTickMs: 100, healHp: 12,
+                    tickMs: 250, hitHalfWidthM: 1.5, slowMs: 700, revealMs: 900, damagePerTick: 4 },
+                // X Reckoning: a pool that moves forward and erupts under enemies, for the ult's durationMs (spawnHarborReckoning, 2YY step)
+                x: { look: ['groundZone', 'blast'], spawnAheadM: 4.5, radiusM: 10.0, speedMps: 4.2, firstGeyserMs: 350, geyserIntervalMs: 1800,
+                    blindMs: 3200, slowMs: 3500, revealMs: 4000, damage: 35 }
+            },
+            miks: {
+                // C M-Pulse: a thrown emitter; it bursts where it lands, then pulses, healing you and hurting enemies (castMiksMPulse, spawnMiksMPulse, 2PPP step)
+                c: { look: ['projectile', 'pulse'], spawnAheadM: 0.72, speedMps: 24.5, upSpeedMps: 2.4, gravity: 14.0, fuseMs: 1500,
+                    radiusM: 6.8, lifetimeMs: 6000, healHp: 18, shieldHp: 12, blindMs: 2200, slowMs: 4200, revealMs: 4000, damage: 32, targetDamage: 45,
+                    firstTickMs: 500, tickMs: 600, healPerTickHp: 10, shieldPerTickHp: 8, tickSlowMs: 1400, tickRevealMs: 1400, damagePerTick: 14 },
+                // Q Harmonize: heal and shield, and Brimstone's stim and Clove's haste for a while; kills refresh it (castMiksHarmonize, onActorEliminated)
+                q: { look: ['self'], hasteMs: 7500, healHp: 25, shieldHp: 20, killHealHp: 20 },
+                // E Waveform: a smoke at your aim point that slows and reveals the enemies under it (castMiksWaveform)
+                e: { look: ['smoke'], rangeM: 32.0, heightM: 2.4, radiusM: 5.4, lifetimeMs: 12500, hitRadiusM: 5.8, slowMs: 3500, revealMs: 3500 },
+                // X Bassquake: shockwaves that roll forward one after another, hitting the enemies at each (spawnMiksBassquake, 2RRR step)
+                x: { look: ['groundZone', 'pulse'], shieldHp: 50, spawnAheadM: 3.2, firstWaveMs: 240, lifetimeMs: 5400, waveCount: 4,
+                    waveIntervalMs: 950, waveSpacingM: 7.0, waveRadiusM: 7.4, blindMs: 3400, slowMs: 5500, revealMs: 6000, damage: 55, targetDamage: 70 }
+            },
+            viper: {
+                // C Snake Bite: a grenade; its acid zone hurts and reveals enemies (castViperSnakeBite, spawnMollyZone, molly step)
+                c: { look: ['projectile', 'groundZone'], spawnAheadM: 1.05, speedMps: 27, upSpeedMps: 2.4, gravity: 15.5, fuseMs: 1550,
+                    radiusM: 5.2, lifetimeMs: 6500, damagePerTick: 10, revealMs: 3000 },
+                // Q Poison Cloud: a thrown smoke that hurts, slows and reveals the enemies in it (castSmokeProjectile, 2M step)
+                q: { look: ['projectile', 'smoke'], fuseSec: 0.62, radiusM: 5.2, lifetimeMs: 11500,
+                    tickMs: 200, hitPadM: 0.5, burnMs: 350, slowMs: 600, revealMs: 1800, damagePerTick: 6 },
+                // E Toxic Screen: a long gas wall in front of you that blocks sight and hurts enemies on it (castViperToxicScreen, 2N step)
+                e: { look: ['wall'], spawnAheadM: 1.8, lengthM: 22.0, halfWidthM: 1.35, lifetimeMs: 11000, firstTickMs: 150,
+                    tickMs: 200, hitPadM: 0.45, burnMs: 350, slowMs: 800, revealMs: 2400, damagePerTick: 7 },
+                // X Viper's Pit: a big gas dome around you that nearsights and hurts enemies, and heals you inside (activateUltimate, 2O step)
+                x: { look: ['smoke', 'groundZone'], radiusM: 14.0, firstTickMs: 150, healHp: 25, tickMs: 200, burnMs: 350,
+                    slowMs: 1200, revealMs: 2200, blindMs: 900, damagePerTick: 8, healPerTickHp: 2 }
             }
         };
         
@@ -21998,6 +22095,7 @@
                     });
                 }
 
+                // V2.2: Omen's numbers are in AGENT_TUNING.omen (the portals are visual)
                 // 8B. Omen Wall-Piercing Paranoia Shadow Waves (2) & Shadow Rift Portals (4)
                 const paraCoreGeo = new THREE.SphereGeometry(0.62, 16, 12);
                 const paraAuraGeo = new THREE.TorusGeometry(1.15, 0.14, 10, 24);
@@ -22032,7 +22130,7 @@
                         velocity: new THREE.Vector3(),
                         startAt: 0,
                         expireAt: 0,
-                        radius: 2.8,
+                        radius: AGENT_TUNING.omen.q.radiusM,
                         hitSet: new Set(),
                         group: waveGroup,
                         coreMesh: coreMesh,
@@ -22382,6 +22480,7 @@
                     });
                 }
 
+                // V2.2: Brimstone's numbers are in AGENT_TUNING.brimstone (also the Orbital Strike below)
                 // Brimstone Combat Stim Beacons (2)
                 const stimBaseGeo = new THREE.CylinderGeometry(0.28, 0.46, 0.36, 12);
                 const stimCoreGeo = new THREE.OctahedronGeometry(0.28, 0);
@@ -22437,7 +22536,7 @@
                     this.stimBeacons.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 8.5,
+                        radius: AGENT_TUNING.brimstone.c.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -22498,7 +22597,7 @@
                 this.orbitalStrike = {
                     active: false,
                     position: new THREE.Vector3(),
-                    radius: 8.2,
+                    radius: AGENT_TUNING.brimstone.x.radiusM,
                     startAt: 0,
                     beamActiveAt: 0,
                     expireAt: 0,
@@ -22513,6 +22612,7 @@
                     ringMat: orbRingMat
                 };
 
+                // V2.2: Viper's numbers are in AGENT_TUNING.viper (also Viper's Pit below)
                 // Viper Toxic Screens (2) — 22m Long Wall of Toxin Gas
                 const screenWallGeo = new THREE.BoxGeometry(0.42, 3.6, 22.0);
                 const screenBaseGeo = new THREE.BoxGeometry(0.55, 0.16, 22.0);
@@ -22549,8 +22649,8 @@
                         endPos: new THREE.Vector3(),
                         dirX: 0,
                         dirZ: -1,
-                        length: 22.0,
-                        halfWidth: 1.35,
+                        length: AGENT_TUNING.viper.e.lengthM,
+                        halfWidth: AGENT_TUNING.viper.e.halfWidthM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -22604,7 +22704,7 @@
                 this.vipersPit = {
                     active: false,
                     position: new THREE.Vector3(),
-                    radius: 14.0,
+                    radius: AGENT_TUNING.viper.x.radiusM,
                     startAt: 0,
                     expireAt: 0,
                     nextTickAt: 0,
@@ -24058,6 +24158,7 @@
                     beamMesh: dcBeamMesh
                 };
 
+                // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
                 // 8J. Harbor Pooled 3D Hydro-Controller Meshes (Cascade [C], Cove [Q], High Tide [E], Reckoning [X])
                 const hwWallGeo = new THREE.BoxGeometry(6.8, 3.2, 0.45);
                 const hwCrestGeo = new THREE.BoxGeometry(7.0, 0.38, 0.65);
@@ -24094,8 +24195,8 @@
                         inUse: false,
                         position: new THREE.Vector3(),
                         dir: new THREE.Vector3(0, 0, -1),
-                        speed: 8.5,
-                        halfWidth: 3.4,
+                        speed: AGENT_TUNING.harbor.c.speedMps,
+                        halfWidth: AGENT_TUNING.harbor.c.halfWidthM,
                         startAt: 0,
                         moveUntil: 0,
                         expireAt: 0,
@@ -24145,8 +24246,8 @@
                     this.harborCoves.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 5.0,
-                        shieldHp: 500,
+                        radius: AGENT_TUNING.harbor.q.radiusM,
+                        shieldHp: AGENT_TUNING.harbor.q.domeHp,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -24194,7 +24295,7 @@
                         inUse: false,
                         startPos: new THREE.Vector3(),
                         endPos: new THREE.Vector3(),
-                        length: 22.0,
+                        length: AGENT_TUNING.harbor.e.lengthM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -24252,8 +24353,8 @@
                     active: false,
                     position: new THREE.Vector3(),
                     dir: new THREE.Vector3(0, 0, -1),
-                    radius: 10.0,
-                    speed: 4.2,
+                    radius: AGENT_TUNING.harbor.x.radiusM,
+                    speed: AGENT_TUNING.harbor.x.speedMps,
                     startAt: 0,
                     expireAt: 0,
                     nextGeyserAt: 0,
@@ -24266,6 +24367,7 @@
                     spireMat: hrSpireMat
                 };
 
+                // V2.2: Astra's numbers are in AGENT_TUNING.astra
                 // 8K. Astra Pooled 3D Cosmic Controller Meshes (Gravity Well [C], Nova Pulse [Q], Cosmic Divide [X])
                 const gwCoreGeo = new THREE.OctahedronGeometry(0.55, 1);
                 for (let i = 0; i < 2; i++) {
@@ -24306,7 +24408,7 @@
                         inUse: false,
                         imploded: false,
                         position: new THREE.Vector3(),
-                        radius: 6.8,
+                        radius: AGENT_TUNING.astra.c.radiusM,
                         startAt: 0,
                         implodeAt: 0,
                         expireAt: 0,
@@ -24347,7 +24449,7 @@
                         inUse: false,
                         detonated: false,
                         position: new THREE.Vector3(),
-                        radius: 6.6,
+                        radius: AGENT_TUNING.astra.q.radiusM,
                         startAt: 0,
                         detonateAt: 0,
                         expireAt: 0,
@@ -24394,7 +24496,7 @@
                     position: new THREE.Vector3(),
                     startPos: new THREE.Vector3(),
                     endPos: new THREE.Vector3(),
-                    halfLength: 28.0,
+                    halfLength: AGENT_TUNING.astra.x.halfLengthM,
                     startAt: 0,
                     expireAt: 0,
                     nextTickAt: 0,
@@ -25115,6 +25217,7 @@
                     ringMat: veRingMat
                 };
 
+                // V2.2: Miks's numbers are in AGENT_TUNING.miks
                 // 8P. Miks Pooled 3D Sonic Controller Meshes (M-Pulse [C], Harmonize Halo [Q], Bassquake [X])
                 const mkpCoreGeo = new THREE.OctahedronGeometry(0.42, 1);
                 const mkpWaveGeo = new THREE.TorusGeometry(1.0, 0.08, 8, 28);
@@ -25165,7 +25268,7 @@
                         inUse: false,                  // V1.7 fix: spawn/update/radar use inUse + position
                         position: new THREE.Vector3(),
                         x: 0, y: 0, z: 0,
-                        radius: 6.8,
+                        radius: AGENT_TUNING.miks.c.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         nextPulseAt: 0,
@@ -25269,7 +25372,7 @@
                     startAt: 0,
                     expireAt: 0,
                     wavesDone: 0,
-                    maxWaves: 4,
+                    maxWaves: AGENT_TUNING.miks.x.waveCount,
                     nextWaveAt: 0,
                     group: mbqGroup,
                     laneMesh: mbqLaneMesh,
@@ -26009,13 +26112,14 @@
                 return false;
             },
 
+            // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
             stopHarborCascade: function(now) {
                 let stopped = false;
                 for (let i = 0; i < this.harborCascades.length; i++) {
                     const hw = this.harborCascades[i];
                     if (hw.inUse && now < hw.moveUntil) {
                         hw.moveUntil = now;
-                        hw.expireAt = Math.max(hw.expireAt, now + 5000);
+                        hw.expireAt = Math.max(hw.expireAt, now + AGENT_TUNING.harbor.c.anchorLifetimeMs);
                         stopped = true;
                         this.spawnWindRing(hw.position.x, hw.position.y + 0.15, hw.position.z, 0x06b6d4, 4.2, now);
                     }
@@ -26027,12 +26131,13 @@
                 }
             },
 
+            // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
             castHarborCascade: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 1.8));
-                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 1.8));
+                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.harbor.c.spawnAheadM));
+                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.harbor.c.spawnAheadM));
                 const floorY = this.findSupportFloorY(sx, characterController.position.y, sz);
 
                 let hw = this.harborCascades[0];
@@ -26042,11 +26147,11 @@
                 hw.inUse = true;
                 hw.position.set(sx, floorY, sz);
                 hw.dir.set(fwdX, 0, fwdZ).normalize();
-                hw.speed = 8.5;
-                hw.halfWidth = 3.4;
+                hw.speed = AGENT_TUNING.harbor.c.speedMps;
+                hw.halfWidth = AGENT_TUNING.harbor.c.halfWidthM;
                 hw.startAt = now;
-                hw.moveUntil = now + 4500;
-                hw.expireAt = now + 7500;
+                hw.moveUntil = now + AGENT_TUNING.harbor.c.moveMs;
+                hw.expireAt = now + AGENT_TUNING.harbor.c.lifetimeMs;
                 hw.hitSet.clear();
                 hw.group.position.copy(hw.position);
                 hw.group.rotation.y = Math.atan2(fwdX, fwdZ);
@@ -26055,6 +26160,7 @@
                 showNotification("CASCADE WAVE SURGING! Press [C] again to Anchor Wave in Place!", 1850);
             },
 
+            // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
             castHarborCove: function(now) {
                 const proj = this.acquireProjectile();
                 camera.updateMatrixWorld();
@@ -26062,11 +26168,11 @@
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 proj.type = 'cove';
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 0.75);
-                proj.velocity.copy(_abilityForward).multiplyScalar(24.0);
-                proj.velocity.y += 2.7;
-                proj.gravity = 14.5;
-                proj.detonateAt = now + 1700;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.harbor.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.harbor.q.speedMps);
+                proj.velocity.y += AGENT_TUNING.harbor.q.upSpeedMps;
+                proj.gravity = AGENT_TUNING.harbor.q.gravity;
+                proj.detonateAt = now + AGENT_TUNING.harbor.q.fuseMs;
                 proj.mat.color.setHex(0x06b6d4).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -26074,6 +26180,7 @@
                 showNotification("COVE SPHERE THROWN — Expands into 5.0m Bullet-Blocking Water Shield Dome!", 1750);
             },
 
+            // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
             spawnHarborCove: function(x, y, z, now) {
                 let hc = this.harborCoves[0];
                 for (let i = 0; i < this.harborCoves.length; i++) {
@@ -26081,11 +26188,11 @@
                 }
                 hc.inUse = true;
                 hc.position.set(x, Math.max(0.02, y), z);
-                hc.radius = 5.0;
-                hc.shieldHp = 500;
+                hc.radius = AGENT_TUNING.harbor.q.radiusM;
+                hc.shieldHp = AGENT_TUNING.harbor.q.domeHp;
                 hc.startAt = now;
-                hc.expireAt = now + 10000;
-                hc.nextTickAt = now + 150;
+                hc.expireAt = now + AGENT_TUNING.harbor.q.lifetimeMs;
+                hc.nextTickAt = now + AGENT_TUNING.harbor.q.firstTickMs;
                 hc.domeMesh.scale.set(hc.radius, hc.radius * 0.82, hc.radius);
                 hc.ringMesh.scale.set(hc.radius, 1, hc.radius);
                 hc.group.position.copy(hc.position);
@@ -26095,13 +26202,14 @@
                 showNotification("COVE SHIELD DOME ACTIVE (10s Bullet-Blocking Water Sphere + Overshield Regen Inside)!", 2000);
             },
 
+            // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
             castHarborHighTide: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 1.6));
-                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 1.6));
-                const len = 22.0;
+                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.harbor.e.spawnAheadM));
+                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.harbor.e.spawnAheadM));
+                const len = AGENT_TUNING.harbor.e.lengthM;
                 const ex = Math.max(-46, Math.min(46, sx + fwdX * len));
                 const ez = Math.max(-46, Math.min(46, sz + fwdZ * len));
                 const actualLen = Math.max(4.0, Math.hypot(ex - sx, ez - sz));
@@ -26115,36 +26223,37 @@
                 ht.endPos.set(ex, 0, ez);
                 ht.length = actualLen;
                 ht.startAt = now;
-                ht.expireAt = now + 12000;
-                ht.nextTickAt = now + 100;
+                ht.expireAt = now + AGENT_TUNING.harbor.e.lifetimeMs;
+                ht.nextTickAt = now + AGENT_TUNING.harbor.e.firstTickMs;
                 ht.wallMesh.scale.set(1, 1, actualLen);
                 ht.crestMesh.scale.set(1, 1, actualLen);
                 ht.group.position.set((sx + ex) * 0.5, 0, (sz + ez) * 0.5);
                 ht.group.rotation.y = Math.atan2(ex - sx, ez - sz);
                 ht.group.visible = true;
 
-                this.healPlayer(12, now);
+                this.healPlayer(AGENT_TUNING.harbor.e.healHp, now);
                 soundFX.harborWave();
                 this.spawnWindRing(sx, 0.2, sz, 0x06b6d4, 4.0, now);
                 showNotification("HIGH TIDE WALL DEPLOYED — 22m Hydro-Wall Blocking Vision & Slowing Hostiles (+12 HP)!", 1950);
             },
 
+            // V2.2: Harbor's numbers are in AGENT_TUNING.harbor; the pool lasts the ult (AGENT_DEFS)
             spawnHarborReckoning: function(now) {
                 const hr = this.harborReckoning;
                 if (!hr) return;
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const sx = Math.max(-42, Math.min(42, characterController.position.x + fwdX * 4.5));
-                const sz = Math.max(-42, Math.min(42, characterController.position.z + fwdZ * 4.5));
+                const sx = Math.max(-42, Math.min(42, characterController.position.x + fwdX * AGENT_TUNING.harbor.x.spawnAheadM));
+                const sz = Math.max(-42, Math.min(42, characterController.position.z + fwdZ * AGENT_TUNING.harbor.x.spawnAheadM));
                 hr.active = true;
                 hr.position.set(sx, 0.04, sz);
                 hr.dir.set(fwdX, 0, fwdZ).normalize();
-                hr.radius = 10.0;
-                hr.speed = 4.2;
+                hr.radius = AGENT_TUNING.harbor.x.radiusM;
+                hr.speed = AGENT_TUNING.harbor.x.speedMps;
                 hr.startAt = now;
-                hr.expireAt = now + 9000;
-                hr.nextGeyserAt = now + 350;
+                hr.expireAt = now + AGENT_DEFS.harbor.abilities.x.durationMs;
+                hr.nextGeyserAt = now + AGENT_TUNING.harbor.x.firstGeyserMs;
                 hr.ringMesh.scale.set(hr.radius, 1, hr.radius);
                 hr.discMesh.scale.set(hr.radius, 1, hr.radius);
                 hr.group.position.copy(hr.position);
@@ -26153,8 +26262,9 @@
             },
 
             // --- Astra Cosmic Controller Abilities (Gravity Well [C], Nova Pulse [Q], Nebula / Dissipate [E], Cosmic Divide [X]) ---
+            // V2.2: Astra's numbers are in AGENT_TUNING.astra
             castAstraGravityWell: function(now) {
-                const hit = this.getAimGroundPoint(32.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.astra.c.rangeM);
                 let gw = this.astraGravityWells[0];
                 for (let i = 0; i < this.astraGravityWells.length; i++) {
                     if (!this.astraGravityWells[i].inUse) { gw = this.astraGravityWells[i]; break; }
@@ -26162,11 +26272,11 @@
                 gw.inUse = true;
                 gw.imploded = false;
                 gw.position.set(hit.x, Math.max(0.02, hit.y), hit.z);
-                gw.radius = 6.8;
+                gw.radius = AGENT_TUNING.astra.c.radiusM;
                 gw.startAt = now;
-                gw.implodeAt = now + 1800;
-                gw.expireAt = now + 2450;
-                gw.nextPullAt = now + 80;
+                gw.implodeAt = now + AGENT_TUNING.astra.c.fuseMs;
+                gw.expireAt = now + AGENT_TUNING.astra.c.lifetimeMs;
+                gw.nextPullAt = now + AGENT_TUNING.astra.c.firstPullMs;
                 gw.vortexMesh.scale.set(gw.radius, 1, gw.radius);
                 gw.ringMesh.scale.set(gw.radius, 1, gw.radius);
                 gw.group.position.copy(gw.position);
@@ -26176,8 +26286,9 @@
                 showNotification("GRAVITY WELL ACTIVATED — Pulling Hostiles to Center & Imploding for Fragile Vulnerability!", 1950);
             },
 
+            // V2.2: Astra's numbers are in AGENT_TUNING.astra
             castAstraNovaPulse: function(now) {
-                const hit = this.getAimGroundPoint(32.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.astra.q.rangeM);
                 let np = this.astraNovaPulses[0];
                 for (let i = 0; i < this.astraNovaPulses.length; i++) {
                     if (!this.astraNovaPulses[i].inUse) { np = this.astraNovaPulses[i]; break; }
@@ -26185,10 +26296,10 @@
                 np.inUse = true;
                 np.detonated = false;
                 np.position.set(hit.x, Math.max(0.02, hit.y), hit.z);
-                np.radius = 6.6;
+                np.radius = AGENT_TUNING.astra.q.radiusM;
                 np.startAt = now;
-                np.detonateAt = now + 650;
-                np.expireAt = now + 1350;
+                np.detonateAt = now + AGENT_TUNING.astra.q.fuseMs;
+                np.expireAt = now + AGENT_TUNING.astra.q.lifetimeMs;
                 np.ringMesh.scale.set(np.radius, 1, np.radius);
                 np.group.position.copy(np.position);
                 np.group.visible = true;
@@ -26197,15 +26308,17 @@
                 showNotification("NOVA PULSE CHARGING — Detonates 6.6m Astral Concuss Nova in 0.65s!", 1750);
             },
 
+            // V2.2: Astra's numbers are in AGENT_TUNING.astra (the Nebula's slow and reveal are in updateRender, unchanged)
             castAstraNebula: function(now) {
-                const hit = this.getAimGroundPoint(34.0);
-                this.spawnSmokeSphere(hit.x, hit.y + 1.2, hit.z, 0xa855f7, 4.9, 11000, now);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.astra.e.rangeM);
+                this.spawnSmokeSphere(hit.x, hit.y + AGENT_TUNING.astra.e.heightM, hit.z, 0xa855f7, AGENT_TUNING.astra.e.radiusM, AGENT_TUNING.astra.e.lifetimeMs, now);
                 this.spawnWindRing(hit.x, hit.y + 0.15, hit.z, 0xeab308, 5.2, now);
-                this.healPlayer(10, now);
+                this.healPlayer(AGENT_TUNING.astra.e.healHp, now);
                 soundFX.astraStar();
                 showNotification("NEBULA / DISSIPATE DEPLOYED — 4.9m Cosmic Smoke Sphere Blinds & Slows Hostiles Inside!", 1850);
             },
 
+            // V2.2: Astra's numbers are in AGENT_TUNING.astra; the wall lasts the ult (AGENT_DEFS)
             spawnAstraCosmicDivide: function(now) {
                 const cd = this.astraCosmicDivide;
                 if (!cd) return;
@@ -26214,9 +26327,9 @@
                 const fwdZ = -Math.cos(yaw);
                 const perpX = -fwdZ;
                 const perpZ = fwdX;
-                const cx = Math.max(-38, Math.min(38, characterController.position.x + fwdX * 6.5));
-                const cz = Math.max(-38, Math.min(38, characterController.position.z + fwdZ * 6.5));
-                const halfLen = 28.0;
+                const cx = Math.max(-38, Math.min(38, characterController.position.x + fwdX * AGENT_TUNING.astra.x.spawnAheadM));
+                const cz = Math.max(-38, Math.min(38, characterController.position.z + fwdZ * AGENT_TUNING.astra.x.spawnAheadM));
+                const halfLen = AGENT_TUNING.astra.x.halfLengthM;
 
                 cd.active = true;
                 cd.position.set(cx, 0, cz);
@@ -26224,8 +26337,8 @@
                 cd.endPos.set(cx + perpX * halfLen, 0, cz + perpZ * halfLen);
                 cd.halfLength = halfLen;
                 cd.startAt = now;
-                cd.expireAt = now + 14000;
-                cd.nextTickAt = now + 100;
+                cd.expireAt = now + AGENT_DEFS.astra.abilities.x.durationMs;
+                cd.nextTickAt = now + AGENT_TUNING.astra.x.firstTickMs;
                 cd.group.position.set(cx, 0, cz);
                 cd.group.rotation.y = yaw;
                 cd.group.visible = true;
@@ -26940,6 +27053,7 @@
             },
 
             // --- Miks Sonic Controller Abilities (M-Pulse [C], Harmonize [Q], Waveform [E], Bassquake [X]) ---
+            // V2.2: Miks's numbers are in AGENT_TUNING.miks
             castMiksMPulse: function(now) {
                 const proj = this.acquireProjectile();
                 camera.updateMatrixWorld();
@@ -26947,11 +27061,11 @@
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 proj.type = 'mpulse';
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 0.72);
-                proj.velocity.copy(_abilityForward).multiplyScalar(24.5);
-                proj.velocity.y += 2.4;
-                proj.gravity = 14.0;
-                proj.detonateAt = now + 1500;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.miks.c.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.miks.c.speedMps);
+                proj.velocity.y += AGENT_TUNING.miks.c.upSpeedMps;
+                proj.gravity = AGENT_TUNING.miks.c.gravity;
+                proj.detonateAt = now + AGENT_TUNING.miks.c.fuseMs;
                 proj.mat.color.setHex(0xec4899).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -26959,6 +27073,7 @@
                 showNotification("M-PULSE SONIC EMITTER THROWN — Dual-Frequency Soundwaves Heal You & Concuss Hostiles!", 1750);
             },
 
+            // V2.2: Miks's numbers are in AGENT_TUNING.miks
             spawnMiksMPulse: function(x, y, z, now) {
                 let mp = this.miksMPulses[0];
                 for (let i = 0; i < this.miksMPulses.length; i++) {
@@ -26967,10 +27082,10 @@
                 mp.inUse = true;
                 mp.active = true;
                 mp.position.set(x, Math.max(0.02, y), z);
-                mp.radius = 6.8;
+                mp.radius = AGENT_TUNING.miks.c.radiusM;
                 mp.startAt = now;
-                mp.expireAt = now + 6000;
-                mp.nextPulseAt = now + 500;
+                mp.expireAt = now + AGENT_TUNING.miks.c.lifetimeMs;
+                mp.nextPulseAt = now + AGENT_TUNING.miks.c.firstTickMs;
                 mp.ringMesh.scale.set(mp.radius, 1, mp.radius);
                 mp.group.position.copy(mp.position);
                 mp.group.visible = true;
@@ -26979,14 +27094,14 @@
                 this.spawnWindRing(x, y + 0.1, z, 0x22d3ee, 6.8, now);
 
                 const nowMs = Date.now();
-                const rSq = 6.8 * 6.8;
+                const rSq = AGENT_TUNING.miks.c.radiusM * AGENT_TUNING.miks.c.radiusM;
                 const pdx = characterController.position.x - x;
                 const pdz = characterController.position.z - z;
                 if (pdx * pdx + pdz * pdz <= rSq) {
-                    this.healPlayer(18, now);
+                    this.healPlayer(AGENT_TUNING.miks.c.healHp, now);
                     this.playerBlindUntil = 0;
                     game.maxShield = Math.max(game.maxShield || 25, 50);
-                    game.shield = Math.min(50, (game.shield || 0) + 12);
+                    game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.miks.c.shieldHp);
                     if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                 }
 
@@ -26998,10 +27113,10 @@
                     const dz = e.mesh.position.z - z;
                     if (dx * dx + dz * dz <= rSq) {
                         hitCount++;
-                        this.applyEnemyBlind(e, now, 2200);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 4200);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 4000);
-                        damageEnemyActor(e, 32, now, nowMs, "M-Pulse Concuss", false);
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.miks.c.blindMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.miks.c.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.miks.c.revealMs);
+                        damageEnemyActor(e, AGENT_TUNING.miks.c.damage, now, nowMs, "M-Pulse Concuss", false);
                     }
                 }
                 for (let i = 0; i < targetObjects.length; i++) {
@@ -27010,7 +27125,7 @@
                     const dx = t.mesh.position.x - x;
                     const dz = t.mesh.position.z - z;
                     if (dx * dx + dz * dz <= rSq) {
-                        damageTargetActor(t, 45, now, nowMs, "M-Pulse Concuss", t.leaves[0]);
+                        damageTargetActor(t, AGENT_TUNING.miks.c.targetDamage, now, nowMs, "M-Pulse Concuss", t.leaves[0]);
                     }
                 }
                 if (hitCount > 0) {
@@ -27018,22 +27133,23 @@
                 }
             },
 
+            // V2.2: Miks's numbers are in AGENT_TUNING.miks (the speed and fire rate come from Clove's and Brimstone's timers)
             castMiksHarmonize: function(now) {
-                this.miksHarmonizeUntil = now + 7500;
-                this.brimStimUntil = Math.max(this.brimStimUntil, now + 7500);
-                this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + 7500);
+                this.miksHarmonizeUntil = now + AGENT_TUNING.miks.q.hasteMs;
+                this.brimStimUntil = Math.max(this.brimStimUntil, now + AGENT_TUNING.miks.q.hasteMs);
+                this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + AGENT_TUNING.miks.q.hasteMs);
                 this.playerBlindUntil = 0;
                 this.dashFxUntil = now + 520;
                 this.healFxUntil = now + 620;
-                this.healPlayer(25, now);
+                this.healPlayer(AGENT_TUNING.miks.q.healHp, now);
                 game.maxShield = Math.max(game.maxShield || 25, 50);
-                game.shield = Math.min(50, (game.shield || 0) + 20);
+                game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.miks.q.shieldHp);
                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
 
                 if (this.miksHarmonizeHalo) {
                     this.miksHarmonizeHalo.active = true;
                     this.miksHarmonizeHalo.startAt = now;
-                    this.miksHarmonizeHalo.expireAt = now + 7500;
+                    this.miksHarmonizeHalo.expireAt = now + AGENT_TUNING.miks.q.hasteMs;
                     this.miksHarmonizeHalo.group.position.set(characterController.position.x, 0.06, characterController.position.z);
                     this.miksHarmonizeHalo.group.visible = true;
                 }
@@ -27042,14 +27158,15 @@
                 showNotification("HARMONIZE SONIC STIM ACTIVE (7.5s) — +35% Haste, +25% Rapid Fire & Refreshes on Every Kill!", 2000);
             },
 
+            // V2.2: Miks's numbers are in AGENT_TUNING.miks
             castMiksWaveform: function(now) {
-                const hit = this.getAimGroundPoint(32.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.miks.e.rangeM);
                 const floorY = this.findSupportFloorY(hit.x, hit.y + 1.5, hit.z);
-                this.spawnSmokeSphere(hit.x, floorY + 2.4, hit.z, 0xec4899, 5.4, 12500, now);
+                this.spawnSmokeSphere(hit.x, floorY + AGENT_TUNING.miks.e.heightM, hit.z, 0xec4899, AGENT_TUNING.miks.e.radiusM, AGENT_TUNING.miks.e.lifetimeMs, now);
                 this.spawnWindRing(hit.x, floorY + 0.15, hit.z, 0x22d3ee, 6.2, now);
                 soundFX.miksWaveform();
 
-                const rSq = 5.8 * 5.8;
+                const rSq = AGENT_TUNING.miks.e.hitRadiusM * AGENT_TUNING.miks.e.hitRadiusM;
                 let tagged = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -27058,8 +27175,8 @@
                     const dz = e.mesh.position.z - hit.z;
                     if (dx * dx + dz * dz <= rSq) {
                         tagged++;
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 3500);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.miks.e.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.miks.e.revealMs);
                     }
                 }
                 if (tagged > 0) {
@@ -27069,14 +27186,15 @@
                 }
             },
 
+            // V2.2: Miks's numbers are in AGENT_TUNING.miks
             spawnMiksBassquake: function(now) {
                 const bq = this.miksBassquake;
                 if (!bq) return;
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const ox = Math.max(-42, Math.min(42, characterController.position.x + fwdX * 3.2));
-                const oz = Math.max(-42, Math.min(42, characterController.position.z + fwdZ * 3.2));
+                const ox = Math.max(-42, Math.min(42, characterController.position.x + fwdX * AGENT_TUNING.miks.x.spawnAheadM));
+                const oz = Math.max(-42, Math.min(42, characterController.position.z + fwdZ * AGENT_TUNING.miks.x.spawnAheadM));
 
                 bq.active = true;
                 bq.origin.set(ox, 0.04, oz);
@@ -27084,8 +27202,8 @@
                 bq.currentWavePos.set(ox, 0.04, oz);
                 bq.wavesFired = 0;
                 bq.startAt = now;
-                bq.nextWaveAt = now + 240;
-                bq.expireAt = now + 5400;
+                bq.nextWaveAt = now + AGENT_TUNING.miks.x.firstWaveMs;
+                bq.expireAt = now + AGENT_TUNING.miks.x.lifetimeMs;
                 // V1.7 fix: the lane/wave meshes are children of the group, authored
                 // along local -Z (forward), so place and yaw the group itself.
                 bq.group.position.set(ox, 0, oz);
@@ -27263,12 +27381,13 @@
             },
 
             // --- Clove Immortal Controller Abilities (Pick-Me-Up [C], Meddle [Q], Ruse [E], Not Dead Yet [X]) ---
+            // V2.2: Clove's numbers are in AGENT_TUNING.clove (the speed is in movement)
             castClovePickMeUp: function(now) {
-                this.healPlayer(50, now);
+                this.healPlayer(AGENT_TUNING.clove.c.healHp, now);
                 game.maxShield = Math.max(game.maxShield || 25, 50);
-                game.shield = 50;
+                game.shield = AGENT_TUNING.clove.c.shieldHp;
                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
-                this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + 8000);
+                this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + AGENT_TUNING.clove.c.hasteMs);
                 this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.35, characterController.position.z, 0xf472b6, 4.4, 340, now);
                 this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.45), characterController.position.z, 0xf472b6, 4.6, now);
                 soundFX.clovePickMeUp();
@@ -27276,6 +27395,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Clove's numbers are in AGENT_TUNING.clove
             castCloveMeddle: function(now) {
                 const proj = this.acquireProjectile();
                 camera.updateMatrixWorld();
@@ -27283,19 +27403,20 @@
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 proj.type = 'meddle';
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 0.7);
-                proj.velocity.copy(_abilityForward).multiplyScalar(23.5);
-                proj.velocity.y += 2.6;
-                proj.gravity = 13.5;
-                proj.detonateAt = now + 1600;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.clove.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.clove.q.speedMps);
+                proj.velocity.y += AGENT_TUNING.clove.q.upSpeedMps;
+                proj.gravity = AGENT_TUNING.clove.q.gravity;
+                proj.detonateAt = now + AGENT_TUNING.clove.q.fuseMs;
                 proj.mat.color.setHex(0xf472b6).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
                 soundFX.cloveMeddle();
             },
 
+            // V2.2: Clove's numbers are in AGENT_TUNING.clove
             spawnCloveMeddleBurst: function(x, y, z, now) {
-                const radius = 6.2;
+                const radius = AGENT_TUNING.clove.q.radiusM;
                 this.spawnFlashBurst(x, y + 0.4, z, 0xf472b6, radius, 420, now);
                 this.spawnWindRing(x, Math.max(0.1, y), z, 0xc084fc, radius, now);
                 soundFX.cloveMeddle();
@@ -27309,10 +27430,10 @@
                     const dz = e.mesh.position.z - z;
                     if (dx * dx + dz * dz <= rSq) {
                         hitCount++;
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 6000);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 4000);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.clove.q.revealMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.clove.q.slowMs);
                         createHitEffect(e.mesh.position, false);
-                        damageEnemyActor(e, 55, now, nowMs, "Meddle Decay", false);
+                        damageEnemyActor(e, AGENT_TUNING.clove.q.damage, now, nowMs, "Meddle Decay", false);
                     }
                 }
                 for (let i = 0; i < targetObjects.length; i++) {
@@ -27322,7 +27443,7 @@
                     const dz = t.mesh.position.z - z;
                     if (dx * dx + dz * dz <= rSq) {
                         hitCount++;
-                        damageTargetActor(t, 55, now, nowMs, "Meddle Decay", t.leaves[0]);
+                        damageTargetActor(t, AGENT_TUNING.clove.q.damage, now, nowMs, "Meddle Decay", t.leaves[0]);
                     }
                 }
                 if (hitCount > 0) {
@@ -27332,9 +27453,10 @@
                 }
             },
 
+            // V2.2: Clove's numbers are in AGENT_TUNING.clove (the Ruse's slow and reveal are in updateRender, unchanged)
             castCloveRuse: function(now) {
-                const hit = this.getAimGroundPoint(32.0);
-                this.spawnSmokeSphere(hit.x, hit.y, hit.z, 0xf472b6, 4.8, 10500, now);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.clove.e.rangeM);
+                this.spawnSmokeSphere(hit.x, hit.y, hit.z, 0xf472b6, AGENT_TUNING.clove.e.radiusM, AGENT_TUNING.clove.e.lifetimeMs, now);
                 this.spawnWindRing(hit.x, Math.max(0.1, hit.y + 0.08), hit.z, 0xf472b6, 5.0, now);
                 showNotification("RUSE TWILIGHT CLOUD DEPLOYED (10.5s Vision Block + Decay Slow)", 1700);
             },
@@ -28300,17 +28422,18 @@
             },
 
             // --- Viper Toxic Controller Abilities (Snake Bite [C], Poison Cloud [Q], Toxic Screen [E], Viper's Pit [X]) ---
+            // V2.2: Viper's numbers are in AGENT_TUNING.viper (the acid zone's are in spawnMollyZone and the molly step)
             castViperSnakeBite: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'snakebite';
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.05);
-                proj.velocity.copy(_abilityForward).multiplyScalar(27);
-                proj.velocity.y += 2.4;
-                proj.gravity = 15.5;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.viper.c.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.viper.c.speedMps);
+                proj.velocity.y += AGENT_TUNING.viper.c.upSpeedMps;
+                proj.gravity = AGENT_TUNING.viper.c.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 1550;
+                proj.detonateAt = now + AGENT_TUNING.viper.c.fuseMs;
                 proj.mesh.material.color.setHex(0x22c55e).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -28318,20 +28441,22 @@
                 showNotification("SNAKE BITE LAUNCHED! Corrosive Acid Pool (50 DPS + Fragile +20% DMG)!", 1500);
             },
 
+            // V2.2: Viper's numbers are in AGENT_TUNING.viper
             castViperPoisonCloud: function(now) {
                 // Emerald Poison Gas Cloud (5.2m radius, 11.5s duration, 0x22c55e) — blocks vision & inflicts Toxin Decay!
-                this.castSmokeProjectile(now, 0x22c55e, 0.62, 5.2, 11500);
+                this.castSmokeProjectile(now, 0x22c55e, AGENT_TUNING.viper.q.fuseSec, AGENT_TUNING.viper.q.radiusM, AGENT_TUNING.viper.q.lifetimeMs);
                 soundFX.viperToxin();
                 showNotification("POISON CLOUD DEPLOYED! Blocks Sight & Inflicts Toxin Decay (30 DPS)!", 1600);
             },
 
+            // V2.2: Viper's numbers are in AGENT_TUNING.viper
             castViperToxicScreen: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const startX = characterController.position.x + fwdX * 1.8;
-                const startZ = characterController.position.z + fwdZ * 1.8;
-                const len = 22.0;
+                const startX = characterController.position.x + fwdX * AGENT_TUNING.viper.e.spawnAheadM;
+                const startZ = characterController.position.z + fwdZ * AGENT_TUNING.viper.e.spawnAheadM;
+                const len = AGENT_TUNING.viper.e.lengthM;
                 const centerX = Math.max(-38, Math.min(38, startX + fwdX * (len * 0.5)));
                 const centerZ = Math.max(-38, Math.min(38, startZ + fwdZ * (len * 0.5)));
                 const floorY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z);
@@ -28347,8 +28472,8 @@
                 screen.dirX = fwdX;
                 screen.dirZ = fwdZ;
                 screen.startAt = now;
-                screen.expireAt = now + 11000;
-                screen.nextTickAt = now + 150;
+                screen.expireAt = now + AGENT_TUNING.viper.e.lifetimeMs;
+                screen.nextTickAt = now + AGENT_TUNING.viper.e.firstTickMs;
                 screen.group.position.set(centerX, floorY, centerZ);
                 screen.group.rotation.set(0, yaw, 0);
                 screen.group.visible = true;
@@ -28531,12 +28656,13 @@
             },
 
             // --- Brimstone Orbital Controller Abilities (Stim Beacon [C], Incendiary [Q], Sky Smoke [E], Orbital Strike [X]) ---
+            // V2.2: Brimstone's numbers are in AGENT_TUNING.brimstone
             castBrimstoneStimBeacon: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 2.2));
-                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 2.2));
+                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.brimstone.c.spawnAheadM));
+                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.brimstone.c.spawnAheadM));
                 const floorY = this.findSupportFloorY(sx, characterController.position.y + 1.0, sz);
 
                 let beacon = this.stimBeacons[0];
@@ -28546,7 +28672,7 @@
                 beacon.inUse = true;
                 beacon.position.set(sx, floorY, sz);
                 beacon.startAt = now;
-                beacon.expireAt = now + 12000;
+                beacon.expireAt = now + AGENT_TUNING.brimstone.c.lifetimeMs;
                 beacon.nextTickAt = now;
                 beacon.ringMesh.scale.set(beacon.radius, 1, beacon.radius);
                 beacon.discMesh.scale.set(beacon.radius, 1, beacon.radius);
@@ -28554,8 +28680,8 @@
                 beacon.group.visible = true;
 
                 // Immediate Combat Stim buff: +25% Rapid Fire, Move Speed, +15 HP & Instant Mag Top-Up!
-                this.brimStimUntil = Math.max(this.brimStimUntil, now + 8000);
-                this.healPlayer(15, now);
+                this.brimStimUntil = Math.max(this.brimStimUntil, now + AGENT_TUNING.brimstone.c.stimMs);
+                this.healPlayer(AGENT_TUNING.brimstone.c.healHp, now);
                 const weapon = game.weapons[game.activeWeapon];
                 if (weapon && !weapon.isMelee) {
                     weapon.ammo = weapon.maxAmmo;
@@ -28567,17 +28693,18 @@
                 showNotification("STIM BEACON DEPLOYED! +25% Rapid Fire + Speed Boost + Instant Ammo Top-Up!", 1800);
             },
 
+            // V2.2: Brimstone's numbers are in AGENT_TUNING.brimstone (the fire zone's are in spawnMollyZone and the molly step)
             castBrimstoneIncendiary: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'incendiary';
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.05);
-                proj.velocity.copy(_abilityForward).multiplyScalar(28);
-                proj.velocity.y += 2.6;
-                proj.gravity = 15.5;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.brimstone.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.brimstone.q.speedMps);
+                proj.velocity.y += AGENT_TUNING.brimstone.q.upSpeedMps;
+                proj.gravity = AGENT_TUNING.brimstone.q.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 1650;
+                proj.detonateAt = now + AGENT_TUNING.brimstone.q.fuseMs;
                 proj.mesh.material.color.setHex(0xf97316).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -28585,9 +28712,10 @@
                 showNotification("INCENDIARY LAUNCHED! Heavy Napalm Fire Zone (60 DPS)!", 1400);
             },
 
+            // V2.2: Brimstone's numbers are in AGENT_TUNING.brimstone
             castBrimstoneSkySmoke: function(now) {
                 // Long-lasting Orbital Sky Smoke (5.2m radius, 14s duration, warm tactical amber-brown 0xd97706)
-                this.castSmokeProjectile(now, 0xd97706, 0.65, 5.2, 14000);
+                this.castSmokeProjectile(now, 0xd97706, AGENT_TUNING.brimstone.e.fuseSec, AGENT_TUNING.brimstone.e.radiusM, AGENT_TUNING.brimstone.e.lifetimeMs);
                 showNotification("ORBITAL SKY SMOKE DEPLOYED! (14s Tactical Smoke Screen)", 1500);
             },
 
@@ -29074,6 +29202,7 @@
             },
 
             // V1.9.1: four Omen numbers moved from ABILITY_TUNING to AGENT_TUNING.omen; the rest is unchanged
+            // V2.2: Omen's numbers are in AGENT_TUNING.omen (all of them now)
             castOmenShroudedStep: function(now, isUlt) {
                 const range = isUlt ? AGENT_TUNING.omen.x.rangeM : AGENT_TUNING.omen.c.rangeM;
                 const hit = this.getAimGroundPoint(range);
@@ -29085,7 +29214,7 @@
                 characterController.position.set(hit.x, hit.y + characterController.height, hit.z);
                 characterController.prevSimPosition.copy(characterController.position);
                 characterController.velocity.set(0, 0, 0);
-                this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + 600);
+                this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + AGENT_TUNING.omen.c.intangibleMs);
                 this.dashFxUntil = now + 380;
                 soundFX.omenTeleport();
                 showNotification(isUlt ? "FROM THE SHADOWS! Long-Range Shadow Blink" : "SHROUDED STEP! Teleported to Crosshair", 1300);
@@ -29111,6 +29240,7 @@
                 portal.group.visible = true;
             },
 
+            // V2.2: Omen's numbers are in AGENT_TUNING.omen
             castOmenParanoia: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
@@ -29119,8 +29249,8 @@
                     if (!this.paranoiaWaves[i].inUse) { wave = this.paranoiaWaves[i]; break; }
                 }
                 wave.inUse = true;
-                wave.position.copy(camera.position).addScaledVector(_abilityForward, 1.2);
-                wave.velocity.copy(_abilityForward).multiplyScalar(24);
+                wave.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.omen.q.spawnAheadM);
+                wave.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.omen.q.speedMps);
                 wave.startAt = now;
                 wave.expireAt = now + AGENT_TUNING.omen.q.travelMs; // 24 m/s, passes through walls
                 wave.hitSet.clear();
@@ -29130,9 +29260,10 @@
                 showNotification("PARANOIA! Shadow Wave Nearsights Everything It Passes Through", 1400);
             },
 
+            // V2.2: Omen's numbers are in AGENT_TUNING.omen
             castOmenDarkCover: function(now) {
                 // Long-lasting purple controller smoke through the shared smoke system
-                this.castSmokeProjectile(now, 0x6d28d9, 0.8, 4.8, AGENT_TUNING.omen.e.lifetimeMs);
+                this.castSmokeProjectile(now, 0x6d28d9, AGENT_TUNING.omen.e.fuseSec, AGENT_TUNING.omen.e.radiusM, AGENT_TUNING.omen.e.lifetimeMs);
             },
 
             castPhoenixHotHands: function(now) {
@@ -29277,6 +29408,7 @@
             },
 
             // --- X: Ultimates (Jett Blade Storm, Phoenix Run It Back, Sova Hunter's Fury, Sage Resurrection, Reyna Empress, Omen From the Shadows, Raze Showstopper, Killjoy Lockdown, Cypher Neural Theft, Brimstone Orbital Strike) ---
+            // V2.2: Omen's, Brimstone's, Viper's, Clove's, Astra's and Miks's branches read AGENT_TUNING.<agent>.x (Harbor's branch has no numbers)
             activateUltimate: function(agentId, now) {
                 const def = AGENT_DEFS[agentId];
                 castFX.start('ult', def.themeColor);
@@ -29334,7 +29466,7 @@
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.5, characterController.position.z, 0xc084fc, 4.5, 360, now);
                     showNotification("THE HUNT BEGINS! EMPRESS ACTIVE (+35% Fire Rate + Auto-Devour & Dismiss Reset on Kill)!", 3400);
                 } else if (agentId === 'omen') {
-                    game.ultChargesLeft = 2;
+                    game.ultChargesLeft = AGENT_TUNING.omen.x.blinkCount;
                     const weapon = game.weapons[game.activeWeapon];
                     if (weapon && !weapon.isMelee) {
                         weapon.ammo = weapon.maxAmmo;
@@ -29345,7 +29477,7 @@
                     for (let i = 0; i < enemyObjects.length; i++) {
                         const e = enemyObjects[i];
                         if (e.isActive && !e.hit) {
-                            this.applyEnemyBlind(e, now, 2800);
+                            this.applyEnemyBlind(e, now, AGENT_TUNING.omen.x.blindMs);
                         }
                     }
                     // Recharge Shrouded Step & Dark Cover
@@ -29420,16 +29552,16 @@
                     _abilityOrigin.copy(camera.position);
                     _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
-                    let strikeDist = 36.0;
+                    let strikeDist = AGENT_TUNING.brimstone.x.openRangeM;
                     const savedFar = raycaster.far;
                     raycaster.ray.origin.copy(_abilityOrigin);
                     raycaster.ray.direction.copy(_abilityForward);
-                    raycaster.far = 45.0;
+                    raycaster.far = AGENT_TUNING.brimstone.x.rayRangeM;
                     _shotHits.length = 0;
-                    envShotIndex.raycast(raycaster.ray, 45.0);
+                    envShotIndex.raycast(raycaster.ray, AGENT_TUNING.brimstone.x.rayRangeM);
                     if (_shotHits.length > 0) {
                         _shotHits.sort(compareHitDistance);
-                        strikeDist = Math.min(42.0, Math.max(4.0, _shotHits[0].distance - 0.5));
+                        strikeDist = Math.min(AGENT_TUNING.brimstone.x.wallMaxRangeM, Math.max(AGENT_TUNING.brimstone.x.wallMinRangeM, _shotHits[0].distance - AGENT_TUNING.brimstone.x.wallGapM));
                     }
                     _shotHits.length = 0;
                     raycaster.far = savedFar;
@@ -29442,9 +29574,9 @@
                         this.orbitalStrike.active = true;
                         this.orbitalStrike.position.set(ox, floorY, oz);
                         this.orbitalStrike.startAt = now;
-                        this.orbitalStrike.beamActiveAt = now + 450;
+                        this.orbitalStrike.beamActiveAt = now + AGENT_TUNING.brimstone.x.windupMs;
                         this.orbitalStrike.expireAt = now + def.abilities.x.durationMs;
-                        this.orbitalStrike.nextTickAt = now + 450;
+                        this.orbitalStrike.nextTickAt = now + AGENT_TUNING.brimstone.x.firstTickMs;
                         this.orbitalStrike.group.position.copy(this.orbitalStrike.position);
                         this.orbitalStrike.groundRing.scale.set(this.orbitalStrike.radius, 1, this.orbitalStrike.radius);
                         this.orbitalStrike.groundDisc.scale.set(this.orbitalStrike.radius, 1, this.orbitalStrike.radius);
@@ -29452,7 +29584,7 @@
                         this.orbitalStrike.innerCyl.scale.set(0.2, 1, 0.2);
                         this.orbitalStrike.group.visible = true;
                     }
-                    this.brimStimUntil = Math.max(this.brimStimUntil, now + 6500);
+                    this.brimStimUntil = Math.max(this.brimStimUntil, now + AGENT_TUNING.brimstone.x.stimMs);
                     soundFX.orbitalStrike();
                     showNotification("OPEN UP THE SKY! ORBITAL STRIKE LASER SCORCHING TARGET ZONE (130 DPS)!", 3500);
                 } else if (agentId === 'viper') {
@@ -29466,14 +29598,14 @@
                         this.vipersPit.position.set(px, floorY, pz);
                         this.vipersPit.startAt = now;
                         this.vipersPit.expireAt = now + def.abilities.x.durationMs;
-                        this.vipersPit.nextTickAt = now + 150;
+                        this.vipersPit.nextTickAt = now + AGENT_TUNING.viper.x.firstTickMs;
                         this.vipersPit.group.position.copy(this.vipersPit.position);
                         this.vipersPit.domeMesh.scale.set(this.vipersPit.radius, this.vipersPit.radius * 0.55, this.vipersPit.radius);
                         this.vipersPit.ringMesh.scale.set(this.vipersPit.radius, 1, this.vipersPit.radius);
                         this.vipersPit.discMesh.scale.set(this.vipersPit.radius, 1, this.vipersPit.radius);
                         this.vipersPit.group.visible = true;
                     }
-                    this.healPlayer(25, now);
+                    this.healPlayer(AGENT_TUNING.viper.x.healHp, now);
                     const st = this.stateByAgent.viper;
                     if (st) {
                         st.c.charges = st.c.maxCharges; st.c.rechargeEnd = 0;
@@ -29591,10 +29723,10 @@
                     showNotification("IT'S YOU AND ME! KILL CONTRACT 1v1 DUEL ARENA DEPLOYED (Isolated Target + Prismatic Flow Shield)!", 3600);
                 } else if (agentId === 'clove') {
                     // Not Dead Yet: Defy death with Immortal Butterfly Phase (2.2s intangible), 100 HP + 50 Overshield, +35% Haste, & Self-Revive Aegis!
-                    game.ultChargesLeft = 1;
-                    game.health = 100;
+                    game.ultChargesLeft = AGENT_TUNING.clove.x.reviveCount;
+                    game.health = AGENT_TUNING.clove.x.healthHp;
                     game.maxShield = 50;
-                    game.shield = 50;
+                    game.shield = AGENT_TUNING.clove.x.shieldHp;
                     healthFill.style.width = '100%';
                     healthValue.textContent = game.health;
                     if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
@@ -29609,7 +29741,7 @@
                         st.q.charges = st.q.maxCharges; st.q.rechargeEnd = 0;
                         st.e.charges = st.e.maxCharges; st.e.rechargeEnd = 0;
                     }
-                    this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + 2200);
+                    this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + AGENT_TUNING.clove.x.intangibleMs);
                     this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + def.abilities.x.durationMs);
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.4, characterController.position.z, 0xf472b6, 5.8, 440, now);
                     this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.45), characterController.position.z, 0xf472b6, 6.2, now);
@@ -29652,7 +29784,7 @@
                     // Cosmic Divide: Slice the battlefield with an infinite 56m Bullet-Blocking & Audio-Dampening Cosmic Wall!
                     game.ultChargesLeft = 0;
                     game.maxShield = Math.max(game.maxShield || 25, 50);
-                    game.shield = 50;
+                    game.shield = AGENT_TUNING.astra.x.shieldHp;
                     if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                     const st = this.stateByAgent.astra;
                     if (st) {
@@ -29731,7 +29863,7 @@
                     // Bassquake: Unleash a 30m Rolling Sub-Bass Seismic Corridor (4 Sub-Bass Drops) + Harmonize Sonic Overdrive + 50 Armor!
                     game.ultChargesLeft = 0;
                     game.maxShield = Math.max(game.maxShield || 25, 50);
-                    game.shield = 50;
+                    game.shield = AGENT_TUNING.miks.x.shieldHp;
                     if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                     const st = this.stateByAgent.miks;
                     if (st) {
@@ -29820,26 +29952,27 @@
             },
 
             tryPhoenixRebirth: function(now) {
+                // V2.2: Clove's numbers are in AGENT_TUNING.clove.x (this automatic revive, and Clove's phase in the shared revive below, whose other numbers are Sage's / KAY/O's too)
                 // Support Clove's automatic Not Dead Yet self-resurrection when holding full 6/6 Ult Points!
                 if (game.activeAgent === 'clove' && !this.isUltActive(now) && game.ultPoints >= game.maxUltPoints) {
                     game.ultPoints = 0;
                     game.ultAgent = 'clove';
-                    game.ultActiveUntil = now + 10000;
-                    game.health = 100;
+                    game.ultActiveUntil = now + AGENT_TUNING.clove.x.autoReviveUltMs;
+                    game.health = AGENT_TUNING.clove.x.healthHp;
                     game.maxShield = 50;
-                    game.shield = 50;
+                    game.shield = AGENT_TUNING.clove.x.shieldHp;
                     healthFill.style.width = '100%';
                     healthValue.textContent = game.health;
                     if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
-                    this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + 2200);
-                    this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + 10000);
+                    this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + AGENT_TUNING.clove.x.intangibleMs);
+                    this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + AGENT_TUNING.clove.x.autoReviveUltMs);
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.4, characterController.position.z, 0xf472b6, 6.5, 520, now);
                     for (let i = 0; i < enemyObjects.length; i++) {
                         const e = enemyObjects[i];
-                        if (e.isActive && !e.hit && e.mesh.position.distanceToSquared(characterController.position) <= 196) {
-                            this.applyEnemyBlind(e, now, 3000);
-                            e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                            e.revealedUntil = Math.max(e.revealedUntil, now + 4500);
+                        if (e.isActive && !e.hit && e.mesh.position.distanceToSquared(characterController.position) <= AGENT_TUNING.clove.x.blindRadiusSqM2) {
+                            this.applyEnemyBlind(e, now, AGENT_TUNING.clove.x.blindMs);
+                            e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.clove.x.slowMs);
+                            e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.clove.x.revealMs);
                         }
                     }
                     this.healFxUntil = now + 1100;
@@ -29874,7 +30007,7 @@
                     this.healFxUntil = now + 1100;
                     soundFX.revive();
                     if (isClove) {
-                        this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + 1800);
+                        this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + AGENT_TUNING.clove.x.reviveIntangibleMs);
                         soundFX.cloveRevive();
                         showNotification("NOT DEAD YET! Clove Resurrected in Immortal Butterfly Phase with 100 HP + 50 Armor!", 3400);
                     } else if (isKayo) {
@@ -29991,6 +30124,7 @@
                 el.style.opacity = '0';
             },
 
+            // V2.2: Omen's kill bonus and Miks's Harmonize kill refresh are in AGENT_TUNING.omen.x / AGENT_TUNING.miks.q (the shared kill bonuses are unchanged)
             onActorEliminated: function(kind, worldPos) {
                 const now = gameNow();
                 let gainedUltPoint = false;
@@ -30073,8 +30207,8 @@
                         soundFX.reynaDevour();
                     } else if (game.ultAgent === 'omen') {
                         // Kills during From the Shadows restore +1 Shadow Blink [X] charge & heal +25 HP!
-                        game.ultChargesLeft = Math.min(2, game.ultChargesLeft + 1);
-                        this.healPlayer(25, now);
+                        game.ultChargesLeft = Math.min(AGENT_TUNING.omen.x.blinkCount, game.ultChargesLeft + AGENT_TUNING.omen.x.killBlinkCount);
+                        this.healPlayer(AGENT_TUNING.omen.x.killHealHp, now);
                     } else if (game.ultAgent === 'raze') {
                         // Kills with Showstopper refresh Blast Pack [Q] for follow-up satchel jumps!
                         const st = this.stateByAgent.raze;
@@ -30136,15 +30270,15 @@
 
                 // Miks Harmonize Kill-Refresh Passive: Any kill while Harmonize is active refreshes its full 7.5s Sonic Stim & Haste duration!
                 if (now < (this.miksHarmonizeUntil || 0)) {
-                    this.miksHarmonizeUntil = now + 7500;
-                    this.brimStimUntil = Math.max(this.brimStimUntil, now + 7500);
-                    this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + 7500);
+                    this.miksHarmonizeUntil = now + AGENT_TUNING.miks.q.hasteMs;
+                    this.brimStimUntil = Math.max(this.brimStimUntil, now + AGENT_TUNING.miks.q.hasteMs);
+                    this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + AGENT_TUNING.miks.q.hasteMs);
                     if (this.miksHarmonizeHalo) {
                         this.miksHarmonizeHalo.active = true;
-                        this.miksHarmonizeHalo.expireAt = now + 7500;
+                        this.miksHarmonizeHalo.expireAt = now + AGENT_TUNING.miks.q.hasteMs;
                         this.miksHarmonizeHalo.group.visible = true;
                     }
-                    this.healPlayer(20, now);
+                    this.healPlayer(AGENT_TUNING.miks.q.killHealHp, now);
                     soundFX.miksHarmonize();
                     showNotification("HARMONIZE REFRESHED ON KILL (+7.5s Sonic Stim & Haste + +20 HP)!", 1750);
                 }
@@ -30284,6 +30418,7 @@
                 soundFX.smoke();
             },
 
+            // V2.2: Brimstone's (Incendiary) and Viper's (Snake Bite) numbers are in AGENT_TUNING.brimstone.q / AGENT_TUNING.viper.c (their sides of this method only)
             spawnMollyZone: function(x, y, z, now, isNanoswarm = false, isIncendiary = false, isSnakeBite = false) {
                 let item = this.mollies[0];
                 for (let i = 0; i < this.mollies.length; i++) {
@@ -30294,9 +30429,9 @@
                 item.isIncendiary = isIncendiary;
                 item.isSnakeBite = isSnakeBite;
                 item.position.set(x, Math.max(0.02, y), z);
-                item.radius = isIncendiary ? 5.6 : (isSnakeBite ? 5.2 : (isNanoswarm ? 5.0 : AGENT_TUNING.phoenix.c.radiusM));
+                item.radius = isIncendiary ? AGENT_TUNING.brimstone.q.radiusM : (isSnakeBite ? AGENT_TUNING.viper.c.radiusM : (isNanoswarm ? 5.0 : AGENT_TUNING.phoenix.c.radiusM));
                 item.startAt = now;
-                item.expireAt = now + (isIncendiary ? 7500 : (isSnakeBite ? 6500 : (isNanoswarm ? 6000 : AGENT_TUNING.phoenix.c.lifetimeMs)));
+                item.expireAt = now + (isIncendiary ? AGENT_TUNING.brimstone.q.lifetimeMs : (isSnakeBite ? AGENT_TUNING.viper.c.lifetimeMs : (isNanoswarm ? 6000 : AGENT_TUNING.phoenix.c.lifetimeMs)));
                 item.nextTickAt = now + 100;
                 item.discMat.color.setHex(isSnakeBite ? 0x22c55e : (isNanoswarm ? 0xfacc15 : (isIncendiary ? 0xef4444 : 0xff5500))).convertSRGBToLinear();
                 item.crownMat.color.setHex(isSnakeBite ? 0x86efac : (isNanoswarm ? 0xe879f9 : (isIncendiary ? 0xf97316 : 0xff7b00))).convertSRGBToLinear();
@@ -30831,6 +30966,7 @@
                     }
                 }
 
+                // V2.2: Brimstone's (Incendiary) and Viper's (Snake Bite) numbers are in AGENT_TUNING.brimstone.q / AGENT_TUNING.viper.c (their sides of this step only)
                 // 2. Step Incendiary Molly, Brimstone Incendiary, Viper Snake Bite & Killjoy Nanoswarm Ground Zones (AoE DoT + Vulnerable Reveal + Phoenix passive heal)
                 const nowMs = Date.now();
                 for (let i = 0; i < this.mollies.length; i++) {
@@ -30844,7 +30980,7 @@
                     if (now >= m.nextTickAt) {
                         m.nextTickAt = now + 200; // 5 ticks per second
                         const rSq = m.radius * m.radius;
-                        const tickDmg = m.isIncendiary ? 12 : (m.isSnakeBite ? 10 : (m.isNanoswarm ? 9 : AGENT_TUNING.phoenix.c.damagePerTick));
+                        const tickDmg = m.isIncendiary ? AGENT_TUNING.brimstone.q.damagePerTick : (m.isSnakeBite ? AGENT_TUNING.viper.c.damagePerTick : (m.isNanoswarm ? 9 : AGENT_TUNING.phoenix.c.damagePerTick));
                         const zoneLabel = m.isIncendiary ? "Incendiary" : (m.isSnakeBite ? "Snake Bite" : (m.isNanoswarm ? "Nanoswarm" : "Hot Hands Molly"));
 
                         // Damage enemies standing in zone
@@ -30858,7 +30994,7 @@
                                 e.burningUntil = now + 350;
                                 e.slowedUntil = Math.max(e.slowedUntil, now + 450);
                                 if (m.isNanoswarm || m.isSnakeBite) {
-                                    e.revealedUntil = Math.max(e.revealedUntil, now + (m.isSnakeBite ? 3000 : 2200));
+                                    e.revealedUntil = Math.max(e.revealedUntil, now + (m.isSnakeBite ? AGENT_TUNING.viper.c.revealMs : 2200));
                                 }
                                 damageEnemyActor(e, tickDmg, now, nowMs, zoneLabel, false);
                             }
@@ -30953,6 +31089,7 @@
                     }
                 }
 
+                // V2.2: Omen's numbers are in AGENT_TUNING.omen
                 // 2D. Step Omen Paranoia Wall-Piercing Shadow Waves (passes through all walls, nearsighting & weakening enemies)
                 for (let i = 0; i < this.paranoiaWaves.length; i++) {
                     const wave = this.paranoiaWaves[i];
@@ -30970,13 +31107,13 @@
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit || wave.hitSet.has(e)) continue;
                         const dx = e.mesh.position.x - wave.position.x;
-                        const dy = (e.mesh.position.y + 1.1) - wave.position.y;
+                        const dy = (e.mesh.position.y + AGENT_TUNING.omen.q.enemyAimHeightM) - wave.position.y;
                         const dz = e.mesh.position.z - wave.position.z;
                         if (dx * dx + dy * dy + dz * dz <= rSq) {
                             wave.hitSet.add(e);
-                            this.applyEnemyBlind(e, now, 3800);
-                            e.slowedUntil = Math.max(e.slowedUntil, now + 3800);
-                            e.revealedUntil = Math.max(e.revealedUntil, now + 3800);
+                            this.applyEnemyBlind(e, now, AGENT_TUNING.omen.q.blindMs);
+                            e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.omen.q.slowMs);
+                            e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.omen.q.revealMs);
                             showNotification(`PARANOIA HIT! Hostile Nearsighted & Vulnerable (+20% DMG)!`, 1400);
                         }
                     }
@@ -31245,6 +31382,7 @@
                     }
                 }
 
+                // V2.2: Brimstone's numbers are in AGENT_TUNING.brimstone
                 // 2K. Step Brimstone Combat Stim Beacons (+25% Rapid Fire, +25% Move Speed & Combat Regen Aura)
                 for (let i = 0; i < this.stimBeacons.length; i++) {
                     const beacon = this.stimBeacons[i];
@@ -31257,21 +31395,22 @@
                     const px = characterController.position.x - beacon.position.x;
                     const pz = characterController.position.z - beacon.position.z;
                     if (px * px + pz * pz <= beacon.radius * beacon.radius) {
-                        this.brimStimUntil = Math.max(this.brimStimUntil, now + 1500);
+                        this.brimStimUntil = Math.max(this.brimStimUntil, now + AGENT_TUNING.brimstone.c.auraStimMs);
                         if (now >= beacon.nextTickAt) {
-                            beacon.nextTickAt = now + 1000;
-                            this.healPlayer(3, now);
+                            beacon.nextTickAt = now + AGENT_TUNING.brimstone.c.tickMs;
+                            this.healPlayer(AGENT_TUNING.brimstone.c.healPerTickHp, now);
                         }
                     }
                 }
 
+                // V2.2: Brimstone's numbers are in AGENT_TUNING.brimstone
                 // 2L. Step Brimstone Orbital Strike Sky-Laser (130 DPS Scorching Beam)
                 if (this.orbitalStrike && this.orbitalStrike.active) {
                     if (now >= this.orbitalStrike.expireAt) {
                         this.orbitalStrike.active = false;
                         this.orbitalStrike.group.visible = false;
                     } else if (now >= this.orbitalStrike.beamActiveAt && now >= this.orbitalStrike.nextTickAt) {
-                        this.orbitalStrike.nextTickAt = now + 200; // 5 ticks/sec = 130 DPS (26 dmg/tick)
+                        this.orbitalStrike.nextTickAt = now + AGENT_TUNING.brimstone.x.tickMs; // 5 ticks/sec = 130 DPS (26 dmg/tick)
                         const rSq = this.orbitalStrike.radius * this.orbitalStrike.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -31279,11 +31418,11 @@
                             const dx = e.mesh.position.x - this.orbitalStrike.position.x;
                             const dz = e.mesh.position.z - this.orbitalStrike.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.burningUntil = now + 350;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 600);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 1200);
+                                e.burningUntil = now + AGENT_TUNING.brimstone.x.burnMs;
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.brimstone.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.brimstone.x.revealMs);
                                 createHitEffect(e.mesh.position, false);
-                                damageEnemyActor(e, 26, now, nowMs, "Orbital Strike", false);
+                                damageEnemyActor(e, AGENT_TUNING.brimstone.x.damagePerTick, now, nowMs, "Orbital Strike", false);
                             }
                         }
                         for (let j = 0; j < targetObjects.length; j++) {
@@ -31292,34 +31431,36 @@
                             const dx = t.mesh.position.x - this.orbitalStrike.position.x;
                             const dz = t.mesh.position.z - this.orbitalStrike.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                damageTargetActor(t, 26, now, nowMs, "Orbital Strike", t.leaves[0]);
+                                damageTargetActor(t, AGENT_TUNING.brimstone.x.damagePerTick, now, nowMs, "Orbital Strike", t.leaves[0]);
                             }
                         }
                     }
                 }
 
+                // V2.2: Viper's numbers are in AGENT_TUNING.viper
                 // 2M. Step Viper Poison Clouds (Toxin Gas Smoke Sphere: 30 DPS Decay + Slow + Reveal)
                 for (let i = 0; i < this.smokes.length; i++) {
                     const s = this.smokes[i];
                     if (!s.inUse || !s.isPoisonCloud) continue;
                     if (now >= s.nextTickAt) {
-                        s.nextTickAt = now + 200; // 5 ticks/sec = 30 DPS (6 dmg/tick)
-                        const rSq = (s.radius + 0.5) * (s.radius + 0.5);
+                        s.nextTickAt = now + AGENT_TUNING.viper.q.tickMs; // 5 ticks/sec = 30 DPS (6 dmg/tick)
+                        const rSq = (s.radius + AGENT_TUNING.viper.q.hitPadM) * (s.radius + AGENT_TUNING.viper.q.hitPadM);
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit) continue;
                             const dx = e.mesh.position.x - s.position.x;
                             const dz = e.mesh.position.z - s.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.burningUntil = now + 350;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 600);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 1800);
-                                damageEnemyActor(e, 6, now, nowMs, "Poison Cloud Decay", false);
+                                e.burningUntil = now + AGENT_TUNING.viper.q.burnMs;
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.viper.q.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.viper.q.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.viper.q.damagePerTick, now, nowMs, "Poison Cloud Decay", false);
                             }
                         }
                     }
                 }
 
+                // V2.2: Viper's numbers are in AGENT_TUNING.viper
                 // 2N. Step Viper Toxic Screens (22m Toxin Gas Wall: 35 DPS Decay + Slow + Reveal)
                 for (let i = 0; i < this.toxicScreens.length; i++) {
                     const ts = this.toxicScreens[i];
@@ -31330,7 +31471,7 @@
                         continue;
                     }
                     if (now >= ts.nextTickAt) {
-                        ts.nextTickAt = now + 200; // 5 ticks/sec = 35 DPS (7 dmg/tick)
+                        ts.nextTickAt = now + AGENT_TUNING.viper.e.tickMs; // 5 ticks/sec = 35 DPS (7 dmg/tick)
                         const vx = ts.endPos.x - ts.startPos.x;
                         const vz = ts.endPos.z - ts.startPos.z;
                         const lenSq = Math.max(0.01, vx * vx + vz * vz);
@@ -31344,23 +31485,24 @@
                             const cz = ts.startPos.z + tProj * vz;
                             const dx = e.mesh.position.x - cx;
                             const dz = e.mesh.position.z - cz;
-                            if (dx * dx + dz * dz <= (ts.halfWidth + 0.45) * (ts.halfWidth + 0.45)) {
-                                e.burningUntil = now + 350;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 800);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 2400);
-                                damageEnemyActor(e, 7, now, nowMs, "Toxic Screen Decay", false);
+                            if (dx * dx + dz * dz <= (ts.halfWidth + AGENT_TUNING.viper.e.hitPadM) * (ts.halfWidth + AGENT_TUNING.viper.e.hitPadM)) {
+                                e.burningUntil = now + AGENT_TUNING.viper.e.burnMs;
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.viper.e.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.viper.e.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.viper.e.damagePerTick, now, nowMs, "Toxic Screen Decay", false);
                             }
                         }
                     }
                 }
 
+                // V2.2: Viper's numbers are in AGENT_TUNING.viper
                 // 2O. Step Viper's Pit Ultimate Dome (14m Radius Toxin Cloud: 40 DPS Decay + Nearsight + Reveal + Viper Regen)
                 if (this.vipersPit && this.vipersPit.active) {
                     if (now >= this.vipersPit.expireAt) {
                         this.vipersPit.active = false;
                         this.vipersPit.group.visible = false;
                     } else if (now >= this.vipersPit.nextTickAt) {
-                        this.vipersPit.nextTickAt = now + 200; // 5 ticks/sec = 40 DPS (8 dmg/tick)
+                        this.vipersPit.nextTickAt = now + AGENT_TUNING.viper.x.tickMs; // 5 ticks/sec = 40 DPS (8 dmg/tick)
                         const rSq = this.vipersPit.radius * this.vipersPit.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -31368,11 +31510,11 @@
                             const dx = e.mesh.position.x - this.vipersPit.position.x;
                             const dz = e.mesh.position.z - this.vipersPit.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.burningUntil = now + 350;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 1200);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 2200);
-                                this.applyEnemyBlind(e, now, 900);
-                                damageEnemyActor(e, 8, now, nowMs, "Viper's Pit Decay", false);
+                                e.burningUntil = now + AGENT_TUNING.viper.x.burnMs;
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.viper.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.viper.x.revealMs);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.viper.x.blindMs);
+                                damageEnemyActor(e, AGENT_TUNING.viper.x.damagePerTick, now, nowMs, "Viper's Pit Decay", false);
                             }
                         }
                         // Viper regenerates +10 HP/s (+2 HP per 200ms tick) while standing inside Viper's Pit
@@ -31380,7 +31522,7 @@
                             const px = characterController.position.x - this.vipersPit.position.x;
                             const pz = characterController.position.z - this.vipersPit.position.z;
                             if (px * px + pz * pz <= rSq) {
-                                this.healPlayer(2, now);
+                                this.healPlayer(AGENT_TUNING.viper.x.healPerTickHp, now);
                             }
                         }
                     }
@@ -32621,6 +32763,7 @@
                     }
                 }
 
+                // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
                 // 2VV. Step Harbor Cascade Advancing Tidal Waves (moves at 8.5 m/s unless anchored; slows, pushes back & damages enemies)
                 for (let i = 0; i < this.harborCascades.length; i++) {
                     const hc = this.harborCascades[i];
@@ -32644,20 +32787,21 @@
                         const dz = e.mesh.position.z - hc.position.z;
                         const along = Math.abs(dx * hc.dir.x + dz * hc.dir.z);
                         const across = Math.abs(dx * perpX + dz * perpZ);
-                        if (along <= 1.35 && across <= hc.halfWidth + 0.6) {
-                            e.slowedUntil = Math.max(e.slowedUntil, now + 2600);
-                            e.revealedUntil = Math.max(e.revealedUntil, now + 3000);
+                        if (along <= AGENT_TUNING.harbor.c.hitDepthM && across <= hc.halfWidth + AGENT_TUNING.harbor.c.hitPadM) {
+                            e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.harbor.c.slowMs);
+                            e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.harbor.c.revealMs);
                             if (!hc.hitSet.has(e)) {
                                 hc.hitSet.add(e);
-                                e.mesh.position.x = Math.max(-45, Math.min(45, e.mesh.position.x + hc.dir.x * 1.4));
-                                e.mesh.position.z = Math.max(-45, Math.min(45, e.mesh.position.z + hc.dir.z * 1.4));
+                                e.mesh.position.x = Math.max(-45, Math.min(45, e.mesh.position.x + hc.dir.x * AGENT_TUNING.harbor.c.pushM));
+                                e.mesh.position.z = Math.max(-45, Math.min(45, e.mesh.position.z + hc.dir.z * AGENT_TUNING.harbor.c.pushM));
                                 e.transformDirty = true;
-                                damageEnemyActor(e, 25, now, nowMs, "Cascade Wave", false);
+                                damageEnemyActor(e, AGENT_TUNING.harbor.c.damage, now, nowMs, "Cascade Wave", false);
                             }
                         }
                     }
                 }
 
+                // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
                 // 2WW. Step Harbor Cove Bullet-Shielded Water Domes (regenerates player HP/Shield inside & slows/reveals enemies)
                 for (let i = 0; i < this.harborCoves.length; i++) {
                     const cv = this.harborCoves[i];
@@ -32668,15 +32812,15 @@
                         continue;
                     }
                     if (now >= cv.nextTickAt) {
-                        cv.nextTickAt = now + 350;
+                        cv.nextTickAt = now + AGENT_TUNING.harbor.q.tickMs;
                         const rSq = cv.radius * cv.radius;
                         const pdx = characterController.position.x - cv.position.x;
                         const pdz = characterController.position.z - cv.position.z;
                         if (pdx * pdx + pdz * pdz <= rSq) {
-                            this.healPlayer(4, now);
+                            this.healPlayer(AGENT_TUNING.harbor.q.healPerTickHp, now);
                             if ((game.shield || 0) < 50) {
                                 game.maxShield = Math.max(game.maxShield || 25, 50);
-                                game.shield = Math.min(50, (game.shield || 0) + 4);
+                                game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.harbor.q.shieldPerTickHp);
                                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                             }
                         }
@@ -32686,13 +32830,14 @@
                             const dx = e.mesh.position.x - cv.position.x;
                             const dz = e.mesh.position.z - cv.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 800);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 900);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.harbor.q.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.harbor.q.revealMs);
                             }
                         }
                     }
                 }
 
+                // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
                 // 2XX. Step Harbor High Tide 22m Hydro-Walls (slows, reveals & ticks 16 DPS tidal pressure on crossing enemies)
                 for (let i = 0; i < this.harborHighTides.length; i++) {
                     const ht = this.harborHighTides[i];
@@ -32703,7 +32848,7 @@
                         continue;
                     }
                     const canTick = now >= ht.nextTickAt;
-                    if (canTick) ht.nextTickAt = now + 250;
+                    if (canTick) ht.nextTickAt = now + AGENT_TUNING.harbor.e.tickMs;
                     const segX = ht.endPos.x - ht.startPos.x;
                     const segZ = ht.endPos.z - ht.startPos.z;
                     const segLenSq = Math.max(0.01, segX * segX + segZ * segZ);
@@ -32714,16 +32859,17 @@
                         const pz = e.mesh.position.z - ht.startPos.z;
                         const t = Math.max(0, Math.min(1, (px * segX + pz * segZ) / segLenSq));
                         const distSq = (px - t * segX) * (px - t * segX) + (pz - t * segZ) * (pz - t * segZ);
-                        if (distSq <= 1.5 * 1.5) {
-                            e.slowedUntil = Math.max(e.slowedUntil, now + 700);
-                            e.revealedUntil = Math.max(e.revealedUntil, now + 900);
+                        if (distSq <= AGENT_TUNING.harbor.e.hitHalfWidthM * AGENT_TUNING.harbor.e.hitHalfWidthM) {
+                            e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.harbor.e.slowMs);
+                            e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.harbor.e.revealMs);
                             if (canTick) {
-                                damageEnemyActor(e, 4, now, nowMs, "High Tide", true);
+                                damageEnemyActor(e, AGENT_TUNING.harbor.e.damagePerTick, now, nowMs, "High Tide", true);
                             }
                         }
                     }
                 }
 
+                // V2.2: Harbor's numbers are in AGENT_TUNING.harbor
                 // 2YY. Step Harbor Reckoning Advancing Geyser Pool (advances at 4.2 m/s & erupts concussing geysers on enemies every 1.8s)
                 if (this.harborReckoning && this.harborReckoning.active) {
                     const hr = this.harborReckoning;
@@ -32735,7 +32881,7 @@
                         hr.position.z = Math.max(-38, Math.min(38, hr.position.z + hr.dir.z * hr.speed * dt));
                         hr.group.position.copy(hr.position);
                         if (now >= hr.nextGeyserAt) {
-                            hr.nextGeyserAt = now + 1800;
+                            hr.nextGeyserAt = now + AGENT_TUNING.harbor.x.geyserIntervalMs;
                             soundFX.harborReckoning();
                             const rSq = hr.radius * hr.radius;
                             let geyserHits = 0;
@@ -32748,10 +32894,10 @@
                                     geyserHits++;
                                     this.spawnFlashBurst(e.mesh.position.x, 1.0, e.mesh.position.z, 0x06b6d4, 3.6, 320, now);
                                     this.spawnWindRing(e.mesh.position.x, 0.2, e.mesh.position.z, 0xfacc15, 3.8, now);
-                                    this.applyEnemyBlind(e, now, 3200);
-                                    e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                                    e.revealedUntil = Math.max(e.revealedUntil, now + 4000);
-                                    damageEnemyActor(e, 35, now, nowMs, "Reckoning Geyser", false);
+                                    this.applyEnemyBlind(e, now, AGENT_TUNING.harbor.x.blindMs);
+                                    e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.harbor.x.slowMs);
+                                    e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.harbor.x.revealMs);
+                                    damageEnemyActor(e, AGENT_TUNING.harbor.x.damage, now, nowMs, "Reckoning Geyser", false);
                                 }
                             }
                             if (geyserHits > 0) {
@@ -32761,6 +32907,7 @@
                     }
                 }
 
+                // V2.2: Astra's numbers are in AGENT_TUNING.astra
                 // 2ZZ. Step Astra Gravity Well Black Hole Vortexes (pulls enemies to singularity -> 1.8s Supernova Fragile implosion)
                 for (let i = 0; i < this.astraGravityWells.length; i++) {
                     const gw = this.astraGravityWells[i];
@@ -32784,16 +32931,16 @@
                             const dz = gw.position.z - e.mesh.position.z;
                             if (dx * dx + dz * dz <= rSq) {
                                 pulled++;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 4500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 6000);
-                                damageEnemyActor(e, 45, now, nowMs, "Gravity Well Supernova", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.astra.c.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.astra.c.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.astra.c.damage, now, nowMs, "Gravity Well Supernova", false);
                             }
                         }
                         if (pulled > 0) {
                             showNotification(`GRAVITY WELL SUPERNOVA! ${pulled} ${pulled === 1 ? 'Hostile' : 'Hostiles'} Pulled & Fragile (6.0s)!`, 1800);
                         }
                     } else if (now >= gw.nextPullAt) {
-                        gw.nextPullAt = now + 90;
+                        gw.nextPullAt = now + AGENT_TUNING.astra.c.pullTickMs;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit) continue;
@@ -32802,18 +32949,19 @@
                             const d2 = dx * dx + dz * dz;
                             if (d2 <= rSq) {
                                 const dist = Math.sqrt(d2) || 1;
-                                if (dist > 0.65) {
-                                    e.mesh.position.x += (dx / dist) * 0.36;
-                                    e.mesh.position.z += (dz / dist) * 0.36;
+                                if (dist > AGENT_TUNING.astra.c.pullMinDistM) {
+                                    e.mesh.position.x += (dx / dist) * AGENT_TUNING.astra.c.pullStepM;
+                                    e.mesh.position.z += (dz / dist) * AGENT_TUNING.astra.c.pullStepM;
                                     e.transformDirty = true;
                                 }
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 400);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 600);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.astra.c.pullSlowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.astra.c.pullRevealMs);
                             }
                         }
                     }
                 }
 
+                // V2.2: Astra's numbers are in AGENT_TUNING.astra
                 // 2AAA. Step Astra Nova Pulse Stars & Cosmic Divide Wall
                 for (let i = 0; i < this.astraNovaPulses.length; i++) {
                     const np = this.astraNovaPulses[i];
@@ -32837,10 +32985,10 @@
                             const dz = e.mesh.position.z - np.position.z;
                             if (dx * dx + dz * dz <= rSq) {
                                 concussed++;
-                                this.applyEnemyBlind(e, now, 4200);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 4500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 5000);
-                                damageEnemyActor(e, 50, now, nowMs, "Nova Pulse", false);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.astra.q.blindMs);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.astra.q.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.astra.q.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.astra.q.damage, now, nowMs, "Nova Pulse", false);
                             }
                         }
                         if (concussed > 0) {
@@ -32855,7 +33003,7 @@
                         cd.active = false;
                         cd.group.visible = false;
                     } else if (now >= cd.nextTickAt) {
-                        cd.nextTickAt = now + 250;
+                        cd.nextTickAt = now + AGENT_TUNING.astra.x.tickMs;
                         const segX = cd.endPos.x - cd.startPos.x;
                         const segZ = cd.endPos.z - cd.startPos.z;
                         const segLenSq = Math.max(0.01, segX * segX + segZ * segZ);
@@ -32866,10 +33014,10 @@
                             const pz = e.mesh.position.z - cd.startPos.z;
                             const t = Math.max(0, Math.min(1, (px * segX + pz * segZ) / segLenSq));
                             const distSq = (px - t * segX) * (px - t * segX) + (pz - t * segZ) * (pz - t * segZ);
-                            if (distSq <= 1.65 * 1.65) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 800);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 1200);
-                                damageEnemyActor(e, 6, now, nowMs, "Cosmic Divide", true);
+                            if (distSq <= AGENT_TUNING.astra.x.hitHalfWidthM * AGENT_TUNING.astra.x.hitHalfWidthM) {
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.astra.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.astra.x.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.astra.x.damagePerTick, now, nowMs, "Cosmic Divide", true);
                             }
                         }
                     }
@@ -33295,6 +33443,7 @@
                     }
                 }
 
+                // V2.2: Miks's numbers are in AGENT_TUNING.miks
                 // 2PPP. Step Miks M-Pulse Sonic Resonance Emitters (6.8m dual-frequency: heals player + concusses/damages enemies)
                 for (let i = 0; i < this.miksMPulses.length; i++) {
                     const mp = this.miksMPulses[i];
@@ -33306,16 +33455,16 @@
                         continue;
                     }
                     if (now >= mp.nextPulseAt) {
-                        mp.nextPulseAt = now + 600;
+                        mp.nextPulseAt = now + AGENT_TUNING.miks.c.tickMs;
                         const rSq = mp.radius * mp.radius;
                         const pdx = characterController.position.x - mp.position.x;
                         const pdz = characterController.position.z - mp.position.z;
                         if (pdx * pdx + pdz * pdz <= rSq) {
-                            this.healPlayer(10, now);
+                            this.healPlayer(AGENT_TUNING.miks.c.healPerTickHp, now);
                             this.playerBlindUntil = 0;
                             game.maxShield = Math.max(game.maxShield || 25, 50);
                             if ((game.shield || 0) < 50) {
-                                game.shield = Math.min(50, (game.shield || 0) + 8);
+                                game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.miks.c.shieldPerTickHp);
                                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                             }
                         }
@@ -33325,9 +33474,9 @@
                             const dx = e.mesh.position.x - mp.position.x;
                             const dz = e.mesh.position.z - mp.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 1400);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 1400);
-                                damageEnemyActor(e, 14, now, nowMs, "M-Pulse Resonance", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.miks.c.tickSlowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.miks.c.tickRevealMs);
+                                damageEnemyActor(e, AGENT_TUNING.miks.c.damagePerTick, now, nowMs, "M-Pulse Resonance", false);
                             }
                         }
                         this.spawnWindRing(mp.position.x, mp.position.y + 0.15, mp.position.z, 0x22d3ee, mp.radius, now);
@@ -33342,16 +33491,17 @@
                     }
                 }
 
+                // V2.2: Miks's numbers are in AGENT_TUNING.miks
                 // 2RRR. Step Miks Bassquake Sub-Bass Seismic Corridor (4 rolling 12m-wide sub-bass shockwaves across 30m)
                 if (this.miksBassquake && this.miksBassquake.active) {
                     const bq = this.miksBassquake;
                     if (now >= bq.expireAt) {
                         bq.active = false;
                         bq.group.visible = false;
-                    } else if (bq.wavesFired < 4 && now >= bq.nextWaveAt) {
+                    } else if (bq.wavesFired < AGENT_TUNING.miks.x.waveCount && now >= bq.nextWaveAt) {
                         bq.wavesFired++;
-                        bq.nextWaveAt = now + 950;
-                        const stepDist = bq.wavesFired * 7.0;
+                        bq.nextWaveAt = now + AGENT_TUNING.miks.x.waveIntervalMs;
+                        const stepDist = bq.wavesFired * AGENT_TUNING.miks.x.waveSpacingM;
                         const wx = bq.origin.x + bq.dir.x * stepDist;
                         const wz = bq.origin.z + bq.dir.z * stepDist;
                         bq.currentWavePos.set(wx, 0.04, wz);
@@ -33360,7 +33510,7 @@
                         this.spawnFlashBurst(wx, 1.2, wz, 0xec4899, 7.2, 420, now);
                         this.spawnWindRing(wx, 0.25, wz, 0x22d3ee, 10.5, now);
 
-                        const rSq = 7.4 * 7.4;
+                        const rSq = AGENT_TUNING.miks.x.waveRadiusM * AGENT_TUNING.miks.x.waveRadiusM;
                         let hitCount = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -33369,10 +33519,10 @@
                             const dz = e.mesh.position.z - wz;
                             if (dx * dx + dz * dz <= rSq) {
                                 hitCount++;
-                                this.applyEnemyBlind(e, now, 3400);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 5500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 6000);
-                                damageEnemyActor(e, 55, now, nowMs, "Bassquake Drop", false);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.miks.x.blindMs);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.miks.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.miks.x.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.miks.x.damage, now, nowMs, "Bassquake Drop", false);
                             }
                         }
                         for (let j = 0; j < targetObjects.length; j++) {
@@ -33381,7 +33531,7 @@
                             const dx = t.mesh.position.x - wx;
                             const dz = t.mesh.position.z - wz;
                             if (dx * dx + dz * dz <= rSq) {
-                                damageTargetActor(t, 70, now, nowMs, "Bassquake Drop", t.leaves[0]);
+                                damageTargetActor(t, AGENT_TUNING.miks.x.targetDamage, now, nowMs, "Bassquake Drop", t.leaves[0]);
                             }
                         }
                         if (hitCount > 0) {
