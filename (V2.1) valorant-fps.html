@@ -9839,7 +9839,7 @@
             bind: {
                 id: 'bind',
                 name: 'BIND',
-                subtitle: 'Moroccan Solar Desert & Two-Way Teleporters',
+                subtitle: 'Desert Market Town & One-Way Teleporters',   // V2.1: the teleporters are one-way now
                 skyColor: 0x291d12,
                 // V1.7 lighting mood: warm orange desert sun, amber/teleporter-blue accents
                 sunColor: 0xffb26b,
@@ -9848,35 +9848,187 @@
                 accentB: 0x0ea5e9,
                 floorColor: 0x3b2a1a,
                 wallColor: 0x451a03,
+                // V2.1: Bind's own layout, an original desert market town. Attackers west, defenders
+                // east, A north (-Z), B south (+Z), as on Ascent. There is NO mid: the middle of the
+                // town is solid buildings, so the only ways across are the lanes round the edge and two
+                // one-way teleporters. A is reached along Camel Road (a long street with a jog) and
+                // through Spice Hall (a covered market hall); B along Caravan Road and its Palm Garden,
+                // and through the Cistern, whose exit drops through a window onto the site. Defenders
+                // hold Copper Lane (A), Lantern Arcade and Clock Lane (B). Every lane has a 3.5 m
+                // chokepoint; buildings are 8-10 m and never thinner than 3 m between two open areas.
+                // The Caravanserai, a walled courtyard off the defender spawn, is a dead end kept clear
+                // for the range and the aim trainer.
+                plan: {
+                    atkSpawn: [-49.5, -37, -10, 10],
+                    defSpawn: [37, 49.5, -10, 10],
+                    roadW: [-47, -41, -46, -10],
+                    roadN: [-47, -20, -46, -40],
+                    roadJog: [-20, -14, -46, -36],
+                    roadE: [-14, 0, -40, -36],
+                    tpAlcoveA: [-27, -22, -49.5, -46],
+                    hallLane: [-37, -31, -32, -6],
+                    hall: [-31, -23, -36, -26],
+                    hallExit: [-23, 0, -33, -28],
+                    aSite: [0, 16, -44, -28],
+                    copperN: [42, 48, -38, -10],
+                    copperW: [16, 48, -38, -33],
+                    cRoadW: [-47, -41, 10, 46],
+                    cRoadS: [-47, 4, 40, 46],
+                    tpAlcoveB: [-25, -20, 46, 49.5],
+                    cisLane: [-37, -31, 6, 22],
+                    cistern: [-31, -19, 16, 28],
+                    cisExit: [-19, 8, 17, 22],
+                    cisDrop: [4, 8, 22, 28],
+                    bSite: [4, 20, 28, 44],
+                    arcS: [42, 48, 10, 34],
+                    arcW: [20, 48, 29, 34],
+                    clockLane: [20, 34, 40, 44],
+                    clockUp: [30, 34, 34, 40],
+                    court: [22, 37, -9, 9]
+                },
+                // V2.1: High Detail surface types by colour (the rest by shape, as on the other maps)
+                surf: { 0x6b4f2a: 'wood', 0x7a5a32: 'wood', 0x4a5563: 'metal', 0x9a7b5a: 'stone', 0xa88a66: 'stone', 0x8a6a48: 'stone', 0x7c4a2a: 'wood' },
                 build: function() {
-                    // Split Moroccan Solar Refinery Core (leaves Mid Breeze lane open!)
-                    createBox(-8, 4.5, 0, 8, 9, 14, 0x92400e);
-                    createBox(8, 4.5, 0, 8, 9, 14, 0x92400e);
-                    createBox(0, 9.5, 0, 24, 1.5, 10, 0xd97706);
-                    // Hookah (West) & Lamps (East) Sandstone Compounds
-                    createBox(-22, 3, -18, 12, 6, 8, 0x78350f);
-                    createBox(22, 3, -18, 12, 6, 8, 0x78350f);
-                    createBox(-22, 2.5, 18, 10, 5, 10, 0xb45309);
-                    createBox(22, 2.5, 18, 10, 5, 10, 0xb45309);
-                    // Teleporter Gate Frames at (-34, 0) and (34, 0)
-                    createBox(-37.5, 3.5, 0, 1.5, 7, 6, 0xd97706);
-                    createBox(37.5, 3.5, 0, 1.5, 7, 6, 0x0284c7);
-                    // Desert Obelisk Pillars
-                    createCylinder(-16, 5, -8, 1.2, 10, 0xd97706);
-                    createCylinder(16, 5, -8, 1.2, 10, 0xd97706);
-                    createCylinder(-16, 5, 8, 1.2, 10, 0xd97706);
-                    createCylinder(16, 5, 8, 1.2, 10, 0xd97706);
-                    // Radianite Desert Crates
-                    createBox(-12, 1.2, -26, 3, 2.4, 3, 0xd97706);
-                    createBox(12, 1.2, -26, 3, 2.4, 3, 0x0284c7);
-                    createBox(-12, 1.2, 26, 3, 2.4, 3, 0x0284c7);
-                    createBox(12, 1.2, 26, 3, 2.4, 3, 0xd97706);
+                    const P = this.plan;
+                    // V2.1: sandstone blocks round the plan's open floor (the shared helper)
+                    buildPlanBuildings(P, { walls: [0xc49a6c, 0xb38a5e, 0xd0a878, 0xa97f55], parapet: 0x7a5a3a });
+                    const CH = 0x9a7350, LT = 0x6b4a2e, SB = 0x7a5a3a;
+                    const WOOD = 0x6b4f2a, SACK = 0x7a5a32, METAL = 0x4a5563, STONE = 0x9a7b5a, STEP = 0xa88a66, TIMBER = 0x7c4a2a;
+                    // Chokepoints: 3.5 m gaps in every lane, under an arch (lanes) or a lintel (doors)
+                    planBox(-34, -30, -46, -44.75, 0, 8, CH); planBox(-34, -30, -41.25, -40, 0, 8, CH); planBox(-34, -30, -44.75, -41.25, 5, 8, CH);   // Camel Road
+                    planBox(-23, -22, -33, -32.25, 0, 8, CH); planBox(-23, -22, -28.75, -28, 0, 8, CH); planBox(-23, -22, -32.25, -28.75, 4.5, 8, LT); // Spice Hall door
+                    planBox(-30, -26, 40, 41.25, 0, 8, CH); planBox(-30, -26, 44.75, 46, 0, 8, CH); planBox(-30, -26, 41.25, 44.75, 5, 8, CH);         // Caravan Road
+                    planBox(-19, -18, 17, 17.75, 0, 8, CH); planBox(-19, -18, 21.25, 22, 0, 8, CH); planBox(-19, -18, 17.75, 21.25, 4.5, 8, LT);       // Cistern door
+                    planBox(28, 31, -38, -37.25, 0, 8, CH); planBox(28, 31, -33.75, -33, 0, 8, CH); planBox(28, 31, -37.25, -33.75, 5, 8, CH);         // Copper Lane
+                    planBox(28, 31, 29, 29.75, 0, 8, CH); planBox(28, 31, 33.25, 34, 0, 8, CH); planBox(28, 31, 29.75, 33.25, 5, 8, CH);               // Lantern Arcade
+                    planBox(30, 30.6, 36.5, 38, 0, 8, CH);                                                                                             // Clock Lane (a pier)
+                    // A dogleg in Copper Lane just off A: no line runs from the attackers' lanes through A down it
+                    planBox(18, 20, -38, -35.5, 0, 8, CH); planBox(23, 25, -35.5, -33, 0, 8, CH);
+                    // Spawn walls with ways round both ends, and crates beyond both ways round: no line from
+                    // a lane runs on through a spawn into another lane
+                    planBox(-46.5, -39.5, -4, -2, 0, 6, SB); planBox(-49.5, -46, 3, 5, 0, 3, WOOD); planBox(-42.5, -37, 3, 5, 0, 3, WOOD);
+                    planBox(40, 46.5, 2, 4, 0, 6, SB); planBox(46, 49.5, -5, -3, 0, 3, WOOD); planBox(37, 42.5, -5, -3, 0, 3, WOOD);
+                    // A site (16 x 16, x 0..16). Entrances: Camel Road and Spice Hall from the west, Copper
+                    // Lane from the east. A Tower (heaven) is a 2.5 m platform in the north-east corner, up
+                    // five 0.5 m steps along the north wall, with a chest-high rail facing the site.
+                    planBox(10, 16, -44, -40, 0, 2.5, STONE);
+                    for (let k = 1; k <= 5; k++) planBox(4 + k, 5 + k, -44, -41, 0, k * 0.5, STEP);
+                    planBox(10, 16, -40.25, -40, 2.5, 3.6, TIMBER); planBox(10, 10.25, -41, -40.25, 2.5, 3.6, TIMBER);
+                    planBox(0, 1.5, -36, -33, 0, 8, 0xb38a5e);                                     // buttress between the two west doors
+                    // Cover: the spice stall, the well house, a stall in the north-west corner and crates
+                    // in the south-east. No spot on the site can see all three entrances.
+                    planBox(2.5, 5, -35.5, -32, 0, 1.2, WOOD); planBox(2.5, 5, -35.5, -32, 1.2, 2.6, SACK);
+                    planBox(8, 11, -36.5, -33.5, 0, 2.2, STONE); planBox(7.8, 11.2, -36.7, -33.3, 2.2, 2.6, TIMBER);
+                    planBox(1.5, 4, -43, -40.5, 0, 2.2, WOOD);
+                    planBox(11, 13.5, -31, -29, 0, 1.2, WOOD); planBox(11, 13.5, -31, -29, 1.2, 2.4, SACK);
+                    planBox(0, 16, -28.2, -28, 3, 3.3, this.accentA); planBox(15.8, 16, -33, -28.2, 3, 3.3, this.accentA);   // site trim
+                    // B site (16 x 16, x 4..20). Entrances: the Palm Garden from the west, the Cistern's window
+                    // (north-west), Lantern Arcade and Clock Lane from the east.
+                    planBox(10.5, 13.5, 31, 35, 0, 2.6, STONE); planBox(10.2, 13.8, 30.7, 35.3, 2.6, 2.9, TIMBER);   // lantern shrine
+                    planBox(5.5, 8, 31, 33.5, 0, 1.2, WOOD); planBox(5.5, 8, 31, 33.5, 1.2, 2.4, SACK);              // crates by the window
+                    planBox(10.5, 13, 40, 44, 0, 1.2, WOOD); planBox(10.5, 13, 40, 44, 1.2, 2.6, SACK);                // laden wagon
+                    planBox(17, 20, 34, 36.5, 0, 1.2, WOOD); planBox(17, 20, 34, 36.5, 1.2, 2.4, SACK);              // crates by the arcade door
+                    planBox(4, 8, 27.6, 28, 2.6, 8, LT);                                                              // the Cistern window's lintel
+                    planBox(4, 20, 43.8, 44, 3, 3.3, this.accentB); planBox(8, 20, 28, 28.2, 3, 3.3, this.accentB);   // site trim
+                    // Lane cover, against the walls (every way through stays 2.5 m or wider)
+                    planBox(-47, -45, -30, -28, 0, 1.2, WOOD); planBox(-46.7, -45.3, -29.7, -28.3, 1.2, 2.3, WOOD);   // Camel Road
+                    planBox(-40, -37.5, -46, -44.8, 0, 1.0, WOOD);
+                    planBox(-20, -18.5, -46, -44.5, 0, 1.0, SACK);
+                    planBox(-29.5, -27.5, -35.5, -34, 0, 1.2, WOOD); planBox(-29.2, -27.8, -35.2, -34.3, 1.2, 2.3, WOOD); // Spice Hall
+                    planBox(-12, -10, -33, -31.8, 0, 1.0, STONE);
+                    planBox(-27, -23, 20, 24, 0, 0.8, STONE);                                                         // the cistern's basin
+                    planBox(-47, -45, 26, 28, 0, 1.2, WOOD); planBox(-46.7, -45.3, 26.3, 27.7, 1.2, 2.3, WOOD);       // Caravan Road
+                    planBox(-14, -12, 44.8, 46, 0, 1.0, STONE); planBox(-6, -4, 40, 41.2, 0, 1.0, STONE);             // garden planters...
+                    createCylinder(-13, 3.5, 45.4, 0.27, 7, 0x6b4a2b); createCylinder(-5, 3, 40.6, 0.27, 6, 0x6b4a2b);  // ...with palms
+                    planBox(46, 48, -26, -24, 0, 1.1, WOOD);                                                          // Copper Lane
+                    planBox(46, 48, 22, 24, 0, 1.1, WOOD);                                                            // Lantern Arcade
+                    planBox(24, 26, 42.8, 44, 0, 1.0, METAL);                                                         // Clock Lane
+                    // Teleporter gates over the two alcoves (the pads themselves are drawn by the teleporter code)
+                    for (const g of [[-27, -22, -46.6, -46, this.accentA], [-25, -20, 46, 46.6, this.accentB]]) {
+                        planBox(g[0], g[0] + 0.6, g[2], g[3], 0, 4.2, CH); planBox(g[1] - 0.6, g[1], g[2], g[3], 0, 4.2, CH);
+                        planBox(g[0], g[1], g[2], g[3], 4.2, 5, g[4]);
+                    }
+                    // Landmarks above the roofs: the clock tower between B and Clock Lane, the minaret in
+                    // the middle of the town (both inside solid blocks: nothing at street level changes)
+                    planBox(22, 26, 35.5, 38.5, 0, 15, 0xd0a878); planBox(21.7, 26.3, 35.2, 38.8, 15, 15.6, SB);
+                    planBox(23.2, 24.8, 35.4, 35.5, 11.5, 13.1, 0xf5e6c8);                                            // clock face
+                    planBox(18.5, 21.5, -21.5, -18.5, 0, 14, 0xc49a6c); planBox(18.2, 21.8, -21.8, -18.2, 14, 14.5, SB);
+                    createCylinder(20, 16.5, -20, 1.1, 4, 0xd0a878); createCylinder(20, 18.9, -20, 0.6, 0.8, this.accentA);
+                    // Spice Hall and the Cistern are covered rooms: timber roofs 6.5 m up with skylight slots
+                    for (const zz of [[-36, -33], [-32, -30], [-29, -26]]) planBox(-31, -23, zz[0], zz[1], 6.5, 7, TIMBER);
+                    for (const zz of [[16, 19.5], [20.5, 23.5], [24.5, 28]]) planBox(-31, -19, zz[0], zz[1], 6.5, 7, TIMBER);
+                },
+                // V2.1: High Detail props for the market town (decor only: no colliders, nothing in the
+                // way at player height): fabric awnings over the streets, rugs hung on the walls, brass
+                // lanterns under the arches, palm fronds and strings of bunting
+                hiDecor: function(add, rnd) {
+                    const CLOTH = [0x9b2c2c, 0xd99a2b, 0x2f4a7a, 0x2c7a7b, 0x7b3f8c];
+                    const tilt = (ax, a) => new THREE.Quaternion().setFromAxisAngle(ax === 'x' ? _xAxisDecor : _zAxisDecor, a);
+                    let ci = 0;
+                    // Awnings: wall at z = wz (lane on side dir), from x0 to x1; or wall at x = wx along z
+                    const awningsZ = (wz, dir, x0, x1) => {
+                        for (let x = x0 + 1.4; x <= x1 - 1.4; x += 3.2) {
+                            const col = CLOTH[ci++ % CLOTH.length];
+                            add('box', x, 3.35, wz + dir * 0.7, 2.6, 0.05, 1.45, col, 0.9, 0, tilt('x', dir * 0.3));
+                            add('box', x, 3.1, wz + dir * 1.38, 2.6, 0.22, 0.03, col, 0.7, 0);
+                        }
+                    };
+                    const awningsX = (wx, dir, z0, z1) => {
+                        for (let z = z0 + 1.4; z <= z1 - 1.4; z += 3.2) {
+                            const col = CLOTH[ci++ % CLOTH.length];
+                            add('box', wx + dir * 0.7, 3.35, z, 1.45, 0.05, 2.6, col, 0.9, 0, tilt('z', -dir * 0.3));
+                            add('box', wx + dir * 1.38, 3.1, z, 0.03, 0.22, 2.6, col, 0.7, 0);
+                        }
+                    };
+                    awningsZ(-40, 1, -14, 0);         // Camel Road, east leg (north wall)
+                    awningsZ(-33, 1, -21, -13);       // Spice Hall exit
+                    awningsZ(46, -1, -19, -14.5);     // Palm Garden (south wall), either side of the palm
+                    awningsZ(46, -1, -11.5, 4);
+                    awningsZ(34, -1, 34.5, 47);       // Lantern Arcade
+                    awningsX(-47, 1, -38, -31);       // Camel Road, west leg
+                    awningsX(48, -1, 12, 24);         // Lantern Arcade, south leg
+                    // Rugs on the walls: a border and a field, 3.4 m up
+                    const rugX = (wx, dir, z, col) => {
+                        add('box', wx + dir * 0.02, 3.4, z, 0.03, 2.1, 1.5, 0x3b1f14, 0.8, 0);
+                        add('box', wx + dir * 0.04, 3.4, z, 0.03, 1.8, 1.2, col, 0.9, 0);
+                    };
+                    const rugZ = (wz, dir, x, col) => {
+                        add('box', x, 3.4, wz + dir * 0.02, 1.5, 2.1, 0.03, 0x3b1f14, 0.8, 0);
+                        add('box', x, 3.4, wz + dir * 0.04, 1.2, 1.8, 0.03, col, 0.9, 0);
+                    };
+                    rugX(-47, 1, -20, CLOTH[0]); rugX(-47, 1, 20, CLOTH[2]); rugX(-47, 1, 36, CLOTH[4]);
+                    rugX(48, -1, -30, CLOTH[3]); rugX(48, -1, -18, CLOTH[1]); rugX(48, -1, 28, CLOTH[0]);
+                    rugZ(-9, 1, 26, CLOTH[2]); rugZ(-9, 1, 33, CLOTH[4]); rugZ(9, -1, 29.5, CLOTH[1]);   // the Caravanserai
+                    rugZ(-36, 1, -28, CLOTH[1]); rugZ(16, 1, -25, CLOTH[3]);                              // Spice Hall, the Cistern
+                    // Brass lanterns hanging under the lane arches and the covered rooms' beams
+                    const lantern = (x, z, top) => {
+                        add('box', x, top - 0.25, z, 0.03, 0.5, 0.03, 0x2b2620, 1, MAP_SURF.metal);
+                        add('cylinder', x, top - 0.7, z, 0.17, 0.42, 0.17, 0xb08d3c, 1.1, MAP_SURF.metal);
+                        add('cylinder', x, top - 0.45, z, 0.1, 0.1, 0.1, 0xb08d3c, 0.9, MAP_SURF.metal);
+                    };
+                    for (const p of [[-32, -43], [-28, 43], [29.5, -35.5], [29.5, 31.5]]) lantern(p[0], p[1], 5);
+                    for (const p of [[-27, -31.5], [-27, -28], [-25, 18], [-25, 26]]) lantern(p[0], p[1], 6.5);
+                    // Palm fronds: eight per palm, drooping from the crown
+                    for (const p of [[-13, 45.4, 7], [-5, 40.6, 6]]) {
+                        for (let k = 0; k < 8; k++) {
+                            const a = k * Math.PI / 4 + rnd() * 0.3, droop = 0.35 + rnd() * 0.25;
+                            const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, a, -droop, 'YXZ'));
+                            add('box', p[0] + Math.cos(a) * 1.05, p[2] - Math.sin(droop) * 1.05, p[1] - Math.sin(a) * 1.05, 2.3, 0.04, 0.5, 0x3f6b2a, 0.9, 0, q);
+                        }
+                        add('cylinder', p[0], p[2] + 0.05, p[1], 0.32, 0.3, 0.32, 0x5b4a2b, 1, 0);
+                    }
+                    // Bunting across Camel Road and the Palm Garden, 5.5 m up
+                    const bunting = (x, z0, z1) => {
+                        add('box', x, 5.55, (z0 + z1) / 2, 0.02, 0.02, z1 - z0, 0x2b2620, 1, 0);
+                        for (let z = z0 + 0.5; z < z1 - 0.3; z += 0.7) add('box', x, 5.32, z, 0.02, 0.38, 0.32, CLOTH[ci++ % CLOTH.length], 0.95, 0);
+                    };
+                    bunting(-38, -46, -40); bunting(-24, -46, -40); bunting(-18, 40, 46); bunting(-8, 40, 46);
                 }
             },
             haven: {
                 id: 'haven',
                 name: 'HAVEN',
-                subtitle: 'Bhutanese Night Monastery & 3-Lane Courtyard',
+                subtitle: 'Night Monastery & Three Spike Sites',   // V2.1: its own three-site layout
                 skyColor: 0x0f172a,
                 // V1.7 lighting mood: soft gold sun, crimson/jade shrine accents
                 sunColor: 0xffd79a,
@@ -9885,27 +10037,183 @@
                 accentB: 0x14b8a6,
                 floorColor: 0x1e293b,
                 wallColor: 0x0f172a,
+                // V2.1: Haven's own layout, an original mountain monastery at night, with THREE spike
+                // sites. Attackers west, defenders east; A north (-Z), B in the centre nearest the
+                // defenders (the smallest), C south (+Z). A is reached along the Pilgrim Walk (a long
+                // straight run on the north edge) and through the Cloister (a covered passage out of the
+                // Prayer Court); B from the Prayer Court through the Lamp Window (vault the sill) and the
+                // Shrine Doors; C along Mill Alley (with the Mill Nook halfway) and through the Granary
+                // (a covered room behind double doors). Whoever holds the Prayer Court threatens all
+                // three. Defenders rotate A - B - C on their side through the Library and the Kitchen
+                // Yard (the Library also runs from the spawn to B's north door; the Kitchen Yard only
+                // joins B and C). Every lane has a 3.5 m chokepoint; buildings are 8-10 m, never thinner than
+                // 3 m between two open areas.
+                plan: {
+                    atkSpawn: [-49.5, -37, -10, 10],
+                    defSpawn: [37, 49.5, -10, 10],
+                    longW: [-47, -41, -44, -10],
+                    longN: [-47, -4, -44, -38],
+                    longE: [-8, 2, -40, -36],
+                    midW: [-37, -26, -4, 4],
+                    court: [-26, -6, -12, 12],
+                    cloister: [-26, -20, -33, -12],
+                    cloisterE: [-20, 2, -33, -28],
+                    aSite: [2, 18, -44, -28],
+                    winLane: [-6, 18, -7, -3],
+                    doorLane: [-6, 18, 1, 4.5],
+                    bSite: [18, 30, -8, 8],
+                    granN: [-26, -20, 12, 22],
+                    granary: [-28, -14, 22, 33],
+                    granExit: [-14, 2, 28, 33],
+                    longCW: [-47, -41, 10, 44],
+                    longCS: [-47, -4, 38, 44],
+                    longCE: [-8, 2, 36, 40],
+                    cubby: [-23, -19, 44, 47.5],
+                    cSite: [2, 18, 28, 44],
+                    aLinkN: [42, 48, -38, -10],
+                    aLinkW: [18, 48, -38, -33],
+                    libLink: [27, 42, -22, -18],
+                    libDown: [24, 30, -33, -8],
+                    cLinkN: [42, 48, 10, 38],
+                    cLinkW: [18, 48, 33, 38],
+                    kitUp: [24, 30, 8, 33]
+                },
+                // V2.1: High Detail surface types by colour (the rest by shape)
+                surf: { 0x5b2a1a: 'wood', 0x7f1d1d: 'wood', 0x6b4f2a: 'wood', 0x8a8578: 'stone', 0xa39d8f: 'stone', 0xe2dbcc: 'stone', 0xb08d3c: 'metal' },
                 build: function() {
-                    // Central Bhutanese Pagoda Tower (Tiered Crimson & Jade Roofs)
-                    createBox(0, 4.5, 0, 14, 9, 14, 0x7f1d1d);
-                    createBox(0, 10, 0, 18, 2, 18, 0x0f766e);
-                    createBox(0, 12.5, 0, 10, 3, 10, 0x991b1b);
-                    // 3-Lane Dividers (A-Long West, Mid Courtyard, C-Long East)
-                    createBox(-18, 3.5, 0, 4, 7, 26, 0x1e293b);
-                    createBox(18, 3.5, 0, 4, 7, 26, 0x1e293b);
-                    // North & South Shrine Platforms
-                    createBox(-28, 2, -22, 8, 4, 8, 0x0f766e);
-                    createBox(28, 2, -22, 8, 4, 8, 0x0f766e);
-                    createBox(-28, 2, 22, 8, 4, 8, 0x991b1b);
-                    createBox(28, 2, 22, 8, 4, 8, 0x991b1b);
-                    // Temple Columns
-                    createCylinder(-9, 5, -18, 1.1, 10, 0x991b1b);
-                    createCylinder(9, 5, -18, 1.1, 10, 0x991b1b);
-                    createCylinder(-9, 5, 18, 1.1, 10, 0x0f766e);
-                    createCylinder(9, 5, 18, 1.1, 10, 0x0f766e);
-                    // Garden Bell Crates
-                    createBox(-6, 1, -28, 2.5, 2, 2.5, 0x0f766e);
-                    createBox(6, 1, 28, 2.5, 2, 2.5, 0x991b1b);
+                    const P = this.plan;
+                    // V2.1: whitewashed stone blocks round the plan's open floor (the shared helper)
+                    buildPlanBuildings(P, { walls: [0xd8d0c0, 0xcfc6b4, 0xe2dbcc, 0xc4baa6], parapet: 0x6b1f1f });
+                    const CH = 0x5b2a1a, LT = 0x4a2416, SB = 0x6b1f1f;
+                    const TIMBER = 0x5b2a1a, STONE = 0x8a8578, PALE = 0xe2dbcc, LACQUER = 0x7f1d1d, WOOD = 0x6b4f2a, BRASS = 0xb08d3c, STEP = 0xa39d8f, GOLD = 0xd4a017;
+                    // Chokepoints: 3.5 m gaps in every lane, under an arch (lanes) or a lintel (doors)
+                    planBox(-30, -26, -44, -42.75, 0, 8, CH); planBox(-30, -26, -39.25, -38, 0, 8, CH); planBox(-30, -26, -42.75, -39.25, 5, 8, CH);   // Pilgrim Walk
+                    planBox(-30, -26, 38, 39.25, 0, 8, CH); planBox(-30, -26, 42.75, 44, 0, 8, CH); planBox(-30, -26, 39.25, 42.75, 5, 8, CH);         // Mill Alley
+                    planBox(-10, -9, -33, -32.25, 0, 8, CH); planBox(-10, -9, -28.75, -28, 0, 8, CH); planBox(-10, -9, -32.25, -28.75, 4.5, 8, LT);   // Cloister door
+                    planBox(-10, -9, 28, 28.75, 0, 8, CH); planBox(-10, -9, 32.25, 33, 0, 8, CH); planBox(-10, -9, 28.75, 32.25, 4.5, 8, LT);         // Granary exit
+                    planBox(-23.3, -22.7, 12, 16, 0, 8, CH); planBox(-26, -20, 12, 13, 4.2, 8, LT);                                                  // Granary double doors
+                    planBox(-32, -30, -4, -1.75, 0, 8, CH); planBox(-32, -30, 1.75, 4, 0, 8, CH); planBox(-32, -30, -1.75, 1.75, 5, 8, CH);            // into the Prayer Court
+                    planBox(4, 5, -7, -6.4, 0, 8, CH); planBox(4, 5, -6.4, -3, 5, 8, CH);                                                                // Lamp Window lane
+                    planBox(30, 33, -38, -37.25, 0, 8, CH); planBox(30, 33, -33.75, -33, 0, 8, CH); planBox(30, 33, -37.25, -33.75, 5, 8, CH);         // Library
+                    planBox(30, 33, 33, 33.75, 0, 8, CH); planBox(30, 33, 37.25, 38, 0, 8, CH); planBox(30, 33, 33.75, 37.25, 5, 8, CH);               // Kitchen Yard
+                    planBox(24, 25.25, -9, -8, 0, 8, CH); planBox(28.75, 30, -9, -8, 0, 8, CH); planBox(25.25, 28.75, -9, -8, 4.2, 8, LT);             // B's north door
+                    planBox(24, 25.25, 8, 9, 0, 8, CH); planBox(28.75, 30, 8, 9, 0, 8, CH); planBox(25.25, 28.75, 8, 9, 4.2, 8, LT);                   // B's south door
+                    // The Lamp Window: a sill (players vault it, bots take the doors) under a lintel; the Shrine Doors' lintel
+                    planBox(16.5, 18, -7, -3, 0, 1.0, STONE); planBox(17, 18, -7, -3, 3.2, 8, LT);
+                    planBox(17, 18, 1, 4.5, 3.2, 8, LT);
+                    // Spawn walls with ways round both ends, and crates beyond both ways round: no line from
+                    // a lane runs on through a spawn into another lane
+                    planBox(-46.5, -39.5, -4, -2, 0, 6, SB); planBox(-49.5, -46, 3, 5, 0, 3, WOOD); planBox(-42.5, -37, 3, 5, 0, 3, WOOD);
+                    planBox(40, 46.5, -4, -2, 0, 6, SB); planBox(46, 49.5, 3, 5, 0, 3, WOOD); planBox(37, 42.5, 3, 5, 0, 3, WOOD);
+                    planBox(-37, -35.5, -4, -2.5, 0, 8, CH);                                                           // a jamb at the mid entry
+                    // Doglegs in the Library and the Kitchen Yard just off A and C: no line runs from the
+                    // attackers' lanes through a site down a defender link
+                    planBox(20, 22, -38, -35.5, 0, 8, CH); planBox(25, 27, -35.5, -33, 0, 8, CH);
+                    planBox(20, 22, 35.5, 38, 0, 8, CH); planBox(25, 27, 33, 35.5, 0, 8, CH);
+                    // A site (16 x 16, x 2..18). Entrances: the Pilgrim Walk and the Cloister from the west, the
+                    // Library from the east. The Bell Tower (heaven) is a 2.5 m platform in the north-east
+                    // corner, up five 0.5 m steps along the north wall, with a chest-high rail facing the site.
+                    planBox(12, 18, -44, -40, 0, 2.5, STONE);
+                    for (let k = 1; k <= 5; k++) planBox(6 + k, 7 + k, -44, -41, 0, k * 0.5, STEP);
+                    planBox(12, 18, -40.25, -40, 2.5, 3.6, TIMBER); planBox(12, 12.25, -41, -40.25, 2.5, 3.6, TIMBER);
+                    planBox(2, 3.5, -36, -33, 0, 8, 0xcfc6b4);                                                          // pier between the west doors
+                    planBox(4.5, 7, -35.5, -32, 0, 2.6, TIMBER);                                                        // prayer-wheel house
+                    planBox(10, 13, -36.5, -33.5, 0, 2.2, STONE); planBox(9.8, 13.2, -36.7, -33.3, 2.2, 2.6, LACQUER); // lantern shrine
+                    planBox(3.5, 6, -43, -40.5, 0, 2.2, LACQUER);                                                       // drum stand
+                    planBox(13, 15.5, -31, -29, 0, 1.2, LACQUER); planBox(13, 15.5, -31, -29, 1.2, 2.4, WOOD);         // offering chests
+                    planBox(2, 18, -28.2, -28, 3, 3.3, this.accentA); planBox(17.8, 18, -33, -28.2, 3, 3.3, this.accentA);   // site trim
+                    // B site (12 x 16, the smallest): a ring round the altar block. Entrances: the Lamp Window
+                    // and the Shrine Doors from the west, a door from each defender link. The altar hides the
+                    // west side from both defender doors; the small cover stands against the walls.
+                    planBox(23, 30, -4, 4, 0, 2.2, STONE); planBox(22.8, 30, -4.2, 4.2, 2.2, 2.8, LACQUER);           // the altar block
+                    planBox(18, 19, -2.5, 0.5, 0, 2.2, LACQUER);                                                        // offering cabinet
+                    planBox(19, 22, -8, -7.2, 0, 0.6, WOOD);                                                            // bench
+                    planBox(19, 21, 7.2, 8, 0, 1.1, TIMBER);                                                            // lamp stand
+                    planBox(22, 24, -8, -7.8, 3, 3.3, GOLD); planBox(22, 24, 7.8, 8, 3, 3.3, GOLD);                     // site trim
+                    // C site (16 x 16, x 2..18): A's mirror image, with a stupa where A has its tower.
+                    // Entrances: Mill Alley and the Granary from the west, the Kitchen Yard from the east.
+                    planBox(2, 3.5, 33, 36, 0, 8, 0xcfc6b4);
+                    planBox(4.5, 7, 32, 35.5, 0, 2.6, TIMBER);                                                          // incense house
+                    planBox(10, 13, 33.5, 36.5, 0, 2.2, STONE); planBox(9.8, 13.2, 33.3, 36.7, 2.2, 2.6, LACQUER);
+                    planBox(3.5, 6, 40.5, 43, 0, 2.2, LACQUER);
+                    planBox(13, 15.5, 29, 31, 0, 1.2, LACQUER); planBox(13, 15.5, 29, 31, 1.2, 2.4, WOOD);
+                    planBox(13, 18, 40, 44, 0, 3, PALE); createCylinder(15.5, 3.9, 42, 1.8, 1.8, PALE); createCylinder(15.5, 5.6, 42, 0.45, 1.6, BRASS);   // stupa
+                    planBox(2, 18, 28, 28.2, 3, 3.3, this.accentB); planBox(17.8, 18, 28.2, 33, 3, 3.3, this.accentB);   // site trim
+                    // Prayer Court: two stupas on square plinths either side of the mid entry (no line runs from
+                    // the Cloister across the court into the Granary), prayer-wheel rows against the walls; the
+                    // east half stays clear for the range and the aim trainer
+                    for (const sz of [-6, 6]) {
+                        planBox(-25, -21, sz - 2, sz + 2, 0, 2.4, PALE);
+                        createCylinder(-23, 3.2, sz, 1.6, 1.6, PALE); createCylinder(-23, 4.5, sz, 0.9, 1.0, PALE); createCylinder(-23, 5.8, sz, 0.3, 1.6, BRASS);
+                    }
+                    planBox(-18.5, -13.5, -12, -11.2, 0, 1.2, TIMBER); planBox(-6.8, -6, -11, -8, 0, 1.2, TIMBER);
+                    // Lane cover, against the walls (every way through stays 2.5 m or wider)
+                    planBox(-47, -45, -30, -28, 0, 1.2, WOOD); planBox(-46.7, -45.3, -29.7, -28.3, 1.2, 2.3, WOOD);   // Pilgrim Walk
+                    planBox(-40, -37.5, -44, -42.8, 0, 1.0, STONE);                                                    // a mani-stone wall
+                    planBox(-47, -45, 26, 28, 0, 1.2, WOOD); planBox(-46.7, -45.3, 26.3, 27.7, 1.2, 2.3, WOOD);       // Mill Alley
+                    planBox(-40, -37.5, 42.8, 44, 0, 1.0, STONE);
+                    planBox(-26, -24.5, -24, -21, 0, 1.1, LACQUER);                                                    // Cloister
+                    planBox(-27.5, -25, 30.5, 32.5, 0, 2.2, WOOD); planBox(-19, -17, 23, 25, 0, 1.1, WOOD);            // Granary: grain sacks
+                    planBox(46, 48, -26, -24, 0, 1.1, WOOD); planBox(46, 48, 24, 26, 0, 1.1, STONE);                   // Library, Kitchen Yard
+                    // Covered ways: timber roofs 6.5 m up with skylight slots over the Cloister and the Granary
+                    for (const zz of [[-33, -28], [-27, -21], [-20, -12]]) planBox(-26, -20, zz[0], zz[1], 6.5, 7, TIMBER);
+                    planBox(-20, -11, -33, -28, 6.5, 7, TIMBER);
+                    for (const zz of [[22, 26], [27, 29.5], [30.5, 33]]) planBox(-28, -14, zz[0], zz[1], 6.5, 7, TIMBER);
+                    // Landmark above the roofs: the temple tower in the middle of the monastery (inside a
+                    // solid block: nothing at street level changes)
+                    planBox(2, 10, -22, -14, 0, 13, PALE); planBox(1.2, 10.8, -22.8, -13.2, 13, 13.5, LACQUER);
+                    planBox(3, 9, -21, -15, 13.5, 16, PALE); planBox(2.2, 9.8, -21.8, -14.2, 16, 16.4, LACQUER);
+                    planBox(4, 8, -20, -16, 16.4, 18, PALE); createCylinder(6, 18.8, -18, 0.25, 1.6, GOLD);
+                },
+                // V2.1: High Detail props for the night monastery (decor only: no colliders, nothing in
+                // the way at player height): prayer flags strung across the lanes, red paper lanterns
+                // under the arches and roofs, painted banners on the walls, prayer wheels in the walls
+                hiDecor: function(add, rnd) {
+                    const FLAGS = [0x2f5fa8, 0xe8e4d8, 0xb3261e, 0x2f8a4a, 0xd9a521];
+                    let fi = 0;
+                    // A string of flags across a lane: from (x0, z0) to (x1, z1), 5.6 m up
+                    const flags = (x0, z0, x1, z1) => {
+                        const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(z1 - z0, x1 - x0);
+                        const q = new THREE.Quaternion().setFromAxisAngle(_yAxisDecor, -ang);
+                        add('box', (x0 + x1) / 2, 5.6, (z0 + z1) / 2, len, 0.02, 0.02, 0x2b2620, 1, 0, q);
+                        for (let t = 0.4; t < len - 0.3; t += 0.55) {
+                            const x = x0 + (x1 - x0) * t / len, z = z0 + (z1 - z0) * t / len;
+                            add('box', x, 5.36, z, 0.36, 0.42, 0.02, FLAGS[fi++ % FLAGS.length], 0.95, 0, q);
+                        }
+                    };
+                    flags(-38, -44, -38, -38); flags(-20, -44, -20, -38); flags(-38, 38, -38, 44); flags(-20, 38, -20, 44);
+                    flags(-18, -12, -10, 12); flags(-20, 0, -6, 6); flags(-20, 6, -6, 0);
+                    flags(42, -24, 48, -24); flags(42, 24, 48, 24); flags(24, -26, 30, -26); flags(24, 26, 30, 26);
+                    // Red paper lanterns: under the lane arches, the doors' lintels and the covered roofs
+                    const lantern = (x, z, top) => {
+                        add('box', x, top - 0.2, z, 0.03, 0.4, 0.03, 0x2b2620, 1, 0);
+                        add('cylinder', x, top - 0.68, z, 0.24, 0.55, 0.24, 0xc0262d, 1.15, 0);
+                        add('cylinder', x, top - 0.4, z, 0.14, 0.06, 0.14, 0x2b2620, 1, MAP_SURF.metal);
+                        add('cylinder', x, top - 0.97, z, 0.14, 0.06, 0.14, 0x2b2620, 1, MAP_SURF.metal);
+                    };
+                    for (const p of [[-28, -41], [-28, 41], [-31, 0], [4.5, -5], [31.5, -35.5], [31.5, 35.5]]) lantern(p[0], p[1], 5);
+                    for (const p of [[-23, -24], [-23, -16], [-15, -30.5], [-21, 24.5], [-21, 31.5]]) lantern(p[0], p[1], 6.5);
+                    for (const p of [[27, -8.5], [27, 8.5]]) lantern(p[0], p[1], 4.2);
+                    for (const p of [[-9.5, -30.5], [-9.5, 30.5]]) lantern(p[0], p[1], 4.5);
+                    // Painted banners: a dark mount and a coloured field, 3.6 m up
+                    const banX = (wx, dir, z, col) => {
+                        add('box', wx + dir * 0.02, 3.6, z, 0.03, 2.6, 1.3, 0x3b1f14, 0.8, 0);
+                        add('box', wx + dir * 0.04, 3.7, z, 0.03, 2.1, 1.0, col, 0.95, 0);
+                    };
+                    const banZ = (wz, dir, x, col) => {
+                        add('box', x, 3.6, wz + dir * 0.02, 1.3, 2.6, 0.03, 0x3b1f14, 0.8, 0);
+                        add('box', x, 3.7, wz + dir * 0.04, 1.0, 2.1, 0.03, col, 0.95, 0);
+                    };
+                    banX(-47, 1, -20, FLAGS[2]); banX(-47, 1, 20, FLAGS[0]); banX(48, -1, -18, FLAGS[3]); banX(48, -1, 18, FLAGS[4]);
+                    banZ(12, -1, -10, FLAGS[4]); banZ(-12, 1, -10, FLAGS[3]); banX(-26, 1, -27, FLAGS[4]); banZ(33, -1, -21, FLAGS[3]); banX(-6, -1, 8, FLAGS[2]); banX(-26, 1, 8, FLAGS[0]);
+                    banZ(-22, 1, 32, FLAGS[2]); banX(30, -1, 26, FLAGS[0]);
+                    // Prayer wheels set into the walls: a row of brass drums on the Pilgrim Walk and Mill Alley
+                    for (const side of [-1, 1]) {
+                        const wz = side * 44;
+                        for (let x = -17, k = 0; x <= -7; x += 0.9, k++) add('cylinder', x, 1.25, wz - side * 0.18, 0.16, 0.5, 0.16, k % 2 ? 0x7f1d1d : 0xb08d3c, 1, MAP_SURF.metal);
+                        add('box', -12.05, 0.95, wz - side * 0.1, 10.6, 0.08, 0.2, 0x5b2a1a, 1, MAP_SURF.wood);
+                        add('box', -12.05, 1.55, wz - side * 0.1, 10.6, 0.08, 0.2, 0x5b2a1a, 1, MAP_SURF.wood);
+                    }
                 }
             },
             icebox: {
@@ -10189,6 +10497,130 @@
             propMargin: 2.2,
             checkTargets: true
         };
+        // V2.1: Bind's callouts (by the open areas of its plan)
+        function bindZoneName(x, y, z) {
+            const P = MAP_PRESETS.bind.plan;
+            const any = (...ks) => ks.some((k) => _inPlanRect(P[k], x, z));
+            if (any('aSite')) return (y > 3.6 && x >= 10 && z <= -40) ? 'A TOWER' : 'A SITE';
+            if (any('bSite')) return 'B SITE';
+            if (any('roadW', 'roadN', 'roadJog', 'roadE', 'tpAlcoveA')) return 'CAMEL ROAD';
+            if (any('hallLane', 'hall', 'hallExit')) return 'SPICE HALL';
+            if (any('copperN', 'copperW')) return 'COPPER LANE';
+            if (any('cRoadW') || (any('cRoadS') && x < -26)) return 'CARAVAN ROAD';
+            if (any('cRoadS', 'tpAlcoveB')) return 'PALM GARDEN';
+            if (any('cisLane', 'cistern', 'cisExit', 'cisDrop')) return 'CISTERN';
+            if (any('arcS', 'arcW')) return 'LANTERN ARCADE';
+            if (any('clockLane', 'clockUp')) return 'CLOCK LANE';
+            if (any('court')) return 'CARAVANSERAI';
+            if (any('atkSpawn')) return 'ATTACKER SPAWN';
+            if (any('defSpawn')) return 'DEFENDER SPAWN';
+            return 'BIND';
+        }
+        // V2.1: Bind's layout. Route lengths (navGrid) are within a few metres of Ascent's, with the
+        // defenders about 10 m ahead at both sites, as on Ascent.
+        const BIND_LAYOUT = {
+            sites: { A: { x: 9, z: -39 }, B: { x: 10, z: 38 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } },
+            // The Caravanserai (the range and aim-trainer court)
+            start: { x: 29.5, z: 6, yaw: 0 },
+            bootStart: { x: 29.5, z: 6, yaw: 0 },
+            botSpawns: [[-44, -25, 'rusher'], [7, -30.5, 'sniper'], [-44, 30, 'armored'], [7, 41, 'standard'], [-34, -20, 'rusher'], [45, -22, 'armored']],
+            botSpawnsLow: [[-44, -25, 'rusher'], [7, 41, 'armored']],
+            // Open spots all over the map (lanes, sites, rooms, both spawns, the court)
+            respawnSpots: [[-44, -25], [-40, -43], [-7, -38], [-27, -30], [-34, -20], [7, -30.5], [13, -35], [36, -35.5], [45, -22],
+                [-43, 22], [-36, 43], [-10, 43], [-29, 18], [-34, 14], [-5, 19.5], [7, 41], [16, 40], [34, 31.5], [44, 18], [27, 42],
+                [-42, -7], [42, -7], [30, -4]],
+            orbs: [{ x: -27, z: -31, name: 'SPICE HALL ORB' }, { x: 45, z: 20, name: 'LANTERN ARCADE ORB' }],
+            zoneName: bindZoneName,
+            // (alternating sites: on a low-end device with only two bots, one holds each site)
+            matchDefend: () => [[13.5, -37.5], [15, 38.5], [6, -30], [8, 36], [36, 0]],
+            // Attacking bots stack south of the spawn wall, clear of it and the crates
+            matchAttack: (o) => [[o.x, o.z + 1.5], [o.x + 2.5, o.z + 1], [o.x - 3, o.z + 1.5], [o.x - 2, o.z + 7.5], [o.x + 2, o.z + 8]],
+            // Retake: you come in from the defender side, down Copper Lane (A) or Lantern Arcade (B)
+            retake: {
+                A: { player: { x: 45, z: -14, yaw: 0 }, guards: [[9, -39, 'armored'], [13.5, -37, 'standard'], [6, -38, 'rusher'], [14.5, -33.5, 'sniper'], [6, -30, 'armored'], [2, -38, 'standard']] },
+                B: { player: { x: 45, z: 14, yaw: Math.PI }, guards: [[10, 38, 'armored'], [15, 37.5, 'standard'], [8, 36, 'rusher'], [16, 31, 'sniper'], [7, 41, 'armored'], [14.5, 42, 'standard']] }
+            },
+            // The Caravanserai is kept clear for the range and the aim trainer
+            range: { player: { x: 29.5, z: 7 }, lanesX: [25, 27, 29, 30, 32, 34], lanesZ: [-2.5, -4, -5.5] },
+            aim: { x: 29.5, z: 7 },
+            propKeepOut: [[22, 37, -9, 9]],
+            // Practice targets: open air in the long east-west lanes, 10 m clear either side
+            targetSpots: [[-33.5, 3.5, -43], [-6, 3, -30.5], [-5, 3, 19.5], [-12, 3.5, 43], [36.5, 3.5, -35.5], [34, 3.5, 31.5]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.6,
+            propSafe: true,
+            checkTargets: true,
+            // One-way teleporters: step on a pad in an alcove off one lane and come out at the
+            // attacker end of the other site's room, with a loud arrival sound
+            teleporters: [
+                { from: { x: -24.5, z: -47.75 }, to: { x: -34, z: 19, yaw: -Math.PI / 2 }, color: 0xf59e0b, name: 'CAMEL ROAD', dest: 'CISTERN' },
+                { from: { x: -22.5, z: 47.75 }, to: { x: -34, z: -29, yaw: -Math.PI / 2 }, color: 0x38bdf8, name: 'PALM GARDEN', dest: 'SPICE HALL' }
+            ],
+            teleportRadius: 1.2
+        };
+        // V2.1: Haven's callouts (by the open areas of its plan)
+        function havenZoneName(x, y, z) {
+            const P = MAP_PRESETS.haven.plan;
+            const any = (...ks) => ks.some((k) => _inPlanRect(P[k], x, z));
+            if (any('aSite')) return (y > 3.6 && x >= 12 && z <= -40) ? 'BELL TOWER' : 'A SITE';
+            if (any('bSite')) return 'B SITE';
+            if (any('cSite')) return 'C SITE';
+            if (any('longW', 'longN', 'longE')) return 'PILGRIM WALK';
+            if (any('cloister', 'cloisterE')) return 'CLOISTER';
+            if (any('winLane')) return 'LAMP WINDOW';
+            if (any('doorLane')) return 'SHRINE DOORS';
+            if (any('court', 'midW')) return 'PRAYER COURT';
+            if (any('granN', 'granary', 'granExit')) return 'GRANARY';
+            if (any('cubby')) return 'MILL NOOK';
+            if (any('longCW', 'longCS', 'longCE')) return 'MILL ALLEY';
+            if (any('aLinkN', 'aLinkW', 'libLink', 'libDown')) return 'LIBRARY';
+            if (any('cLinkN', 'cLinkW', 'kitUp')) return 'KITCHEN YARD';
+            if (any('atkSpawn')) return 'ATTACKER SPAWN';
+            if (any('defSpawn')) return 'DEFENDER SPAWN';
+            return 'HAVEN';
+        }
+        // V2.1: Haven's layout: three sites. B is the nearest to the defenders; route lengths are
+        // within a few metres of Ascent's (B's against Ascent's B), defenders about 10 m ahead.
+        const HAVEN_LAYOUT = {
+            sites: { A: { x: 9, z: -38 }, B: { x: 21, z: -5 }, C: { x: 8, z: 37 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } },
+            // The Prayer Court (the range and aim-trainer end of it)
+            start: { x: -13, z: 8, yaw: 0 },
+            bootStart: { x: -13, z: 8, yaw: 0 },
+            botSpawns: [[-44, -25, 'rusher'], [8, -30.5, 'sniper'], [-44, 25, 'armored'], [8, 30.5, 'standard'], [-23, -22, 'rusher'], [20, -1, 'armored']],
+            botSpawnsLow: [[-44, -25, 'rusher'], [8, 30.5, 'armored']],
+            // Open spots all over the map (lanes, sites, rooms, links, both spawns)
+            respawnSpots: [[-44, -25], [-36, -41], [-6, -38], [-23, -22], [-14, -30.5], [8, -30.5], [15, -35], [36, -35.5], [45, -22], [27, -28], [34, -20],
+                [-44, 25], [-36, 41], [-6, 38], [-21, 27], [-14, 30.5], [8, 30.5], [15, 35], [36, 35.5], [45, 22], [27, 28], [27, 18],
+                [-16, 4], [-11, -4], [-31, 0], [8, -5], [8, 2.75], [20, -1], [-42, -7], [42, 7]],
+            orbs: [{ x: -11, z: -6, name: 'PRAYER COURT ORB' }, { x: 45, z: 20, name: 'KITCHEN YARD ORB' }],
+            zoneName: havenZoneName,
+            // Defenders (when you attack): two at A, one at B, two at C
+            matchDefend: () => [[13.5, -37.5], [8, -30], [21, 2], [13.5, 37.5], [8, 30]],
+            // Attacking bots stack south of the spawn wall, clear of it and the crates
+            matchAttack: (o) => [[o.x, o.z + 1.5], [o.x + 2.5, o.z + 1], [o.x - 3, o.z + 1.5], [o.x - 2, o.z + 7.5], [o.x + 2, o.z + 8]],
+            // Retake: you come in from the defender side, through the Library (A, B) or the Kitchen Yard (C)
+            retake: {
+                A: { player: { x: 45, z: -14, yaw: 0 }, guards: [[9, -38, 'armored'], [13.5, -37.5, 'standard'], [6, -38.5, 'rusher'], [15, -33.5, 'sniper'], [8, -30, 'armored'], [4.5, -38, 'standard']] },
+                B: { player: { x: 38, z: -20, yaw: Math.PI / 2 }, guards: [[21, -5, 'armored'], [21, 2, 'standard'], [26.5, -6, 'rusher'], [26.5, 6, 'sniper'], [22, 5.5, 'armored'], [24, -6, 'standard']] },
+                C: { player: { x: 45, z: 14, yaw: Math.PI }, guards: [[8, 37, 'armored'], [13.5, 37.5, 'standard'], [6, 38.5, 'rusher'], [15, 33.5, 'sniper'], [8, 30, 'armored'], [4.5, 38, 'standard']] }
+            },
+            // The Prayer Court's south half is kept clear for the range and the aim trainer
+            range: { player: { x: -13, z: 10 }, lanesX: [-19, -17, -15, -11, -9, -8], lanesZ: [-1, -2.5, -4] },
+            aim: { x: -13, z: 10 },
+            // No barrels or glass in the Prayer Court, the two lanes from it into B, or B itself (a
+            // barrel there could shut the Shrine Doors)
+            propKeepOut: [[-26, -6, -12, 12], [-6, 18, -7, 4.5], [18, 30, -8, 8]],
+            // Practice targets: open air in the long east-west lanes, 10 m clear either side
+            targetSpots: [[-35, 3.5, -41], [-9, 3, -30.5], [4, 3, -5], [4, 3, 2.75], [-6, 3, 30.5], [-35, 3.5, 41]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.6,
+            propSafe: true,
+            checkTargets: true
+        };
 
         function mapLayout() {
             const p = (typeof game !== 'undefined' && MAP_PRESETS[game.mapPreset]) || MAP_PRESETS.ascent;
@@ -10207,7 +10639,9 @@
             return keys.length > 1 ? keys.slice(0, -1).join(', ') + ' OR ' + keys[keys.length - 1] : (keys[0] || 'A');
         }
         MAP_PRESETS.ascent.layout = ASCENT_LAYOUT;
-        for (const id of ['bind', 'haven', 'icebox', 'lotus', 'split', 'skyline']) MAP_PRESETS[id].layout = LEGACY_LAYOUT;
+        MAP_PRESETS.bind.layout = BIND_LAYOUT;   // V2.1
+        MAP_PRESETS.haven.layout = HAVEN_LAYOUT; // V2.1
+        for (const id of ['icebox', 'lotus', 'split', 'skyline']) MAP_PRESETS[id].layout = LEGACY_LAYOUT;
 
         // Create map elements from active MAP_PRESETS entry
         function createMap() {
@@ -10288,6 +10722,17 @@
                 const e = enemyObjects[i];
                 if (e.isActive && !e.hit) {
                     resolveEnemyMapCollision(e.mesh.position, 0.72);
+                    // V2.1: a bot still inside a building after that push (a walled map has solid
+                    // blocks where the last map had floor) moves to this map's nearest respawn spot
+                    // V2.1: ...and so does one whose patrol anchor (the spot from the last map it walks a
+                    // circle round while the player is far off) is inside one of this map's buildings
+                    const p = e.mesh.position, c = e.position;
+                    if (L.respawnSpots && (enemyInsideBox(p, 0.72, collisionIndex.query(p.x - 1, p.z - 1, p.x + 1, p.z + 1, [])) >= 0 ||
+                        enemyInsideBox(c, 0.72, collisionIndex.query(c.x - 1, c.z - 1, c.x + 1, c.z + 1, [])) >= 0)) {
+                        let best = null, bd = Infinity;
+                        for (const s of L.respawnSpots) { const d = Math.hypot(s[0] - p.x, s[1] - p.z); if (d < bd) { bd = d; best = s; } }
+                        if (best) activateEnemy(e, best[0], 0, best[1], e.archetype);
+                    }
                     e.poseDirty = true;
                     syncEnemyBroadphase(e);
                 }
@@ -10488,6 +10933,9 @@
             const preset = (typeof game !== 'undefined' && game.mapPreset) || 'ascent';
             const metalMap = preset === 'icebox' || preset === 'split' || preset === 'skyline';
             const cyl = shape === 'cylinder';
+            // V2.1: a map can name the surface of its own colours (Bind, Haven: timber, sacks, stone)
+            const own = MAP_PRESETS[preset] && MAP_PRESETS[preset].surf;
+            if (own && own[color]) return MAP_SURF[own[color]] + (cyl ? 10 : 0);
             let id;
             if (cyl) id = metalMap ? MAP_SURF.metal : MAP_SURF.stone;
             else if (Math.max(sx, sz) >= 90 && Math.min(sx, sz) <= 1.5) id = SURF_STONE_MAPS[preset] ? MAP_SURF.stone : MAP_SURF.concrete;
@@ -10642,6 +11090,9 @@
                         rubble(x, z, p.color);
                     }
                 }
+
+                // V2.1: the map's own themed props (decor only: no colliders), after the generic ones
+                if (preset.hiDecor) preset.hiDecor(add, rnd);
 
                 // Batch by shape and chunk, like the map itself
                 const groups = new Map();
@@ -12461,6 +12912,7 @@
         };
 
         const _enemyColScratch = [];
+        const _enemyHereScratch = [];   // V2.1: where a pushed bot ended up
         // Index of the first map box (from a collisionIndex query) a bot of this radius
         // overlaps at its height, or -1
         const _enemyEscapeScratch = [];
@@ -12515,7 +12967,10 @@
             // bot back and forth into each other, so it could stay wedged inside them.
             // If it is still inside one, step it out to the nearest point that is clear
             // of every box (rare: only reached when the pass above could not free it).
-            if (!testOnly && enemyInsideBox(pos, radius, nearby) >= 0) {
+            // V2.1: ...and look again round where it ended up: a run of steps can push it more than
+            // a metre, into a box (the platform at their top) the first look did not cover
+            if (!testOnly && (enemyInsideBox(pos, radius, nearby) >= 0 || (hitWall &&
+                enemyInsideBox(pos, radius, collisionIndex.query(pos.x - radius - 1.2, pos.z - radius - 1.2, pos.x + radius + 1.2, pos.z + radius + 1.2, _enemyHereScratch)) >= 0))) {
                 const wide = collisionIndex.query(pos.x - radius - 9, pos.z - radius - 9, pos.x + radius + 9, pos.z + radius + 9, _enemyEscapeScratch);
                 let best = Infinity, bx = pos.x, bz = pos.z;
                 const ox = pos.x, oz = pos.z;
@@ -12523,8 +12978,24 @@
                     const dx = d === 0 ? 1 : d === 1 ? -1 : 0, dz = d === 2 ? 1 : d === 3 ? -1 : 0;
                     for (let s = 0.1; s <= 8 && s < best; s += 0.1) {
                         pos.x = ox + dx * s; pos.z = oz + dz * s;
-                        if (Math.abs(pos.x) > 48 || Math.abs(pos.z) > 48) break;
+                        // V2.1: skip, not stop at, a step outside the arena: a bot pushed through a
+                        // map's outer building to the arena wall still finds its way back in
+                        if (Math.abs(pos.x) > 48 || Math.abs(pos.z) > 48) continue;
                         if (enemyInsideBox(pos, radius, wide) < 0) { best = s; bx = pos.x; bz = pos.z; break; }
+                    }
+                }
+                // V2.1: nothing clear along the four axes (a corner where two of a map's outer
+                // buildings meet): look all round, nearest ring first, from the nearest point inside
+                // the arena (only reached when the bot would otherwise be left inside a box)
+                if (best === Infinity) {
+                    const cx = Math.max(-48, Math.min(48, ox)), cz = Math.max(-48, Math.min(48, oz));
+                    const ring = collisionIndex.query(cx - radius - 9, cz - radius - 9, cx + radius + 9, cz + radius + 9, _enemyEscapeScratch);
+                    for (let s = 0.25; s <= 8 && best === Infinity; s += 0.25) {
+                        for (let a = 0; a < 16; a++) {
+                            pos.x = cx + Math.cos(a * Math.PI / 8) * s; pos.z = cz + Math.sin(a * Math.PI / 8) * s;
+                            if (Math.abs(pos.x) > 48 || Math.abs(pos.z) > 48) continue;
+                            if (enemyInsideBox(pos, radius, ring) < 0) { best = s; bx = pos.x; bz = pos.z; break; }
+                        }
                     }
                 }
                 pos.x = bx; pos.z = bz;
@@ -17751,6 +18222,12 @@
             teleporter: function() {
                 this.playTone(180, 920, 0.26, 'sawtooth', 0.14, 0);
                 this.playTone(640, 1480, 0.22, 'sine', 0.12, 0.05);
+            },
+            // V2.1: arriving out of a one-way teleporter: a loud crack and a falling whoosh
+            teleporterExit: function() {
+                this.playTone(1500, 110, 0.45, 'sawtooth', 0.26, 0.04);
+                this.playTone(240, 60, 0.5, 'square', 0.18, 0.06);
+                this.playTone(900, 2400, 0.16, 'sine', 0.16, 0.04);
             },
             // Sound redesign: every gun is built from layers (a noise crack, a body
             // that drops in pitch, a low punch, a mechanical click and a filtered
@@ -36992,87 +37469,93 @@
             },
 
             // =============================================
-            // Map Presets System (Ascent / Bind / Haven / Icebox) + Bind Two-Way 3D Teleporters
+            // Map Presets System (Ascent / Bind / Haven / Icebox) + Bind One-Way 3D Teleporters (V2.1)
             // =============================================
             bindTeleporterGroup: null,
-            bindPadA: null,
-            bindPadB: null,
+            bindPads: [],
             lastPlayerTeleportAt: 0,
 
+            // V2.1: the pads come from the map's layout (layout.teleporters: from, to, yaw, colour).
+            // They are ONE-WAY: stepping on a pad sends you to its exit, and there is no pad at the
+            // exit, only a dim marker. Built once; placed (and shown) for the map that has them.
             buildBindTeleporters3D: function() {
                 const group = new THREE.Group();
-                const ringGeo = new THREE.TorusGeometry(1.85, 0.12, 10, 28);
-                const pillarGeo = new THREE.CylinderGeometry(1.75, 1.75, 3.2, 20, 1, true);
-                const matA = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false });
-                const matB = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false });
-                const beamMatA = new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false });
-                const beamMatB = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false });
-
-                const padA = new THREE.Group();
-                padA.position.set(-34, 0.08, 0);
-                const ringA = new THREE.Mesh(ringGeo, matA);
-                ringA.rotation.x = Math.PI * 0.5;
-                const pillarA = new THREE.Mesh(pillarGeo, beamMatA);
-                pillarA.position.y = 1.6;
-                padA.add(ringA);
-                padA.add(pillarA);
-
-                const padB = new THREE.Group();
-                padB.position.set(34, 0.08, 0);
-                const ringB = new THREE.Mesh(ringGeo, matB);
-                ringB.rotation.x = Math.PI * 0.5;
-                const pillarB = new THREE.Mesh(pillarGeo, beamMatB);
-                pillarB.position.y = 1.6;
-                padB.add(ringB);
-                padB.add(pillarB);
-
-                group.add(padA);
-                group.add(padB);
-                group.visible = (game.mapPreset === 'bind');
+                const ringGeo = new THREE.TorusGeometry(1.3, 0.1, 10, 28);
+                const pillarGeo = new THREE.CylinderGeometry(1.2, 1.2, 3.2, 20, 1, true);
+                const markGeo = new THREE.RingGeometry(0.9, 1.1, 28);
+                for (let i = 0; i < 2; i++) {
+                    const col = i === 0 ? 0xf59e0b : 0x38bdf8;
+                    const pad = new THREE.Group();
+                    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false }));
+                    ring.rotation.x = Math.PI * 0.5;
+                    const pillar = new THREE.Mesh(pillarGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+                    pillar.position.y = 1.6;
+                    pad.add(ring);
+                    pad.add(pillar);
+                    const mark = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
+                    mark.rotation.x = -Math.PI * 0.5;
+                    group.add(pad);
+                    group.add(mark);
+                    this.bindPads.push({ pad: pad, ring: ring, pillar: pillar, mark: mark, tp: null });
+                }
+                group.visible = false;
                 scene.add(group);
                 this.bindTeleporterGroup = group;
-                this.bindPadA = padA;
-                this.bindPadB = padB;
+                this._tpLayout = null;
+                this.placeTeleporters();
+            },
+
+            // V2.1: put the pads where this map's layout says (hidden on maps without teleporters)
+            placeTeleporters: function() {
+                if (!this.bindTeleporterGroup) return;
+                const L = mapLayout();
+                const tps = L.teleporters || [];
+                this._tpLayout = L;
+                this.bindPads.forEach((p, i) => {
+                    const tp = tps[i] || null;
+                    p.tp = tp;
+                    p.pad.visible = p.mark.visible = !!tp;
+                    if (!tp) return;
+                    p.pad.position.set(tp.from.x, 0.08, tp.from.z);
+                    p.mark.position.set(tp.to.x, 0.04, tp.to.z);
+                    p.ring.material.color.setHex(tp.color);
+                    p.pillar.material.color.setHex(tp.color);
+                    p.mark.material.color.setHex(tp.color);
+                });
+                this.bindTeleporterGroup.visible = tps.length > 0;
             },
 
             updateBindTeleporters: function(delta, now) {
                 if (!this.bindTeleporterGroup) return;
-                const isBind = (game.mapPreset === 'bind');
-                if (this.bindTeleporterGroup.visible !== isBind) {
-                    this.bindTeleporterGroup.visible = isBind;
-                }
-                if (!isBind) return;
+                if (this._tpLayout !== mapLayout()) this.placeTeleporters();
+                if (!this.bindTeleporterGroup.visible) return;
 
-                if (this.bindPadA) this.bindPadA.rotation.y += delta * 1.8;
-                if (this.bindPadB) this.bindPadB.rotation.y -= delta * 1.8;
+                for (let i = 0; i < this.bindPads.length; i++) {
+                    const p = this.bindPads[i];
+                    if (p.tp) p.pad.rotation.y += delta * (i % 2 ? -1.8 : 1.8);
+                }
 
                 if (now - this.lastPlayerTeleportAt < 3200) return;
                 const px = characterController.position.x;
                 const pz = characterController.position.z;
-
-                // Gate A (-34, 0) -> Exits East at (29.5, 0, 5.5)
-                const dASq = (px + 34) * (px + 34) + pz * pz;
-                if (dASq <= 2.1 * 2.1) {
+                const r = mapLayout().teleportRadius || 1.2;
+                for (let i = 0; i < this.bindPads.length; i++) {
+                    const tp = this.bindPads[i].tp;
+                    if (!tp) continue;
+                    const dx = px - tp.from.x, dz = pz - tp.from.z;
+                    if (dx * dx + dz * dz > r * r) continue;
+                    // One way: from the pad to its exit
                     this.lastPlayerTeleportAt = now;
-                    characterController.position.set(29.5, characterController.position.y, 5.5);
+                    characterController.position.set(tp.to.x, characterController.position.y, tp.to.z);
                     characterController.prevSimPosition.copy(characterController.position);
-                    camera.rotation.y = Math.PI * 0.5;
+                    camera.rotation.y = tp.to.yaw;
                     if (soundFX.teleporter) soundFX.teleporter();
-                    if (agentSystem && agentSystem.triggerScreenWash) agentSystem.triggerScreenWash('rgba(245, 158, 11, 0.42)', 380);
-                    showNotification("BIND TELEPORTER [WEST -> EAST]! Warped across the desert!", 2100);
+                    // ...and a loud arrival at the exit
+                    if (soundFX.teleporterExit) soundFX.teleporterExit();
+                    const c = new THREE.Color(tp.color);
+                    if (agentSystem && agentSystem.triggerScreenWash) agentSystem.triggerScreenWash('rgba(' + Math.round(c.r * 255) + ', ' + Math.round(c.g * 255) + ', ' + Math.round(c.b * 255) + ', 0.42)', 380);
+                    showNotification('TELEPORTER: ' + tp.name + ' \u2192 ' + tp.dest + ' (ONE-WAY)', 2100);
                     return;
-                }
-
-                // Gate B (+34, 0) -> Exits West at (-29.5, 0, -5.5)
-                const dBSq = (px - 34) * (px - 34) + pz * pz;
-                if (dBSq <= 2.1 * 2.1) {
-                    this.lastPlayerTeleportAt = now;
-                    characterController.position.set(-29.5, characterController.position.y, -5.5);
-                    characterController.prevSimPosition.copy(characterController.position);
-                    camera.rotation.y = -Math.PI * 0.5;
-                    if (soundFX.teleporter) soundFX.teleporter();
-                    if (agentSystem && agentSystem.triggerScreenWash) agentSystem.triggerScreenWash('rgba(56, 189, 248, 0.42)', 380);
-                    showNotification("BIND TELEPORTER [EAST -> WEST]! Warped across the desert!", 2100);
                 }
             },
 
@@ -38931,6 +39414,7 @@
                     }
 
                     // Lightweight separation between nearby active enemies so bots don't overlap
+                    let separated = false;   // V2.1
                     for (let j = 0; j < i; j++) {
                         const other = enemyObjects[j];
                         if (!other.isActive || other.hit || other.tier === 'frozen') continue;
@@ -38943,8 +39427,13 @@
                             const push = (minSep - d) * 0.5;
                             pos.x += (ox / d) * push;
                             pos.z += (oz / d) * push;
+                            separated = true;
                         }
                     }
+                    // V2.1: ...but not back into a wall: when the map pushes two bots into the same
+                    // corner, the push apart could shove one of them half into it (a no-op unless the
+                    // push apart left the bot overlapping a box, a pillar or the arena edge)
+                    if (separated) resolveEnemyMapCollision(pos, 0.68);
                 }
                 
                 if (pos.x !== oldX || pos.z !== oldZ || mesh.rotation.y !== oldRotation) {
@@ -40908,6 +41397,16 @@
         const ULTRA_LIGHTS_BEGIN = THREE.ShaderChunk.lights_fragment_begin.replace(ULTRA_SHADOW_LINE,
             'directLight.color *= all( bvec2( directLight.visible, receiveShadow ) ) ? ultraNearShadow( getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) ) : 1.0;');
         const ULTRA_NEAR_OK = ULTRA_LIGHTS_BEGIN !== THREE.ShaderChunk.lights_fragment_begin;
+        // V2.1: what Ultra Realism does differently per map (these were special cases for 'ascent'):
+        // the paving's albedo, whether tall stone walls are plaster over a plinth and how much lighter
+        // they bake, the decor builder, and the roof colour the light bake bounces. Maps not listed
+        // get none of it, as before.
+        const ULTRA_MAP_STYLE = {
+            ascent: { floorAlbedo: 0x8a8274, plaster: 1.3, decor: '_buildAscent', roof: 0xb4583c },
+            bind: { floorAlbedo: 0x9c7f5c, plaster: 1.2, decor: '_buildBind', roof: 0xd0a878 },
+            haven: { floorAlbedo: 0x6f7178, plaster: 1.15, decor: '_buildHaven', roof: 0x8a6a2a }
+        };
+        function ultraMapStyle() { return (typeof game !== 'undefined' && ULTRA_MAP_STYLE[game.mapPreset]) || null; }
         const ultraU = {
             tUA: { value: null }, tUN: { value: null }, uMatOn: { value: 0 }, uLightOn: { value: 0 },
             tVol: { value: null }, uVolOn: { value: 0 }, uVolMin: { value: new THREE.Vector3(-50, 0, -50) },
@@ -41343,7 +41842,8 @@
 
             floorAlbedo: function () {
                 const c = this._fa || (this._fa = new THREE.Color());
-                if (game.mapPreset === 'ascent') return c.setHex(0x8a8274).convertSRGBToLinear();
+                const st = ultraMapStyle();   // V2.1: per map
+                if (st && st.floorAlbedo !== undefined) return c.setHex(st.floorAlbedo).convertSRGBToLinear();
                 c.copy(floorMaterial.color).multiplyScalar(0.6);
                 const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
                 if (l < 0.08) c.multiplyScalar(0.08 / Math.max(l, 1e-3));
@@ -41362,7 +41862,8 @@
                 const want = ultraRealism.is('materials') || ultraRealism.is('lighting');
                 ultraU.uMatOn.value = ultraRealism.is('materials') && ultraTex.ready ? 1 : 0;
                 ultraU.uLightOn.value = ultraRealism.is('lighting') ? 1 : 0;
-                ultraU.uPlaster.value = game.mapPreset === 'ascent' ? 1 : 0;
+                const st = ultraMapStyle();   // V2.1: per map
+                ultraU.uPlaster.value = st && st.plaster ? 1 : 0;
                 ultraU.uFloorAlb.value.copy(this.floorAlbedo());
                 const mm = want ? this.mapMat : mapMaterial;
                 for (const b of mapBatches) b.mesh.material = mm;
@@ -41432,7 +41933,8 @@
             onMapBuilt: function () {
                 if (!this.group) return;
                 this.clear();
-                if (game.mapPreset === 'ascent') this._buildAscent();
+                const st = ultraMapStyle();   // V2.1: this map's decor builder, if it has one
+                if (st && st.decor && this[st.decor]) this[st.decor]();
                 this._vis();
             },
             update: function () {},
@@ -41615,6 +42117,286 @@
                 mk(new THREE.BoxGeometry(1, 1, 1), L.boxCast, true, false);
                 mk(new THREE.CylinderGeometry(1, 1, 1, 14, 1), L.cyl, true, true);
                 mk(this.prismGeo.clone(), L.prism, true, false);
+            },
+
+            // V2.1: helpers for the newer maps' decor builders, on the same rules as Ascent's: built
+            // from the map's own pieces, flush on a wall or above 3 m, no colliders, nav or hit data,
+            // one instanced mesh per kind drawn with the Ultra map material
+            _kit: function () {
+                const C = ULTRA_DECOR_COLORS, S = ULTRA_SURF;
+                const L = { box: [], boxCast: [], cyl: [], dome: [], prism: [], cone: [] };
+                const q0 = new THREE.Quaternion();
+                const add = (list, x, y, z, sx, sy, sz, hex, surf, rot, gain) => list.push({ x, y, z, sx, sy, sz, hex, surf: surf || 0, rot: rot || q0, gain: gain || 1 });
+                const inside = (x, y, z, pad) => {
+                    for (const p of mapPieces) {
+                        const b = p.bounds;
+                        if (x > b.min.x - pad && x < b.max.x + pad && y > b.min.y - pad && y < b.max.y + pad && z > b.min.z - pad && z < b.max.z + pad) return true;
+                    }
+                    return false;
+                };
+                const tall = [];
+                for (const p of mapPieces) {
+                    if (p.shape !== 'box') continue;
+                    const b = p.bounds, sx = b.max.x - b.min.x, sy = b.max.y - b.min.y, sz = b.max.z - b.min.z;
+                    // (only the thin perimeter walls are left out: a plan's outer strip can be one long block)
+                    if (b.min.y > 0.05 || sy < 6 || (Math.max(sx, sz) >= 90 && Math.min(sx, sz) <= 1.5)) continue;
+                    tall.push({ b, sx, sy, sz, w: Math.min(sx, sz), len: Math.max(sx, sz), alongX: sx >= sz, color: p.color });
+                }
+                const faces = (T) => {
+                    const b = T.b;
+                    return [
+                        { nx: 1, nz: 0, at: b.max.x, a0: b.min.z, a1: b.max.z },
+                        { nx: -1, nz: 0, at: b.min.x, a0: b.min.z, a1: b.max.z },
+                        { nx: 0, nz: 1, at: b.max.z, a0: b.min.x, a1: b.max.x },
+                        { nx: 0, nz: -1, at: b.min.z, a0: b.min.x, a1: b.max.x }
+                    ];
+                };
+                const onFace = (list, f, along, y, out, t, h, d, hex, surf, rot) => {
+                    if (f.nx !== 0) add(list, f.at + f.nx * out, y, along, d, h, t, hex, surf, rot);
+                    else add(list, along, y, f.at + f.nz * out, t, h, d, hex, surf, rot);
+                };
+                const pt = (f, along, out) => f.nx !== 0 ? [f.at + f.nx * out, along] : [along, f.at + f.nz * out];
+                const lampAt = (f, along, y) => {
+                    if (this.lamps.length >= 30) return;
+                    onFace(L.boxCast, f, along, y + 0.24, 0.17, 0.05, 0.05, 0.34, C.lamp, S.metal);
+                    onFace(L.boxCast, f, along, y + 0.19, 0.32, 0.27, 0.05, 0.27, C.lamp, S.metal);
+                    onFace(L.box, f, along, y, 0.32, 0.17, 0.3, 0.17, C.lampGlass, S.lamp);
+                    onFace(L.boxCast, f, along, y - 0.17, 0.32, 0.21, 0.04, 0.21, C.lamp, S.metal);
+                    const [x, z] = pt(f, along, 0.32);
+                    this.lamps.push([x, y, z]);
+                };
+                const mk = (geo, list, cast, cyl) => {
+                    if (!list.length) return;
+                    const surf = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 4), 4);
+                    geo.setAttribute('aSurf', surf);
+                    const mesh = new THREE.InstancedMesh(geo, ultraMats.mapMat, list.length);
+                    list.forEach((it, i) => {
+                        this._m.compose(this._p.set(it.x, it.y, it.z), it.rot, this._s.set(it.sx, it.sy, it.sz));
+                        mesh.setMatrixAt(i, this._m);
+                        mesh.setColorAt(i, this._c.copy(linearColorFromHex(it.hex)).multiplyScalar(it.gain));
+                        surf.setXYZW(i, it.surf + (cyl && it.surf ? 10 : 0), mapSurfaceSeed(it.x, it.y, it.z), 0, 0);
+                    });
+                    mesh.castShadow = cast;
+                    mesh.receiveShadow = true;
+                    mesh.frustumCulled = false;
+                    mesh.matrixAutoUpdate = false;
+                    mesh.updateMatrix();
+                    this.group.add(mesh);
+                    this.meshes.push(mesh);
+                    this.count += list.length;
+                };
+                const finish = () => {
+                    mk(new THREE.BoxGeometry(1, 1, 1), L.box, false, false);
+                    mk(new THREE.BoxGeometry(1, 1, 1), L.boxCast, true, false);
+                    mk(new THREE.CylinderGeometry(1, 1, 1, 14, 1), L.cyl, true, true);
+                    mk(new THREE.SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), L.dome, true, false);
+                    mk(this.prismGeo.clone(), L.prism, true, false);
+                    mk(new THREE.ConeGeometry(1, 1, 4, 1).rotateY(Math.PI / 4), L.cone, true, false);
+                };
+                // The passages between two buildings (1.5 to 4.6 m wide): calls fn(ax, oth, A, B, gap, o0, o1, mid)
+                const passages = (fn) => {
+                    for (const A of tall) for (const B of tall) {
+                        if (A === B) continue;
+                        for (const ax of ['x', 'z']) {
+                            const oth = ax === 'x' ? 'z' : 'x';
+                            const gap = B.b.min[ax] - A.b.max[ax];
+                            if (gap < 1.5 || gap > 4.6) continue;
+                            const o0 = Math.max(A.b.min[oth], B.b.min[oth]), o1 = Math.min(A.b.max[oth], B.b.max[oth]);
+                            if (o1 - o0 < 0.8) continue;
+                            const mid = (A.b.max[ax] + B.b.min[ax]) / 2;
+                            const mx = ax === 'x' ? mid : (o0 + o1) / 2, mz = ax === 'x' ? (o0 + o1) / 2 : mid;
+                            if (inside(mx, 1.0, mz, 0)) continue;
+                            fn(ax, oth, A, B, gap, o0, o1, mid);
+                        }
+                    }
+                };
+                return { C, S, L, q0, add, inside, tall, faces, onFace, pt, lampAt, finish, passages };
+            },
+
+            // V2.1: Bind (desert market town): crenellated parapets on the flat roofs, plaster and
+            // tiled domes on the bigger blocks, arched upper windows behind timber lattice screens
+            // with a few balconies, brass wall lanterns (their light is baked), horseshoe arches with
+            // a tiled band over the passages, and a tiled dado round both sites
+            _buildBind: function () {
+                const K = this._kit(), C = K.C, S = K.S, L = K.L;
+                const qX = new THREE.Quaternion().setFromAxisAngle(_xAxisDecor, Math.PI / 2);
+                const qZ = new THREE.Quaternion().setFromAxisAngle(_zAxisDecor, Math.PI / 2);
+                const LATTICE = 0x4a2e1a, ARCH = 0xd8c09a, BRASS = 0xb08d3c;
+                const TILE = [0x1f6f78, 0x2f4a7a, 0xb8862b];
+                const P = MAP_PRESETS.bind.plan;
+                let windows = 0, domes = 0, bi = 0;
+                for (const T of K.tall) {
+                    const b = T.b, top = b.max.y;
+                    bi++;
+                    // Crenellations: merlons along every roof edge with open air or a lower roof beyond
+                    for (const f of K.faces(T)) {
+                        for (let a = f.a0 + 0.45; a <= f.a1 - 0.45; a += 1.1) {
+                            const [qx, qz] = K.pt(f, a, 0.3);
+                            if (K.inside(qx, top - 0.6, qz, 0)) continue;
+                            K.onFace(L.boxCast, f, a, top + 0.3, -0.2, 0.55, 0.6, 0.4, T.color, S.stone);
+                        }
+                    }
+                    if (T.w < 3.5) continue;
+                    // A dome on a drum, with a brass finial, on every other big block
+                    if (T.w >= 6 && T.len >= 6 && (bi % 2) === 0 && domes < 12) {
+                        const r = Math.min(3.2, T.w * 0.28), cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                        const tiled = (domes % 3) === 2;
+                        K.add(L.cyl, cx, top + 0.3, cz, r * 1.04, 0.6, r * 1.04, T.color, S.stone);
+                        K.add(L.dome, cx, top + 0.6, cz, r, r * 0.92, r, tiled ? 0x2f6f6a : 0xe6d6b8, tiled ? S.roof : S.plaster);
+                        K.add(L.cyl, cx, top + 0.6 + r * 0.92 + 0.4, cz, 0.06, 0.8, 0.06, BRASS, S.metal);
+                        domes++;
+                    }
+                    // Upper windows (bottom above 4.5 m): a round-headed opening behind a lattice
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0;
+                        if (flen < 5) continue;
+                        const wy = Math.min(top - 2.4, 5.6);
+                        if (wy - 0.75 < 4.5) continue;
+                        const n = Math.floor((flen - 3.2) / 4.2) + 1;
+                        const start = (f.a0 + f.a1) / 2 - (n - 1) * 2.1;
+                        let lampsHere = 0;
+                        for (let i = 0; i < n; i++) {
+                            const a = start + i * 4.2;
+                            const [ox, oz] = K.pt(f, a, 0.8);
+                            if (K.inside(ox, wy, oz, 0.2)) continue;
+                            windows++;
+                            K.onFace(L.box, f, a, wy, 0.015, 0.95, 1.5, 0.03, C.glass, S.window);
+                            const [hx, hz] = K.pt(f, a, 0.02);
+                            K.add(L.cyl, hx, wy + 0.75, hz, 0.62, 0.05, 0.62, ARCH, S.stone, f.nz !== 0 ? qX : qZ);
+                            K.onFace(L.boxCast, f, a, wy - 0.05, 0.07, 1.05, 1.4, 0.08, LATTICE, S.wood);
+                            K.onFace(L.boxCast, f, a, wy - 0.82, 0.08, 1.3, 0.1, 0.16, ARCH, S.stone);
+                            if ((windows % 3) === 0) {
+                                K.onFace(L.boxCast, f, a, wy - 0.98, 0.32, 1.5, 0.12, 0.64, LATTICE, S.wood);
+                                K.onFace(L.boxCast, f, a, wy - 0.62, 0.62, 1.5, 0.6, 0.04, LATTICE, S.wood);
+                            }
+                            // A lantern under every second gap between windows (3.2 m up)
+                            if (i < n - 1 && lampsHere < 2 && (i % 2) === 0 && flen >= 8) {
+                                const la = a + 2.1;
+                                const [lx, lz] = K.pt(f, la, 0.6);
+                                if (!K.inside(lx, 3.2, lz, 0.2)) { K.lampAt(f, la, 3.2); lampsHere++; }
+                            }
+                        }
+                    }
+                    // Tiled dado (0.25 to 1.05 m) on the walls round the two sites
+                    for (const f of K.faces(T)) {
+                        for (const [key, col] of [['aSite', TILE[0]], ['bSite', TILE[1]]]) {
+                            const r = P[key];
+                            const lo = f.nx !== 0 ? r[2] : r[0], hi = f.nx !== 0 ? r[3] : r[1];
+                            const a0 = Math.max(f.a0, lo), a1 = Math.min(f.a1, hi);
+                            if (a1 - a0 < 0.5) continue;
+                            const [sx, sz] = K.pt(f, (a0 + a1) / 2, 0.5);
+                            if (!_inPlanRect(r, sx, sz)) continue;
+                            K.onFace(L.box, f, (a0 + a1) / 2, 0.65, 0.012, a1 - a0, 0.8, 0.024, col, S.stone);
+                            K.onFace(L.box, f, (a0 + a1) / 2, 1.09, 0.02, a1 - a0, 0.08, 0.04, TILE[2], S.stone);
+                        }
+                    }
+                }
+                // Horseshoe arches over the passages between buildings: stone jambs, a lintel with a
+                // brass keystone, and a tiled band above
+                K.passages((ax, oth, A, B, gap, o0, o1, mid) => {
+                    const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                    for (const [oe, sgn] of [[o0, 1], [o1, -1]]) {
+                        const oc = oe + sgn * 0.16;
+                        for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                            const [jx, jz] = P2(u + us * 0.03, oc);
+                            const [sx, sz] = P2(0.06, 0.32);
+                            K.add(L.box, jx, 1.65, jz, sx, 3.3, sz, ARCH, S.stone);
+                        }
+                        const [lx, lz] = P2(mid, oc);
+                        const [w1, w2] = P2(gap + 0.12, 0.34);
+                        K.add(L.boxCast, lx, 3.46, lz, w1, 0.32, w2, ARCH, S.stone);
+                        const [t1, t2] = P2(gap + 0.12, 0.3);
+                        K.add(L.box, lx, 3.86, lz, t1, 0.42, t2, TILE[(Math.round(mid) & 1)], S.stone);
+                        const [k1, k2] = P2(0.3, 0.4);
+                        K.add(L.boxCast, lx, 3.44, lz, k1, 0.42, k2, BRASS, S.metal);
+                    }
+                });
+                K.finish();
+            },
+
+            // V2.1: Haven (night monastery): steep gilded roofs over every building with gold finials
+            // on the ridge and a small lantern tower on some, a dark-red band under the eaves, framed
+            // upper windows with a timber lintel and a painted frieze, butter-lamp lanterns (their
+            // light is baked) and timber door frames with a gold band over the passages
+            _buildHaven: function () {
+                const K = this._kit(), C = K.C, S = K.S, L = K.L;
+                const qY = new THREE.Quaternion().setFromAxisAngle(_yAxisDecor, Math.PI / 2);
+                const ROOF = [0x8a6a2a, 0x2f5a4a], BAND = 0x6b1f1f, FRAME = 0x1d1a17, PAINT = 0xb3261e, GOLD = 0xd4a017, TIMBER = 0x5b2a1a;
+                let bi = 0, towers = 0;
+                for (const T of K.tall) {
+                    const b = T.b, top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    const building = T.w >= 3.5;
+                    bi++;
+                    // Roof: 30 degrees with 0.5 m eaves (a tile coping on a wall top)
+                    const ov = building ? 0.5 : 0.1;
+                    const h = building ? (T.w / 2 + ov) * Math.tan(30 * Math.PI / 180) : 0.32;
+                    K.add(L.prism, cx, top + h / 2, cz, T.w + ov * 2, h, T.len + ov * 2, ROOF[(bi % 4) === 0 ? 1 : 0], S.roof, T.alongX ? qY : K.q0, building ? 1.3 : 1.1);
+                    this.roofs.push({ cx, cz, y0: top, w: T.w + ov * 2, h, len: T.len + ov * 2, alongX: T.alongX });
+                    if (!building) continue;
+                    // Gold finials: a spire in the middle of the ridge and a knob at each end
+                    const rx = T.alongX ? 1 : 0, rz = T.alongX ? 0 : 1, half = T.len / 2;
+                    K.add(L.cyl, cx, top + h + 0.35, cz, 0.1, 0.7, 0.1, GOLD, S.metal);
+                    K.add(L.cyl, cx, top + h + 0.8, cz, 0.2, 0.26, 0.2, GOLD, S.metal);
+                    for (const sg of [-1, 1]) K.add(L.cyl, cx + rx * sg * (half - 0.2), top + h + 0.12, cz + rz * sg * (half - 0.2), 0.09, 0.26, 0.09, GOLD, S.metal);
+                    // A lantern tower on every third big block: a drum astride the ridge under a pyramid roof
+                    if (T.w >= 6 && T.len >= 8 && (bi % 3) === 0 && towers < 8) {
+                        const tw = Math.min(2.4, T.w * 0.3), y0 = top + h * 0.5, y1 = top + h + 1.3;
+                        const ox = rx * T.len * 0.25, oz = rz * T.len * 0.25;
+                        K.add(L.boxCast, cx + ox, (y0 + y1) / 2, cz + oz, tw, y1 - y0, tw, 0xe2dbcc, S.plaster);
+                        K.add(L.box, cx + ox, y1 - 0.45, cz + oz, tw + 0.04, 0.4, tw + 0.04, BAND, S.plaster);
+                        K.add(L.cone, cx + ox, y1 + 0.55, cz + oz, tw * 0.95, 1.1, tw * 0.95, ROOF[0], S.roof);
+                        K.add(L.cyl, cx + ox, y1 + 1.35, cz + oz, 0.08, 0.5, 0.08, GOLD, S.metal);
+                        towers++;
+                    }
+                    // The dark-red band under the eaves (hidden inside any taller neighbour)
+                    for (const f of K.faces(T)) K.onFace(L.box, f, (f.a0 + f.a1) / 2, top - 0.75, 0.02, f.a1 - f.a0, 0.9, 0.04, BAND, S.plaster);
+                    // Upper windows (bottom above 4.4 m): a black surround, the opening, a timber lintel
+                    // with a painted frieze over it and a sill; a lantern under some of the gaps
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0;
+                        if (flen < 5) continue;
+                        const wy = Math.min(top - 2.6, 5.4);
+                        if (wy - 0.7 < 4.4) continue;
+                        const n = Math.floor((flen - 3.2) / 3.6) + 1;
+                        const start = (f.a0 + f.a1) / 2 - (n - 1) * 1.8;
+                        let lampsHere = 0;
+                        for (let i = 0; i < n; i++) {
+                            const a = start + i * 3.6;
+                            const [ox, oz] = K.pt(f, a, 0.8);
+                            if (K.inside(ox, wy, oz, 0.2)) continue;
+                            K.onFace(L.box, f, a, wy - 0.05, 0.008, 1.45, 1.45, 0.016, FRAME, S.plaster);
+                            K.onFace(L.box, f, a, wy, 0.02, 0.85, 1.15, 0.02, C.glass, S.window);
+                            K.onFace(L.boxCast, f, a, wy + 0.76, 0.07, 1.7, 0.14, 0.14, TIMBER, S.wood);
+                            K.onFace(L.box, f, a, wy + 0.93, 0.035, 1.55, 0.2, 0.07, PAINT, S.wood);
+                            K.onFace(L.boxCast, f, a, wy - 0.68, 0.06, 1.25, 0.08, 0.12, TIMBER, S.wood);
+                            if (i < n - 1 && lampsHere < 2 && (i % 2) === 0 && flen >= 8) {
+                                const la = a + 1.8;
+                                const [lx, lz] = K.pt(f, la, 0.6);
+                                if (!K.inside(lx, 3.2, lz, 0.2)) { K.lampAt(f, la, 3.2); lampsHere++; }
+                            }
+                        }
+                    }
+                }
+                // Timber door frames over the passages: jambs, a lintel with a gold band, a painted board
+                K.passages((ax, oth, A, B, gap, o0, o1, mid) => {
+                    const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                    for (const [oe, sgn] of [[o0, 1], [o1, -1]]) {
+                        const oc = oe + sgn * 0.16;
+                        for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                            const [jx, jz] = P2(u + us * 0.04, oc);
+                            const [sx, sz] = P2(0.08, 0.3);
+                            K.add(L.box, jx, 1.7, jz, sx, 3.4, sz, TIMBER, S.wood);
+                        }
+                        const [lx, lz] = P2(mid, oc);
+                        const [w1, w2] = P2(gap + 0.14, 0.32);
+                        K.add(L.boxCast, lx, 3.5, lz, w1, 0.24, w2, TIMBER, S.wood);
+                        const [g1, g2] = P2(gap + 0.14, 0.34);
+                        K.add(L.box, lx, 3.66, lz, g1, 0.08, g2, GOLD, S.metal);
+                        const [p1, p2] = P2(gap + 0.1, 0.3);
+                        K.add(L.box, lx, 3.95, lz, p1, 0.5, p2, PAINT, S.wood);
+                    }
+                });
+                K.finish();
             }
         };
         // ---- Ultra Realism: baked light and a near shadow cascade ----
@@ -41842,14 +42624,15 @@
                     return i;
                 };
                 const boxes = [];
+                const st = ultraMapStyle(), pg = st && st.plaster ? st.plaster : 1;   // V2.1: per map
                 for (const p of mapPieces) {
                     const b = p.bounds;
-                    // Ascent's tall walls are lighter plaster above the plinth
-                    const gain = (game.mapPreset === 'ascent' && b.max.y - b.min.y > 3) ? 1.3 : 1;
+                    // A plaster map's tall walls (Ascent's, Bind's) are lighter above the plinth
+                    const gain = (pg !== 1 && b.max.y - b.min.y > 3) ? pg : 1;
                     boxes.push([b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z, palOf(p.color, gain), p.shape === 'cylinder' ? 1 : 0]);
                 }
                 const decorOn = ultraRealism.is('detail');
-                const roofs = decorOn ? ultraDecor.roofs.map((r) => Object.assign({ pal: palOf(0xb4583c, 1) }, r)) : [];
+                const roofs = decorOn ? ultraDecor.roofs.map((r) => Object.assign({ pal: palOf((st && st.roof) || 0xb4583c, 1) }, r)) : [];
                 const lamps = decorOn ? ultraDecor.lamps.slice() : [];
                 const sd = this._d.copy(directionalLight.position).sub(directionalLight.target.position).normalize();
                 const sc = directionalLight.color, si = directionalLight.intensity;
@@ -46147,6 +46930,48 @@
                 return true;
             },
 
+            // V2.1: a map with narrow lanes can ask for safe props (layout.propSafe: Bind, Haven). No prop
+            // then stands within 1.5 m of a spot the layout uses (bot spawns, respawns, orbs, defender,
+            // retake and teleporter spots), and a barrel leaves a 2.6 m way past it along both axes, so
+            // it never shuts a lane or a door. Maps without the flag place props exactly as before.
+            _layoutSpots: function (L) {
+                if (L._propSpots) return L._propSpots;
+                const out = [];
+                const push = (p) => { if (p) out.push(Array.isArray(p) ? [p[0], p[1]] : [p.x, p.z]); };
+                for (const p of (L.botSpawns || []).concat(L.botSpawnsLow || [], L.respawnSpots || [], L.orbs || [])) push(p);
+                const S = {};
+                for (const k of siteKeys(L)) S[k] = L.sites[k];
+                if (L.matchDefend) for (const p of L.matchDefend(S)) push(p);
+                for (const k in (L.retake || {})) { push(L.retake[k].player); for (const g of L.retake[k].guards) push(g); }
+                for (const t of (L.teleporters || [])) { push(t.from); push(t.to); }
+                if (L.range) push(L.range.player);
+                push(L.aim);
+                L._propSpots = out;
+                return out;
+            },
+            _safeSpot: function (minX, minZ, maxX, maxZ, barrel) {
+                const L = mapLayout();
+                if (!L.propSafe) return true;
+                for (const p of this._layoutSpots(L)) if (p[0] > minX - 1.5 && p[0] < maxX + 1.5 && p[1] > minZ - 1.5 && p[1] < maxZ + 1.5) return false;
+                if (!barrel) return true;
+                const w = 2.6;
+                const xOk = this._open(minX - w, minZ, minX, maxZ) || this._open(maxX, minZ, maxX + w, maxZ);
+                const zOk = this._open(minX, minZ - w, maxX, minZ) || this._open(minX, maxZ, maxX, maxZ + w);
+                return xOk && zOk;
+            },
+            // V2.1: no wall, cover piece or other prop in this strip of floor (a way past a barrel)
+            _open: function (minX, minZ, maxX, maxZ) {
+                for (const r of collisionIndex.query(minX, minZ, maxX, maxZ, this._scratch)) {
+                    if (r.maxY < 0.15) continue;
+                    if (r.maxX > minX && r.minX < maxX && r.maxZ > minZ && r.minZ < maxZ) return false;
+                }
+                for (const p of this.glass.concat(this.barrels)) {
+                    const b = p.box;
+                    if (b.max.x > minX && b.min.x < maxX && b.max.z > minZ && b.min.z < maxZ) return false;
+                }
+                return Math.abs(minX) < 49.5 && Math.abs(maxX) < 49.5 && Math.abs(minZ) < 49.5 && Math.abs(maxZ) < 49.5;
+            },
+
             _collider: function (box) {
                 const rec = createColliderRecord('static', null);
                 setColliderFromBox3(rec, box, (box.min.x + box.max.x) / 2, (box.min.z + box.max.z) / 2);
@@ -46170,19 +46995,25 @@
                 let seed = 0;
                 for (const ch of String(game.mapPreset || 'ascent')) seed = seed * 31 + ch.charCodeAt(0);
                 const rnd = this._rng(seed);
-                for (let tries = 0; tries < 400 && this.glass.length < 4; tries++) {
+                // V2.1: a map with safe props (narrow lanes, some along the arena's edge) gets more tries
+                // over the whole arena to find its spots
+                const safe = !!mapLayout().propSafe;
+                const triesMax = safe ? 2400 : 400, glassSpan = safe ? 46 : 38, barrelSpan = safe ? 46 : 40;
+                for (let tries = 0; tries < triesMax && this.glass.length < 4; tries++) {
                     const alongX = rnd() < 0.5;
-                    const x = (rnd() * 2 - 1) * 38, z = (rnd() * 2 - 1) * 38;
+                    const x = (rnd() * 2 - 1) * glassSpan, z = (rnd() * 2 - 1) * glassSpan;
                     const hw = 1.6, ht = 0.08;
                     const minX = x - (alongX ? hw : ht), maxX = x + (alongX ? hw : ht), minZ = z - (alongX ? ht : hw), maxZ = z + (alongX ? ht : hw);
                     if (!this._awayFromKeySpots(x, z) || !this._clear(minX, minZ, maxX, maxZ, mapLayout().propMargin)) continue;
+                    if (!this._safeSpot(minX, minZ, maxX, maxZ, false)) continue;   // V2.1
                     this._makeGlass(x, z, alongX);
                 }
-                for (let tries = 0; tries < 400 && this.barrels.length < 6; tries++) {
-                    const x = (rnd() * 2 - 1) * 40, z = (rnd() * 2 - 1) * 40;
+                for (let tries = 0; tries < triesMax && this.barrels.length < 6; tries++) {
+                    const x = (rnd() * 2 - 1) * barrelSpan, z = (rnd() * 2 - 1) * barrelSpan;
                     if (!this._awayFromKeySpots(x, z) || !this._clear(x - 0.45, z - 0.45, x + 0.45, z + 0.45, 0.5)) continue;
                     // Next to cover, like a real map
                     if (this._clear(x - 0.45, z - 0.45, x + 0.45, z + 0.45, 2.6)) continue;
+                    if (!this._safeSpot(x - 0.45, z - 0.45, x + 0.45, z + 0.45, true)) continue;   // V2.1
                     this._makeBarrel(x, z);
                 }
                 this.applyEnabled();

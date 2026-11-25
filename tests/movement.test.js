@@ -10,10 +10,10 @@ after(closeBrowser);
 const HELPERS = () => {
     window.updateEnemies = () => {};
     const cc = characterController;
-    // A sprint and slide cover 50-100 m: the open band at z = 32 on Bind is clear for 96 m
-    // (V1.8 Ascent is walled lanes, nothing that long and straight); props off
+    // A sprint and slide cover 50-100 m: the open band at z = 32 on Lotus is clear for 96 m
+    // (Ascent, and since V2.1 Bind and Haven, are walled lanes, nothing that long); props off
     window.__openBand = () => {
-        tacticalDirector.cycleMapPreset('bind');
+        tacticalDirector.cycleMapPreset('lotus');
         game.userSettings.breakables = false; breakables.applyEnabled();
     };
     window.__mv = {
