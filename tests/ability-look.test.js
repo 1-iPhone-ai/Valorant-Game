@@ -169,7 +169,7 @@ test('Classic builds and compiles nothing; High Fidelity draws the ten proof abi
     // taken back before the next frame, is still drawn (a claimed burst is bound as it spawns)
     const reused = await evaluate(() => {
         __bound.delete('phoenix.q>flash');
-        const A = agentSystem, now = performance.now();
+        const A = agentSystem, now = gameNow();
         const burst = (tag, x, col) => { abilityLook.tag = tag; A.spawnFlashBurst(x, 1, 10, col, 5.5, 420, now); abilityLook.tag = null; };
         for (let k = 0; k < 4; k++) burst('raze.e', -6 + k * 3, 0xfb923c);
         burst('phoenix.q', 0, 0xffe066);
@@ -245,7 +245,7 @@ test('gameplay is identical in both looks: smoke sight lines, wall shots and blo
     const sample = (look) => evaluate((look) => {
         game.userSettings.abilityEffects = look;
         abilityLook.refresh();
-        const A = agentSystem, now = performance.now();
+        const A = agentSystem, now = gameNow();
         // expire what is out, through the normal update path
         for (const list of [A.smokes, A.mollies, A.iceWalls]) for (const it of list) if (it.inUse) it.expireAt = 1;
         return now;
@@ -253,7 +253,7 @@ test('gameplay is identical in both looks: smoke sight lines, wall shots and blo
         await frames(3);
         // an open stretch of the map: the player at (-40, 0) looking along +Z, nothing in the way for 40 m
         await evaluate(() => {
-            const A = agentSystem, now = performance.now();
+            const A = agentSystem, now = gameNow();
             A.spawnSmokeSphere(-36, 1.2, 14, 0x6d28d9, 4.6, 9000, now);
             A.spawnMollyZone(-45, 0, 10, now, false, false, false);
             agentSystem.selectAgent('sage');
@@ -325,7 +325,7 @@ test('gameplay is identical in both looks: smoke sight lines, wall shots and blo
         game.botAbilityAI = true;
         e.nextAbilityAt = 1;
         tacticalDirector.lastBotAbilityCastAt = -1e9;
-        tacticalDirector.tryCastBotAbility(e, performance.now(), 12, 0, 1, 1, 0);
+        tacticalDirector.tryCastBotAbility(e, gameNow(), 12, 0, 1, 1, 0);
         e.archetype = arch;
         // the dash leaves wind streaks along its path at once
         let streaks = 0;
@@ -343,7 +343,7 @@ test('gameplay is identical in both looks: smoke sight lines, wall shots and blo
         const p = characterController.position;
         e.mesh.position.set(p.x + 6, 0, p.z - 9);
         e.poseDirty = true;
-        agentSystem.spawnSmokeSphere(p.x + 3, 1.2, p.z - 5, 0x6d28d9, 4.6, 20000, performance.now());
+        agentSystem.spawnSmokeSphere(p.x + 3, 1.2, p.z - 5, 0x6d28d9, 4.6, 20000, gameNow());
     });
     await page.waitForTimeout(3000);
     await evaluate(() => { game.shield = 0; for (let i = 0; i < 6; i++) takeDamage(25, __k.mesh.position, { enemy: __k }); });
