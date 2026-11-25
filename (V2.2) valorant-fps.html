@@ -21154,6 +21154,119 @@
                 // X Viper's Pit: a big gas dome around you that nearsights and hurts enemies, and heals you inside (activateUltimate, 2O step)
                 x: { look: ['smoke', 'groundZone'], radiusM: 14.0, firstTickMs: 150, healHp: 25, tickMs: 200, burnMs: 350,
                     slowMs: 1200, revealMs: 2200, blindMs: 900, damagePerTick: 8, healPerTickHp: 2 }
+            },
+            breach: {
+                // C Aftershock: a charge drilled through the wall ahead that blasts three times (castBreachAftershock, Aftershock step)
+                c: { look: ['groundZone', 'blast'], plantRangeM: 11.0, maxRangeM: 20.0, throughWallM: 2.2, radiusM: 4.4, lifetimeMs: 2350,
+                    blastCount: 3,                  // blasts per charge                   [3]
+                    firstBlastMs: 380, blastIntervalMs: 700, slowMs: 2500, revealMs: 3000, damage: 65 },
+                // Q Flashpoint: a fast flash that blinds through cover (castBreachFlashpoint; its 22 m reach and reveal are shared, in detonateProjectile)
+                q: { look: ['projectile', 'flash'], spawnAheadM: 1.2, speedMps: 28, gravity: 2.5, fuseMs: 520, blindMs: 4000 },
+                // E Fault Line: a quake corridor through walls that erupts after a moment (castBreachFaultLine, Fault Line step)
+                e: { look: ['pulse'], lengthM: 28.0, spawnAheadM: 1.6, windupMs: 620, lifetimeMs: 1550, hitHalfWidthM: 2.6,
+                    slowMs: 4800, revealMs: 4000, blindMs: 2500, damage: 35 },
+                // X Rolling Thunder: quake waves that roll forward (spawnBreachRollingThunder, Rolling Thunder step); the kill bonus is shared with Fade
+                x: { look: ['pulse'], lifetimeMs: 2200, waveCount: 6, firstWaveMs: 80, waveIntervalMs: 260, waveStartM: 3.5, waveSpacingM: 5.5,
+                    hitDepthM: 3.8, hitHalfWidthM: 7.2, slowMs: 6000, revealMs: 6000, blindMs: 3500, damage: 60 }
+            },
+            fade: {
+                // C Prowler: a beast you steer; it locks onto marked enemies and nearsights on a bite (castFadeProwler, Prowler step)
+                c: { look: ['deployable', 'flash'], spawnAheadM: 1.4, speedMps: 15.5, lifetimeMs: 3400,
+                    turnRatePerSec: 5.0,            // steering toward the crosshair
+                    lockRangeM: 18.0, unmarkedLockRangeM: 10.0, chaseSpeedMps: 19.0, triggerRadiusM: 3.6,
+                    radiusM: 4.6, blindMs: 3800, slowMs: 3500, revealMs: 4000, damage: 50 },
+                // Q Seize: an orb that drops into a zone that pulls, slows and decays (castFadeSeize, spawnFadeSeizeZone, Seize step)
+                q: { look: ['projectile', 'groundZone'], spawnAheadM: 1.05, speedMps: 25, upSpeedMps: 2.2, gravity: 16.0, fuseMs: 680,
+                    radiusM: 6.5, lifetimeMs: 4500, slowMs: 3500, revealMs: 4500, damage: 40,
+                    firstTickMs: 50, tickMs: 450, tickSlowMs: 1200, tickRevealMs: 2200, damagePerTick: 10,
+                    pullMinDistM: 0.8, pullStopDistM: 0.6, pullStepM: 1.35 },   // pull per tick, never closer than pullStopDistM
+                // E Haunt: an orb that becomes a watcher; enemies it can see are revealed (castFadeHaunt, spawnFadeHauntWatcher, Haunt step)
+                e: { look: ['projectile', 'deployable'], spawnAheadM: 1.05, speedMps: 28, upSpeedMps: 2.6, gravity: 14.5, fuseMs: 850,
+                    minHeightM: 1.2, lifetimeMs: 2600, pulseIntervalMs: 850, rangeM: 30, revealMs: 5000, slowMs: 2200 },
+                // X Nightfall: a wave through walls that nearsights, slows and reveals (spawnFadeNightfallWave, Nightfall step); the kill bonus is shared with Breach
+                x: { look: ['pulse'], spawnAheadM: 1.8, speedMps: 26.0, lifetimeMs: 1850, hitDepthM: 2.4, hitHalfWidthM: 5.5,
+                    blindMs: 5000, slowMs: 5500, revealMs: 8000, damage: 75 }
+            },
+            gekko: {
+                // C Mosh Pit: a thrown creature that spreads into an acid pool, then erupts (castGekkoMoshPit, spawnGekkoMoshPit, Mosh Pit step)
+                c: { look: ['projectile', 'groundZone', 'blast'], spawnAheadM: 0.7, speedMps: 23.5, upSpeedMps: 2.8, gravity: 14.0, fuseMs: 1700,
+                    radiusM: 6.4, windupMs: 1600, lifetimeMs: 2150, slowMs: 3500, revealMs: 3500, damage: 130,
+                    firstTickMs: 100, tickMs: 250, tickSlowMs: 350, damagePerTick: 4 },
+                // Q Wingman: a buddy that hunts and concusses enemies. Globules (left by Wingman, Dizzy and Thrash) live here (Wingman and globule steps)
+                q: { look: ['deployable', 'blast'], spawnAheadM: 1.4, speedMps: 13.5, lifetimeMs: 4200, huntRangeM: 18,
+                    steerKeepMult: 0.82, steerTurnMult: 0.18,   // heading blend each 60 Hz step
+                    triggerRadiusM: 4.2, radiusM: 5.8, blindMs: 3000, slowMs: 4200, revealMs: 4500, damage: 45,
+                    globuleReadyMs: 350, globuleLifetimeMs: 14000, globuleRadiusM: 2.65, globuleHealHp: 10 },
+                // E Dizzy: flies forward and blinds the enemies near it (castGekkoDizzy, Dizzy step)
+                e: { look: ['deployable', 'flash'], spawnAheadM: 1.3, speedMps: 13.0, lifetimeMs: 2600, firstShotMs: 220, fireIntervalMs: 420,
+                    rangeM: 22, blindMs: 3800, revealMs: 4500, slowMs: 2800, damage: 25 },
+                // X Thrash: a creature you steer that lunges to detain; it lasts AGENT_DEFS.gekko.abilities.x.durationMs (spawnGekkoThrash, detonateGekkoThrash, Thrash step)
+                x: { look: ['deployable', 'blast'], spawnAheadM: 1.6, speedMps: 19.5,
+                    steerKeepMult: 0.84, steerTurnMult: 0.16,   // heading blend each 60 Hz step
+                    triggerRadiusM: 3.4, radiusM: 7.5, blindMs: 4500, slowMs: 6000, revealMs: 6000, damage: 75,
+                    globuleUltPoints: 2 }
+            },
+            kayo: {
+                // C FRAG/ment: a grenade that sticks to the floor and pulses four times, harder at the core (castKayoFragment, spawnKayoFragmentZone, FRAG/ment step)
+                c: { look: ['projectile', 'blast'], spawnAheadM: 1.05, speedMps: 27, upSpeedMps: 2.3, gravity: 15.5, fuseMs: 1500,
+                    radiusM: 5.2, lifetimeMs: 3100, pulseCount: 4, firstPulseMs: 120, pulseIntervalMs: 700, hitHeightM: 3.0,
+                    coreRadiusMult: 0.48, coreDamage: 55, outerDamage: 35, slowMs: 1200, revealMs: 2000, targetDamage: 45 },
+                // Q FLASH/drive: a flash; back off or crouch for a short pop flash (castKayoFlashDrive; its blind and reveal are shared, in detonateProjectile)
+                q: { look: ['projectile', 'flash'], spawnAheadM: 1.0, speedMps: 26, upSpeedMps: 2.2, gravity: 11.5, fuseMs: 820,
+                    popSpeedMps: 14, popUpSpeedMps: 1.8, popGravity: 9.5, popFuseMs: 520 },
+                // E ZERO/point: a blade that sticks, then suppresses and reveals in a wide pulse (castKayoZeroPoint, spawnZeroPointBlade, ZERO/point step)
+                e: { look: ['projectile', 'pulse'], spawnAheadM: 1.1, speedMps: 38, gravity: 6.0, fuseMs: 1700,
+                    minHeightM: 0.45, windupMs: 750, lifetimeMs: 1650, radiusM: 18.0, revealMs: 5500, slowMs: 4500, damage: 25 },
+                // X NULL/cmd: suppression pulses around you; kills heal and extend (emitKayoNullPulse, NULL/cmd step; the self-revive, speed and fire rate are shared)
+                x: { look: ['self', 'pulse'],
+                    chargeCount: 1,                 // game.ultChargesLeft; nothing reads it for KAY/O
+                    pulseIntervalMs: 2500, radiusM: 24.0, revealMs: 3200, slowMs: 2600, damage: 18,
+                    killHealHp: 25, killExtendMs: 2000, killExtendCapMs: 15000 }
+            },
+            skye: {
+                // C Regrowth: an instant heal and shield, then heal ticks (castSkyeRegrowth, Regrowth step)
+                c: { look: ['self'], healHp: 25, shieldHp: 25, firstTickMs: 450, tickMs: 500, tickCount: 6, healPerTickHp: 12 },
+                // Q Trailblazer: a beast that hunts and pounces in a concussing blast (castSkyeTrailblazer, Trailblazer step via detonateExplosionAoE)
+                q: { look: ['deployable', 'blast'], spawnAheadM: 1.4, speedMps: 13.5, lifetimeMs: 7500, huntRangeM: 16.0, chaseSpeedMps: 14.5,
+                    triggerRadiusM: 4.5, blastHeightM: 0.3, radiusM: 6.2, maxDamage: 65, revealMs: 4500, slowMs: 4000, blindMs: 2500 },
+                // E Guiding Light: a hawk you steer; press E again to flash (castSkyeGuidingLight, detonateSkyeHawk, hawk step)
+                e: { look: ['projectile', 'flash'], spawnAheadM: 1.25, speedMps: 18.0, lifetimeMs: 1350,
+                    turnRatePerSec: 6.5,            // steering toward the crosshair
+                    minHeightM: 0.8, radiusM: 22, blindMs: 3800, revealMs: 4000 },
+                // X Seekers: three trackers that hunt the nearest enemies; they last AGENT_DEFS.skye.abilities.x.durationMs (spawnSkyeSeekers, Seekers step)
+                x: { look: ['deployable', 'flash'], spreadRad: 0.38, spawnAheadM: 1.6, hoverHeightM: 0.95, speedMps: 11.5, triggerRadiusM: 2.4,
+                    radiusM: 5.5, blindMs: 4500, slowMs: 4500, revealMs: 6000, damage: 45, killHealHp: 25, killShieldHp: 15 }
+            },
+            sova: {
+                // C Shroud Orb: a thrown smoke (castSmokeProjectile, which Jett and Omen also use)
+                c: { look: ['projectile', 'smoke'], fuseSec: 0.72, radiusM: 4.8, lifetimeMs: 9000 },
+                // Q Shock Bolt: a bolt that shocks where it lands (castSovaShockBolt; its blast is in detonateProjectile)
+                q: { look: ['projectile', 'blast'], spawnAheadM: 1.1, speedMps: 34, gravity: 7.5, fuseMs: 1800,
+                    radiusM: 6.0, falloffPadM: 1.5, falloffMult: 0.55, maxDamage: 75, slowMs: 3000, targetMaxDamage: 80, targetFalloffMult: 0.5 },
+                // E Recon Bolt: a bolt that becomes a beacon and reveals with sonar pulses (castSovaReconBolt, spawnReconBeacon, recon step)
+                e: { look: ['projectile', 'pulse'], spawnAheadM: 1.1, speedMps: 38, gravity: 5.5, fuseMs: 1800,
+                    minHeightM: 0.4, lifetimeMs: 6500, radiusM: 36, pulseIntervalMs: 2000, revealMs: 2600 },
+                // X Hunter's Fury: wall-piercing blasts on left-click or X (fireSovaHunterBeam, shoot)
+                x: { look: ['beam'],
+                    shotCount: 3,                   // blasts per ultimate                 [3]
+                    fireIntervalMs: 360, rangeM: 100, enemyAimHeightM: 1.1, hitRadiusM: 1.75, targetHitRadiusM: 1.85,
+                    damage: 110, revealMs: 5000, endDelayMs: 600 }
+            },
+            tejo: {
+                // C Stealth Drone: a drone you steer; it EMPs near an enemy, at the end, or on C again (castTejoStealthDrone, detonateTejoDronePulse, drone step)
+                c: { look: ['deployable', 'pulse'], spawnAheadM: 1.5, speedMps: 15.5, lifetimeMs: 4500,
+                    steerKeepMult: 0.84, steerTurnMult: 0.16,   // heading blend each 60 Hz step
+                    triggerRadiusM: 4.2, radiusM: 11.0, revealMs: 6000, slowMs: 4500, blindMs: 2200, damage: 30 },
+                // Q Special Delivery: a sticky grenade that concusses (castTejoSpecialDelivery, detonateTejoSpecialDelivery)
+                q: { look: ['projectile', 'blast'], spawnAheadM: 0.75, speedMps: 25.5, upSpeedMps: 2.4, gravity: 14.0, fuseMs: 1500,
+                    radiusM: 7.2, blindMs: 3400, slowMs: 4500, revealMs: 4000, damage: 55, targetDamage: 65 },
+                // E Guided Salvo: two target zones, each struck by three missiles (castTejoGuidedSalvo, Guided Salvo step)
+                e: { look: ['groundZone', 'blast'], rangeM: 30.0, zoneSpacingM: 5.8, radiusM: 5.4, lifetimeMs: 3800,
+                    pulseCount: 3, firstPulseMs: 420, zoneStaggerMs: 240, pulseIntervalMs: 950, slowMs: 2600, revealMs: 3500, damage: 65 },
+                // X Armageddon: bombing waves that roll along a corridor ahead (spawnTejoArmageddon, Armageddon step)
+                x: { look: ['groundZone', 'blast'], spawnAheadM: 3.5, lifetimeMs: 5200, waveCount: 6, firstWaveMs: 260, waveIntervalMs: 460,
+                    waveStartM: 3.5, waveSpacingM: 4.2, hitDepthM: 3.6, hitHalfWidthM: 5.8,
+                    blindMs: 3400, slowMs: 4200, revealMs: 5000, damage: 125 }
             }
         };
         
@@ -21810,6 +21923,7 @@
                     });
                 }
 
+                // V2.2: Sova's numbers are in AGENT_TUNING.sova (the beacon pool's radius)
                 // 5. Pooled Sova Recon Beacons + Expanding Sonar Spheres (2)
                 const beaconGeo = new THREE.CylinderGeometry(0.08, 0.14, 0.9, 8);
                 const sonarSphereGeo = new THREE.SphereGeometry(1, 20, 14);
@@ -21840,7 +21954,7 @@
                         expireAt: 0,
                         nextPulseAt: 0,
                         pulseStartAt: 0,
-                        maxRadius: 36,
+                        maxRadius: AGENT_TUNING.sova.e.radiusM,
                         group: group,
                         beaconMesh: beaconMesh,
                         pulseMesh: pulseMesh,
@@ -23015,6 +23129,7 @@
                     ringMat: caRingMat
                 };
 
+                // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo (FRAG/ment's radius copy, ZERO/point's radius)
                 // KAY/O FRAG/ment Multi-Pulse Plasma Floor Zones (2) & ZERO/point Suppression Blades (2)
                 const kfCoreGeo = new THREE.OctahedronGeometry(0.32, 0);
                 for (let i = 0; i < 2; i++) {
@@ -23054,7 +23169,7 @@
                     this.kayoFragments.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 5.2,
+                        radius: AGENT_TUNING.kayo.c.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         pulsesLeft: 0,
@@ -23095,7 +23210,7 @@
                         inUse: false,
                         pulsed: false,
                         position: new THREE.Vector3(),
-                        radius: 18.0,
+                        radius: AGENT_TUNING.kayo.e.radiusM,
                         startAt: 0,
                         detonateAt: 0,
                         expireAt: 0,
@@ -23238,6 +23353,7 @@
                     });
                 }
 
+                // V2.2: Fade's numbers are in AGENT_TUNING.fade (the Seize pool's radius)
                 // Fade Prowlers (2), Seize Tether Zones (2), Haunt Watchers (2), & Nightfall Wave (1)
                 const fpCoreGeo = new THREE.ConeGeometry(0.38, 1.05, 8);
                 fpCoreGeo.rotateX(Math.PI / 2);
@@ -23327,7 +23443,7 @@
                     this.fadeSeizeZones.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 6.5,
+                        radius: AGENT_TUNING.fade.q.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         nextTickAt: 0,
@@ -23421,6 +23537,7 @@
                     floorMat: nwFloorMat
                 };
 
+                // V2.2: Breach's numbers are in AGENT_TUNING.breach (the Aftershock pool's radius)
                 // Breach Aftershock Fusion Columns (2), Fault Line Corridors (2), & Rolling Thunder Wave (1)
                 const baCylGeo = new THREE.CylinderGeometry(1.0, 1.0, 2.8, 16, 1, true);
                 for (let i = 0; i < 2; i++) {
@@ -23455,7 +23572,7 @@
                     this.breachAftershocks.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 4.4,
+                        radius: AGENT_TUNING.breach.c.radiusM,
                         startAt: 0,
                         expireAt: 0,
                         blastsLeft: 0,
@@ -23750,6 +23867,7 @@
                     ringMat: kcRingMat
                 };
 
+                // V2.2: Gekko's numbers are in AGENT_TUNING.gekko (the pools' radius and speed copies)
                 // Gekko Mosh Pits (2), Wingman (2), Dizzy (2), Thrash (1), & Reclaimable Globules (4)
                 const mpCoreGeo = new THREE.OctahedronGeometry(0.45, 0);
                 for (let i = 0; i < 2; i++) {
@@ -23796,7 +23914,7 @@
                         inUse: false,
                         erupted: false,
                         position: new THREE.Vector3(),
-                        radius: 6.4,
+                        radius: AGENT_TUNING.gekko.c.radiusM,
                         startAt: 0,
                         eruptAt: 0,
                         expireAt: 0,
@@ -23840,7 +23958,7 @@
                         position: new THREE.Vector3(),
                         dirX: 0,
                         dirZ: -1,
-                        speed: 13.5,
+                        speed: AGENT_TUNING.gekko.q.speedMps,
                         startAt: 0,
                         expireAt: 0,
                         group: gwGroup,
@@ -23920,7 +24038,7 @@
                     position: new THREE.Vector3(),
                     dirX: 0,
                     dirZ: -1,
-                    speed: 19.5,
+                    speed: AGENT_TUNING.gekko.x.speedMps,
                     startAt: 0,
                     expireAt: 0,
                     group: gtGroup,
@@ -24720,6 +24838,7 @@
                     ringMat: sgRingMat
                 };
 
+                // V2.2: Tejo's numbers are in AGENT_TUNING.tejo (the pools' speed, radius and pulse-count copies)
                 // 8M. Tejo Pooled 3D Ballistic Initiator Meshes (Stealth Drone [C], Guided Salvo [E], Armageddon [X])
                 const tdBodyGeo = new THREE.BoxGeometry(0.75, 0.24, 0.95);
                 const tdRotorGeo = new THREE.RingGeometry(0.32, 0.68, 16);
@@ -24762,7 +24881,7 @@
                         position: new THREE.Vector3(),
                         dirX: 0,
                         dirZ: -1,
-                        speed: 15.5,
+                        speed: AGENT_TUNING.tejo.c.speedMps,
                         startAt: 0,
                         expireAt: 0,
                         group: tdGroup,
@@ -24810,8 +24929,8 @@
                     this.tejoGuidedSalvos.push({
                         inUse: false,
                         position: new THREE.Vector3(),
-                        radius: 5.4,
-                        pulsesLeft: 3,
+                        radius: AGENT_TUNING.tejo.e.radiusM,
+                        pulsesLeft: AGENT_TUNING.tejo.e.pulseCount,
                         startAt: 0,
                         nextPulseAt: 0,
                         expireAt: 0,
@@ -25510,6 +25629,7 @@
                 return true;
             },
 
+            // V2.2: Sova's numbers are in AGENT_TUNING.sova (its C smoke, cast here)
             castAbility: function(slotKey) {
                 const now = gameNow();   // V2.2: ability timers run on game time (see gameNow)
                 const agentId = game.activeAgent;
@@ -25645,7 +25765,7 @@
                 } else if (agentId === 'sova') {
                     if (slotKey === 'e') this.castSovaReconBolt(now);
                     else if (slotKey === 'q') this.castSovaShockBolt(now);
-                    else if (slotKey === 'c') this.castSmokeProjectile(now, 0x57a8ff, 0.72, 4.8, 9000);
+                    else if (slotKey === 'c') this.castSmokeProjectile(now, 0x57a8ff, AGENT_TUNING.sova.c.fuseSec, AGENT_TUNING.sova.c.radiusM, AGENT_TUNING.sova.c.lifetimeMs);
                 } else if (agentId === 'sage') {
                     if (slotKey === 'e') this.castSageHealingOrb(now);
                     else if (slotKey === 'q') this.castSageSlowOrb(now);
@@ -25754,6 +25874,7 @@
             },
 
             // --- Gekko Radianite Creature Initiator Abilities (Mosh Pit [C], Wingman [Q], Dizzy [E], Thrash [X] + Reclaimable Globules) ---
+            // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
             castGekkoMoshPit: function(now) {
                 const proj = this.acquireProjectile();
                 camera.updateMatrixWorld();
@@ -25761,11 +25882,11 @@
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 proj.type = 'moshpit';
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 0.7);
-                proj.velocity.copy(_abilityForward).multiplyScalar(23.5);
-                proj.velocity.y += 2.8;
-                proj.gravity = 14.0;
-                proj.detonateAt = now + 1700;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.gekko.c.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.gekko.c.speedMps);
+                proj.velocity.y += AGENT_TUNING.gekko.c.upSpeedMps;
+                proj.gravity = AGENT_TUNING.gekko.c.gravity;
+                proj.detonateAt = now + AGENT_TUNING.gekko.c.fuseMs;
                 proj.mat.color.setHex(0xa3e635).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -25773,6 +25894,7 @@
                 showNotification("MOSH PIT THROWN — Expands into 6.4m Acid Pool & Erupts for 130 DMG!", 1600);
             },
 
+            // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
             spawnGekkoMoshPit: function(x, y, z, now) {
                 let mp = this.gekkoMoshPits[0];
                 for (let i = 0; i < this.gekkoMoshPits.length; i++) {
@@ -25781,11 +25903,11 @@
                 mp.inUse = true;
                 mp.erupted = false;
                 mp.position.set(x, Math.max(0.02, y), z);
-                mp.radius = 6.4;
+                mp.radius = AGENT_TUNING.gekko.c.radiusM;
                 mp.startAt = now;
-                mp.eruptAt = now + 1600;
-                mp.expireAt = now + 2150;
-                mp.nextTickAt = now + 100;
+                mp.eruptAt = now + AGENT_TUNING.gekko.c.windupMs;
+                mp.expireAt = now + AGENT_TUNING.gekko.c.lifetimeMs;
+                mp.nextTickAt = now + AGENT_TUNING.gekko.c.firstTickMs;
                 mp.discMesh.scale.set(mp.radius, 1, mp.radius);
                 mp.ringMesh.scale.set(mp.radius, 1, mp.radius);
                 mp.group.position.copy(mp.position);
@@ -25793,12 +25915,13 @@
                 soundFX.gekkoMosh();
             },
 
+            // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
             castGekkoWingman: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 1.4));
-                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 1.4));
+                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.gekko.q.spawnAheadM));
+                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.gekko.q.spawnAheadM));
 
                 let gw = this.gekkoWingman[0];
                 for (let i = 0; i < this.gekkoWingman.length; i++) {
@@ -25808,9 +25931,9 @@
                 gw.position.set(sx, 0.05, sz);
                 gw.dirX = fwdX;
                 gw.dirZ = fwdZ;
-                gw.speed = 13.5;
+                gw.speed = AGENT_TUNING.gekko.q.speedMps;
                 gw.startAt = now;
-                gw.expireAt = now + 4200;
+                gw.expireAt = now + AGENT_TUNING.gekko.q.lifetimeMs;
                 gw.group.position.copy(gw.position);
                 gw.group.rotation.y = Math.atan2(fwdX, fwdZ);
                 gw.group.visible = true;
@@ -25818,6 +25941,7 @@
                 showNotification("WINGMAN SENT OUT! Hunts Hostiles to Concuss (5.8m) & Drops Reclaimable Globule!", 1800);
             },
 
+            // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
             detonateGekkoWingman: function(gw, now, nowMs) {
                 if (!gw || !gw.inUse) return;
                 gw.inUse = false;
@@ -25825,7 +25949,7 @@
                 soundFX.gekkoWingman();
                 this.spawnFlashBurst(gw.position.x, 0.85, gw.position.z, 0xfacc15, 5.8, 340, now);
                 this.spawnWindRing(gw.position.x, 0.25, gw.position.z, 0xa3e635, 5.8, now);
-                const rSq = 5.8 * 5.8;
+                const rSq = AGENT_TUNING.gekko.q.radiusM * AGENT_TUNING.gekko.q.radiusM;
                 let hitCount = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -25834,10 +25958,10 @@
                     const dz = e.mesh.position.z - gw.position.z;
                     if (dx * dx + dz * dz <= rSq) {
                         hitCount++;
-                        this.applyEnemyBlind(e, now, 3000);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 4200);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 4500);
-                        damageEnemyActor(e, 45, now, nowMs || Date.now(), "Wingman Concuss", false);
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.gekko.q.blindMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.gekko.q.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.gekko.q.revealMs);
+                        damageEnemyActor(e, AGENT_TUNING.gekko.q.damage, now, nowMs || Date.now(), "Wingman Concuss", false);
                     }
                 }
                 this.spawnGekkoGlobule(gw.position.x, gw.position.z, 'q', now);
@@ -25848,6 +25972,7 @@
                 }
             },
 
+            // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
             castGekkoDizzy: function(now) {
                 camera.updateMatrixWorld();
                 _abilityOrigin.copy(camera.position);
@@ -25862,14 +25987,14 @@
                 }
                 gd.inUse = true;
                 gd.position.set(
-                    _abilityOrigin.x + (horizX / hLen) * 1.3,
+                    _abilityOrigin.x + (horizX / hLen) * AGENT_TUNING.gekko.e.spawnAheadM,
                     Math.max(2.3, _abilityOrigin.y + 0.55),
-                    _abilityOrigin.z + (horizZ / hLen) * 1.3
+                    _abilityOrigin.z + (horizZ / hLen) * AGENT_TUNING.gekko.e.spawnAheadM
                 );
-                gd.velocity.set((horizX / hLen) * 13.0, 0, (horizZ / hLen) * 13.0);
+                gd.velocity.set((horizX / hLen) * AGENT_TUNING.gekko.e.speedMps, 0, (horizZ / hLen) * AGENT_TUNING.gekko.e.speedMps);
                 gd.startAt = now;
-                gd.expireAt = now + 2600;
-                gd.nextSpitAt = now + 220;
+                gd.expireAt = now + AGENT_TUNING.gekko.e.lifetimeMs;
+                gd.nextSpitAt = now + AGENT_TUNING.gekko.e.firstShotMs;
                 gd.hitSet.clear();
                 gd.group.position.copy(gd.position);
                 gd.group.visible = true;
@@ -25877,6 +26002,7 @@
                 showNotification("DIZZY SOARING! Auto-Blasts Visible Hostiles with Blinding Plasma & Drops Globule!", 1850);
             },
 
+            // V2.2: Gekko's numbers are in AGENT_TUNING.gekko (Thrash lasts AGENT_DEFS.gekko.abilities.x.durationMs)
             spawnGekkoThrash: function(now) {
                 const gt = this.gekkoThrash;
                 if (!gt) return;
@@ -25885,20 +26011,21 @@
                 const fwdZ = -Math.cos(yaw);
                 gt.active = true;
                 gt.position.set(
-                    Math.max(-44, Math.min(44, characterController.position.x + fwdX * 1.6)),
+                    Math.max(-44, Math.min(44, characterController.position.x + fwdX * AGENT_TUNING.gekko.x.spawnAheadM)),
                     0.35,
-                    Math.max(-44, Math.min(44, characterController.position.z + fwdZ * 1.6))
+                    Math.max(-44, Math.min(44, characterController.position.z + fwdZ * AGENT_TUNING.gekko.x.spawnAheadM))
                 );
                 gt.dirX = fwdX;
                 gt.dirZ = fwdZ;
-                gt.speed = 19.5;
+                gt.speed = AGENT_TUNING.gekko.x.speedMps;
                 gt.startAt = now;
-                gt.expireAt = now + 6500;
+                gt.expireAt = now + AGENT_DEFS.gekko.abilities.x.durationMs;
                 gt.group.position.copy(gt.position);
                 gt.group.rotation.y = Math.atan2(fwdX, fwdZ);
                 gt.group.visible = true;
             },
 
+            // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
             detonateGekkoThrash: function(now, nowMs) {
                 const gt = this.gekkoThrash;
                 if (!gt || !gt.active) return;
@@ -25911,7 +26038,7 @@
                 soundFX.gekkoThrash();
                 this.spawnFlashBurst(gt.position.x, 1.0, gt.position.z, 0xa3e635, 7.5, 420, now);
                 this.spawnWindRing(gt.position.x, 0.3, gt.position.z, 0xa3e635, 7.8, now);
-                const rSq = 7.5 * 7.5;
+                const rSq = AGENT_TUNING.gekko.x.radiusM * AGENT_TUNING.gekko.x.radiusM;
                 let detained = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -25920,10 +26047,10 @@
                     const dz = e.mesh.position.z - gt.position.z;
                     if (dx * dx + dz * dz <= rSq) {
                         detained++;
-                        this.applyEnemyBlind(e, now, 4500);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 6000);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 6000);
-                        damageEnemyActor(e, 75, now, nowMs || Date.now(), "Thrash Detain", false);
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.gekko.x.blindMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.gekko.x.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.gekko.x.revealMs);
+                        damageEnemyActor(e, AGENT_TUNING.gekko.x.damage, now, nowMs || Date.now(), "Thrash Detain", false);
                     }
                 }
                 this.spawnGekkoGlobule(gt.position.x, gt.position.z, 'x', now);
@@ -25935,6 +26062,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Gekko's numbers are in AGENT_TUNING.gekko (globules are under Q)
             spawnGekkoGlobule: function(x, z, kind, now) {
                 let gg = this.gekkoGlobules[0];
                 for (let i = 0; i < this.gekkoGlobules.length; i++) {
@@ -25947,8 +26075,8 @@
                 gg.kind = kind || 'e';
                 gg.position.set(gx, floorY, gz);
                 gg.spawnedAt = now;
-                gg.pickupReadyAt = now + 350;
-                gg.expireAt = now + 14000;
+                gg.pickupReadyAt = now + AGENT_TUNING.gekko.q.globuleReadyMs;
+                gg.expireAt = now + AGENT_TUNING.gekko.q.globuleLifetimeMs;
                 const col = kind === 'q' ? 0xfacc15 : (kind === 'x' ? 0xf43f5e : 0xa3e635);
                 gg.coreMat.color.setHex(col).convertSRGBToLinear();
                 gg.ringMat.color.setHex(col).convertSRGBToLinear();
@@ -26511,12 +26639,13 @@
                 return false;
             },
 
+            // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
             castTejoStealthDrone: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 1.5));
-                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 1.5));
+                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.tejo.c.spawnAheadM));
+                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.tejo.c.spawnAheadM));
 
                 let td = this.tejoStealthDrones[0];
                 for (let i = 0; i < this.tejoStealthDrones.length; i++) {
@@ -26526,9 +26655,9 @@
                 td.position.set(sx, 1.35, sz);
                 td.dirX = fwdX;
                 td.dirZ = fwdZ;
-                td.speed = 15.5;
+                td.speed = AGENT_TUNING.tejo.c.speedMps;
                 td.startAt = now;
-                td.expireAt = now + 4500;
+                td.expireAt = now + AGENT_TUNING.tejo.c.lifetimeMs;
                 td.group.position.copy(td.position);
                 td.group.rotation.y = Math.atan2(fwdX, fwdZ);
                 td.group.visible = true;
@@ -26537,6 +26666,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
             detonateTejoDronePulse: function(now, targetDrone) {
                 let drone = targetDrone || null;
                 if (!drone) {
@@ -26559,7 +26689,7 @@
                 this.spawnWindRing(dx, 0.25, dz, 0xf59e0b, 11.0, now);
 
                 const nowMs = Date.now();
-                const rSq = 11.0 * 11.0;
+                const rSq = AGENT_TUNING.tejo.c.radiusM * AGENT_TUNING.tejo.c.radiusM;
                 let hitCount = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -26568,10 +26698,10 @@
                     const ez = e.mesh.position.z - dz;
                     if (ex * ex + ez * ez <= rSq) {
                         hitCount++;
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 6000);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 4500);
-                        this.applyEnemyBlind(e, now, 2200);
-                        damageEnemyActor(e, 30, now, nowMs, "Stealth Drone EMP", false);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.tejo.c.revealMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.tejo.c.slowMs);
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.tejo.c.blindMs);
+                        damageEnemyActor(e, AGENT_TUNING.tejo.c.damage, now, nowMs, "Stealth Drone EMP", false);
                     }
                 }
                 if (hitCount > 0) {
@@ -26582,6 +26712,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
             castTejoSpecialDelivery: function(now) {
                 const proj = this.acquireProjectile();
                 camera.updateMatrixWorld();
@@ -26589,11 +26720,11 @@
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 proj.type = 'specialdelivery';
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 0.75);
-                proj.velocity.copy(_abilityForward).multiplyScalar(25.5);
-                proj.velocity.y += 2.4;
-                proj.gravity = 14.0;
-                proj.detonateAt = now + 1500;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.tejo.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.tejo.q.speedMps);
+                proj.velocity.y += AGENT_TUNING.tejo.q.upSpeedMps;
+                proj.gravity = AGENT_TUNING.tejo.q.gravity;
+                proj.detonateAt = now + AGENT_TUNING.tejo.q.fuseMs;
                 proj.mat.color.setHex(0xf59e0b).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -26601,12 +26732,13 @@
                 showNotification("SPECIAL DELIVERY GRENADE FIRED — Detonates 7.2m Sticky Concuss Blast on Impact!", 1750);
             },
 
+            // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
             detonateTejoSpecialDelivery: function(x, y, z, now) {
                 soundFX.tejoConcuss();
                 this.spawnFlashBurst(x, y + 0.5, z, 0xf59e0b, 7.2, 420, now);
                 this.spawnWindRing(x, y + 0.1, z, 0xfacc15, 7.2, now);
                 const nowMs = Date.now();
-                const rSq = 7.2 * 7.2;
+                const rSq = AGENT_TUNING.tejo.q.radiusM * AGENT_TUNING.tejo.q.radiusM;
                 let hitCount = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -26615,10 +26747,10 @@
                     const dz = e.mesh.position.z - z;
                     if (dx * dx + dz * dz <= rSq) {
                         hitCount++;
-                        this.applyEnemyBlind(e, now, 3400);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 4500);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 4000);
-                        damageEnemyActor(e, 55, now, nowMs, "Special Delivery", false);
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.tejo.q.blindMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.tejo.q.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.tejo.q.revealMs);
+                        damageEnemyActor(e, AGENT_TUNING.tejo.q.damage, now, nowMs, "Special Delivery", false);
                     }
                 }
                 for (let i = 0; i < targetObjects.length; i++) {
@@ -26627,7 +26759,7 @@
                     const dx = t.mesh.position.x - x;
                     const dz = t.mesh.position.z - z;
                     if (dx * dx + dz * dz <= rSq) {
-                        damageTargetActor(t, 65, now, nowMs, "Special Delivery", t.leaves[0]);
+                        damageTargetActor(t, AGENT_TUNING.tejo.q.targetDamage, now, nowMs, "Special Delivery", t.leaves[0]);
                     }
                 }
                 if (hitCount > 0) {
@@ -26635,12 +26767,13 @@
                 }
             },
 
+            // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
             castTejoGuidedSalvo: function(now) {
-                const hit = this.getAimGroundPoint(30.0);
+                const hit = this.getAimGroundPoint(AGENT_TUNING.tejo.e.rangeM);
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const offsets = [0.0, 5.8];
+                const offsets = [0.0, AGENT_TUNING.tejo.e.zoneSpacingM];
 
                 for (let k = 0; k < offsets.length; k++) {
                     let gs = this.tejoGuidedSalvos[0];
@@ -26652,11 +26785,11 @@
                     const floorY = this.findSupportFloorY(tx, hit.y + 1.5, tz);
                     gs.inUse = true;
                     gs.position.set(tx, Math.max(0.02, floorY), tz);
-                    gs.radius = 5.4;
-                    gs.pulsesLeft = 3;
+                    gs.radius = AGENT_TUNING.tejo.e.radiusM;
+                    gs.pulsesLeft = AGENT_TUNING.tejo.e.pulseCount;
                     gs.startAt = now;
-                    gs.nextPulseAt = now + 420 + k * 240;
-                    gs.expireAt = now + 3800;
+                    gs.nextPulseAt = now + AGENT_TUNING.tejo.e.firstPulseMs + k * AGENT_TUNING.tejo.e.zoneStaggerMs;
+                    gs.expireAt = now + AGENT_TUNING.tejo.e.lifetimeMs;
                     gs.discMesh.scale.set(gs.radius, 1, gs.radius);
                     gs.ringMesh.scale.set(gs.radius, 1, gs.radius);
                     gs.group.position.copy(gs.position);
@@ -26667,14 +26800,15 @@
                 showNotification("GUIDED SALVO LOCKED — Twin Target Zones Firing 3 Autonomous Missile Pulses Each!", 2000);
             },
 
+            // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
             spawnTejoArmageddon: function(now) {
                 const ta = this.tejoArmageddon;
                 if (!ta) return;
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const ox = Math.max(-42, Math.min(42, characterController.position.x + fwdX * 3.5));
-                const oz = Math.max(-42, Math.min(42, characterController.position.z + fwdZ * 3.5));
+                const ox = Math.max(-42, Math.min(42, characterController.position.x + fwdX * AGENT_TUNING.tejo.x.spawnAheadM));
+                const oz = Math.max(-42, Math.min(42, characterController.position.z + fwdZ * AGENT_TUNING.tejo.x.spawnAheadM));
 
                 ta.active = true;
                 ta.origin.set(ox, 0.04, oz);
@@ -26682,8 +26816,8 @@
                 ta.currentWavePos.set(ox, 0.04, oz);
                 ta.wavesFired = 0;
                 ta.startAt = now;
-                ta.nextWaveAt = now + 260;
-                ta.expireAt = now + 5200;
+                ta.nextWaveAt = now + AGENT_TUNING.tejo.x.firstWaveMs;
+                ta.expireAt = now + AGENT_TUNING.tejo.x.lifetimeMs;
                 ta.floorMesh.position.set(ox + fwdX * 14.0, 0.05, oz + fwdZ * 14.0);
                 ta.floorMesh.rotation.y = yaw;
                 ta.waveMesh.position.set(ox, 1.8, oz);
@@ -27462,12 +27596,13 @@
             },
 
             // --- Fade Nightmare Bounty Hunter Initiator Abilities (Prowler [C], Seize [Q], Haunt [E], Nightfall [X]) ---
+            // V2.2: Fade's numbers are in AGENT_TUNING.fade
             castFadeProwler: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 1.4));
-                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 1.4));
+                const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.fade.c.spawnAheadM));
+                const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.fade.c.spawnAheadM));
                 const floorY = this.findSupportFloorY(sx, characterController.position.y, sz);
 
                 let fp = this.fadeProwlers[0];
@@ -27476,9 +27611,9 @@
                 }
                 fp.inUse = true;
                 fp.position.set(sx, floorY, sz);
-                fp.velocity.set(fwdX * 15.5, 0, fwdZ * 15.5);
+                fp.velocity.set(fwdX * AGENT_TUNING.fade.c.speedMps, 0, fwdZ * AGENT_TUNING.fade.c.speedMps);
                 fp.startAt = now;
-                fp.expireAt = now + 3400;
+                fp.expireAt = now + AGENT_TUNING.fade.c.lifetimeMs;
                 fp.group.position.copy(fp.position);
                 fp.group.rotation.set(0, yaw, 0);
                 fp.group.visible = true;
@@ -27487,18 +27622,19 @@
                 showNotification("PROWLER UNLEASHED! Steer with Crosshair (Locks onto Haunt/Nightfall Trails & Nearsights on Bite)!", 1800);
             },
 
+            // V2.2: Fade's numbers are in AGENT_TUNING.fade
             castFadeSeize: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'seize';
                 proj.bounced = false;
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.05);
-                proj.velocity.copy(_abilityForward).multiplyScalar(25);
-                proj.velocity.y += 2.2;
-                proj.gravity = 16.0;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.fade.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.fade.q.speedMps);
+                proj.velocity.y += AGENT_TUNING.fade.q.upSpeedMps;
+                proj.gravity = AGENT_TUNING.fade.q.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 680;
+                proj.detonateAt = now + AGENT_TUNING.fade.q.fuseMs;
                 proj.mesh.material.color.setHex(0xa855f7).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -27506,6 +27642,7 @@
                 showNotification("SEIZE ORB THROWN! Plummets into a 6.5m Nightmare Tether & Decay Vortex!", 1500);
             },
 
+            // V2.2: Fade's numbers are in AGENT_TUNING.fade
             spawnFadeSeizeZone: function(x, y, z, now) {
                 let sz = this.fadeSeizeZones[0];
                 for (let i = 0; i < this.fadeSeizeZones.length; i++) {
@@ -27513,10 +27650,10 @@
                 }
                 sz.inUse = true;
                 sz.position.set(x, Math.max(0.02, y), z);
-                sz.radius = 6.5;
+                sz.radius = AGENT_TUNING.fade.q.radiusM;
                 sz.startAt = now;
-                sz.expireAt = now + 4500;
-                sz.nextTickAt = now + 50;
+                sz.expireAt = now + AGENT_TUNING.fade.q.lifetimeMs;
+                sz.nextTickAt = now + AGENT_TUNING.fade.q.firstTickMs;
                 sz.discMesh.scale.set(sz.radius, 1, sz.radius);
                 sz.ringMesh.scale.set(sz.radius, 1, sz.radius);
                 sz.group.position.copy(sz.position);
@@ -27534,9 +27671,9 @@
                     const dSq = dx * dx + dz * dz;
                     if (dSq <= sz.radius * sz.radius) {
                         trappedCount++;
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 4500);
-                        damageEnemyActor(e, 40, now, nowMs, "Seize Decay", false);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.fade.q.slowMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.fade.q.revealMs);
+                        damageEnemyActor(e, AGENT_TUNING.fade.q.damage, now, nowMs, "Seize Decay", false);
                     }
                 }
                 if (trappedCount > 0) {
@@ -27544,18 +27681,19 @@
                 }
             },
 
+            // V2.2: Fade's numbers are in AGENT_TUNING.fade
             castFadeHaunt: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'haunt';
                 proj.bounced = false;
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.05);
-                proj.velocity.copy(_abilityForward).multiplyScalar(28);
-                proj.velocity.y += 2.6;
-                proj.gravity = 14.5;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.fade.e.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.fade.e.speedMps);
+                proj.velocity.y += AGENT_TUNING.fade.e.upSpeedMps;
+                proj.gravity = AGENT_TUNING.fade.e.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 850;
+                proj.detonateAt = now + AGENT_TUNING.fade.e.fuseMs;
                 proj.mesh.material.color.setHex(0xc084fc).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -27563,20 +27701,22 @@
                 showNotification("HAUNT WATCHER THROWN! Reveals Visible Hostiles & Marks Terror Trails!", 1500);
             },
 
+            // V2.2: Fade's numbers are in AGENT_TUNING.fade
             spawnFadeHauntWatcher: function(x, y, z, now) {
                 let fh = this.fadeHaunts[0];
                 for (let i = 0; i < this.fadeHaunts.length; i++) {
                     if (!this.fadeHaunts[i].inUse) { fh = this.fadeHaunts[i]; break; }
                 }
                 fh.inUse = true;
-                fh.position.set(x, Math.max(1.2, y), z);
+                fh.position.set(x, Math.max(AGENT_TUNING.fade.e.minHeightM, y), z);
                 fh.startAt = now;
-                fh.expireAt = now + 2600;
+                fh.expireAt = now + AGENT_TUNING.fade.e.lifetimeMs;
                 fh.nextPulseAt = now;
                 fh.group.position.copy(fh.position);
                 fh.group.visible = true;
             },
 
+            // V2.2: Fade's numbers are in AGENT_TUNING.fade
             spawnFadeNightfallWave: function(now) {
                 if (!this.fadeNightfallWave) return;
                 const yaw = camera.rotation.y;
@@ -27585,12 +27725,12 @@
                 const nw = this.fadeNightfallWave;
                 nw.active = true;
                 nw.direction.set(fwdX, 0, fwdZ).normalize();
-                const sx = characterController.position.x + fwdX * 1.8;
-                const sz = characterController.position.z + fwdZ * 1.8;
+                const sx = characterController.position.x + fwdX * AGENT_TUNING.fade.x.spawnAheadM;
+                const sz = characterController.position.z + fwdZ * AGENT_TUNING.fade.x.spawnAheadM;
                 const floorY = this.findSupportFloorY(sx, characterController.position.y, sz);
                 nw.position.set(sx, floorY, sz);
                 nw.startAt = now;
-                nw.expireAt = now + 1850;
+                nw.expireAt = now + AGENT_TUNING.fade.x.lifetimeMs;
                 nw.hitSet.clear();
                 nw.group.position.copy(nw.position);
                 nw.group.rotation.set(0, yaw, 0);
@@ -27598,22 +27738,23 @@
             },
 
             // --- Breach Bionic Seismic Initiator Abilities (Aftershock [C], Flashpoint [Q], Fault Line [E], Rolling Thunder [X]) ---
+            // V2.2: Breach's numbers are in AGENT_TUNING.breach
             castBreachAftershock: function(now) {
                 camera.updateMatrixWorld();
                 _abilityOrigin.copy(camera.position);
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
 
                 // Drill through wall along crosshair: if a wall is hit within 18m, plant fusion charge 2.4m past the impact face!
-                let plantDist = 11.0;
+                let plantDist = AGENT_TUNING.breach.c.plantRangeM;
                 const savedFar = raycaster.far;
                 raycaster.ray.origin.copy(_abilityOrigin);
                 raycaster.ray.direction.copy(_abilityForward);
-                raycaster.far = 20.0;
+                raycaster.far = AGENT_TUNING.breach.c.maxRangeM;
                 _shotHits.length = 0;
-                envShotIndex.raycast(raycaster.ray, 20.0);
+                envShotIndex.raycast(raycaster.ray, AGENT_TUNING.breach.c.maxRangeM);
                 if (_shotHits.length > 0) {
                     _shotHits.sort(compareHitDistance);
-                    plantDist = Math.min(20.0, _shotHits[0].distance + 2.2);
+                    plantDist = Math.min(AGENT_TUNING.breach.c.maxRangeM, _shotHits[0].distance + AGENT_TUNING.breach.c.throughWallM);
                 }
                 _shotHits.length = 0;
                 raycaster.far = savedFar;
@@ -27628,17 +27769,18 @@
                 }
                 ba.inUse = true;
                 ba.position.set(ax, floorY, az);
-                ba.radius = 4.4;
+                ba.radius = AGENT_TUNING.breach.c.radiusM;
                 ba.startAt = now;
-                ba.expireAt = now + 2350;
-                ba.blastsLeft = 3;
-                ba.nextBlastAt = now + 380;
+                ba.expireAt = now + AGENT_TUNING.breach.c.lifetimeMs;
+                ba.blastsLeft = AGENT_TUNING.breach.c.blastCount;
+                ba.nextBlastAt = now + AGENT_TUNING.breach.c.firstBlastMs;
                 ba.group.position.copy(ba.position);
                 ba.group.visible = true;
                 soundFX.breachAftershock();
                 showNotification("AFTERSHOCK FUSION CHARGE PLANTED THROUGH WALL! (3 Blasts x 65 DMG)", 1700);
             },
 
+            // V2.2: Breach's numbers are in AGENT_TUNING.breach (its blind is in detonateProjectile)
             castBreachFlashpoint: function(now) {
                 camera.updateMatrixWorld();
                 _abilityOrigin.copy(camera.position);
@@ -27646,11 +27788,11 @@
                 const proj = this.acquireProjectile();
                 proj.type = 'flashpoint';
                 proj.bounced = false;
-                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, 1.2);
-                proj.velocity.copy(_abilityForward).multiplyScalar(28);
-                proj.gravity = 2.5;
+                proj.position.copy(_abilityOrigin).addScaledVector(_abilityForward, AGENT_TUNING.breach.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.breach.q.speedMps);
+                proj.gravity = AGENT_TUNING.breach.q.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 520;
+                proj.detonateAt = now + AGENT_TUNING.breach.q.fuseMs;
                 proj.mesh.material.color.setHex(0xfb923c).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -27658,13 +27800,14 @@
                 showNotification("FLASHPOINT CHARGE FIRED! Rapid Blinding Burst Through Cover!", 1400);
             },
 
+            // V2.2: Breach's numbers are in AGENT_TUNING.breach
             castBreachFaultLine: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const len = 28.0;
-                const sx = characterController.position.x + fwdX * 1.6;
-                const sz = characterController.position.z + fwdZ * 1.6;
+                const len = AGENT_TUNING.breach.e.lengthM;
+                const sx = characterController.position.x + fwdX * AGENT_TUNING.breach.e.spawnAheadM;
+                const sz = characterController.position.z + fwdZ * AGENT_TUNING.breach.e.spawnAheadM;
                 const ex = sx + fwdX * len;
                 const ez = sz + fwdZ * len;
                 const cx = (sx + ex) * 0.5;
@@ -27680,8 +27823,8 @@
                 bf.startPos.set(sx, floorY, sz);
                 bf.endPos.set(ex, floorY, ez);
                 bf.startAt = now;
-                bf.detonateAt = now + 620;
-                bf.expireAt = now + 1550;
+                bf.detonateAt = now + AGENT_TUNING.breach.e.windupMs;
+                bf.expireAt = now + AGENT_TUNING.breach.e.lifetimeMs;
                 bf.group.position.set(cx, floorY, cz);
                 bf.group.rotation.set(0, yaw, 0);
                 bf.group.visible = true;
@@ -27689,6 +27832,7 @@
                 showNotification("FAULT LINE CHARGING! 28m Wall-Piercing Seismic Quake in 0.6s!", 1600);
             },
 
+            // V2.2: Breach's numbers are in AGENT_TUNING.breach
             spawnBreachRollingThunder: function(now) {
                 if (!this.breachRollingThunder) return;
                 const yaw = camera.rotation.y;
@@ -27700,9 +27844,9 @@
                 rt.direction.set(fwdX, 0, fwdZ).normalize();
                 rt.currentWavePos.copy(characterController.position);
                 rt.startAt = now;
-                rt.expireAt = now + 2200;
-                rt.wavesLeft = 6;
-                rt.nextWaveAt = now + 80;
+                rt.expireAt = now + AGENT_TUNING.breach.x.lifetimeMs;
+                rt.wavesLeft = AGENT_TUNING.breach.x.waveCount;
+                rt.nextWaveAt = now + AGENT_TUNING.breach.x.firstWaveMs;
                 rt.hitSet.clear();
                 rt.group.position.copy(rt.currentWavePos);
                 rt.group.rotation.set(0, yaw, 0);
@@ -27710,18 +27854,19 @@
             },
 
             // --- KAY/O Cybernetic Suppression Initiator Abilities (FRAG/ment [C], FLASH/drive [Q], ZERO/point [E], NULL/cmd [X]) ---
+            // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo
             castKayoFragment: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'fragment';
                 proj.bounced = false;
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.05);
-                proj.velocity.copy(_abilityForward).multiplyScalar(27);
-                proj.velocity.y += 2.3;
-                proj.gravity = 15.5;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.kayo.c.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.kayo.c.speedMps);
+                proj.velocity.y += AGENT_TUNING.kayo.c.upSpeedMps;
+                proj.gravity = AGENT_TUNING.kayo.c.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 1500;
+                proj.detonateAt = now + AGENT_TUNING.kayo.c.fuseMs;
                 proj.mesh.material.color.setHex(0x6366f1).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -27729,6 +27874,7 @@
                 showNotification("FRAG/MENT THROWN! 4-Pulse Floor Plasma Zone (55 Core / 35 Outer DMG per Pulse)!", 1500);
             },
 
+            // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo
             spawnKayoFragmentZone: function(x, y, z, now) {
                 let kf = this.kayoFragments[0];
                 for (let i = 0; i < this.kayoFragments.length; i++) {
@@ -27736,11 +27882,11 @@
                 }
                 kf.inUse = true;
                 kf.position.set(x, Math.max(0.02, y), z);
-                kf.radius = 5.2;
+                kf.radius = AGENT_TUNING.kayo.c.radiusM;
                 kf.startAt = now;
-                kf.expireAt = now + 3100;
-                kf.pulsesLeft = 4;
-                kf.nextPulseAt = now + 120;
+                kf.expireAt = now + AGENT_TUNING.kayo.c.lifetimeMs;
+                kf.pulsesLeft = AGENT_TUNING.kayo.c.pulseCount;
+                kf.nextPulseAt = now + AGENT_TUNING.kayo.c.firstPulseMs;
                 kf.discMesh.scale.set(kf.radius, 1, kf.radius);
                 kf.ringMesh.scale.set(kf.radius, 1, kf.radius);
                 kf.group.position.copy(kf.position);
@@ -27748,6 +27894,7 @@
                 soundFX.kayoFragment();
             },
 
+            // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo (its blind and reveal are shared, in detonateProjectile)
             castKayoFlashDrive: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
@@ -27756,12 +27903,12 @@
                 const proj = this.acquireProjectile();
                 proj.type = 'flashdrive';
                 proj.bounced = false;
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.0);
-                proj.velocity.copy(_abilityForward).multiplyScalar(isPopFlash ? 14 : 26);
-                proj.velocity.y += isPopFlash ? 1.8 : 2.2;
-                proj.gravity = isPopFlash ? 9.5 : 11.5;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.kayo.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(isPopFlash ? AGENT_TUNING.kayo.q.popSpeedMps : AGENT_TUNING.kayo.q.speedMps);
+                proj.velocity.y += isPopFlash ? AGENT_TUNING.kayo.q.popUpSpeedMps : AGENT_TUNING.kayo.q.upSpeedMps;
+                proj.gravity = isPopFlash ? AGENT_TUNING.kayo.q.popGravity : AGENT_TUNING.kayo.q.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + (isPopFlash ? 520 : 820);
+                proj.detonateAt = now + (isPopFlash ? AGENT_TUNING.kayo.q.popFuseMs : AGENT_TUNING.kayo.q.fuseMs);
                 proj.mesh.material.color.setHex(0x818cf8).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -27769,17 +27916,18 @@
                 showNotification(isPopFlash ? "FLASH/DRIVE POP-FLASH OUT! (0.5s Short Fuse)" : "FLASH/DRIVE OUT! Blinds & Tags Hostiles in Line-of-Sight!", 1300);
             },
 
+            // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo
             castKayoZeroPoint: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'zeropoint';
                 proj.bounced = false;
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.1);
-                proj.velocity.copy(_abilityForward).multiplyScalar(38);
-                proj.gravity = 6.0;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.kayo.e.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.kayo.e.speedMps);
+                proj.gravity = AGENT_TUNING.kayo.e.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 1700;
+                proj.detonateAt = now + AGENT_TUNING.kayo.e.fuseMs;
                 proj.mesh.material.color.setHex(0x6366f1).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -27787,6 +27935,7 @@
                 showNotification("ZERO/POINT SUPPRESSION BLADE THROWN! (18m Wall-Piercing Suppress & Reveal)", 1600);
             },
 
+            // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo
             spawnZeroPointBlade: function(x, y, z, now) {
                 let zb = this.zeroPointBlades[0];
                 for (let i = 0; i < this.zeroPointBlades.length; i++) {
@@ -27794,10 +27943,10 @@
                 }
                 zb.inUse = true;
                 zb.pulsed = false;
-                zb.position.set(x, Math.max(0.45, y), z);
+                zb.position.set(x, Math.max(AGENT_TUNING.kayo.e.minHeightM, y), z);
                 zb.startAt = now;
-                zb.detonateAt = now + 750;
-                zb.expireAt = now + 1650;
+                zb.detonateAt = now + AGENT_TUNING.kayo.e.windupMs;
+                zb.expireAt = now + AGENT_TUNING.kayo.e.lifetimeMs;
                 zb.pulseMesh.scale.set(0.4, 0.4, 0.4);
                 zb.pulseMat.opacity = 0.55;
                 zb.group.position.copy(zb.position);
@@ -27805,6 +27954,7 @@
                 soundFX.chamberSnap();
             },
 
+            // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo
             emitKayoNullPulse: function(now, nowMs) {
                 const px = characterController.position.x;
                 const py = Math.max(0.1, characterController.position.y - 1.3);
@@ -27812,39 +27962,41 @@
                 this.spawnWindRing(px, py, pz, 0x6366f1, 14.0, now);
                 this.spawnFlashBurst(px, py + 0.5, pz, 0x818cf8, 5.5, 340, now);
                 soundFX.kayoSuppress();
-                const rSq = 24.0 * 24.0;
+                const rSq = AGENT_TUNING.kayo.x.radiusM * AGENT_TUNING.kayo.x.radiusM;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
                     if (!e.isActive || e.hit) continue;
                     if (e.mesh.position.distanceToSquared(characterController.position) <= rSq) {
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 3200);
-                        e.slowedUntil = Math.max(e.slowedUntil, now + 2600);
-                        damageEnemyActor(e, 18, now, nowMs, "NULL/cmd Pulse", false);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.kayo.x.revealMs);
+                        e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.kayo.x.slowMs);
+                        damageEnemyActor(e, AGENT_TUNING.kayo.x.damage, now, nowMs, "NULL/cmd Pulse", false);
                     }
                 }
             },
 
             // --- Skye Nature Initiator Abilities (Regrowth [C], Trailblazer [Q], Guiding Light [E], Seekers [X]) ---
+            // V2.2: Skye's numbers are in AGENT_TUNING.skye
             castSkyeRegrowth: function(now) {
-                this.healPlayer(25, now);
+                this.healPlayer(AGENT_TUNING.skye.c.healHp, now);
                 game.maxShield = Math.max(game.maxShield || 25, 50);
-                game.shield = Math.min(50, (game.shield || 0) + 25);
+                game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.skye.c.shieldHp);
                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                 this.skyeRegrowthSession.active = true;
-                this.skyeRegrowthSession.ticksLeft = 6;
-                this.skyeRegrowthSession.nextTickAt = now + 450;
+                this.skyeRegrowthSession.ticksLeft = AGENT_TUNING.skye.c.tickCount;
+                this.skyeRegrowthSession.nextTickAt = now + AGENT_TUNING.skye.c.firstTickMs;
                 this.healFxUntil = now + 3200;
                 this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.45), characterController.position.z, 0x4ade80, 4.8, now);
                 soundFX.revive();
                 showNotification("REGROWTH TRINKET ACTIVE! (+97 HP Emerald Mend + +25 Overshield)", 2000);
             },
 
+            // V2.2: Skye's numbers are in AGENT_TUNING.skye
             castSkyeTrailblazer: function(now) {
                 const yaw = camera.rotation.y;
                 const fwdX = -Math.sin(yaw);
                 const fwdZ = -Math.cos(yaw);
-                const spawnX = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 1.4));
-                const spawnZ = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 1.4));
+                const spawnX = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.skye.q.spawnAheadM));
+                const spawnZ = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.skye.q.spawnAheadM));
                 const floorY = this.findSupportFloorY(spawnX, characterController.position.y, spawnZ);
 
                 let sp = this.skyePredators[0];
@@ -27853,9 +28005,9 @@
                 }
                 sp.inUse = true;
                 sp.position.set(spawnX, floorY, spawnZ);
-                sp.velocity.set(fwdX * 13.5, 0, fwdZ * 13.5);
+                sp.velocity.set(fwdX * AGENT_TUNING.skye.q.speedMps, 0, fwdZ * AGENT_TUNING.skye.q.speedMps);
                 sp.startAt = now;
-                sp.expireAt = now + 7500;
+                sp.expireAt = now + AGENT_TUNING.skye.q.lifetimeMs;
                 sp.group.position.copy(sp.position);
                 sp.group.rotation.set(0, yaw + Math.PI, 0);
                 sp.group.visible = true;
@@ -27864,6 +28016,7 @@
                 showNotification("TRAILBLAZER UNLEASHED! Bounding Tasmanian Predator Hunts & Concusses Hostiles!", 1700);
             },
 
+            // V2.2: Skye's numbers are in AGENT_TUNING.skye
             castSkyeGuidingLight: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
@@ -27872,10 +28025,10 @@
                     if (!this.skyeHawks[i].inUse) { sh = this.skyeHawks[i]; break; }
                 }
                 sh.inUse = true;
-                sh.position.copy(camera.position).addScaledVector(_abilityForward, 1.25);
-                sh.velocity.copy(_abilityForward).multiplyScalar(18.0);
+                sh.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.skye.e.spawnAheadM);
+                sh.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.skye.e.speedMps);
                 sh.startAt = now;
-                sh.expireAt = now + 1350;
+                sh.expireAt = now + AGENT_TUNING.skye.e.lifetimeMs;
                 sh.group.position.copy(sh.position);
                 _abilityTempVec.copy(sh.position).add(sh.velocity);
                 sh.group.lookAt(_abilityTempVec);
@@ -27902,6 +28055,7 @@
                 }
             },
 
+            // V2.2: Skye's numbers are in AGENT_TUNING.skye
             detonateSkyeHawk: function(sh, now) {
                 sh.inUse = false;
                 sh.group.visible = false;
@@ -27914,9 +28068,9 @@
                     const e = enemyObjects[i];
                     if (!e.isActive || e.hit) continue;
                     const dSq = e.mesh.position.distanceToSquared(p);
-                    if (dSq <= 22 * 22 && this.hasWallLineOfSight(p, e.mesh.position, Math.sqrt(dSq))) {
-                        this.applyEnemyBlind(e, now, 3800);
-                        e.revealedUntil = Math.max(e.revealedUntil, now + 4000);
+                    if (dSq <= AGENT_TUNING.skye.e.radiusM * AGENT_TUNING.skye.e.radiusM && this.hasWallLineOfSight(p, e.mesh.position, Math.sqrt(dSq))) {
+                        this.applyEnemyBlind(e, now, AGENT_TUNING.skye.e.blindMs);
+                        e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.skye.e.revealMs);
                         blindedCount++;
                     }
                 }
@@ -27929,6 +28083,7 @@
                 this.syncHud(now, true);
             },
 
+            // V2.2: Skye's numbers are in AGENT_TUNING.skye (Seekers last AGENT_DEFS.skye.abilities.x.durationMs)
             spawnSkyeSeekers: function(now) {
                 const yaw = camera.rotation.y;
                 const liveEnemies = [];
@@ -27943,21 +28098,21 @@
                 }
                 liveEnemies.sort((a, b) => a.dSq - b.dSq);
 
-                const angleOffsets = [-0.38, 0, 0.38];
+                const angleOffsets = [-AGENT_TUNING.skye.x.spreadRad, 0, AGENT_TUNING.skye.x.spreadRad];
                 for (let i = 0; i < this.skyeSeekers.length; i++) {
                     const ss = this.skyeSeekers[i];
                     const a = yaw + angleOffsets[i % 3];
                     const fwdX = -Math.sin(a);
                     const fwdZ = -Math.cos(a);
-                    const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * 1.6));
-                    const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * 1.6));
+                    const sx = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.skye.x.spawnAheadM));
+                    const sz = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.skye.x.spawnAheadM));
                     const floorY = this.findSupportFloorY(sx, characterController.position.y, sz);
                     ss.inUse = true;
-                    ss.position.set(sx, floorY + 0.95, sz);
-                    ss.velocity.set(fwdX * 11.5, 0, fwdZ * 11.5);
+                    ss.position.set(sx, floorY + AGENT_TUNING.skye.x.hoverHeightM, sz);
+                    ss.velocity.set(fwdX * AGENT_TUNING.skye.x.speedMps, 0, fwdZ * AGENT_TUNING.skye.x.speedMps);
                     ss.targetEnemy = liveEnemies.length > 0 ? liveEnemies[i % liveEnemies.length].enemy : null;
                     ss.startAt = now;
-                    ss.expireAt = now + 12000;
+                    ss.expireAt = now + AGENT_DEFS.skye.abilities.x.durationMs;
                     ss.group.position.copy(ss.position);
                     ss.group.visible = true;
                 }
@@ -28980,16 +29135,17 @@
                 showNotification("BLAZE STEP!", 1100);
             },
 
+            // V2.2: Sova's numbers are in AGENT_TUNING.sova
             castSovaReconBolt: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'recon';
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.1);
-                proj.velocity.copy(_abilityForward).multiplyScalar(38);
-                proj.gravity = 5.5;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.sova.e.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.sova.e.speedMps);
+                proj.gravity = AGENT_TUNING.sova.e.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 1800;
+                proj.detonateAt = now + AGENT_TUNING.sova.e.fuseMs;
                 proj.mesh.material.color.setHex(0x38f6ff).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -29036,16 +29192,17 @@
                 showNotification("CURVEBALL OUT!", 1100);
             },
 
+            // V2.2: Sova's numbers are in AGENT_TUNING.sova
             castSovaShockBolt: function(now) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'shock';
-                proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.1);
-                proj.velocity.copy(_abilityForward).multiplyScalar(34);
-                proj.gravity = 7.5;
+                proj.position.copy(camera.position).addScaledVector(_abilityForward, AGENT_TUNING.sova.q.spawnAheadM);
+                proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.sova.q.speedMps);
+                proj.gravity = AGENT_TUNING.sova.q.gravity;
                 proj.spawnAt = now;
-                proj.detonateAt = now + 1800;
+                proj.detonateAt = now + AGENT_TUNING.sova.q.fuseMs;
                 proj.mesh.material.color.setHex(0x7cc4ff).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
                 proj.mesh.visible = true;
@@ -29409,6 +29566,8 @@
 
             // --- X: Ultimates (Jett Blade Storm, Phoenix Run It Back, Sova Hunter's Fury, Sage Resurrection, Reyna Empress, Omen From the Shadows, Raze Showstopper, Killjoy Lockdown, Cypher Neural Theft, Brimstone Orbital Strike) ---
             // V2.2: Omen's, Brimstone's, Viper's, Clove's, Astra's and Miks's branches read AGENT_TUNING.<agent>.x (Harbor's branch has no numbers)
+            // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo (its branch here: charges and pulse interval)
+            // V2.2: Sova's numbers are in AGENT_TUNING.sova (its branch here: blast count)
             activateUltimate: function(agentId, now) {
                 const def = AGENT_DEFS[agentId];
                 castFX.start('ult', def.themeColor);
@@ -29439,7 +29598,7 @@
                     ammoValue.textContent = weapon.ammo;
                     showNotification("RUN IT BACK ACTIVE! Solar Anchor placed — Fatal damage rewinds you to full HP!", 3400);
                 } else if (agentId === 'sova') {
-                    game.ultChargesLeft = 3;
+                    game.ultChargesLeft = AGENT_TUNING.sova.x.shotCount;
                     this.revealAllEnemies(now, def.abilities.x.durationMs);
                     showNotification("HUNTER'S FURY! 3 Wall-Piercing Railgun Blasts Ready (Click or Press X to fire)", 3400);
                 } else if (agentId === 'sage') {
@@ -29652,7 +29811,7 @@
                     showNotification("THEY ARE SO DEAD! TOUR DE FORCE READY (5 One-Shot Golden Sniper Rounds — Press Left-Click or [X])!", 3600);
                 } else if (agentId === 'kayo') {
                     // NULL/cmd: Overload Polarized Radianite Core (+25% Rapid Fire, +20% Speed, 24m Periodic Suppression Pulses, & Self-Stabilize Revive on Down)!
-                    game.ultChargesLeft = 1;
+                    game.ultChargesLeft = AGENT_TUNING.kayo.x.chargeCount;
                     const weapon = game.weapons[game.activeWeapon];
                     if (weapon && !weapon.isMelee) {
                         weapon.ammo = weapon.maxAmmo;
@@ -29664,7 +29823,7 @@
                         st.q.charges = st.q.maxCharges; st.q.rechargeEnd = 0;
                         st.e.charges = st.e.maxCharges; st.e.rechargeEnd = 0;
                     }
-                    this.kayoNextNullPulseAt = now + 2500;
+                    this.kayoNextNullPulseAt = now + AGENT_TUNING.kayo.x.pulseIntervalMs;
                     this.emitKayoNullPulse(now, Date.now());
                     showNotification("NO ONE WALKS AWAY! NULL/CMD ACTIVE (Combat Stim + 24m Suppression Pulses + Self-Revive on Down)!", 3600);
                 } else if (agentId === 'skye') {
@@ -29887,6 +30046,7 @@
                 return game.ultActiveUntil > now && !!game.ultAgent;
             },
 
+            // V2.2: Sova's numbers are in AGENT_TUNING.sova
             fireSovaHunterBeam: function(now) {
                 if (game.ultChargesLeft <= 0) return;
                 game.ultChargesLeft--;
@@ -29914,16 +30074,16 @@
                     const enemy = enemyObjects[i];
                     if (!enemy.isActive || enemy.hit) continue;
                     const ex = enemy.mesh.position.x - _abilityOrigin.x;
-                    const ey = (enemy.mesh.position.y + 1.1) - _abilityOrigin.y;
+                    const ey = (enemy.mesh.position.y + AGENT_TUNING.sova.x.enemyAimHeightM) - _abilityOrigin.y;
                     const ez = enemy.mesh.position.z - _abilityOrigin.z;
                     const proj = ex * _abilityForward.x + ey * _abilityForward.y + ez * _abilityForward.z;
-                    if (proj < 0 || proj > 100) continue;
+                    if (proj < 0 || proj > AGENT_TUNING.sova.x.rangeM) continue;
                     const perpSq = (ex * ex + ey * ey + ez * ez) - proj * proj;
-                    if (perpSq <= 1.75 * 1.75) {
+                    if (perpSq <= AGENT_TUNING.sova.x.hitRadiusM * AGENT_TUNING.sova.x.hitRadiusM) {
                         hitCount++;
-                        enemy.revealedUntil = Math.max(enemy.revealedUntil, now + 5000);
+                        enemy.revealedUntil = Math.max(enemy.revealedUntil, now + AGENT_TUNING.sova.x.revealMs);
                         createHitEffect(enemy.mesh.position, false);
-                        damageEnemyActor(enemy, 110, now, nowMs, "Hunter's Fury", false);
+                        damageEnemyActor(enemy, AGENT_TUNING.sova.x.damage, now, nowMs, "Hunter's Fury", false);
                     }
                 }
 
@@ -29934,17 +30094,17 @@
                     const ty = target.mesh.position.y - _abilityOrigin.y;
                     const tz = target.mesh.position.z - _abilityOrigin.z;
                     const proj = tx * _abilityForward.x + ty * _abilityForward.y + tz * _abilityForward.z;
-                    if (proj < 0 || proj > 100) continue;
+                    if (proj < 0 || proj > AGENT_TUNING.sova.x.rangeM) continue;
                     const perpSq = (tx * tx + ty * ty + tz * tz) - proj * proj;
-                    if (perpSq <= 1.85 * 1.85) {
+                    if (perpSq <= AGENT_TUNING.sova.x.targetHitRadiusM * AGENT_TUNING.sova.x.targetHitRadiusM) {
                         hitCount++;
                         createHitEffect(target.mesh.position, false);
-                        damageTargetActor(target, 110, now, nowMs, "Hunter's Fury", target.leaves[0]);
+                        damageTargetActor(target, AGENT_TUNING.sova.x.damage, now, nowMs, "Hunter's Fury", target.leaves[0]);
                     }
                 }
 
                 if (game.ultChargesLeft <= 0) {
-                    game.ultActiveUntil = Math.min(game.ultActiveUntil, now + 600);
+                    game.ultActiveUntil = Math.min(game.ultActiveUntil, now + AGENT_TUNING.sova.x.endDelayMs);
                 } else {
                     showNotification(`HUNTER'S FURY BLAST (${game.ultChargesLeft} left)${hitCount ? ` — Hit ${hitCount}!` : ''}`, 1400);
                 }
@@ -30125,6 +30285,8 @@
             },
 
             // V2.2: Omen's kill bonus and Miks's Harmonize kill refresh are in AGENT_TUNING.omen.x / AGENT_TUNING.miks.q (the shared kill bonuses are unchanged)
+            // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo (its kill bonus)
+            // V2.2: Skye's numbers are in AGENT_TUNING.skye (its kill bonus)
             onActorEliminated: function(kind, worldPos) {
                 const now = gameNow();
                 let gainedUltPoint = false;
@@ -30228,18 +30390,18 @@
                         if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                     } else if (game.ultAgent === 'kayo') {
                         // Kills during NULL/cmd extend overload by +2.0s, heal +25 HP, and top up ammo!
-                        this.healPlayer(25, now);
+                        this.healPlayer(AGENT_TUNING.kayo.x.killHealHp, now);
                         const weapon = game.weapons[game.activeWeapon];
                         if (weapon && !weapon.isMelee) {
                             weapon.ammo = weapon.maxAmmo;
                             ammoValue.textContent = weapon.ammo;
                         }
-                        game.ultActiveUntil = Math.min(now + 15000, game.ultActiveUntil + 2000);
+                        game.ultActiveUntil = Math.min(now + AGENT_TUNING.kayo.x.killExtendCapMs, game.ultActiveUntil + AGENT_TUNING.kayo.x.killExtendMs);
                     } else if (game.ultAgent === 'skye') {
                         // Kills during Seekers heal +25 HP and restore +15 Armor!
-                        this.healPlayer(25, now);
+                        this.healPlayer(AGENT_TUNING.skye.x.killHealHp, now);
                         game.maxShield = Math.max(game.maxShield || 25, 50);
-                        game.shield = Math.min(50, (game.shield || 0) + 15);
+                        game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.skye.x.killShieldHp);
                         if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                     } else if (game.ultAgent === 'fade' || game.ultAgent === 'breach') {
                         this.healPlayer(25, now);
@@ -30478,23 +30640,27 @@
                 else abilityLook.bindNow(item, 'flash', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
+            // V2.2: Sova's numbers are in AGENT_TUNING.sova (only Sova's Recon Bolt spawns beacons)
             spawnReconBeacon: function(x, y, z, now) {
                 let item = this.recons[0];
                 for (let i = 0; i < this.recons.length; i++) {
                     if (!this.recons[i].inUse) { item = this.recons[i]; break; }
                 }
                 item.inUse = true;
-                item.position.set(x, Math.max(0.4, y), z);
+                item.position.set(x, Math.max(AGENT_TUNING.sova.e.minHeightM, y), z);
                 item.startAt = now;
-                item.expireAt = now + 6500;
+                item.expireAt = now + AGENT_TUNING.sova.e.lifetimeMs;
                 item.nextPulseAt = now; // First pulse immediately on impact
                 item.pulseStartAt = now;
-                item.maxRadius = 36;
+                item.maxRadius = AGENT_TUNING.sova.e.radiusM;
                 item.group.position.copy(item.position);
                 item.pulseMesh.scale.set(0.2, 0.2, 0.2);
                 item.group.visible = true;
             },
 
+            // V2.2: Breach's numbers are in AGENT_TUNING.breach (only Flashpoint's blind; the rest of the flash branch is shared and unchanged)
+            // V2.2: Fade's numbers are in AGENT_TUNING.fade (its haunt branch)
+            // V2.2: Sova's numbers are in AGENT_TUNING.sova (its shock branch)
             detonateProjectile: function(proj, now) {
                 proj.inUse = false;
                 proj.mesh.visible = false;
@@ -30563,7 +30729,7 @@
                         const dSq = e.mesh.position.distanceToSquared(p);
                         // Breach Flashpoint charges detonate through cover within 22m; standard flashes check LOS
                         if (dSq <= 22 * 22 && (isFlashpoint || this.hasWallLineOfSight(p, e.mesh.position, Math.sqrt(dSq)))) {
-                            this.applyEnemyBlind(e, now, isFlashpoint ? 4000 : 3800);
+                            this.applyEnemyBlind(e, now, isFlashpoint ? AGENT_TUNING.breach.q.blindMs : 3800);
                             if (isBlindside || isFlashDrive || isFlashpoint) {
                                 e.revealedUntil = Math.max(e.revealedUntil, now + 3200);
                             }
@@ -30592,15 +30758,15 @@
                     abilityLook.tag = null;
                     soundFX.shock();
                     const nowMs = Date.now();
-                    const shockRadius = 6.0;
+                    const shockRadius = AGENT_TUNING.sova.q.radiusM;
                     for (let i = 0; i < enemyObjects.length; i++) {
                         const e = enemyObjects[i];
                         if (!e.isActive || e.hit) continue;
                         const dist = e.mesh.position.distanceTo(p);
                         if (dist <= shockRadius) {
-                            const falloff = 1 - (dist / (shockRadius + 1.5)) * 0.55;
-                            const dmg = Math.round(75 * falloff);
-                            e.slowedUntil = Math.max(e.slowedUntil, now + 3000);
+                            const falloff = 1 - (dist / (shockRadius + AGENT_TUNING.sova.q.falloffPadM)) * AGENT_TUNING.sova.q.falloffMult;
+                            const dmg = Math.round(AGENT_TUNING.sova.q.maxDamage * falloff);
+                            e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.sova.q.slowMs);
                             createHitEffect(e.mesh.position, false);
                             damageEnemyActor(e, dmg, now, nowMs, "Shock Bolt", false);
                         }
@@ -30610,7 +30776,7 @@
                         if (!t.active || t.hit) continue;
                         const dist = t.mesh.position.distanceTo(p);
                         if (dist <= shockRadius) {
-                            const dmg = Math.round(80 * (1 - (dist / (shockRadius + 1.5)) * 0.5));
+                            const dmg = Math.round(AGENT_TUNING.sova.q.targetMaxDamage * (1 - (dist / (shockRadius + AGENT_TUNING.sova.q.falloffPadM)) * AGENT_TUNING.sova.q.targetFalloffMult));
                             createHitEffect(t.mesh.position, false);
                             damageTargetActor(t, dmg, now, nowMs, "Shock Bolt", t.leaves[0]);
                         }
@@ -30628,7 +30794,7 @@
                     const floorY = this.findSupportFloorY(p.x, p.y, p.z);
                     this.spawnFadeSeizeZone(p.x, floorY, p.z, now);
                 } else if (proj.type === 'haunt') {
-                    this.spawnFadeHauntWatcher(p.x, Math.max(1.2, p.y), p.z, now);
+                    this.spawnFadeHauntWatcher(p.x, Math.max(AGENT_TUNING.fade.e.minHeightM, p.y), p.z, now);
                 } else if (proj.type === 'meddle') {
                     const floorY = this.findSupportFloorY(p.x, p.y, p.z);
                     this.spawnCloveMeddleBurst(p.x, Math.max(floorY + 0.1, p.y), p.z, now);
@@ -31738,6 +31904,7 @@
                     this.syncHud(now, true);
                 }
 
+                // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo
                 // 2U. Step KAY/O FRAG/ment Multi-Pulse Plasma Floor Zones (4 high-intensity plasma pulses every 700ms)
                 for (let i = 0; i < this.kayoFragments.length; i++) {
                     const kf = this.kayoFragments[i];
@@ -31749,7 +31916,7 @@
                     }
                     if (kf.pulsesLeft > 0 && now >= kf.nextPulseAt) {
                         kf.pulsesLeft--;
-                        kf.nextPulseAt = now + 700;
+                        kf.nextPulseAt = now + AGENT_TUNING.kayo.c.pulseIntervalMs;
                         soundFX.kayoFragment();
                         this.spawnWindRing(kf.position.x, kf.position.y + 0.1, kf.position.z, 0x6366f1, kf.radius * 0.95, now);
                         this.spawnFlashBurst(kf.position.x, kf.position.y + 0.35, kf.position.z, 0x38bdf8, kf.radius * 0.85, 280, now);
@@ -31760,11 +31927,11 @@
                             const dx = e.mesh.position.x - kf.position.x;
                             const dz = e.mesh.position.z - kf.position.z;
                             const dSq = dx * dx + dz * dz;
-                            if (dSq <= rSq && Math.abs(e.mesh.position.y - kf.position.y) <= 3.0) {
-                                const isCore = dSq <= (kf.radius * 0.48) * (kf.radius * 0.48);
-                                const dmg = isCore ? 55 : 35;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 1200);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 2000);
+                            if (dSq <= rSq && Math.abs(e.mesh.position.y - kf.position.y) <= AGENT_TUNING.kayo.c.hitHeightM) {
+                                const isCore = dSq <= (kf.radius * AGENT_TUNING.kayo.c.coreRadiusMult) * (kf.radius * AGENT_TUNING.kayo.c.coreRadiusMult);
+                                const dmg = isCore ? AGENT_TUNING.kayo.c.coreDamage : AGENT_TUNING.kayo.c.outerDamage;
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.kayo.c.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.kayo.c.revealMs);
                                 damageEnemyActor(e, dmg, now, nowMs, "FRAG/ment", false);
                             }
                         }
@@ -31774,12 +31941,13 @@
                             const dx = t.mesh.position.x - kf.position.x;
                             const dz = t.mesh.position.z - kf.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                damageTargetActor(t, 45, now, nowMs, "FRAG/ment", t.leaves[0]);
+                                damageTargetActor(t, AGENT_TUNING.kayo.c.targetDamage, now, nowMs, "FRAG/ment", t.leaves[0]);
                             }
                         }
                     }
                 }
 
+                // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo
                 // 2V. Step KAY/O ZERO/point Suppression Throwing Blades (750ms windup -> 18m wall-piercing Suppression & X-Ray pulse)
                 for (let i = 0; i < this.zeroPointBlades.length; i++) {
                     const zb = this.zeroPointBlades[i];
@@ -31800,9 +31968,9 @@
                             if (!e.isActive || e.hit) continue;
                             if (e.mesh.position.distanceToSquared(zb.position) <= rSq) {
                                 suppressedCount++;
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 5500);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 4500);
-                                damageEnemyActor(e, 25, now, nowMs, "ZERO/point", false);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.kayo.e.revealMs);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.kayo.e.slowMs);
+                                damageEnemyActor(e, AGENT_TUNING.kayo.e.damage, now, nowMs, "ZERO/point", false);
                             }
                         }
                         if (suppressedCount > 0) {
@@ -31813,23 +31981,26 @@
                     }
                 }
 
+                // V2.2: KAY/O's numbers are in AGENT_TUNING.kayo
                 // 2W. Step KAY/O NULL/cmd Ultimate Periodic 24m Suppression Waves (every 2.5s)
                 if (this.isUltActive(now) && game.ultAgent === 'kayo' && now >= this.kayoNextNullPulseAt) {
-                    this.kayoNextNullPulseAt = now + 2500;
+                    this.kayoNextNullPulseAt = now + AGENT_TUNING.kayo.x.pulseIntervalMs;
                     this.emitKayoNullPulse(now, nowMs);
                 }
 
+                // V2.2: Skye's numbers are in AGENT_TUNING.skye
                 // 2X. Step Skye Regrowth Emerald Healing Aura (6 healing waves over 3.0s)
                 if (this.skyeRegrowthSession && this.skyeRegrowthSession.active && now >= this.skyeRegrowthSession.nextTickAt) {
-                    this.healPlayer(12, now);
+                    this.healPlayer(AGENT_TUNING.skye.c.healPerTickHp, now);
                     this.skyeRegrowthSession.ticksLeft--;
-                    this.skyeRegrowthSession.nextTickAt = now + 500;
+                    this.skyeRegrowthSession.nextTickAt = now + AGENT_TUNING.skye.c.tickMs;
                     this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.45), characterController.position.z, 0x4ade80, 4.2, now);
                     if (this.skyeRegrowthSession.ticksLeft <= 0) {
                         this.skyeRegrowthSession.active = false;
                     }
                 }
 
+                // V2.2: Skye's numbers are in AGENT_TUNING.skye (the blast's own numbers are this call's; detonateExplosionAoE is shared)
                 // 2Y. Step Skye Trailblazer Tasmanian Predator (bounds at 13.5 m/s, homes within 16m, leaps & concusses within 4.5m)
                 for (let i = 0; i < this.skyePredators.length; i++) {
                     const sp = this.skyePredators[i];
@@ -31840,7 +32011,7 @@
                         continue;
                     }
                     let nearestEnemy = null;
-                    let nearestDistSq = 16.0 * 16.0;
+                    let nearestDistSq = AGENT_TUNING.skye.q.huntRangeM * AGENT_TUNING.skye.q.huntRangeM;
                     for (let j = 0; j < enemyObjects.length; j++) {
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit) continue;
@@ -31856,19 +32027,19 @@
                         const tx = nearestEnemy.mesh.position.x - sp.position.x;
                         const tz = nearestEnemy.mesh.position.z - sp.position.z;
                         const len = Math.max(0.01, Math.hypot(tx, tz));
-                        sp.velocity.x = (tx / len) * 14.5;
-                        sp.velocity.z = (tz / len) * 14.5;
-                        if (nearestDistSq <= 4.5 * 4.5) {
+                        sp.velocity.x = (tx / len) * AGENT_TUNING.skye.q.chaseSpeedMps;
+                        sp.velocity.z = (tz / len) * AGENT_TUNING.skye.q.chaseSpeedMps;
+                        if (nearestDistSq <= AGENT_TUNING.skye.q.triggerRadiusM * AGENT_TUNING.skye.q.triggerRadiusM) {
                             sp.inUse = false;
                             sp.group.visible = false;
                             soundFX.skyePredator();
-                            const hitCount = this.detonateExplosionAoE(sp.position.x, sp.position.y + 0.3, sp.position.z, 6.2, 65, "Trailblazer", 0x4ade80, 4500, now);
+                            const hitCount = this.detonateExplosionAoE(sp.position.x, sp.position.y + AGENT_TUNING.skye.q.blastHeightM, sp.position.z, AGENT_TUNING.skye.q.radiusM, AGENT_TUNING.skye.q.maxDamage, "Trailblazer", 0x4ade80, AGENT_TUNING.skye.q.revealMs, now);
                             for (let j = 0; j < enemyObjects.length; j++) {
                                 const e = enemyObjects[j];
                                 if (!e.isActive || e.hit) continue;
-                                if (e.mesh.position.distanceToSquared(sp.position) <= 6.2 * 6.2) {
-                                    e.slowedUntil = Math.max(e.slowedUntil, now + 4000);
-                                    this.applyEnemyBlind(e, now, 2500);
+                                if (e.mesh.position.distanceToSquared(sp.position) <= AGENT_TUNING.skye.q.radiusM * AGENT_TUNING.skye.q.radiusM) {
+                                    e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.skye.q.slowMs);
+                                    this.applyEnemyBlind(e, now, AGENT_TUNING.skye.q.blindMs);
                                 }
                             }
                             showNotification(`TRAILBLAZER POUNCE! Concussed & Revealed ${Math.max(1, hitCount)} ${hitCount === 1 ? 'Hostile' : 'Hostiles'}!`, 1800);
@@ -31902,16 +32073,17 @@
                     }
                 }
 
+                // V2.2: Skye's numbers are in AGENT_TUNING.skye
                 // 2Z. Step Skye Guiding Light Steered Emerald Hawks (steers toward player's live crosshair direction)
                 for (let i = 0; i < this.skyeHawks.length; i++) {
                     const sh = this.skyeHawks[i];
                     if (!sh.inUse) continue;
                     camera.updateMatrixWorld();
                     _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
-                    sh.velocity.addScaledVector(_abilityForward, 18.0 * dt * 6.5);
-                    sh.velocity.normalize().multiplyScalar(18.0);
+                    sh.velocity.addScaledVector(_abilityForward, AGENT_TUNING.skye.e.speedMps * dt * AGENT_TUNING.skye.e.turnRatePerSec);
+                    sh.velocity.normalize().multiplyScalar(AGENT_TUNING.skye.e.speedMps);
                     const nx = sh.position.x + sh.velocity.x * dt;
-                    const ny = Math.max(0.8, sh.position.y + sh.velocity.y * dt);
+                    const ny = Math.max(AGENT_TUNING.skye.e.minHeightM, sh.position.y + sh.velocity.y * dt);
                     const nz = sh.position.z + sh.velocity.z * dt;
                     let hitWall = (nx < -46 || nx > 46 || nz < -46 || nz > 46);
                     if (!hitWall) {
@@ -31935,6 +32107,7 @@
                     }
                 }
 
+                // V2.2: Skye's numbers are in AGENT_TUNING.skye
                 // 2AA. Step Skye Seekers Autonomous Homing Trackers (3 jellyfish seekers hunting nearest enemies)
                 for (let i = 0; i < this.skyeSeekers.length; i++) {
                     const ss = this.skyeSeekers[i];
@@ -31963,7 +32136,7 @@
                         const dx = targetEnemy.mesh.position.x - ss.position.x;
                         const dz = targetEnemy.mesh.position.z - ss.position.z;
                         const dist = Math.hypot(dx, dz);
-                        if (dist <= 2.4) {
+                        if (dist <= AGENT_TUNING.skye.x.triggerRadiusM) {
                             ss.inUse = false;
                             ss.group.visible = false;
                             this.spawnFlashBurst(ss.position.x, ss.position.y + 0.5, ss.position.z, 0x4ade80, 5.5, 420, now);
@@ -31972,26 +32145,27 @@
                             for (let j = 0; j < enemyObjects.length; j++) {
                                 const e = enemyObjects[j];
                                 if (!e.isActive || e.hit) continue;
-                                if (e.mesh.position.distanceToSquared(ss.position) <= 5.5 * 5.5) {
-                                    this.applyEnemyBlind(e, now, 4500);
-                                    e.slowedUntil = Math.max(e.slowedUntil, now + 4500);
-                                    e.revealedUntil = Math.max(e.revealedUntil, now + 6000);
-                                    damageEnemyActor(e, 45, now, nowMs, "Seeker", false);
+                                if (e.mesh.position.distanceToSquared(ss.position) <= AGENT_TUNING.skye.x.radiusM * AGENT_TUNING.skye.x.radiusM) {
+                                    this.applyEnemyBlind(e, now, AGENT_TUNING.skye.x.blindMs);
+                                    e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.skye.x.slowMs);
+                                    e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.skye.x.revealMs);
+                                    damageEnemyActor(e, AGENT_TUNING.skye.x.damage, now, nowMs, "Seeker", false);
                                 }
                             }
                             showNotification("SEEKER TARGET FOUND! Hostile Nearsighted, Slowed & Revealed!", 1800);
                             continue;
                         }
-                        ss.velocity.x = (dx / dist) * 11.5;
-                        ss.velocity.z = (dz / dist) * 11.5;
+                        ss.velocity.x = (dx / dist) * AGENT_TUNING.skye.x.speedMps;
+                        ss.velocity.z = (dz / dist) * AGENT_TUNING.skye.x.speedMps;
                     }
                     const nx = Math.max(-45.5, Math.min(45.5, ss.position.x + ss.velocity.x * dt));
                     const nz = Math.max(-45.5, Math.min(45.5, ss.position.z + ss.velocity.z * dt));
                     const supportY = this.findSupportFloorY(nx, ss.position.y + 1.2, nz);
-                    ss.position.set(nx, supportY + 0.95, nz);
+                    ss.position.set(nx, supportY + AGENT_TUNING.skye.x.hoverHeightM, nz);
                     ss.group.position.copy(ss.position);
                 }
 
+                // V2.2: Fade's numbers are in AGENT_TUNING.fade
                 // 2BB. Step Fade Prowlers (steers toward player crosshair or locks onto Haunt/Nightfall-marked enemies within 18m; bites within 3.6m)
                 for (let i = 0; i < this.fadeProwlers.length; i++) {
                     const fp = this.fadeProwlers[i];
@@ -32002,13 +32176,13 @@
                         continue;
                     }
                     let lockedEnemy = null;
-                    let bestDistSq = 18.0 * 18.0;
+                    let bestDistSq = AGENT_TUNING.fade.c.lockRangeM * AGENT_TUNING.fade.c.lockRangeM;
                     for (let j = 0; j < enemyObjects.length; j++) {
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit) continue;
                         const dSq = e.mesh.position.distanceToSquared(fp.position);
                         // Prioritize enemies marked by Haunt/Nightfall (revealedUntil > now) within 18m, or any enemy within 10m
-                        if (dSq < bestDistSq && (e.revealedUntil > now || dSq <= 10.0 * 10.0)) {
+                        if (dSq < bestDistSq && (e.revealedUntil > now || dSq <= AGENT_TUNING.fade.c.unmarkedLockRangeM * AGENT_TUNING.fade.c.unmarkedLockRangeM)) {
                             bestDistSq = dSq;
                             lockedEnemy = e;
                         }
@@ -32017,9 +32191,9 @@
                         const dx = lockedEnemy.mesh.position.x - fp.position.x;
                         const dz = lockedEnemy.mesh.position.z - fp.position.z;
                         const dist = Math.max(0.01, Math.hypot(dx, dz));
-                        fp.velocity.x = (dx / dist) * 19.0;
-                        fp.velocity.z = (dz / dist) * 19.0;
-                        if (bestDistSq <= 3.6 * 3.6) {
+                        fp.velocity.x = (dx / dist) * AGENT_TUNING.fade.c.chaseSpeedMps;
+                        fp.velocity.z = (dz / dist) * AGENT_TUNING.fade.c.chaseSpeedMps;
+                        if (bestDistSq <= AGENT_TUNING.fade.c.triggerRadiusM * AGENT_TUNING.fade.c.triggerRadiusM) {
                             fp.inUse = false;
                             fp.group.visible = false;
                             soundFX.fadeProwler();
@@ -32028,11 +32202,11 @@
                             for (let j = 0; j < enemyObjects.length; j++) {
                                 const e = enemyObjects[j];
                                 if (!e.isActive || e.hit) continue;
-                                if (e.mesh.position.distanceToSquared(fp.position) <= 4.6 * 4.6) {
-                                    this.applyEnemyBlind(e, now, 3800);
-                                    e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                                    e.revealedUntil = Math.max(e.revealedUntil, now + 4000);
-                                    damageEnemyActor(e, 50, now, nowMs, "Prowler", false);
+                                if (e.mesh.position.distanceToSquared(fp.position) <= AGENT_TUNING.fade.c.radiusM * AGENT_TUNING.fade.c.radiusM) {
+                                    this.applyEnemyBlind(e, now, AGENT_TUNING.fade.c.blindMs);
+                                    e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.fade.c.slowMs);
+                                    e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.fade.c.revealMs);
+                                    damageEnemyActor(e, AGENT_TUNING.fade.c.damage, now, nowMs, "Prowler", false);
                                 }
                             }
                             showNotification("PROWLER BITE! Target Nearsighted, Slowed & Revealed!", 1700);
@@ -32044,11 +32218,11 @@
                         _abilityForward.y = 0;
                         if (_abilityForward.lengthSq() > 0.01) {
                             _abilityForward.normalize();
-                            fp.velocity.x += _abilityForward.x * 15.5 * dt * 5.0;
-                            fp.velocity.z += _abilityForward.z * 15.5 * dt * 5.0;
+                            fp.velocity.x += _abilityForward.x * AGENT_TUNING.fade.c.speedMps * dt * AGENT_TUNING.fade.c.turnRatePerSec;
+                            fp.velocity.z += _abilityForward.z * AGENT_TUNING.fade.c.speedMps * dt * AGENT_TUNING.fade.c.turnRatePerSec;
                             const spd = Math.max(0.01, Math.hypot(fp.velocity.x, fp.velocity.z));
-                            fp.velocity.x = (fp.velocity.x / spd) * 15.5;
-                            fp.velocity.z = (fp.velocity.z / spd) * 15.5;
+                            fp.velocity.x = (fp.velocity.x / spd) * AGENT_TUNING.fade.c.speedMps;
+                            fp.velocity.z = (fp.velocity.z / spd) * AGENT_TUNING.fade.c.speedMps;
                         }
                     }
                     let nx = fp.position.x + fp.velocity.x * dt;
@@ -32063,6 +32237,7 @@
                     }
                 }
 
+                // V2.2: Fade's numbers are in AGENT_TUNING.fade
                 // 2CC. Step Fade Seize Nightmare Tether Zones (pulls enemies inward, tethers/slows, reveals & applies Decay shock)
                 for (let i = 0; i < this.fadeSeizeZones.length; i++) {
                     const sz = this.fadeSeizeZones[i];
@@ -32073,7 +32248,7 @@
                         continue;
                     }
                     if (now >= sz.nextTickAt) {
-                        sz.nextTickAt = now + 450;
+                        sz.nextTickAt = now + AGENT_TUNING.fade.q.tickMs;
                         const rSq = sz.radius * sz.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -32083,20 +32258,21 @@
                             const dSq = dx * dx + dz * dz;
                             if (dSq <= rSq) {
                                 const dist = Math.sqrt(dSq);
-                                if (dist > 0.8) {
-                                    const pullStep = Math.min(dist - 0.6, 1.35);
+                                if (dist > AGENT_TUNING.fade.q.pullMinDistM) {
+                                    const pullStep = Math.min(dist - AGENT_TUNING.fade.q.pullStopDistM, AGENT_TUNING.fade.q.pullStepM);
                                     e.mesh.position.x += (dx / dist) * pullStep;
                                     e.mesh.position.z += (dz / dist) * pullStep;
                                     e.transformDirty = true;
                                 }
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 1200);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 2200);
-                                damageEnemyActor(e, 10, now, nowMs, "Seize Tether", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.fade.q.tickSlowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.fade.q.tickRevealMs);
+                                damageEnemyActor(e, AGENT_TUNING.fade.q.damagePerTick, now, nowMs, "Seize Tether", false);
                             }
                         }
                     }
                 }
 
+                // V2.2: Fade's numbers are in AGENT_TUNING.fade
                 // 2DD. Step Fade Haunt Nightmare Watcher Eyes (30m LOS scan pulses -> X-Ray Terror Trail mark)
                 for (let i = 0; i < this.fadeHaunts.length; i++) {
                     const fh = this.fadeHaunts[i];
@@ -32107,7 +32283,7 @@
                         continue;
                     }
                     if (now >= fh.nextPulseAt) {
-                        fh.nextPulseAt = now + 850;
+                        fh.nextPulseAt = now + AGENT_TUNING.fade.e.pulseIntervalMs;
                         soundFX.fadeHaunt();
                         this.spawnWindRing(fh.position.x, Math.max(0.1, fh.position.y), fh.position.z, 0xa855f7, 9.5, now);
                         let hauntedCount = 0;
@@ -32115,10 +32291,10 @@
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit) continue;
                             const dSq = e.mesh.position.distanceToSquared(fh.position);
-                            if (dSq <= 30 * 30 && this.hasWallLineOfSight(fh.position, e.mesh.position, Math.sqrt(dSq))) {
+                            if (dSq <= AGENT_TUNING.fade.e.rangeM * AGENT_TUNING.fade.e.rangeM && this.hasWallLineOfSight(fh.position, e.mesh.position, Math.sqrt(dSq))) {
                                 hauntedCount++;
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 5000);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 2200);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.fade.e.revealMs);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.fade.e.slowMs);
                             }
                         }
                         if (hauntedCount > 0) {
@@ -32127,6 +32303,7 @@
                     }
                 }
 
+                // V2.2: Fade's numbers are in AGENT_TUNING.fade
                 // 2EE. Step Fade Nightfall Wall-Piercing Nightmare Wave (26 m/s across 44m, 10m wide; 75 Decay DMG + Blind + Slow + 8s X-Ray)
                 if (this.fadeNightfallWave && this.fadeNightfallWave.active) {
                     const nw = this.fadeNightfallWave;
@@ -32134,7 +32311,7 @@
                         nw.active = false;
                         nw.group.visible = false;
                     } else {
-                        nw.position.addScaledVector(nw.direction, 26.0 * dt);
+                        nw.position.addScaledVector(nw.direction, AGENT_TUNING.fade.x.speedMps * dt);
                         const supportY = this.findSupportFloorY(nw.position.x, nw.position.y + 1.5, nw.position.z);
                         nw.position.y = supportY;
                         nw.group.position.copy(nw.position);
@@ -32145,17 +32322,18 @@
                             const dz = e.mesh.position.z - nw.position.z;
                             const along = Math.abs(dx * nw.direction.x + dz * nw.direction.z);
                             const perp = Math.abs(dx * (-nw.direction.z) + dz * nw.direction.x);
-                            if (along <= 2.4 && perp <= 5.5) {
+                            if (along <= AGENT_TUNING.fade.x.hitDepthM && perp <= AGENT_TUNING.fade.x.hitHalfWidthM) {
                                 nw.hitSet.add(e);
-                                this.applyEnemyBlind(e, now, 5000);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 5500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 8000);
-                                damageEnemyActor(e, 75, now, nowMs, "Nightfall", false);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.fade.x.blindMs);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.fade.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.fade.x.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.fade.x.damage, now, nowMs, "Nightfall", false);
                             }
                         }
                     }
                 }
 
+                // V2.2: Breach's numbers are in AGENT_TUNING.breach
                 // 2FF. Step Breach Aftershock 3-Stage Wall-Piercing Fusion Charges (3 blasts x 65 damage every 700ms)
                 for (let i = 0; i < this.breachAftershocks.length; i++) {
                     const ba = this.breachAftershocks[i];
@@ -32167,7 +32345,7 @@
                     }
                     if (ba.blastsLeft > 0 && now >= ba.nextBlastAt) {
                         ba.blastsLeft--;
-                        ba.nextBlastAt = now + 700;
+                        ba.nextBlastAt = now + AGENT_TUNING.breach.c.blastIntervalMs;
                         soundFX.breachAftershock();
                         this.spawnFlashBurst(ba.position.x, ba.position.y + 0.8, ba.position.z, 0xfb923c, ba.radius * 1.1, 320, now);
                         this.spawnWindRing(ba.position.x, ba.position.y + 0.1, ba.position.z, 0xf97316, ba.radius, now);
@@ -32178,9 +32356,9 @@
                             const dx = e.mesh.position.x - ba.position.x;
                             const dz = e.mesh.position.z - ba.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 2500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 3000);
-                                damageEnemyActor(e, 65, now, nowMs, "Aftershock", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.breach.c.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.breach.c.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.breach.c.damage, now, nowMs, "Aftershock", false);
                             }
                         }
                         for (let j = 0; j < targetObjects.length; j++) {
@@ -32189,12 +32367,13 @@
                             const dx = t.mesh.position.x - ba.position.x;
                             const dz = t.mesh.position.z - ba.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                damageTargetActor(t, 65, now, nowMs, "Aftershock", t.leaves[0]);
+                                damageTargetActor(t, AGENT_TUNING.breach.c.damage, now, nowMs, "Aftershock", t.leaves[0]);
                             }
                         }
                     }
                 }
 
+                // V2.2: Breach's numbers are in AGENT_TUNING.breach
                 // 2GG. Step Breach Fault Line Wall-Piercing Seismic Quake Corridor (650ms charge -> 28m x 4.5m tectonic eruption)
                 for (let i = 0; i < this.breachFaultLines.length; i++) {
                     const bf = this.breachFaultLines[i];
@@ -32227,12 +32406,12 @@
                             const cz = bf.startPos.z + abZ * t;
                             const dx = e.mesh.position.x - cx;
                             const dz = e.mesh.position.z - cz;
-                            if (dx * dx + dz * dz <= 2.6 * 2.6) {
+                            if (dx * dx + dz * dz <= AGENT_TUNING.breach.e.hitHalfWidthM * AGENT_TUNING.breach.e.hitHalfWidthM) {
                                 concussedCount++;
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 4800);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 4000);
-                                this.applyEnemyBlind(e, now, 2500);
-                                damageEnemyActor(e, 35, now, nowMs, "Fault Line", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.breach.e.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.breach.e.revealMs);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.breach.e.blindMs);
+                                damageEnemyActor(e, AGENT_TUNING.breach.e.damage, now, nowMs, "Fault Line", false);
                             }
                         }
                         if (concussedCount > 0) {
@@ -32241,6 +32420,7 @@
                     }
                 }
 
+                // V2.2: Breach's numbers are in AGENT_TUNING.breach
                 // 2HH. Step Breach Rolling Thunder Cascading 6-Stage Seismic Earthquake (34m x 14m wall-piercing quake waves)
                 if (this.breachRollingThunder && this.breachRollingThunder.active) {
                     const rt = this.breachRollingThunder;
@@ -32248,10 +32428,10 @@
                         rt.active = false;
                         rt.group.visible = false;
                     } else if (rt.wavesLeft > 0 && now >= rt.nextWaveAt) {
-                        const stageIdx = 6 - rt.wavesLeft;
+                        const stageIdx = AGENT_TUNING.breach.x.waveCount - rt.wavesLeft;
                         rt.wavesLeft--;
-                        rt.nextWaveAt = now + 260;
-                        const distAlong = 3.5 + stageIdx * 5.5;
+                        rt.nextWaveAt = now + AGENT_TUNING.breach.x.waveIntervalMs;
+                        const distAlong = AGENT_TUNING.breach.x.waveStartM + stageIdx * AGENT_TUNING.breach.x.waveSpacingM;
                         const wx = rt.origin.x + rt.direction.x * distAlong;
                         const wz = rt.origin.z + rt.direction.z * distAlong;
                         const floorY = this.findSupportFloorY(wx, rt.origin.y + 1.5, wz);
@@ -32267,12 +32447,12 @@
                             const dz = e.mesh.position.z - wz;
                             const along = Math.abs(dx * rt.direction.x + dz * rt.direction.z);
                             const perp = Math.abs(dx * (-rt.direction.z) + dz * rt.direction.x);
-                            if (along <= 3.8 && perp <= 7.2) {
+                            if (along <= AGENT_TUNING.breach.x.hitDepthM && perp <= AGENT_TUNING.breach.x.hitHalfWidthM) {
                                 rt.hitSet.add(e);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 6000);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 6000);
-                                this.applyEnemyBlind(e, now, 3500);
-                                damageEnemyActor(e, 60, now, nowMs, "Rolling Thunder", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.breach.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.breach.x.revealMs);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.breach.x.blindMs);
+                                damageEnemyActor(e, AGENT_TUNING.breach.x.damage, now, nowMs, "Rolling Thunder", false);
                             }
                         }
                     }
@@ -32381,6 +32561,7 @@
                     }
                 }
 
+                // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
                 // 2MM. Step Gekko Mosh Pit Acidic Pools (15 DPS + slow during 1.6s windup, then 130 DMG AoE eruption)
                 for (let i = 0; i < this.gekkoMoshPits.length; i++) {
                     const mp = this.gekkoMoshPits[i];
@@ -32403,9 +32584,9 @@
                             const dx = e.mesh.position.x - mp.position.x;
                             const dz = e.mesh.position.z - mp.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 3500);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 3500);
-                                damageEnemyActor(e, 130, now, nowMs, "Mosh Pit Eruption", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.gekko.c.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.gekko.c.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.gekko.c.damage, now, nowMs, "Mosh Pit Eruption", false);
                                 hits++;
                             }
                         }
@@ -32413,20 +32594,21 @@
                             showNotification(`MOSH PIT ERUPTION! ${hits} ${hits === 1 ? 'Hostile' : 'Hostiles'} Blasted (130 DMG)!`, 1750);
                         }
                     } else if (!mp.erupted && now >= mp.nextTickAt) {
-                        mp.nextTickAt = now + 250;
+                        mp.nextTickAt = now + AGENT_TUNING.gekko.c.tickMs;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit) continue;
                             const dx = e.mesh.position.x - mp.position.x;
                             const dz = e.mesh.position.z - mp.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 350);
-                                damageEnemyActor(e, 4, now, nowMs, "Mosh Pit Acid", true);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.gekko.c.tickSlowMs);
+                                damageEnemyActor(e, AGENT_TUNING.gekko.c.damagePerTick, now, nowMs, "Mosh Pit Acid", true);
                             }
                         }
                     }
                 }
 
+                // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
                 // 2NN. Step Gekko Wingman Autonomous Buddy (hunts enemies at 13.5 m/s, concusses in 5.8m cone & drops reclaimable Globule)
                 for (let i = 0; i < this.gekkoWingman.length; i++) {
                     const gw = this.gekkoWingman[i];
@@ -32436,7 +32618,7 @@
                         continue;
                     }
                     let nearestE = null;
-                    let bestD2 = 18 * 18;
+                    let bestD2 = AGENT_TUNING.gekko.q.huntRangeM * AGENT_TUNING.gekko.q.huntRangeM;
                     for (let j = 0; j < enemyObjects.length; j++) {
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit) continue;
@@ -32452,8 +32634,8 @@
                         const tx = nearestE.mesh.position.x - gw.position.x;
                         const tz = nearestE.mesh.position.z - gw.position.z;
                         const tLen = Math.hypot(tx, tz) || 1;
-                        gw.dirX = gw.dirX * 0.82 + (tx / tLen) * 0.18;
-                        gw.dirZ = gw.dirZ * 0.82 + (tz / tLen) * 0.18;
+                        gw.dirX = gw.dirX * AGENT_TUNING.gekko.q.steerKeepMult + (tx / tLen) * AGENT_TUNING.gekko.q.steerTurnMult;
+                        gw.dirZ = gw.dirZ * AGENT_TUNING.gekko.q.steerKeepMult + (tz / tLen) * AGENT_TUNING.gekko.q.steerTurnMult;
                         const dLen = Math.hypot(gw.dirX, gw.dirZ) || 1;
                         gw.dirX /= dLen;
                         gw.dirZ /= dLen;
@@ -32469,11 +32651,12 @@
                     }
                     gw.group.position.set(gw.position.x, 0.05, gw.position.z);
                     gw.group.rotation.y = Math.atan2(gw.dirX, gw.dirZ);
-                    if (nearestE && bestD2 <= 4.2 * 4.2) {
+                    if (nearestE && bestD2 <= AGENT_TUNING.gekko.q.triggerRadiusM * AGENT_TUNING.gekko.q.triggerRadiusM) {
                         this.detonateGekkoWingman(gw, now, nowMs);
                     }
                 }
 
+                // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
                 // 2OO. Step Gekko Dizzy Soaring Plasma Companion (auto-fires blinding plasma blasts at LOS enemies within 22m & drops Globule)
                 for (let i = 0; i < this.gekkoDizzy.length; i++) {
                     const gd = this.gekkoDizzy[i];
@@ -32498,9 +32681,9 @@
                     }
                     gd.group.position.copy(gd.position);
                     if (now >= gd.nextSpitAt) {
-                        gd.nextSpitAt = now + 420;
+                        gd.nextSpitAt = now + AGENT_TUNING.gekko.e.fireIntervalMs;
                         let targetE = null;
-                        let bestD2 = 22 * 22;
+                        let bestD2 = AGENT_TUNING.gekko.e.rangeM * AGENT_TUNING.gekko.e.rangeM;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit || gd.hitSet.has(e)) continue;
@@ -32517,15 +32700,16 @@
                             soundFX.gekkoDizzy();
                             this.spawnFlashBurst(gd.position.x, gd.position.y, gd.position.z, 0x38bdf8, 2.2, 220, now);
                             this.spawnFlashBurst(targetE.mesh.position.x, targetE.mesh.position.y + 1.4, targetE.mesh.position.z, 0xa3e635, 2.8, 280, now);
-                            targetE.blindedUntil = Math.max(targetE.blindedUntil, now + 3800);
-                            targetE.revealedUntil = Math.max(targetE.revealedUntil, now + 4500);
-                            targetE.slowedUntil = Math.max(targetE.slowedUntil, now + 2800);
-                            damageEnemyActor(targetE, 25, now, nowMs, "Dizzy Plasma Blast", false);
+                            targetE.blindedUntil = Math.max(targetE.blindedUntil, now + AGENT_TUNING.gekko.e.blindMs);
+                            targetE.revealedUntil = Math.max(targetE.revealedUntil, now + AGENT_TUNING.gekko.e.revealMs);
+                            targetE.slowedUntil = Math.max(targetE.slowedUntil, now + AGENT_TUNING.gekko.e.slowMs);
+                            damageEnemyActor(targetE, AGENT_TUNING.gekko.e.damage, now, nowMs, "Dizzy Plasma Blast", false);
                             showNotification("DIZZY PLASMA BLAST! Hostile Blinded (3.8s) & Revealed!", 1500);
                         }
                     }
                 }
 
+                // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
                 // 2PP. Step Gekko Thrash Steerable Shark Ultimate (19.5 m/s crosshair-steered; 7.5m Detain burst & drops Globule)
                 if (this.gekkoThrash && this.gekkoThrash.active) {
                     const gt = this.gekkoThrash;
@@ -32537,8 +32721,8 @@
                         _abilityForward.y = 0;
                         if (_abilityForward.lengthSq() > 0.001) _abilityForward.normalize();
                         else _abilityForward.set(0, 0, -1);
-                        gt.dirX = gt.dirX * 0.84 + _abilityForward.x * 0.16;
-                        gt.dirZ = gt.dirZ * 0.84 + _abilityForward.z * 0.16;
+                        gt.dirX = gt.dirX * AGENT_TUNING.gekko.x.steerKeepMult + _abilityForward.x * AGENT_TUNING.gekko.x.steerTurnMult;
+                        gt.dirZ = gt.dirZ * AGENT_TUNING.gekko.x.steerKeepMult + _abilityForward.z * AGENT_TUNING.gekko.x.steerTurnMult;
                         const dLen = Math.hypot(gt.dirX, gt.dirZ) || 1;
                         gt.dirX /= dLen;
                         gt.dirZ /= dLen;
@@ -32552,7 +32736,7 @@
                             if (!e.isActive || e.hit) continue;
                             const dx = e.mesh.position.x - gt.position.x;
                             const dz = e.mesh.position.z - gt.position.z;
-                            if (dx * dx + dz * dz <= 3.4 * 3.4) {
+                            if (dx * dx + dz * dz <= AGENT_TUNING.gekko.x.triggerRadiusM * AGENT_TUNING.gekko.x.triggerRadiusM) {
                                 this.detonateGekkoThrash(now, nowMs);
                                 break;
                             }
@@ -32560,6 +32744,7 @@
                     }
                 }
 
+                // V2.2: Gekko's numbers are in AGENT_TUNING.gekko
                 // 2QQ. Step Gekko Reclaimable Creature Globules (walk within 2.6m to reclaim +10 HP & refund ability / +2 Ult Points)
                 for (let i = 0; i < this.gekkoGlobules.length; i++) {
                     const gg = this.gekkoGlobules[i];
@@ -32572,11 +32757,11 @@
                     if (now >= gg.pickupReadyAt && game.activeAgent === 'gekko') {
                         const dx = characterController.position.x - gg.position.x;
                         const dz = characterController.position.z - gg.position.z;
-                        if (dx * dx + dz * dz <= 2.65 * 2.65) {
+                        if (dx * dx + dz * dz <= AGENT_TUNING.gekko.q.globuleRadiusM * AGENT_TUNING.gekko.q.globuleRadiusM) {
                             gg.inUse = false;
                             gg.group.visible = false;
                             soundFX.gekkoGlobule();
-                            this.healPlayer(10, now);
+                            this.healPlayer(AGENT_TUNING.gekko.q.globuleHealHp, now);
                             const st = this.stateByAgent.gekko;
                             if (gg.kind === 'q' || gg.kind === 'e') {
                                 if (st && st[gg.kind]) {
@@ -32585,7 +32770,7 @@
                                 }
                                 showNotification(`GLOBULE RECLAIMED! +10 HP & ${gg.kind === 'q' ? 'WINGMAN [Q]' : 'DIZZY [E]'} Refunded!`, 1650);
                             } else {
-                                game.ultPoints = Math.min(game.maxUltPoints, game.ultPoints + 2);
+                                game.ultPoints = Math.min(game.maxUltPoints, game.ultPoints + AGENT_TUNING.gekko.x.globuleUltPoints);
                                 showNotification("THRASH GLOBULE RECLAIMED! +10 HP & +2 Ultimate Points!", 1750);
                             }
                             this.syncHud(now, true);
@@ -33158,6 +33343,7 @@
                     }
                 }
 
+                // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
                 // 2FFF. Step Tejo Stealth Drones (crosshair-steered recon drone at 15.5 m/s; triggers 13m EMP Suppression & Sonar Pulse)
                 for (let i = 0; i < this.tejoStealthDrones.length; i++) {
                     const td = this.tejoStealthDrones[i];
@@ -33171,8 +33357,8 @@
                     _abilityForward.y = 0;
                     if (_abilityForward.lengthSq() > 0.001) _abilityForward.normalize();
                     else _abilityForward.set(0, 0, -1);
-                    td.dirX = td.dirX * 0.84 + _abilityForward.x * 0.16;
-                    td.dirZ = td.dirZ * 0.84 + _abilityForward.z * 0.16;
+                    td.dirX = td.dirX * AGENT_TUNING.tejo.c.steerKeepMult + _abilityForward.x * AGENT_TUNING.tejo.c.steerTurnMult;
+                    td.dirZ = td.dirZ * AGENT_TUNING.tejo.c.steerKeepMult + _abilityForward.z * AGENT_TUNING.tejo.c.steerTurnMult;
                     const dLen = Math.hypot(td.dirX, td.dirZ) || 1;
                     td.dirX /= dLen;
                     td.dirZ /= dLen;
@@ -33186,13 +33372,14 @@
                         if (!e.isActive || e.hit) continue;
                         const dx = e.mesh.position.x - td.position.x;
                         const dz = e.mesh.position.z - td.position.z;
-                        if (dx * dx + dz * dz <= 4.2 * 4.2) {
+                        if (dx * dx + dz * dz <= AGENT_TUNING.tejo.c.triggerRadiusM * AGENT_TUNING.tejo.c.triggerRadiusM) {
                             this.detonateTejoDronePulse(now, td);
                             break;
                         }
                     }
                 }
 
+                // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
                 // 2GGG. Step Tejo Guided Salvo Twin Missile Strikes (3 sequential 65 DMG ballistic pulse blasts per salvo zone)
                 for (let i = 0; i < this.tejoGuidedSalvos.length; i++) {
                     const gs = this.tejoGuidedSalvos[i];
@@ -33204,7 +33391,7 @@
                     }
                     if (gs.pulsesLeft > 0 && now >= gs.nextPulseAt) {
                         gs.pulsesLeft--;
-                        gs.nextPulseAt = now + 950;
+                        gs.nextPulseAt = now + AGENT_TUNING.tejo.e.pulseIntervalMs;
                         soundFX.tejoSalvo();
                         this.spawnFlashBurst(gs.position.x, 0.9, gs.position.z, 0xf59e0b, gs.radius * 0.9, 320, now);
                         this.spawnWindRing(gs.position.x, 0.25, gs.position.z, 0xfbbf24, gs.radius, now);
@@ -33215,24 +33402,25 @@
                             const dx = e.mesh.position.x - gs.position.x;
                             const dz = e.mesh.position.z - gs.position.z;
                             if (dx * dx + dz * dz <= rSq) {
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 2600);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 3500);
-                                damageEnemyActor(e, 65, now, nowMs, "Guided Salvo Missile", false);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.tejo.e.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.tejo.e.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.tejo.e.damage, now, nowMs, "Guided Salvo Missile", false);
                             }
                         }
                     }
                 }
 
+                // V2.2: Tejo's numbers are in AGENT_TUNING.tejo
                 // 2HHH. Step Tejo Armageddon Cascading Tactical Airstrike (6 sequential carpet-bombing waves across 28m corridor)
                 if (this.tejoArmageddon && this.tejoArmageddon.active) {
                     const ta = this.tejoArmageddon;
                     if (now >= ta.expireAt) {
                         ta.active = false;
                         ta.group.visible = false;
-                    } else if (ta.wavesFired < 6 && now >= ta.nextWaveAt) {
+                    } else if (ta.wavesFired < AGENT_TUNING.tejo.x.waveCount && now >= ta.nextWaveAt) {
                         ta.wavesFired++;
-                        ta.nextWaveAt = now + 460;
-                        const distAlong = 3.5 + ta.wavesFired * 4.2;
+                        ta.nextWaveAt = now + AGENT_TUNING.tejo.x.waveIntervalMs;
+                        const distAlong = AGENT_TUNING.tejo.x.waveStartM + ta.wavesFired * AGENT_TUNING.tejo.x.waveSpacingM;
                         const wx = Math.max(-44, Math.min(44, ta.origin.x + ta.dir.x * distAlong));
                         const wz = Math.max(-44, Math.min(44, ta.origin.z + ta.dir.z * distAlong));
                         ta.currentWavePos.set(wx, 0.2, wz);
@@ -33250,12 +33438,12 @@
                             const dz = e.mesh.position.z - wz;
                             const along = Math.abs(dx * ta.dir.x + dz * ta.dir.z);
                             const across = Math.abs(dx * perpX + dz * perpZ);
-                            if (along <= 3.6 && across <= 5.8) {
+                            if (along <= AGENT_TUNING.tejo.x.hitDepthM && across <= AGENT_TUNING.tejo.x.hitHalfWidthM) {
                                 hitWave++;
-                                this.applyEnemyBlind(e, now, 3400);
-                                e.slowedUntil = Math.max(e.slowedUntil, now + 4200);
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 5000);
-                                damageEnemyActor(e, 125, now, nowMs, "Armageddon Airstrike", false);
+                                this.applyEnemyBlind(e, now, AGENT_TUNING.tejo.x.blindMs);
+                                e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.tejo.x.slowMs);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.tejo.x.revealMs);
+                                damageEnemyActor(e, AGENT_TUNING.tejo.x.damage, now, nowMs, "Armageddon Airstrike", false);
                             }
                         }
                         if (hitWave > 0) {
@@ -33540,6 +33728,7 @@
                     }
                 }
 
+                // V2.2: Sova's numbers are in AGENT_TUNING.sova
                 // 3. Step Sova Recon Beacons (3 Sonar Pulses)
                 for (let i = 0; i < this.recons.length; i++) {
                     const r = this.recons[i];
@@ -33551,7 +33740,7 @@
                     }
                     if (now >= r.nextPulseAt) {
                         r.pulseStartAt = now;
-                        r.nextPulseAt = now + 2000;
+                        r.nextPulseAt = now + AGENT_TUNING.sova.e.pulseIntervalMs;
                         soundFX.sonar();
                         let tagged = 0;
                         const rSq = r.maxRadius * r.maxRadius;
@@ -33559,7 +33748,7 @@
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit) continue;
                             if (e.mesh.position.distanceToSquared(r.position) <= rSq) {
-                                e.revealedUntil = Math.max(e.revealedUntil, now + 2600);
+                                e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.sova.e.revealMs);
                                 tagged++;
                             }
                         }
@@ -39051,10 +39240,11 @@
                 const abilityNow = gameNow();   // V2.2: ability timers (ultimates, buffs, Yoru's unmask, Iso's orb) run on game time
                 const ultActive = agentSystem.isUltActive(abilityNow);
 
+                // V2.2: Sova's numbers are in AGENT_TUNING.sova (the blast rate in shoot)
                 // If Sova's Hunter's Fury Ultimate has charges remaining, Left Click fires the wall-piercing energy beam!
                 if (ultActive && game.ultAgent === 'sova' && game.ultChargesLeft > 0) {
                     const nowMs = Date.now();
-                    if (nowMs - game.lastShot < 360) return;
+                    if (nowMs - game.lastShot < AGENT_TUNING.sova.x.fireIntervalMs) return;
                     game.lastShot = nowMs;
                     agentSystem.fireSovaHunterBeam(abilityNow);
                     return;
