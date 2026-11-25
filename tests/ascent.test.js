@@ -387,46 +387,21 @@ test('Ascent: all 8 modes start cleanly, with the player and bots on open floor'
     assert.deepEqual(errors, []);
 });
 
-// The maps not rebuilt yet, read the same way from V1.7 and from this build (V2.1: Bind, Haven,
-// Icebox, Lotus and Split have their own layouts now; tests/bind-haven.test.js, icebox-lotus.test.js and
-// split-skyline.test.js cover them)
-const FINGERPRINT = async (evaluate, frames) => {
-    const out = {};
-    for (const map of ['skyline']) {
-        await evaluate((m) => tacticalDirector.cycleMapPreset(m), map);
-        await frames(2);
-        out[map] = await evaluate(() => {
-            let h = 2166136261 >>> 0;
-            const add = (v) => { const s = String(Math.round(v * 100)) + ','; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } };
-            for (const p of mapPieces) { const b = p.bounds; add(b.min.x); add(b.min.y); add(b.min.z); add(b.max.x); add(b.max.y); add(b.max.z); }
-            let zones = '';
-            for (let z = -45; z <= 45; z += 6) for (let x = -45; x <= 45; x += 6) zones += tacticalRadar.getZoneName(x, 1.7, z) + '|';
-            let zh = 0; for (let i = 0; i < zones.length; i++) zh = (Math.imul(zh, 31) + zones.charCodeAt(i)) >>> 0;
-            const S = tacticalDirector.spikeSites;
-            const spawn = typeof matchSpawn === 'function' ? [matchSpawn('attack'), matchSpawn('defend')] : [MATCH_SPAWN.attack, MATCH_SPAWN.defend];
-            return {
-                pieces: mapPieces.length, hash: h, zones: zh,
-                sites: [S.A.pos.x, S.A.pos.z, S.B.pos.x, S.B.pos.z],
-                spawns: spawn.map((s) => [s.x, s.z]),
-                orbs: (tacticalDirector.ultOrbs || []).map((o) => [o.group.position.x, o.group.position.z]),
-                targets: targetObjects.filter((t) => t.active && !t.hit && !t.moveData).map((t) => [t.initialPosition.x, t.initialPosition.y, t.initialPosition.z])
-            };
-        });
-    }
-    return out;
-};
-
-test('the maps not rebuilt yet are exactly as in V1.7: pieces, sites, spawns, ult orbs, callout zones, practice targets', { timeout: 400000 }, async () => {
-    const old = await boot({ quality: 'low', file: '(V1.7) valorant-fps.html' });
-    const before = await FINGERPRINT(old.evaluate, old.frames);
-    assert.deepEqual(old.errors, []);
-    const cur = await boot({ quality: 'low' });
-    const now = await FINGERPRINT(cur.evaluate, cur.frames);
-    for (const map of Object.keys(before)) {
-        assert.ok(before[map].pieces > 10, `${map} has pieces`);
-        assert.deepEqual(now[map], before[map], `${map} unchanged`);
-    }
-    assert.deepEqual(cur.errors, []);
+// V2.1: every map has its own layout now. (This was a check that the maps not rebuilt yet were
+// exactly as in V1.7, read the same way from both files; Skyline was the last of them.)
+test('every map has its own plan, layout and callouts; none is left on the legacy layout', { timeout: 300000 }, async () => {
+    const { errors, evaluate } = await boot({ quality: 'low' });
+    const r = await evaluate(() => {
+        const out = {};
+        for (const id of Object.keys(MAP_PRESETS)) {
+            const p = MAP_PRESETS[id];
+            out[id] = { plan: !!p.plan, own: !!p.layout && p.layout !== LEGACY_LAYOUT, zones: !!p.layout && p.layout.zoneName !== legacyZoneName };
+        }
+        return out;
+    });
+    assert.deepEqual(Object.keys(r).sort(), ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'skyline', 'split']);
+    for (const [id, v] of Object.entries(r)) assert.deepEqual(v, { plan: true, own: true, zones: true }, id);
+    assert.deepEqual(errors, []);
 });
 
 // V1.8 Part 3 regression run: a bot pressed into the corner where a site's raised

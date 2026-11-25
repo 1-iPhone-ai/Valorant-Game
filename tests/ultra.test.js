@@ -235,29 +235,21 @@ test('Ultra Realism draws every feature with no new shader programs, keeps hitbo
     assert.deepEqual(errors, []);
 });
 
-test('Ultra Realism on another map and time of day: no Ascent detail, light rebaked, no errors', { timeout: 900000 }, async () => {
+test('Ultra Realism on the other maps and at night: each map builds its own detail, light rebaked, no errors', { timeout: 900000 }, async () => {
     const { page, errors, frames, evaluate } = await boot({ quality: 'cinematic', viewport: { width: 480, height: 270 } });
     await evaluate(() => { window.updateEnemies = () => {}; setQualitySettings('ultraRealism'); ultraPrep.finish(); });
     await frames(2);
     const ascentKey = await evaluate(() => ultraLight.bakedKey);
-    // V2.1: a map not rebuilt yet (Bind, Haven, Icebox, Lotus and Split have their own detail now, checked below)
-    await evaluate(() => { rebuildMapPreset('skyline'); ultraPrep.finish(); });
-    await frames(3);
-    const bind = await evaluate(() => ({ map: game.mapPreset, decor: ultraDecor.count, shown: ultraDecor.group.visible, vol: ultraU.uVolOn.value, key: ultraLight.bakedKey, plaster: ultraU.uPlaster.value, matOn: ultraU.uMatOn.value }));
-    assert.equal(bind.map, 'skyline');
-    assert.equal(bind.decor, 0, 'the Ascent detail is Ascent only');
-    assert.equal(bind.shown, false);
-    assert.equal(bind.vol, 1, 'the light is baked for this map');
-    assert.notEqual(bind.key, ascentKey);
-    assert.equal(bind.plaster, 0);
-    assert.equal(bind.matOn, 1);
-    // V2.1: Bind, Haven, Icebox, Lotus and Split build their own detail (lamps included); Bind and Haven plaster
-    // their tall walls (Icebox's corrugated steel, Lotus's rock-cut stone and Split's tiled blocks are not plastered)
-    for (const [m, plaster] of [['bind', 1], ['haven', 1], ['icebox', 0], ['lotus', 0], ['split', 0]]) {
+    // V2.1: every map builds its own detail (lamps included; the Ascent detail is Ascent's only) and gets its
+    // own light bake; Bind and Haven plaster their tall walls (Icebox's corrugated steel, Lotus's rock-cut
+    // stone, Split's tiled blocks and Skyline's towers are not plastered)
+    for (const [m, plaster] of [['bind', 1], ['haven', 1], ['icebox', 0], ['lotus', 0], ['split', 0], ['skyline', 0]]) {
         await evaluate((m) => { rebuildMapPreset(m); ultraPrep.finish(); }, m);
         await frames(2);
-        const own = await evaluate(() => ({ map: game.mapPreset, decor: ultraDecor.count, meshes: ultraDecor.meshes.length, lamps: ultraDecor.lamps.length, shown: ultraDecor.group.visible, plaster: ultraU.uPlaster.value, key: ultraLight.bakedKey }));
+        const own = await evaluate(() => ({ map: game.mapPreset, decor: ultraDecor.count, meshes: ultraDecor.meshes.length, lamps: ultraDecor.lamps.length, shown: ultraDecor.group.visible, plaster: ultraU.uPlaster.value, key: ultraLight.bakedKey, vol: ultraU.uVolOn.value, matOn: ultraU.uMatOn.value }));
         assert.equal(own.map, m);
+        assert.equal(own.vol, 1, `${m}: the light is baked for this map`);
+        assert.equal(own.matOn, 1);
         assert.ok(own.decor > 1000, `${m}: its own detail (${own.decor} pieces)`);
         assert.ok(own.meshes <= 6, `${m}: ${own.meshes} instanced meshes`);
         assert.ok(own.lamps >= 10, `${m}: ${own.lamps} wall lanterns`);

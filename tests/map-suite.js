@@ -14,6 +14,7 @@
 //               and past (or x), and the callout up there
 //   zones       callouts at known points
 //   smallest, nearest   optional: the site that is smallest / nearest the defenders
+//   siteCallouts        optional: each site's callout, in key order ('A SITE', 'B SITE'... by default)
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { boot, programState } = require('./harness');
@@ -491,7 +492,7 @@ module.exports = function mapSuite(label, MAPS) {
             }, map);
             await frames(4);
             const keys = MAPS[map].keys;
-            assert.deepEqual(r.zones, keys.map((k) => k + ' SITE'), `${map}: callouts on the sites`);
+            assert.deepEqual(r.zones, MAPS[map].siteCallouts || keys.map((k) => k + ' SITE'), `${map}: callouts on the sites`);
             assert.deepEqual(r.radar, keys, `${map}: the minimap marks every site`);
             assert.ok(r.hiDecor > 400, `${map}: High Detail props (${r.hiDecor})`);
         }

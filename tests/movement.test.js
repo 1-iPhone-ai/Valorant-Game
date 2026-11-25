@@ -130,7 +130,7 @@ test('mantle: jumping into a chest-high ledge climbs onto it; too high or Mantle
     const r = await evaluate(() => {
         tacticalDirector.cycleMapPreset('skyline');
         const cc = characterController, mv = __mv, out = {};
-        // Run at the east deck (top 2.2 m, no steps at z = 6) and jump into it
+        // Run at the Vent Farm's chest-high condenser (top 2.2 m, x 24..27, z 5.8..8) and jump into it
         const jumpInto = (x, z, yaw) => {
             mv.place(x, z, yaw);
             game.keys.w = true;
@@ -147,24 +147,24 @@ test('mantle: jumping into a chest-high ledge climbs onto it; too high or Mantle
             mv.tick(20);
             return { mantled, foot: mv.foot(), x: +cc.position.x.toFixed(2) };
         };
-        out.deck = jumpInto(27.5, 6, -Math.PI / 2);
+        out.deck = jumpInto(21.5, 7, -Math.PI / 2);
         out.count = cc.mantleCount;
-        // The helipad (3 m) is out of reach
-        out.helipad = jumpInto(8.5, 3, Math.PI / 2);
+        // The helipad block (3 m, east face at x = 7) is out of reach
+        out.helipad = jumpInto(9.5, -35, Math.PI / 2);
         // Without pushing forward into it, no mantle: jump straight up next to the deck
-        mv.place(29.4, 6, -Math.PI / 2);
+        mv.place(23.4, 7, -Math.PI / 2);
         game.keys.space = true; jumpQueued = true; mv.tick(1); game.keys.space = false;
         mv.tick(40);
         out.noPush = { count: cc.mantleCount, foot: mv.foot() };
         // Mantle Off
         document.querySelector('#setting-mantle-pills [data-mantle="off"]').click();
-        out.off = jumpInto(27.5, 6, -Math.PI / 2);
+        out.off = jumpInto(21.5, 7, -Math.PI / 2);
         document.querySelector('#setting-mantle-pills [data-mantle="on"]').click();
         return out;
     });
-    assert.ok(r.deck.mantled, 'climbs the 2.2 m deck');
+    assert.ok(r.deck.mantled, 'climbs the 2.2 m condenser');
     assert.equal(r.deck.foot, 2.2, 'standing on top');
-    assert.ok(r.deck.x > 30, 'on the deck, not at its edge');
+    assert.ok(r.deck.x > 24, 'on top, not at its edge');
     assert.equal(r.count, 1);
     assert.equal(r.helipad.mantled, false, 'a 3 m block is too high');
     assert.equal(r.helipad.foot, 0);

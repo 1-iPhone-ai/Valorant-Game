@@ -37,14 +37,14 @@ test('Skyline: in the F4 cycle and the main menu, city shown only there, rain an
         game.userSettings.weather = 'map';
         const near = (x, z, r) => mapPieces.some((p) => p.bounds.min.y < 1.6 &&
             x > p.bounds.min.x - r && x < p.bounds.max.x + r && z > p.bounds.min.z - r && z < p.bounds.max.z + r);
-        const sites = tacticalDirector.spikeSites;
+        const sites = tacticalDirector.spikeSites, L = mapLayout();
         return {
             weather: weatherFX.resolve(),
             audio: !!MAP_AUDIO.skyline,
             pieces: mapPieces.length,
             inside: mapPieces.every((p) => Math.abs(p.x) <= 50 && Math.abs(p.z) <= 50),
             sitesClear: !near(sites.A.pos.x, sites.A.pos.z, 3) && !near(sites.B.pos.x, sites.B.pos.z, 3),
-            spawnsClear: !near(0, 15, 1) && !near(0, 27, 1),
+            spawnsClear: !near(L.spawns.attack.x, L.spawns.attack.z, 1) && !near(L.spawns.defend.x, L.spawns.defend.z, 1) && !near(L.start.x, L.start.z, 1),
             windows: tacticalEnhancements.skylineGroup.children.length,
             covers: (enemyTactics.covers || []).length
         };
@@ -72,7 +72,7 @@ test('Skyline: in the F4 cycle and the main menu, city shown only there, rain an
     assert.deepEqual(errors, []);
 });
 
-test('Skyline: you can climb the stairs onto a skybridge and walk across it, walk under it, and step up onto the decks and the helipad', { timeout: 300000 }, async () => {
+test('Skyline: you can climb a tower onto the skybridge and walk across it, walk the Alley under it, and step up onto the helipad, the Control Booth and the Billboard deck', { timeout: 300000 }, async () => {
     const { errors, evaluate } = await boot({ quality: 'medium' });
     const r = await evaluate(() => {
         window.updateEnemies = () => {};
@@ -92,25 +92,27 @@ test('Skyline: you can climb the stairs onto a skybridge and walk across it, wal
             return +(cc.position.y - cc.height).toFixed(2);
         };
         const out = {};
-        // North stairs (west tower) rise towards -z; yaw 0 faces -z
-        out.tower = walk(-14, -29, 0, 'z', -37, 200);
-        // Turn east (yaw -PI/2 faces +x) and walk out onto the bridge
-        out.bridge = walk(null, null, -Math.PI / 2, 'x', 0, 200);
-        out.bridgeX = +cc.position.x.toFixed(1);
-        // Under the bridge: straight through along z at floor level
-        out.under = walk(0, -32, 0, 'z', -43, 200);
-        out.underZ = +cc.position.z.toFixed(1);
-        // Side deck steps (east deck, walking +x) and the helipad steps (walking -x)
-        out.deck = walk(25, 0, -Math.PI / 2, 'x', 33, 200);
-        out.helipad = walk(10, 0, Math.PI / 2, 'x', 2, 200);
+        // V2.1: the north tower's steps rise east (yaw -PI/2 faces +x) from the attackers' half of the Alley
+        out.tower = walk(-9, -7, -Math.PI / 2, 'x', -1, 200);
+        // Turn south (yaw PI faces +z) and walk across the bridge onto the south tower
+        out.bridge = walk(null, null, Math.PI, 'z', 6, 300);
+        out.bridgeZ = +cc.position.z.toFixed(1);
+        // The Alley under the bridge: straight through along x at floor level
+        out.under = walk(-10, 0.5, -Math.PI / 2, 'x', 7, 300);
+        out.underX = +cc.position.x.toFixed(1);
+        // The helipad block's steps, the Control Booth's and the Billboard deck's (all walking +x)
+        out.helipad = walk(-5, -35, -Math.PI / 2, 'x', 3, 200);
+        out.booth = walk(0.5, -44.75, -Math.PI / 2, 'x', 9, 300);
+        out.billboard = walk(6, 44.75, -Math.PI / 2, 'x', 16, 300);
         return out;
     });
     assert.equal(r.tower, 4, 'up the stairs onto the tower');
     assert.equal(r.bridge, 4, 'across the skybridge');
-    assert.ok(r.bridgeX > -6, `walked out onto the bridge (x ${r.bridgeX})`);
+    assert.ok(r.bridgeZ > 5, `walked across onto the south tower (z ${r.bridgeZ})`);
     assert.equal(r.under, 0, 'under the bridge on the floor');
-    assert.ok(r.underZ < -42, `walked through under the bridge (z ${r.underZ})`);
-    assert.equal(r.deck, 2.2, 'up the steps onto the side deck');
+    assert.ok(r.underX > 6.5, `walked through under the bridge (x ${r.underX})`);
     assert.equal(r.helipad, 3, 'up the steps onto the helipad');
+    assert.equal(r.booth, 3, 'up the steps into the Control Booth');
+    assert.equal(r.billboard, 3, 'up the steps onto the Billboard deck');
     assert.deepEqual(errors, []);
 });

@@ -10749,7 +10749,7 @@
             skyline: {
                 id: 'skyline',
                 name: 'SKYLINE',
-                subtitle: 'Neon Rooftop City at Night, Skybridges & Billboards',
+                subtitle: 'Neon Rooftops at Night: Helipad, Skybridge & Billboards',   // V2.1: its own layout
                 skyColor: 0x0b0a1f,
                 // Night city: cool moonlight, magenta/cyan neon accents
                 sunColor: 0xa9b8ff,
@@ -10758,64 +10758,161 @@
                 accentB: 0x22e6ff,
                 floorColor: 0x1b1e2b,
                 wallColor: 0x121624,
+                // V2.1: Skyline's own layout, an original rooftop map. Attackers west, defenders east, A
+                // north (-Z), B south (+Z), as on Ascent. A is the Helipad (open and exposed, with the
+                // helipad block and the Control Booth, its heaven), reached through the A Lobby and up A
+                // Stairs along the north edge, or by the Alley from mid. B is the Server Roof (tight lanes
+                // between cooling units, the Billboard deck its heaven, the giant billboard over it),
+                // reached through the B Lobby along the south edge, or by the Alley. Mid is the Skybridge:
+                // two stair towers with a bridge across the street between them, and the Alley running
+                // on beneath it; the attackers come in past the Water Tower, the defenders through the
+                // Vent Farm, where the range and the aim trainer are. Defenders reach A along the vent farm
+                // walkway and B under the billboard. Rooftop edges are walls: nobody falls off. Every lane
+                // has a 3.5 m chokepoint; buildings are 8-10 m and never thinner than 3 m between two
+                // open areas.
+                plan: {
+                    atkSpawn: [-49.5, -37, -10, 10],
+                    defSpawn: [37, 49.5, -10, 10],
+                    lobbyAIn: [-47, -41, -30, -10],
+                    lobbyA: [-47, -35, -46, -30],
+                    stairsA: [-35, -10, -46, -40],
+                    aSite: [-10, 12, -46, -28],
+                    waterIn: [-37, -31, -3, 3],
+                    water: [-31, -18, -8, 8],
+                    waterOut: [-18, -15, -3, 3],
+                    plaza: [-15, 11, -9, 9],
+                    alleyN: [5, 11, -28, -9],
+                    alleyS: [-9, -3, 9, 24],
+                    alleySJ: [-9, 9, 24, 30],
+                    ventOut: [11, 14, 1, 7],
+                    vent: [14, 28, -8, 8],
+                    ventIn: [28, 37, -3, 3],
+                    lobbyBIn: [-47, -41, 10, 30],
+                    lobbyB: [-47, -35, 30, 46],
+                    bLane: [-35, 3, 40, 46],
+                    bSite: [3, 19, 30, 46],
+                    linkAN: [42, 48, -40, -10],
+                    linkAW: [12, 48, -40, -34],
+                    linkBS: [42, 48, 10, 38],
+                    linkBW: [19, 48, 32, 38]
+                },
+                // V2.1: High Detail surface types by colour (the rest by shape)
+                surf: { 0x2e3448: 'concrete', 0x1a1f30: 'metal', 0x262a3d: 'concrete', 0x334155: 'concrete', 0x1f2437: 'concrete', 0x2a3049: 'metal', 0x23283a: 'metal',
+                    0x475569: 'metal', 0x3f4a5c: 'metal', 0x4c5672: 'metal', 0x64748b: 'metal', 0x101522: 'metal', 0x3b3f58: 'metal', 0x1e2433: 'metal' },
+                // V2.1: where the city decor (tacticalEnhancements.buildSkylineCity3D) puts the neon faces on
+                // the billboards, the tubes under the skybridge, the water tower's legs, the helipad's H and
+                // ring, and the antenna masts with their blinking lights
+                landmarks: {
+                    billboards: [{ x0: 4.2, x1: 17.8, z: 47.55, y0: 9.4, y1: 17.6, nz: -1 }, { x0: -46.4, x1: -35.6, z: -47.55, y0: 9.4, y1: 15.6, nz: 1 }],
+                    bridge: { x0: -1.5, x1: 1.5, z0: -3, z1: 3, y: 3.55 },
+                    waterTower: { x: -26.5, z: -5.5, half: 2.6, top: 4.8 },
+                    helipad: { x: 3.5, y: 3.02, z: -35 },
+                    masts: [[2.5, -8.5, 4], [-2.5, 8.5, 4], [11.6, -45.6, 6.3], [18.2, 47.8, 18]]
+                },
                 build: function() {
-                    // Stairs: solid 1 m steps rising towards (dx, dz) from the start point
-                    const stairs = (x, z, dx, dz, count, width, hex) => {
-                        for (let i = 0; i < count; i++) {
-                            const h = i + 1;
-                            const cx = x + dx * i * 1.2, cz = z + dz * i * 1.2;
-                            createBox(cx, h / 2, cz, dx ? 1.2 : width, h, dz ? 1.2 : width, hex);
-                        }
-                    };
-                    // Central helipad block with steps up its east side
-                    createBox(0, 1.5, 0, 10, 3, 8, 0x262a3d);
-                    stairs(6.8, 0, -1, 0, 2, 3.2, 0x2e3448);
-                    // West water tower: base, overhead deck (legs and tank are decor)
-                    createBox(-18, 0.6, -6, 3, 1.2, 3, 0x334155);
-                    createBox(-18, 5, -6, 6.4, 0.4, 6.4, 0x1e2433);
-                    createCylinder(-18, 8.4, -6, 2.7, 6, 0x3b3f58);
-                    // East vent farm: AC units and exhaust stacks
-                    createBox(17, 1, 5, 3, 2, 2.2, 0x475569);
-                    createBox(20.5, 1, 8, 2.2, 2, 3, 0x475569);
-                    createBox(16.5, 0.6, 10, 2.4, 1.2, 2, 0x3f4a5c);
-                    createCylinder(20, 3, 3.5, 0.6, 6, 0x64748b);
-                    createCylinder(14.5, 2.5, 7.5, 0.5, 5, 0x64748b);
-                    // Raised side decks with steps, and the billboards standing on them
-                    createBox(-35, 1.1, 0, 10, 2.2, 18, 0x23283a);
-                    createBox(35, 1.1, 0, 10, 2.2, 18, 0x23283a);
-                    for (const sx of [-1, 1]) {
-                        createBox(28.5 * sx, 0.375, 0, 1, 0.75, 4, 0x2e3448);
-                        createBox(29.5 * sx, 0.75, 0, 1, 1.5, 4, 0x2e3448);
+                    const P = this.plan;
+                    // V2.1: dark city blocks round the plan's open floor (the shared helper)
+                    buildPlanBuildings(P, { walls: [0x1d2233, 0x23293d, 0x1a1f2e, 0x2a3148], parapet: 0x10131c });
+                    const CH = 0x2e3448, BEAM = 0x1a1f30, SB = 0x262a3d, BAR = 0x334155, TOWER = 0x1f2437, BRIDGE = 0x2a3049, DECK = 0x23283a;
+                    const UNIT = 0x475569, UNIT2 = 0x3f4a5c, CRATE = 0x4c5672, STACK = 0x64748b, FRAME = 0x101522, TANK = 0x3b3f58, TDECK = 0x1e2433;
+                    // Chokepoints: 3.5 m gaps in every lane, under a steel beam
+                    planBox(-47, -45.75, -24, -20, 0, 8, CH); planBox(-42.25, -41, -24, -20, 0, 8, CH); planBox(-45.75, -42.25, -24, -20, 5, 8, BEAM);   // A Lobby
+                    planBox(-47, -45.75, 20, 24, 0, 8, CH); planBox(-42.25, -41, 20, 24, 0, 8, CH); planBox(-45.75, -42.25, 20, 24, 5, 8, BEAM);       // B Lobby
+                    planBox(-35, -32, -3, -1.75, 0, 8, CH); planBox(-35, -32, 1.75, 3, 0, 8, CH); planBox(-35, -32, -1.75, 1.75, 5, 8, BEAM);         // into the Water Tower yard
+                    planBox(5, 6.25, -21, -17, 0, 8, CH); planBox(9.75, 11, -21, -17, 0, 8, CH); planBox(6.25, 9.75, -21, -17, 5, 8, BEAM);           // the Alley to A
+                    planBox(-9, -7.75, 15, 19, 0, 8, CH); planBox(-4.25, -3, 15, 19, 0, 8, CH); planBox(-7.75, -4.25, 15, 19, 5, 8, BEAM);           // the Alley to B
+                    planBox(31, 34, -3, -1.75, 0, 8, CH); planBox(31, 34, 1.75, 3, 0, 8, CH); planBox(31, 34, -1.75, 1.75, 5, 8, BEAM);               // into the Vent Farm
+                    planBox(28, 31, -40, -38.75, 0, 8, CH); planBox(28, 31, -35.25, -34, 0, 8, CH); planBox(28, 31, -38.75, -35.25, 5, 8, BEAM);      // the vent farm walkway to A
+                    planBox(28, 31, 32, 33.25, 0, 8, CH); planBox(28, 31, 36.75, 38, 0, 8, CH); planBox(28, 31, 33.25, 36.75, 5, 8, BEAM);            // under the billboard to B
+                    // Spawn walls with ways round both ends: no line from a lane runs on through a spawn into
+                    // another lane
+                    planBox(-46.5, -39.5, -4, -2, 0, 6, SB); planBox(-49.5, -46, 3, 5, 0, 3, BAR); planBox(-42.5, -37, 3, 5, 0, 3, BAR);
+                    planBox(42.5, 46.5, 2, 4, 0, 6, SB); planBox(46, 49.5, -5, -3, 0, 3, BAR); planBox(37, 42.5, -5, -3, 0, 3, BAR); planBox(37, 40, 5, 7, 0, 3, BAR);
+                    // Mid: the Skybridge. Two 4 m stair towers stand against the Alley's north and south walls;
+                    // the bridge spans the 6 m street between them and the Alley runs on beneath it. Each team
+                    // has its own way up: the north tower's steps face the attackers' half of the Alley, the
+                    // south tower's the defenders'
+                    planBox(-3, 3, -9, -3, 0, 4, TOWER); planBox(-3, 3, 3, 9, 0, 4, TOWER);
+                    for (let i = 0; i < 3; i++) {
+                        planBox(-6.6 + 1.2 * i, -5.4 + 1.2 * i, -8.5, -5.5, 0, i + 1, CH);
+                        planBox(5.4 - 1.2 * i, 6.6 - 1.2 * i, 5.5, 8.5, 0, i + 1, CH);
                     }
-                    createBox(-38.5, 7, 0, 0.5, 5, 12, 0x101522);
-                    createBox(38.5, 7, 0, 0.5, 5, 12, 0x101522);
-                    createCylinder(-38.5, 3.5, -4.5, 0.25, 4, 0x1e2433);
-                    createCylinder(-38.5, 3.5, 4.5, 0.25, 4, 0x1e2433);
-                    createCylinder(38.5, 3.5, -4.5, 0.25, 4, 0x1e2433);
-                    createCylinder(38.5, 3.5, 4.5, 0.25, 4, 0x1e2433);
-                    // North and south skybridges between stair towers (walk under or across)
-                    for (const zs of [-1, 1]) {
-                        const z = 38 * zs;
-                        createBox(-14, 2, z, 6, 4, 6, 0x1f2437);
-                        createBox(14, 2, z, 6, 4, 6, 0x1f2437);
-                        createBox(0, 3.8, z, 22, 0.4, 3, 0x2a3049);
-                        createBox(0, 4.55, z - 1.4, 22, 1.1, 0.2, 0x1a1f30);    // railings
-                        createBox(0, 4.55, z + 1.4, 22, 1.1, 0.2, 0x1a1f30);
-                        stairs(-14, z - zs * 6, 0, zs, 3, 3, 0x2e3448);
-                        stairs(14, z - zs * 6, 0, zs, 3, 3, 0x2e3448);
+                    planBox(-1.5, 1.5, -3, 3, 3.6, 4, BRIDGE);
+                    planBox(-1.5, -1.3, -3, 3, 4, 5.1, BEAM); planBox(1.3, 1.5, -3, 3, 4, 5.1, BEAM);   // its railings
+                    // The water tower in the Water Tower yard: a base, its deck overhead (the legs are decor)
+                    // and the tank on top
+                    planBox(-28, -25, -7, -4, 0, 1.2, BAR);
+                    planBox(-29.7, -23.3, -8.7, -2.3, 4.8, 5.2, TDECK);
+                    createCylinder(-26.5, 8.4, -5.5, 2.7, 6, TANK);
+                    // The vent farm: air-con units and exhaust stacks round the Vent Farm yard (a chest-high
+                    // condenser to climb onto), and a row of units along the Alley's east wall north of the way
+                    // in from the yard, which comes in south of the bridge (no line runs from it up the Alley to A)
+                    planBox(15, 18, -8, -5.8, 0, 2, UNIT); planBox(24, 27, 5.8, 8, 0, 2.2, UNIT); planBox(25.8, 28, -8, -5, 0, 2, UNIT2); planBox(9, 11, -8, -5, 0, 2, UNIT2); planBox(9, 11, -5, 0, 0, 2, UNIT);
+                    createCylinder(16, 3.5, -7, 0.45, 7, STACK); createCylinder(26.9, 3.5, -6.5, 0.45, 7, STACK);
+                    // A: the Helipad (22 x 18, x -10..12), open and exposed. Entrances: A Stairs from the west
+                    // (north-west corner), the Alley from the south (south-east corner), the vent farm walkway
+                    // from the east. The helipad block (3 m, two steps up its west side) stands east of centre;
+                    // the Control Booth (heaven) is a 3 m deck in the north-east corner, up five 0.5 m steps
+                    // along the north wall, with a roof on posts and a chest-high rail facing the site. Cover:
+                    // two crate stacks and a fuel cart, placed so that no spot on the site sees all three
+                    // entrances and no line runs on through the site from one lane into another
+                    planBox(0, 7, -38, -32, 0, 3, SB);
+                    planBox(-2.4, -1.2, -36.5, -33.5, 0, 1, CH); planBox(-1.2, 0, -36.5, -33.5, 0, 2, CH);
+                    planBox(7, 12, -46, -41, 0, 3, DECK);
+                    for (let k = 1; k <= 5; k++) planBox(1 + k, 2 + k, -46, -43.5, 0, k * 0.5, CH);
+                    planBox(7.25, 12, -41.25, -41, 3, 4.1, BEAM); planBox(7, 7.25, -43.5, -41, 3, 4.1, BEAM);
+                    for (const [px, pz] of [[7.15, -45.85], [11.85, -45.85], [7.15, -41.15], [11.85, -41.15]]) planBox(px - 0.15, px + 0.15, pz - 0.15, pz + 0.15, 3, 6, BEAM);
+                    planBox(7, 12, -46, -41, 6, 6.3, FRAME);
+                    planBox(-6.5, -1.5, -42.5, -40, 0, 2.6, CRATE); planBox(5, 8, -41, -38, 0, 2.4, UNIT2); planBox(-7.5, -5, -40, -36, 0, 2.4, CRATE);
+                    // B: the Server Roof (16 x 16, x 3..19), tight lanes between four cooling units. Entrances:
+                    // the B Lobby from the west (south-west corner), the Alley from the north (north-west
+                    // corner), the way under the billboard from the east. The Billboard deck (heaven) is a 3 m
+                    // deck in the south-east corner, up five 0.5 m steps along the south wall, with a
+                    // chest-high rail facing the site
+                    planBox(14, 19, 41, 46, 0, 3, DECK);
+                    for (let k = 1; k <= 5; k++) planBox(8 + k, 9 + k, 43.5, 46, 0, k * 0.5, CH);
+                    planBox(14.5, 19, 41, 41.25, 3, 4.1, BEAM);
+                    planBox(8.5, 13.5, 40.5, 43, 0, 2.6, UNIT); planBox(5.5, 8, 33, 37.5, 0, 2.6, UNIT); planBox(6.5, 9.5, 37.5, 40.5, 0, 2.6, UNIT2); planBox(10.5, 13, 30, 33.5, 0, 2.6, UNIT);
+                    // Landmarks above the roofs (inside solid blocks: nothing at street level changes): the giant
+                    // billboard over the Server Roof and a second one over the A Lobby (their neon faces are
+                    // city decor)
+                    planBox(4, 4.6, 47.6, 48.2, 0, 18, FRAME); planBox(17.4, 18, 47.6, 48.2, 0, 18, FRAME); planBox(3.6, 18.4, 47.6, 48, 9, 18, FRAME);
+                    planBox(-46, -45.4, -48.2, -47.6, 0, 16, FRAME); planBox(-36.6, -36, -48.2, -47.6, 0, 16, FRAME); planBox(-46.4, -35.6, -48, -47.6, 9, 16, FRAME);
+                },
+                // V2.1: High Detail props for the rooftops (decor only: no colliders, nothing in the way at
+                // player height): landing markings round the helipad block, neon strips on the lane walls, a
+                // fire-escape stair up the wall of A Stairs, floor grates in the vent farm, cable trays on the
+                // Server Roof, safety stripes on the deck edges and rain puddles
+                hiDecor: function(add, rnd) {
+                    const NEON = [0xff2bd6, 0x22e6ff, 0xa78bfa, 0xfbbf24];
+                    // Landing markings: a yellow box round the helipad block, and chevrons towards it
+                    for (const [x, z, sx, sz] of [[3.5, -38.6, 8.2, 0.25], [3.5, -31.4, 8.2, 0.25], [7.6, -35, 0.25, 7.4]]) add('box', x, 0.012, z, sx, 0.02, sz, 0xfacc15, 1.15, 0);
+                    for (let i = 0; i < 3; i++) add('box', 10.2 - i * 0.9, 0.012, -35, 0.25, 0.02, 1.6, 0xfacc15, 1.15, 0);
+                    // Neon strips along the lane walls, 3.2 m up: [x, z, wall normal x, z, length]
+                    const strips = [[-22.5, -46, 0, 1, 20], [-16, 46, 0, -1, 22], [30, -38, 0, 1, 14], [38, 38, 0, -1, 14], [-24.5, -8, 0, 1, 12], [-24.5, 8, 0, -1, 12],
+                        [21, -8, 0, 1, 8], [-47, -38, 1, 0, 12], [-47, 38, 1, 0, 12], [48, -24, -1, 0, 20], [48, 24, -1, 0, 20], [-15, 6, 1, 0, 5]];
+                    strips.forEach((s, i) => {
+                        const [x, z, nx, nz, len] = s;
+                        add('box', x + nx * 0.06, 3.2, z + nz * 0.06, nx ? 0.06 : len, 0.12, nx ? len : 0.06, NEON[i % NEON.length], 1.9, 0);
+                    });
+                    // A fire-escape stair up the north wall of A Stairs: stringers and treads, flush on the wall
+                    for (let k = 0; k < 8; k++) add('box', -30 + k * 0.7, 0.9 + k * 0.62, -45.92, 0.7, 0.06, 0.12, 0x334155, 1, MAP_SURF.metal);
+                    add('box', -27.55, 3.1, -45.95, 5.8, 0.08, 0.06, 0x1e293b, 1, MAP_SURF.metal);
+                    // Floor grates in the vent farm
+                    for (const [x, z] of [[20, -3], [20, 3], [23, 0], [17, 0]]) {
+                        add('box', x, 0.01, z, 1.6, 0.02, 1.0, 0x111827, 1, MAP_SURF.metal);
+                        for (let k = -2; k <= 2; k++) add('box', x + k * 0.3, 0.02, z, 0.05, 0.02, 0.95, 0x374151, 1, MAP_SURF.metal);
                     }
-                    // Cover around A (north) and B (south)
-                    createBox(-6, 0.6, -25, 2.4, 1.2, 1.2, 0x3f4a5c);
-                    createBox(6.5, 1, -18.5, 2, 2, 2, 0x4c5672);
-                    createBox(-4, 0.6, -29, 4, 1.2, 0.8, 0x2e3448);
-                    createBox(6, 0.6, 25, 2.4, 1.2, 1.2, 0x3f4a5c);
-                    createBox(-6.5, 1, 18.5, 2, 2, 2, 0x4c5672);
-                    createBox(4.5, 0.6, 29.5, 4, 1.2, 0.8, 0x2e3448);
-                    // Rooftop access huts in the corners of the flanks
-                    createBox(-26, 1.75, -22, 5, 3.5, 4, 0x262a3d);
-                    createBox(26, 1.75, 22, 5, 3.5, 4, 0x262a3d);
-                    createBox(26, 1, -24, 3, 2, 3, 0x334155);
-                    createBox(-26, 1, 24, 3, 2, 3, 0x334155);
+                    // Cable trays along the Server Roof's cooling units
+                    for (const [x, z, sx, sz] of [[8.75, 32.7, 6.5, 0.3], [9.8, 35.2, 0.3, 4.4], [11.1, 39.9, 5.2, 0.3]]) add('box', x, 0.06, z, sx, 0.12, sz, 0x1f2937, 1, MAP_SURF.metal);
+                    // Safety stripes on the deck edges (the Control Booth, the Billboard deck, the skybridge towers)
+                    for (const [x, y, z, sx, sz] of [[9.5, 3.01, -40.9, 5, 0.12], [16.5, 3.01, 41.1, 5, 0.12], [0, 4.01, -3.1, 6, 0.12], [0, 4.01, 3.1, 6, 0.12]]) {
+                        for (let k = 0; k < 8; k++) add('box', x - sx / 2 + sx * (k + 0.5) / 8, y, z, sx / 8 * 0.9, 0.02, sz, k % 2 ? 0x111418 : 0xfacc15, 1.1, 0);
+                    }
+                    // Rain puddles
+                    const spots = [[-44, -14], [-41, -42], [-28, -43], [-16, -43], [-4, -30], [9, -30], [-24, 4], [-12, -6], [8, 4], [20, 2], [-6, 21], [0, 27],
+                        [4.5, 44], [15, 32], [-44, 14], [-41, 40], [-28, 43], [-12, 43], [45, -22], [38, -35], [45, 22], [38, 35]];
+                    for (const p of spots) add('box', p[0] + (rnd() - 0.5) * 1.2, 0.008, p[1] + (rnd() - 0.5) * 0.8, 1.0 + rnd() * 1.6, 0.01, 0.7 + rnd() * 1.0, 0x0b1020, 1, 0);
                 }
             }
         };
@@ -11249,6 +11346,63 @@
                 { name: 'CROSSING ASCENDER', x: -20.4, z: 0, topY: 5.4, exit: { x: -17.6, z: 0 } }
             ]
         };
+        // V2.1: Skyline's callouts (the Control Booth and the Billboard deck are the raised spots on A and B;
+        // the Skybridge is the bridge and its two towers over the Alley)
+        function skylineZoneName(x, y, z) {
+            const P = MAP_PRESETS.skyline.plan;
+            const any = (...ks) => ks.some((k) => _inPlanRect(P[k], x, z));
+            if (any('aSite')) return (y > 3.6 && x >= 7 && z <= -41) ? 'CONTROL BOOTH' : 'HELIPAD';
+            if (any('bSite')) return (y > 3.6 && x >= 14 && z >= 41) ? 'BILLBOARD' : 'SERVER ROOF';
+            if (any('plaza') && y > 3.6 && x >= -3 && x <= 3) return 'SKYBRIDGE';
+            if (any('plaza', 'alleyN', 'alleyS', 'alleySJ')) return 'ALLEY';
+            if (any('water', 'waterIn', 'waterOut')) return 'WATER TOWER';
+            if (any('vent', 'ventIn', 'ventOut', 'linkAN', 'linkAW')) return 'VENT FARM';
+            if (any('lobbyAIn', 'lobbyA')) return 'A LOBBY';
+            if (any('stairsA')) return 'A STAIRS';
+            if (any('lobbyBIn', 'lobbyB', 'bLane')) return 'B LOBBY';
+            if (any('linkBS', 'linkBW')) return 'BILLBOARD';
+            if (any('atkSpawn')) return 'ATTACKER SPAWN';
+            if (any('defSpawn')) return 'DEFENDER SPAWN';
+            return 'SKYLINE';
+        }
+        // V2.1: Skyline's layout: two sites, route lengths within 10% of Ascent's, defenders 1.3 s ahead at A
+        // and 1.7 s at B
+        const SKYLINE_LAYOUT = {
+            sites: { A: { x: -6.5, z: -31.5 }, B: { x: 12.5, z: 36.5 } },
+            spawns: { attack: { x: -42, z: 0, yaw: -Math.PI / 2 }, defend: { x: 42, z: 0, yaw: Math.PI / 2 } },
+            // The Vent Farm (the range and aim-trainer yard)
+            start: { x: 16, z: 0, yaw: -Math.PI / 2 },
+            bootStart: { x: 16, z: 0, yaw: -Math.PI / 2 },
+            botSpawns: [[-44, -28, 'rusher'], [-4, -31, 'sniper'], [-44, 28, 'armored'], [4.5, 31.5, 'standard'], [-12, 0, 'rusher'], [45, -22, 'armored']],
+            botSpawnsLow: [[-44, -28, 'rusher'], [4.5, 31.5, 'armored']],
+            // Open spots all over the map (lanes, sites, the Alley, the yards, links, both spawns)
+            respawnSpots: [[-44, -28], [-41, -38], [-28, -43], [-16, -43], [-4, -31], [9.5, -30], [-8, -44], [8, -24], [-12, -5], [-12, 5], [7.5, -3.5], [8, 5], [-24, 4], [-24, -2],
+                [20, 0], [22, 6], [-6, 21], [0, 27], [4.5, 31.5], [15, 32], [4, 44], [17, 38.5], [-44, 28], [-41, 38], [-28, 43], [-12, 43], [45, -22], [38, -37], [45, 22], [38, 35],
+                [-44, -8], [44, 8]],
+            orbs: [{ x: -12, z: 5, name: 'ALLEY ORB' }, { x: 45, z: 22, name: 'BILLBOARD ORB' }],
+            zoneName: skylineZoneName,
+            // (alternating sites: on a low-end device with only two bots, one holds each site)
+            matchDefend: () => [[-4, -31], [15, 37], [9.5, -30], [4.5, 31.5], [20, 0]],
+            // Attacking bots stack round the spawn point, clear of the spawn walls
+            matchAttack: (o) => [[o.x, o.z], [o.x + 2.5, o.z + 1], [o.x - 3, o.z + 0.5], [o.x - 2, o.z - 6.5], [o.x + 1, o.z - 6.5]],
+            // Retake: you come in from the defender side, along the vent farm walkway (A) or under the billboard (B)
+            retake: {
+                A: { player: { x: 45, z: -14, yaw: 0 }, guards: [[-6.5, -31.5, 'armored'], [-3, -30.5, 'standard'], [-8.5, -38, 'rusher'], [9.5, -30, 'sniper'], [-4, -44.5, 'armored'], [3.5, -42.5, 'standard']] },
+                B: { player: { x: 45, z: 14, yaw: Math.PI }, guards: [[12.5, 36.5, 'armored'], [15, 37, 'standard'], [4.5, 31.5, 'rusher'], [17, 38.5, 'sniper'], [4, 44, 'armored'], [15, 32, 'standard']] }
+            },
+            // The Vent Farm's middle is clear for the range and the aim trainer
+            range: { player: { x: 16, z: 0 }, lanesX: [19, 20.5, 22, 23.5, 25, 26.5], lanesZ: [-3, 0, 3] },
+            aim: { x: 16, z: 0 },
+            // No glass or barrels in the Vent Farm or either spawn
+            propKeepOut: [[14, 28, -8, 8], [-49.5, -37, -10, 10], [37, 49.5, -10, 10]],
+            // Practice targets: open air in the long east-west lanes, 10 m clear either side
+            targetSpots: [[-22.5, 3.5, -43], [-24, 3.5, 43], [-6, 3.5, 43], [24, 3.5, -37], [33, 3.5, 35], [-24, 3.5, 0]],
+            openSpan: 47,
+            clampSpan: 47,
+            propMargin: 2.6,
+            propSafe: true,
+            checkTargets: true
+        };
 
         function mapLayout() {
             const p = (typeof game !== 'undefined' && MAP_PRESETS[game.mapPreset]) || MAP_PRESETS.ascent;
@@ -11272,7 +11426,7 @@
         MAP_PRESETS.icebox.layout = ICEBOX_LAYOUT;   // V2.1
         MAP_PRESETS.lotus.layout = LOTUS_LAYOUT;     // V2.1
         MAP_PRESETS.split.layout = SPLIT_LAYOUT;     // V2.1
-        for (const id of ['skyline']) MAP_PRESETS[id].layout = LEGACY_LAYOUT;
+        MAP_PRESETS.skyline.layout = SKYLINE_LAYOUT; // V2.1: every map has its own layout now (LEGACY_LAYOUT is only mapLayout's fallback)
 
         // Create map elements from active MAP_PRESETS entry
         function createMap() {
@@ -42086,7 +42240,8 @@
             haven: { floorAlbedo: 0x6f7178, plaster: 1.15, decor: '_buildHaven', roof: 0x8a6a2a },
             icebox: { floorAlbedo: 0x7a838e, plaster: 0, decor: '_buildIcebox', roof: 0x5a6b7c },
             lotus: { floorAlbedo: 0x7a5a44, plaster: 0, decor: '_buildLotus', roof: 0x8a5a3c },
-            split: { floorAlbedo: 0x5d6472, plaster: 0, decor: '_buildSplit', roof: 0x3a4256 }
+            split: { floorAlbedo: 0x5d6472, plaster: 0, decor: '_buildSplit', roof: 0x3a4256 },
+            skyline: { floorAlbedo: 0x565b6e, plaster: 0, decor: '_buildSkyline', roof: 0x2a3148 }
         };
         function ultraMapStyle() { return (typeof game !== 'undefined' && ULTRA_MAP_STYLE[game.mapPreset]) || null; }
         const ultraU = {
@@ -43288,6 +43443,83 @@
                     K.add(L.boxCast, lx, 4.5, lz, w1, 0.3, w2, FRAME, S.metal);
                     const [g1, g2] = P2(gap + 0.24, 0.32);
                     K.add(L.box, lx, 4.32, lz, g1, 0.06, g2, NEON[1], S.lamp);
+                });
+                K.finish();
+            },
+            // V2.1: Skyline (neon rooftops at night): bands of lit office windows up the facades, a neon
+            // trim under the roof edge, a steel parapet rail round every roof (nobody falls off), roof-top
+            // air-con units, water tanks and antenna masts, wall lamps by the lane walls (their light is
+            // baked), and steel frames with a neon band over the passages
+            _buildSkyline: function () {
+                const K = this._kit(), S = K.S, L = K.L;
+                const RAIL = 0x2a3148, MULLION = 0x161b29, WIN = [0x9ec5ff, 0xffd59e, 0xf5a9e1], TRIM = [0xff2bd6, 0x22e6ff], AC = 0x475569, TANK = 0x3b3f58, MAST = 0x334155, FRAME = 0x1a1f30;
+                let bi = 0, windows = 0, units = 0;
+                for (const T of K.tall) {
+                    const b = T.b, top = b.max.y, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+                    bi++;
+                    for (const f of K.faces(T)) {
+                        const flen = f.a1 - f.a0, mid = (f.a0 + f.a1) / 2;
+                        const [qx, qz] = K.pt(f, mid, 0.4);
+                        if (K.inside(qx, 2, qz, 0)) continue;
+                        // The parapet rail on the roof edge, and a neon trim under it
+                        const [rx, rz] = K.pt(f, mid, 0.3);
+                        if (!K.inside(rx, top - 0.5, rz, 0)) K.onFace(L.boxCast, f, mid, top + 0.55, -0.1, flen, 0.08, 0.08, RAIL, S.metal);
+                        K.onFace(L.box, f, mid, top - 0.6, 0.04, flen, 0.1, 0.05, TRIM[bi % 2], S.lamp);
+                        if (flen < 6 || T.w < 3.5) continue;
+                        // Bands of office windows above head height: a dark mullion strip with lit panes in it
+                        for (let y = 4.2; y < top - 1.4 && windows < 900; y += 2.2) {
+                            K.onFace(L.box, f, mid, y, 0.02, flen - 0.8, 1.1, 0.04, MULLION, S.window);
+                            const n = Math.floor((flen - 1.2) / 1.4);
+                            for (let i = 0; i < n; i++) {
+                                if (((i * 7 + bi * 3 + Math.round(y)) % 5) === 0) continue;
+                                const a = f.a0 + 0.6 + 0.7 + i * 1.4;
+                                K.onFace(L.box, f, a, y, 0.035, 1.0, 0.8, 0.02, WIN[(i + bi) % 3], S.window);
+                                windows++;
+                            }
+                        }
+                        // Lobby glass at street level, flush on the wall, under a neon lintel
+                        for (let a = f.a0 + 1.5; a < f.a1 - 1.2; a += 3) {
+                            const [gx, gz] = K.pt(f, a, 0.3);
+                            if (K.inside(gx, 1.2, gz, 0.1)) continue;
+                            K.onFace(L.box, f, a, 1.3, 0.02, 2.4, 2.2, 0.03, MULLION, S.window);
+                            K.onFace(L.box, f, a, 2.55, 0.03, 2.4, 0.1, 0.04, TRIM[(bi + 1) % 2], S.lamp);
+                        }
+                        // A wall lamp on the longer walls
+                        const la = f.a0 + flen * 0.3;
+                        const [lx, lz] = K.pt(f, la, 0.6);
+                        if (flen >= 10 && !K.inside(lx, 3.4, lz, 0.2)) K.lampAt(f, la, 3.4);
+                    }
+                    // Air-con units, a water tank and an antenna mast on the bigger roofs
+                    if (T.w >= 6 && T.len >= 8 && units < 24) {
+                        const ox = T.alongX ? T.len * 0.25 : 0, oz = T.alongX ? 0 : T.len * 0.25;
+                        if ((bi % 2) === 0) {
+                            K.add(L.boxCast, cx + ox, top + 0.6, cz + oz, 1.8, 1.2, 1.2, AC, S.metal);
+                            K.add(L.box, cx + ox, top + 1.22, cz + oz, 1.6, 0.04, 1.0, 0x3a4757, S.metal);
+                            units++;
+                        }
+                        if ((bi % 3) === 0) {
+                            K.add(L.cyl, cx - ox, top + 1.2, cz - oz, 0.8, 1.6, 0.8, TANK, S.metal);
+                            K.add(L.dome, cx - ox, top + 2.0, cz - oz, 0.8, 0.3, 0.8, TANK, S.metal);
+                        } else if ((bi % 3) === 1) {
+                            K.add(L.cyl, cx - ox, top + 2.5, cz - oz, 0.06, 5, 0.06, MAST, S.metal);
+                            K.add(L.box, cx - ox, top + 4.2, cz - oz, 1.2, 0.06, 0.06, MAST, S.metal);
+                        }
+                    }
+                }
+                // Steel frames over the passages, with a neon band
+                K.passages((ax, oth, A, B, gap, o0, o1, mid) => {
+                    const P2 = (u, o) => ax === 'x' ? [u, o] : [o, u];
+                    const oc = (o0 + o1) / 2;
+                    for (const [u, us] of [[A.b.max[ax], 1], [B.b.min[ax], -1]]) {
+                        const [jx, jz] = P2(u + us * 0.06, oc);
+                        const [sx, sz] = P2(0.12, 0.3);
+                        K.add(L.box, jx, 2.2, jz, sx, 4.4, sz, FRAME, S.metal);
+                    }
+                    const [lx, lz] = P2(mid, oc);
+                    const [w1, w2] = P2(gap + 0.24, 0.3);
+                    K.add(L.boxCast, lx, 4.5, lz, w1, 0.3, w2, FRAME, S.metal);
+                    const [g1, g2] = P2(gap + 0.24, 0.32);
+                    K.add(L.box, lx, 4.32, lz, g1, 0.06, g2, TRIM[1], S.lamp);
                 });
                 K.finish();
             }
@@ -52432,39 +52664,50 @@
                 add(lit[0], 0xffc46b);
                 add(lit[1], 0x7dd3fc);
                 add(lit[2], 0xf472b6);
-                // Billboard faces on the deck frames (x = +-38.5), framed ad panels
-                const magenta = [part(0.06, 4.4, 11.4, -38.2, 7, 0), part(0.06, 4.4, 11.4, 38.2, 7, 0)];
+                // V2.1: the landmark details sit where Skyline's own build puts its landmarks
+                // (MAP_PRESETS.skyline.landmarks; they were on the old open arena's skybridges, side decks,
+                // water tower and helipad). Neon faces on the billboards: a magenta panel, cyan ad blocks
+                // and a yellow strip
+                const LM = MAP_PRESETS.skyline.landmarks;
+                const magenta = [], cyan = [], strip = [];
+                for (const bb of LM.billboards) {
+                    const w = bb.x1 - bb.x0, h = bb.y1 - bb.y0, cx = (bb.x0 + bb.x1) / 2, cy = (bb.y0 + bb.y1) / 2;
+                    magenta.push(part(w, h, 0.06, cx, cy, bb.z));
+                    cyan.push(part(w * 0.45, h * 0.45, 0.08, cx - w * 0.2, cy + h * 0.15, bb.z + bb.nz * 0.03));
+                    cyan.push(part(w * 0.3, h * 0.22, 0.08, cx + w * 0.25, cy - h * 0.25, bb.z + bb.nz * 0.03));
+                    strip.push(part(w * 0.8, 0.5, 0.09, cx, bb.y0 + h * 0.12, bb.z + bb.nz * 0.04));
+                }
                 add(magenta, 0xff2bd6);
-                add([part(0.08, 2.2, 6, -38.15, 7.6, -2), part(0.08, 1.2, 4, -38.15, 5.6, 2.6), part(0.08, 2.2, 6, 38.15, 7.6, 2), part(0.08, 1.2, 4, 38.15, 5.6, -2.6)], 0x22e6ff);
-                add([part(0.09, 0.5, 9, -38.1, 6.0, -1), part(0.09, 0.5, 9, 38.1, 6.0, 1)], 0xfef08a);
-                // Neon tubes along the outer walls and under the skybridges
-                const tubes = [];
+                add(cyan, 0x22e6ff);
+                add(strip, 0xfef08a);
+                // Neon tubes along the outer walls and under the skybridge
+                const tubes = [], BR = LM.bridge;
                 for (const sgn of [-1, 1]) {
                     tubes.push(part(0.12, 0.12, 96, 49.4 * sgn, 3.2, 0));
                     tubes.push(part(96, 0.12, 0.12, 0, 3.2, 49.4 * sgn));
-                    tubes.push(part(22, 0.08, 0.08, 0, 3.55, 38 * sgn - 1.5));
-                    tubes.push(part(22, 0.08, 0.08, 0, 3.55, 38 * sgn + 1.5));
                 }
+                for (const x of [BR.x0 + 0.1, BR.x1 - 0.1]) tubes.push(part(0.08, 0.08, BR.z1 - BR.z0, x, BR.y, (BR.z0 + BR.z1) / 2));
                 add(tubes, 0x22e6ff);
                 // Water tower legs, helipad "H" and ring
-                const legs = [];
-                for (const [lx, lz] of [[-2.6, -2.6], [2.6, -2.6], [-2.6, 2.6], [2.6, 2.6]]) legs.push(part(0.3, 4.8, 0.3, -18 + lx, 2.4, -6 + lz));
+                const legs = [], WT = LM.waterTower, HP = LM.helipad;
+                for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) legs.push(part(0.3, WT.top, 0.3, WT.x + lx * WT.half, WT.top / 2, WT.z + lz * WT.half));
                 add(legs, 0x1e2433);
-                add([part(0.6, 0.04, 4, -1.2, 3.02, 0), part(0.6, 0.04, 4, 1.2, 3.02, 0), part(1.8, 0.04, 0.6, 0, 3.02, 0)], 0xfacc15);
+                add([part(0.6, 0.04, 4, HP.x - 1.2, HP.y, HP.z), part(0.6, 0.04, 4, HP.x + 1.2, HP.y, HP.z), part(1.8, 0.04, 0.6, HP.x, HP.y, HP.z)], 0xfacc15);
                 const ringGeo = new THREE.RingGeometry(2.9, 3.2, 40);
                 ringGeo.rotateX(-Math.PI / 2);
                 const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-                ring.position.set(0, 3.02, 0);
+                ring.position.set(HP.x, HP.y, HP.z);
                 g.add(ring);
-                // Antenna masts on the stair towers, with blinking red lights
+                // Antenna masts (on the skybridge towers, the Control Booth's roof and the giant billboard),
+                // with blinking red lights
                 const masts = [];
                 this.skylineBeacons = [];
                 const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2030 });
                 const beaconGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
-                for (const [mx, mz] of [[-14, -38], [14, -38], [-14, 38], [14, 38]]) {
-                    masts.push(part(0.14, 5, 0.14, mx + 2, 6.5, mz + 2));
+                for (const [mx, mz, base] of LM.masts) {
+                    masts.push(part(0.14, 5, 0.14, mx, base + 2.5, mz));
                     const b = new THREE.Mesh(beaconGeo, beaconMat);
-                    b.position.set(mx + 2, 9.1, mz + 2);
+                    b.position.set(mx, base + 5.1, mz);
                     g.add(b);
                     this.skylineBeacons.push(b);
                 }
