@@ -14464,7 +14464,7 @@
         };
 
         // =============================================
-        // V2.2 Bots Use Map Mechanics (Settings > Practice, off by default)
+        // V2.2 Bots Use Map Mechanics (Settings > Custom & Cheats, with Bot Skill; off by default)
         // =============================================
         // With the setting on, bots use the maps' mechanics as you do:
         //   Bind's teleporters: a bot whose route is quicker through a pad (the walk to it and on from its
@@ -14609,7 +14609,7 @@
                 e.navLen = 0;
             },
             // Out of any move at once (the setting switched off, a new map): a live bot off the floor is put
-            // down at the foot of its rope
+            // down at the foot of its rope (on another map, straight down and out of anything it lands in)
             abort: function (e) {
                 const pos = e.mesh.position;
                 if (e.mechAir && e.isActive && !e.hit) {
@@ -14618,6 +14618,7 @@
                         pos.x = f.x; pos.z = f.z;
                     }
                     pos.y = 0;
+                    resolveEnemyMapCollision(pos, 0.68);
                     e.poseDirty = true;
                     syncEnemyBroadphase(e);
                 }
@@ -15007,7 +15008,7 @@
                 if (now > e.mechUntil) { this.clear(e); e.mechCoolUntil = now + 20000; e.navLen = 0; return 0; }
                 if (Math.hypot(e.mechX - pos.x, e.mechZ - pos.z) <= 0.5) { this._startClimb(e, pos, now); return 2; }
                 const wp = navGrid.steerTo(e, pos, e.mechX, e.mechZ, now, 0);
-                this._turn(e, Math.atan2(wp.x - pos.x, wp.z - pos.z), 0.2);
+                if (Math.abs(wp.x - pos.x) + Math.abs(wp.z - pos.z) > 0.05) this._turn(e, Math.atan2(wp.x - pos.x, wp.z - pos.z), 0.2);
                 enemyTactics._moveToward(pos, wp.x, wp.z, 0.065 * speedMult);
                 return 1;
             },
@@ -41246,7 +41247,7 @@
             const postPlantDefuseGoal = ((game.gameMode === 'wave' || (game.gameMode === 'match' && matchMode.side === 'attack')) && typeof tacticalDirector !== 'undefined' && tacticalDirector.spikeState === 'planted')
                 ? tacticalDirector.activeSpikeSitePos
                 : matchMode.botGoal();
-            // V2.2: Bots Use Map Mechanics (Settings > Practice). Off, none of it runs; switched off with a
+            // V2.2: Bots Use Map Mechanics (Settings > Custom & Cheats). Off, none of it runs; switched off with a
             // bot on a rope or a deck, that bot is put back on the floor
             const mechOn = botMechanics.enabled();
             if (mechOn) botMechanics.beginTick(perfNow);
