@@ -13789,7 +13789,8 @@
                 return this._botNear(td.activeSpikeSitePos, 4.2);
             },
             _mine: function (a) { return a === 'reload' || a === 'cast' || a === 'plant' || a === 'defuse'; },
-            _mag: function (e) { return { rusher: 8, sniper: 3, armored: 10 }[e.archetype] || 6; },
+            MAGS: { rusher: 8, sniper: 3, armored: 10 },
+            _mag: function (e) { return this.MAGS[e.archetype] || 6; },
             _reloadSec: function (e) {
                 const d = (game.userSettings && game.userSettings.botDifficulty) || 'gold';
                 const mult = d === 'iron' ? 1.45 : (d === 'immortal' ? 0.78 : (d === 'radiant' ? 0.58 : 1.0));
@@ -13893,8 +13894,7 @@
                 const mf = Math.cos(v[2]), ms = Math.sin(v[2]);
                 const snap = Math.max(v[5], 0), buckle = Math.max(-v[5], 0);
                 const gc = Math.floor(v[6] + 0.005), gw = Math.min(1, Math.max(0, (v[6] - gc) / 0.99)), gp = v[7], idle = v[9];
-                const is = (c) => (Math.abs(gc - c) < 0.5 ? 1 : 0);
-                const wReload = gw * is(1), wCast = gw * is(2), wWork = gw * (is(3) + is(4)), wClimb = gw * is(5), wPush = gw * is(6);
+                const wReload = gc === 1 ? gw : 0, wCast = gc === 2 ? gw : 0, wWork = (gc === 3 || gc === 4) ? gw : 0, wClimb = gc === 5 ? gw : 0, wPush = gc === 6 ? gw : 0;
                 const still = (1 - walk) * (1 - gw);
                 const sway = 0.03 * Math.sin(idle / 3) * still;
                 const dl = Math.atan2(ms, Math.abs(mf) + 0.0001);
@@ -19514,40 +19514,39 @@
                 if (cls) return cls === 'heavy' ? 'rifle' : cls;
                 return game.activeWeapon === 'sniper' ? 'sniper' : (game.activeWeapon === 'pistol' ? 'pistol' : 'rifle');
             },
+            magDrop: function (w, drop, y) {
+                if (!w.magazine) return;
+                if (w.magRestY === undefined) w.magRestY = w.magazine.position.y;
+                w.magazine.position.y = w.magRestY - y * drop;
+            },
             reload: function (p, w, o, hand) {
                 if (!w || w.isMelee) return false;
                 const cls = this.gunClass(w);
-                const S = (a, b, f) => _seg(p, a, b, f);
-                const mag = (drop, y) => {
-                    if (!w.magazine) return;
-                    if (w.magRestY === undefined) w.magRestY = w.magazine.position.y;
-                    w.magazine.position.y = w.magRestY - y * drop;
-                };
                 if (cls === 'smg') {
                     // Tipped up and out, a quick swap, a slap from below, the bolt slapped home
-                    const tilt = S(0, 0.1) * (1 - S(0.85, 1));
+                    const tilt = _seg(p, 0, 0.1) * (1 - _seg(p, 0.85, 1));
                     o.rz += -0.35 * tilt * hand; o.rx += 0.18 * tilt; o.px += 0.02 * tilt * hand; o.py += 0.02 * tilt;
-                    const drop = p < 0.14 ? 0 : p < 0.24 ? S(0.14, 0.24) : p < 0.4 ? 1 : 1 - S(0.4, 0.52, _ease.out);
-                    mag(drop, 0.3);
+                    const drop = p < 0.14 ? 0 : p < 0.24 ? _seg(p, 0.14, 0.24) : p < 0.4 ? 1 : 1 - _seg(p, 0.4, 0.52, _ease.out);
+                    this.magDrop(w, drop, 0.3);
                     if (w.magazine) w.magazine.visible = !(p > 0.25 && p < 0.38);
                     o.py += 0.03 * _bump(p, 0.53, 0.03); o.rx += 0.07 * _bump(p, 0.53, 0.03);
                     o.rz += 0.16 * _bump(p, 0.72, 0.06) * hand; o.pz += 0.03 * _bump(p, 0.72, 0.04);
                 } else if (cls === 'pistol') {
                     // Turned to the mag well, slide locked back, mag out and in, the slide snaps home
-                    const tilt = S(0, 0.12) * (1 - S(0.86, 1));
+                    const tilt = _seg(p, 0, 0.12) * (1 - _seg(p, 0.86, 1));
                     o.ry += -0.3 * tilt * hand; o.rz += -0.25 * tilt * hand; o.py += -0.02 * tilt;
-                    const drop = p < 0.15 ? 0 : p < 0.25 ? S(0.15, 0.25) : p < 0.45 ? 1 : 1 - S(0.45, 0.58, _ease.out);
-                    mag(drop, 0.25);
+                    const drop = p < 0.15 ? 0 : p < 0.25 ? _seg(p, 0.15, 0.25) : p < 0.45 ? 1 : 1 - _seg(p, 0.45, 0.58, _ease.out);
+                    this.magDrop(w, drop, 0.25);
                     if (w.magazine) w.magazine.visible = !(p > 0.27 && p < 0.43);
                     if (w.slide) {
                         if (w.slideRestZ === undefined) w.slideRestZ = w.slide.position.z;
-                        w.slide.position.z = w.slideRestZ + 0.05 * S(0, 0.08) * (1 - S(0.7, 0.74));
+                        w.slide.position.z = w.slideRestZ + 0.05 * _seg(p, 0, 0.08) * (1 - _seg(p, 0.7, 0.74));
                     }
                     o.pz += 0.025 * _bump(p, 0.73, 0.04); o.rx += -0.08 * _bump(p, 0.73, 0.04);
                     o.py += 0.015 * _bump(p, 0.6, 0.04);
                 } else if (cls === 'sniper') {
                     // Rolled and lifted; the bolt: up, back, a round pressed in, forward, down
-                    const tilt = S(0, 0.12) * (1 - S(0.86, 1));
+                    const tilt = _seg(p, 0, 0.12) * (1 - _seg(p, 0.86, 1));
                     o.rz += 0.35 * tilt * hand; o.py += 0.03 * tilt; o.rx += 0.05 * tilt;
                     o.rz += 0.2 * _bump(p, 0.22, 0.06) * hand;
                     o.pz += 0.065 * _bump(p, 0.33, 0.07);
@@ -19556,7 +19555,7 @@
                     o.rz += -0.16 * _bump(p, 0.76, 0.05) * hand;
                 } else if (cls === 'shotgun') {
                     // Rolled over to the loading port, four shells pushed in, then the pump
-                    const tilt = S(0, 0.12) * (1 - S(0.82, 0.95));
+                    const tilt = _seg(p, 0, 0.12) * (1 - _seg(p, 0.82, 0.95));
                     o.rz += -0.6 * tilt * hand; o.rx += 0.15 * tilt; o.py += 0.02 * tilt;
                     for (let i = 0; i < 4; i++) {
                         const b = _bump(p, 0.2 + i * 0.15, 0.05);
@@ -19566,10 +19565,10 @@
                 } else {
                     // Rifle: canted in, the mag pulled with a tug, the gun turned to meet the new one,
                     // seated with a slap, the charging handle yanked
-                    const tilt = S(0, 0.12) * (1 - S(0.88, 1));
+                    const tilt = _seg(p, 0, 0.12) * (1 - _seg(p, 0.88, 1));
                     o.rz += 0.45 * tilt * hand; o.rx += -0.1 * tilt; o.px += -0.03 * tilt * hand; o.py += 0.03 * tilt;
-                    const drop = p < 0.16 ? 0 : p < 0.3 ? S(0.16, 0.3) : p < 0.48 ? 1 : 1 - S(0.48, 0.62, _ease.out);
-                    mag(drop, 0.38);
+                    const drop = p < 0.16 ? 0 : p < 0.3 ? _seg(p, 0.16, 0.3) : p < 0.48 ? 1 : 1 - _seg(p, 0.48, 0.62, _ease.out);
+                    this.magDrop(w, drop, 0.38);
                     if (w.magazine) w.magazine.visible = !(p > 0.32 && p < 0.46);
                     o.py += -0.02 * _bump(p, 0.2, 0.05);
                     o.ry += -0.2 * _bump(p, 0.55, 0.12) * hand;
