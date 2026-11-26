@@ -50142,9 +50142,10 @@
                     }
                     L.quadsDirty(p.g);
                 };
-                // the hand effect rides a cast gesture that started just now
+                // the hand effect rides a cast gesture that started just now (V2.2: on the gesture's own
+                // clock, the real one, as the viewmodel's; game time lags it after a pause or a long frame)
                 const handOn = (now, h) => {
-                    if (castFX.active && castFX.active.kind === 'cast' && now - castFX.active.start < 120) {
+                    if (castFX.active && castFX.active.kind === 'cast' && performance.now() - castFX.active.start < 120) {
                         hand.on = true; hand.start = castFX.active.start; hand.dur = castFX.active.dur;
                         const hs = h || null;
                         swirlMat.uniforms.uMode.value = hs ? hs.mode : 6;
@@ -50308,9 +50309,9 @@
                             p.ghostMat.uniforms.uAge.value = age;
                             p.ghostMat.uniforms.uFade.value = Math.max(0, 1 - age / 0.55);
                         }
-                        // the hand: wind wrapping the off-hand, on the cast gesture's own clock
+                        // the hand: wind wrapping the off-hand, on the cast gesture's own clock (V2.2: the real one)
                         if (hand.on) {
-                            const t = (now - hand.start) / hand.dur;
+                            const t = (performance.now() - hand.start) / hand.dur;
                             if (t >= 1 || !castFX.core) { hand.on = false; swirl.visible = false; }
                             else {
                                 swirl.visible = true;
