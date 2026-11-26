@@ -9913,6 +9913,13 @@
                 },
                 // V2.1: High Detail surface types by colour (the rest by shape, as on the other maps)
                 surf: { 0x6b4f2a: 'wood', 0x7a5a32: 'wood', 0x4a5563: 'metal', 0x9a7b5a: 'stone', 0xa88a66: 'stone', 0x8a6a48: 'stone', 0x7c4a2a: 'wood' },
+                // V2.2: where the High Detail decor (hiDecor) hangs the brass lanterns ([x, z, top]: under the
+                // lane arches, then the covered rooms' beams) and grows the palm fronds ([x, z, crown]: the
+                // build's palm trunks); the ambience rings its chimes at the lanterns and puts birds in the palms
+                landmarks: {
+                    lanterns: [[-32, -43, 5], [-28, 43, 5], [29.5, -35.5, 5], [29.5, 31.5, 5], [-27, -31.5, 6.5], [-27, -28, 6.5], [-25, 18, 6.5], [-25, 26, 6.5]],
+                    palms: [[-13, 45.4, 7], [-5, 40.6, 6]]
+                },
                 build: function() {
                     const P = this.plan;
                     // V2.1: sandstone blocks round the plan's open floor (the shared helper)
@@ -10031,10 +10038,10 @@
                         add('cylinder', x, top - 0.7, z, 0.17, 0.42, 0.17, 0xb08d3c, 1.1, MAP_SURF.metal);
                         add('cylinder', x, top - 0.45, z, 0.1, 0.1, 0.1, 0xb08d3c, 0.9, MAP_SURF.metal);
                     };
-                    for (const p of [[-32, -43], [-28, 43], [29.5, -35.5], [29.5, 31.5]]) lantern(p[0], p[1], 5);
-                    for (const p of [[-27, -31.5], [-27, -28], [-25, 18], [-25, 26]]) lantern(p[0], p[1], 6.5);
+                    // V2.2: where they hang and where the palms stand are the preset's landmark data (the ambience uses them too)
+                    for (const p of this.landmarks.lanterns) lantern(p[0], p[1], p[2]);
                     // Palm fronds: eight per palm, drooping from the crown
-                    for (const p of [[-13, 45.4, 7], [-5, 40.6, 6]]) {
+                    for (const p of this.landmarks.palms) {
                         for (let k = 0; k < 8; k++) {
                             const a = k * Math.PI / 4 + rnd() * 0.3, droop = 0.35 + rnd() * 0.25;
                             const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, a, -droop, 'YXZ'));
@@ -10471,6 +10478,14 @@
                 },
                 // V2.1: High Detail surface types by colour (the rest by shape)
                 surf: { 0x6b4a36: 'stone', 0x4a3020: 'stone', 0x5a3a28: 'stone', 0x9a7458: 'stone', 0xc8a27c: 'stone', 0xa88466: 'stone', 0x6b4f2a: 'wood', 0x8c6a2f: 'metal' },
+                // V2.2: where the High Detail decor (hiDecor) hangs the bronze bells ([x, z, top of the lintel]:
+                // the chokepoints, the stone doors' frames, then the low lintels of the covered walks) and lays
+                // the Lotus Pool's water (centre and size); the ambience rings the bells and drips into the pool
+                landmarks: {
+                    bells: [[-34, 0, 5], [-28, -44, 5], [-28, 44, 5], [-7, -31, 5], [-7, 31, 5], [31.5, -30.5, 5], [31.5, 30.5, 5], [35, -19.5, 5], [35, 21.5, 5],
+                        [-26, -22, 6.8], [-20, 22, 6.8], [-9, -4, 4.2], [20, -13, 4.2], [20, 13, 4.2]],
+                    pool: { x: -11, z: 45.2, sx: 5.4, sz: 3.2 }
+                },
                 build: function() {
                     const P = this.plan;
                     // V2.1: rock-cut blocks round the plan's open floor (the shared helper)
@@ -10565,9 +10580,8 @@
                         add('cylinder', x, top - 0.72, z, 0.26, 0.5, 0.26, BRONZE, 1.1, MAP_SURF.metal);
                         add('cylinder', x, top - 0.99, z, 0.32, 0.06, 0.32, BRONZE, 1.1, MAP_SURF.metal);
                     };
-                    for (const p of [[-34, 0], [-28, -44], [-28, 44], [-7, -31], [-7, 31], [31.5, -30.5], [31.5, 30.5], [35, -19.5], [35, 21.5]]) bell(p[0], p[1], 5);
-                    for (const p of [[-26, -22], [-20, 22]]) bell(p[0], p[1], 6.8);
-                    for (const p of [[-9, -4], [20, -13], [20, 13]]) bell(p[0], p[1], 4.2);
+                    // V2.2: where they hang is the preset's landmark data (the ambience rings them)
+                    for (const p of this.landmarks.bells) bell(p[0], p[1], p[2]);
                     // Creepers hanging down the cliff walls of the lanes
                     for (let i = 0; i < 70; i++) {
                         const side = rnd() < 0.5 ? -1 : 1;
@@ -10589,7 +10603,8 @@
                     for (const x of [-38, -20, -12]) { lamp(x, -41, 0, -1); lamp(x, 41, 0, 1); }
                     for (const x of [-14, 0]) { lamp(x, -34, 0, 1); lamp(x, 34, 0, -1); }
                     // The Lotus Pool in the River Walk's bend: still water and lotus pads
-                    add('box', -11, 0.025, 45.2, 5.4, 0.03, 3.2, 0x1f5f6a, 1, 0);
+                    const pool = this.landmarks.pool;   // V2.2: the preset's landmark data (the ambience drips into it)
+                    add('box', pool.x, 0.025, pool.z, pool.sx, 0.03, pool.sz, 0x1f5f6a, 1, 0);
                     for (let i = 0; i < 9; i++) add('cylinder', -13.2 + rnd() * 4.4, 0.05, 44 + rnd() * 2.4, 0.22 + rnd() * 0.12, 0.02, 0.22 + rnd() * 0.12, LEAF[i % 3], 1, 0);
                     for (let i = 0; i < 4; i++) add('cylinder', -12.8 + rnd() * 3.6, 0.12, 44.3 + rnd() * 1.8, 0.09, 0.12, 0.09, 0xf2a7c3, 1.2, 0);
                 }
@@ -10649,6 +10664,22 @@
                 // V2.1: High Detail surface types by colour (the rest by shape)
                 surf: { 0x4a5468: 'concrete', 0x1f2937: 'metal', 0x334155: 'concrete', 0x3f4a5f: 'metal', 0x1e1b4b: 'concrete', 0x312e81: 'metal',
                     0x0f766e: 'metal', 0x3b4260: 'concrete', 0xbe185d: 'metal', 0x0e7490: 'metal', 0x0284c7: 'metal', 0x6b4f2a: 'wood', 0x8b6a43: 'wood' },
+                // V2.2: where the High Detail decor (hiDecor) puts the neon sign boards on the lane walls ([x, z,
+                // wall normal x, z, width, height, centre height]); the ambience buzzes in front of them
+                landmarks: {
+                    signs: [
+                        [-47, -30, 1, 0, 0.8, 2.6, 4.2], [-47, -16, 1, 0, 2.6, 0.9, 3.6], [-44, -40, 0, 1, 2.4, 0.9, 3.8], [-32, -40, 0, 1, 0.8, 2.6, 4.4], [-26, -43, 1, 0, 0.8, 2.4, 4.0],
+                        [-14, -46, 0, 1, 3.0, 1.0, 3.8], [-4, -46, 0, 1, 0.8, 2.6, 4.4], [-16, -14, 1, 0, 0.7, 2.2, 3.8], [-10, -12, -1, 0, 2.4, 0.8, 3.4], [-2, -24, 0, -1, 2.8, 0.8, 3.6],
+                        [-24, -9, 0, 1, 2.8, 1.0, 4.0], [-20, -9, 0, 1, 0.8, 2.8, 4.6], [-8.5, -9, 0, 1, 0.8, 2.6, 4.4], [-14, 9, 0, -1, 3.0, 1.0, 4.0], [-10, 9, 0, -1, 0.8, 2.8, 4.6],
+                        [-27, -6, 1, 0, 0.8, 2.6, 4.4], [-27, 6, 1, 0, 2.4, 0.9, 3.8], [-7, -5, -1, 0, 0.8, 2.8, 4.6], [-24, 14, 1, 0, 0.8, 2.4, 4.0], [-18, 13, -1, 0, 2.2, 0.8, 3.6],
+                        [-6, 24, 0, 1, 2.8, 0.9, 3.8], [-12, 29, 0, -1, 0.8, 2.6, 4.4], [0, 29, 0, -1, 3.0, 1.0, 4.0], [-47, 16, 1, 0, 2.6, 0.9, 3.6], [-47, 30, 1, 0, 0.8, 2.6, 4.2],
+                        [-32, 42, 0, -1, 0.8, 2.6, 4.4], [-26, 44, 1, 0, 0.8, 2.4, 4.0], [-14, 46, 0, -1, 3.0, 1.0, 3.8], [-4, 46, 0, -1, 0.8, 2.6, 4.4], [48, -30, -1, 0, 0.8, 2.6, 4.4],
+                        [48, -16, -1, 0, 2.6, 0.9, 3.6], [24, -38, 0, 1, 2.6, 0.9, 3.8], [38, -38, 0, 1, 0.8, 2.6, 4.4], [48, 16, -1, 0, 2.6, 0.9, 3.6], [48, 30, -1, 0, 0.8, 2.6, 4.4],
+                        [24, 38, 0, -1, 2.6, 0.9, 3.8], [38, 38, 0, -1, 0.8, 2.6, 4.4], [-2, 4, 0, 1, 2.8, 0.9, 3.8], [12, 4, 0, 1, 0.8, 2.6, 4.4], [0, 10, 0, -1, 0.8, 2.6, 4.4],
+                        [14, 10, 0, -1, 2.6, 0.9, 4.0], [30, -3, 0, 1, 2.8, 1.0, 4.0], [3, -36, 1, 0, 0.8, 2.6, 4.4], [19, -44, -1, 0, 2.4, 0.9, 5.2], [19, -31, -1, 0, 0.8, 2.2, 4.6],
+                        [3, 36, 1, 0, 0.8, 2.6, 4.4], [19, 44, -1, 0, 2.4, 0.9, 5.2], [19, 31, -1, 0, 0.8, 2.2, 4.6]
+                    ]
+                },
                 build: function() {
                     const P = this.plan;
                     // V2.1: dark tiled city blocks round the plan's open floor (the shared helper)
@@ -10722,18 +10753,7 @@
                     for (let x = -26; x <= -8; x += 1) for (const z of [-5.5, 5.5]) add('box', x, 0.012, z, 0.5, 0.02, 2.6, 0xe5e7eb, 1.05, 0);
                     for (let z = -8; z <= 8; z += 1) for (const x of [-23, -10]) if (Math.abs(z) > 2.6) add('box', x, 0.012, z, 2.6, 0.02, 0.5, 0xe5e7eb, 1.05, 0);
                     // Sign boards on the walls: [x, z, wall normal x, z, width, height, centre height]
-                    const signs = [
-                        [-47, -30, 1, 0, 0.8, 2.6, 4.2], [-47, -16, 1, 0, 2.6, 0.9, 3.6], [-44, -40, 0, 1, 2.4, 0.9, 3.8], [-32, -40, 0, 1, 0.8, 2.6, 4.4], [-26, -43, 1, 0, 0.8, 2.4, 4.0],
-                        [-14, -46, 0, 1, 3.0, 1.0, 3.8], [-4, -46, 0, 1, 0.8, 2.6, 4.4], [-16, -14, 1, 0, 0.7, 2.2, 3.8], [-10, -12, -1, 0, 2.4, 0.8, 3.4], [-2, -24, 0, -1, 2.8, 0.8, 3.6],
-                        [-24, -9, 0, 1, 2.8, 1.0, 4.0], [-20, -9, 0, 1, 0.8, 2.8, 4.6], [-8.5, -9, 0, 1, 0.8, 2.6, 4.4], [-14, 9, 0, -1, 3.0, 1.0, 4.0], [-10, 9, 0, -1, 0.8, 2.8, 4.6],
-                        [-27, -6, 1, 0, 0.8, 2.6, 4.4], [-27, 6, 1, 0, 2.4, 0.9, 3.8], [-7, -5, -1, 0, 0.8, 2.8, 4.6], [-24, 14, 1, 0, 0.8, 2.4, 4.0], [-18, 13, -1, 0, 2.2, 0.8, 3.6],
-                        [-6, 24, 0, 1, 2.8, 0.9, 3.8], [-12, 29, 0, -1, 0.8, 2.6, 4.4], [0, 29, 0, -1, 3.0, 1.0, 4.0], [-47, 16, 1, 0, 2.6, 0.9, 3.6], [-47, 30, 1, 0, 0.8, 2.6, 4.2],
-                        [-32, 42, 0, -1, 0.8, 2.6, 4.4], [-26, 44, 1, 0, 0.8, 2.4, 4.0], [-14, 46, 0, -1, 3.0, 1.0, 3.8], [-4, 46, 0, -1, 0.8, 2.6, 4.4], [48, -30, -1, 0, 0.8, 2.6, 4.4],
-                        [48, -16, -1, 0, 2.6, 0.9, 3.6], [24, -38, 0, 1, 2.6, 0.9, 3.8], [38, -38, 0, 1, 0.8, 2.6, 4.4], [48, 16, -1, 0, 2.6, 0.9, 3.6], [48, 30, -1, 0, 0.8, 2.6, 4.4],
-                        [24, 38, 0, -1, 2.6, 0.9, 3.8], [38, 38, 0, -1, 0.8, 2.6, 4.4], [-2, 4, 0, 1, 2.8, 0.9, 3.8], [12, 4, 0, 1, 0.8, 2.6, 4.4], [0, 10, 0, -1, 0.8, 2.6, 4.4],
-                        [14, 10, 0, -1, 2.6, 0.9, 4.0], [30, -3, 0, 1, 2.8, 1.0, 4.0], [3, -36, 1, 0, 0.8, 2.6, 4.4], [19, -44, -1, 0, 2.4, 0.9, 5.2], [19, -31, -1, 0, 0.8, 2.2, 4.6],
-                        [3, 36, 1, 0, 0.8, 2.6, 4.4], [19, 44, -1, 0, 2.4, 0.9, 5.2], [19, 31, -1, 0, 0.8, 2.2, 4.6]
-                    ];
+                    const signs = this.landmarks.signs;   // V2.2: the preset's landmark data (the ambience buzzes at them)
                     signs.forEach((s, i) => {
                         const [x, z, nx, nz, w, h, y] = s, hex = NEON[i % NEON.length];
                         const sx = nx ? 0.1 : w + 0.12, sz = nx ? w + 0.12 : 0.1;
@@ -23051,6 +23071,8 @@
         //    city rumble) with slow gusts, an optional hum, and occasional one-shot
         //    sounds (birds, bells, drips, metal creaks, neon buzz) placed around the
         //    player through the 3D audio panner.
+        //    V2.2: each one-shot comes from one of the map's own landmarks (its sound
+        //    points, MAP_SOUND_POINTS below).
         // A 250 ms scheduler looks ahead and books notes on the audio clock, so
         // frame drops never make the music stutter. Volumes follow Master Volume.
         const MAP_AUDIO = {
@@ -23068,6 +23090,70 @@
                       bed: { type: 'lowpass', freq: 220, q: 0.6, gain: 0.55 }, hum: 120, events: ['neon', 'creak'] },
             skyline: { root: 51, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 3, 4], tempo: 84, wave: 'sawtooth', cutoff: 1500,
                       bed: { type: 'lowpass', freq: 300, q: 0.5, gain: 0.6 }, hum: 90, events: ['neon', 'drip', 'creak'] }
+        };
+        // V2.2: where each map's one-shot sounds come from: a few sound points per kind ([x, y, z], at the
+        // landmark's height), read from the map's own build (its plan, layout and callouts, the landmark and
+        // decor data on its preset, the pieces its build put down) through the helpers in ambientAudio._kit.
+        // Built once per map, the first time the ambience plays there; a point inside a solid piece is left out.
+        const MAP_SOUND_POINTS = {
+            // The Venetian courtyard: the plaza's bell, over the fountain in the middle of the Mid Courtyard
+            // and under the arches of its four ways in; birds over the roofs and the bigger open areas
+            ascent: (K) => ({
+                bell: [K.above(K.mid('court'), 0.6)].concat(K.mouths('court').map((s) => K.hang(s, 0.72))),
+                bird: K.roofs(0.5).concat(K.open(10))
+            }),
+            // The market town: chimes at the brass lanterns (under the lane arches, in Spice Hall and the
+            // Cistern); birds in the palms, on top of the clock tower and the minaret, and over the roofs
+            bind: (K) => ({
+                chime: K.M.landmarks.lanterns.map((l) => [l[0], l[2] - 0.7, l[1]]),
+                bird: K.M.landmarks.palms.map((p) => [p[0], p[2] + 0.6, p[1]]).concat(K.tops(0.5), K.roofs(0.5))
+            }),
+            // The monastery: bells from the temple tower, the Bell Tower (A's heaven, found by its callout)
+            // and the stupas' brass spires; birds over the roofs and the bigger open areas
+            haven: (K) => {
+                const bt = K.zone('BELL TOWER', 'aSite', 4.2), tower = bt ? [K.above(bt, 2.6)] : [];
+                return {
+                    bell: K.tops(0.5).concat(tower, K.spires(5.5, 11, 0.3)),
+                    bird: K.roofs(0.5).concat(K.open(10))
+                };
+            },
+            // The container port: creaks from the gantry crane (its girders, end beams and cab) and the fuel
+            // tanks, and from on top of each two-high container stack a rope climbs; chimes from the Signal Box
+            // and the Weigh Station
+            icebox: (K) => ({
+                creak: K.tops(0.5).concat(K.L.ropes.map((r) => [r.exit.x, r.topY + 0.3, r.exit.z])),
+                chime: ['signal', 'signalE', 'weigh', 'weighE', 'weighS'].map((k) => { const s = K.mid(k); return [s[0], 3.5, s[1]]; })
+            }),
+            // The cliff temple: drips into the Lotus Pool and along the Water Stair; bells from the bronze bells
+            // under the lintels and the spire over the Stone Grove; birds on the cliff face and over the roofs
+            lotus: (K) => {
+                const pool = K.M.landmarks.pool, ws = K.P.waterStair;
+                return {
+                    drip: [[0, 0], [-0.4, 0], [0.4, 0], [0, -0.4], [0, 0.4]].map((f) => [pool.x + pool.sx * f[0], 0.12, pool.z + pool.sz * f[1]])
+                        .concat([0.25, 0.5, 0.75].map((f) => [ws[0] + (ws[1] - ws[0]) * f, 0.15, (ws[2] + ws[3]) / 2])),
+                    bell: K.M.landmarks.bells.map((b) => [b[0], b[2] - 0.72, b[1]]).concat(K.tops(0.5, (w) => w < 3)),
+                    bird: K.tops(0.5, (w) => w >= 3).concat(K.roofs(0.5))
+                };
+            },
+            // The neon plaza: a buzz in front of every sign board, from the two sign towers and the billboard;
+            // creaks from the chokepoints' steel beams and the rope winches
+            split: (K) => ({
+                neon: K.M.landmarks.signs.map((s) => [s[0] + s[2] * 0.5, s[6], s[1] + s[3] * 0.5]).concat(K.tops(0.5)),
+                creak: K.beams(4, 6, 0.3).concat(K.L.ropes.map((r) => [r.x, r.topY + 1.2, r.z]))
+            }),
+            // The rooftops at night: a buzz in front of both billboards and from the antenna masts' lights;
+            // drips and creaks from the water tower's legs and the skybridge
+            skyline: (K) => {
+                const LM = K.M.landmarks, WT = LM.waterTower, BR = LM.bridge, bz = (BR.z0 + BR.z1) / 2;
+                const legs = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+                const faces = [];
+                for (const b of LM.billboards) for (const f of [0.25, 0.5, 0.75]) faces.push([b.x0 + (b.x1 - b.x0) * f, (b.y0 + b.y1) / 2, b.z + b.nz * 0.6]);
+                return {
+                    neon: faces.concat(LM.masts.map((m) => [m[0], m[2] + 5.1, m[1]])),
+                    drip: legs.map((l) => [WT.x + l[0] * WT.half, WT.top - 0.4, WT.z + l[1] * WT.half]).concat([[BR.x0 - 0.3, BR.y - 0.3, bz], [BR.x1 + 0.3, BR.y - 0.3, bz]]),
+                    creak: legs.map((l) => [WT.x + l[0] * WT.half, WT.top / 2, WT.z + l[1] * WT.half]).concat([[(BR.x0 + BR.x1) / 2, BR.y - 0.4, bz]])
+                };
+            }
         };
         const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -23091,6 +23177,16 @@
             chordsPlayed: 0,
             eventsPlayed: 0,
             _timer: null,
+            // V2.2: this map's sound points per kind (flat [x, y, z, ...] lists), the map they were built for,
+            // how many a map's list had that were left out, and the point and sound the next one-shot plays
+            points: null,
+            _pointsFor: null,
+            pointsDropped: 0,
+            _pt: { x: 0, y: 0, z: 0 },
+            _origin: { x: 0, y: 1.7, z: 0 },
+            _evKind: null,
+            _evV: 0,
+            _playEv: null,
 
             init: function () {
                 if (this._timer) return;
@@ -23283,38 +23379,190 @@
                     this.bedFilter.frequency.setTargetAtTime(P.bed.freq * (0.7 + Math.random() * 0.7), t, 2);
                     this.nextGustTime = t + 3 + Math.random() * 4;
                 }
-                // Occasional placed sounds around the player
+                // Occasional placed sounds. V2.2: each from one of this map's sound points (MAP_SOUND_POINTS) in
+                // earshot: of the kind drawn from the map's list or, with none in earshot, of the next kind on the
+                // list that has one; with none at all, this one is skipped (never a random spot)
                 const now = performance.now();
                 if (now < this.nextEventAt) return;
                 this.nextEventAt = now + 4000 + Math.random() * 7000;
-                const kind = P.events[Math.floor(Math.random() * P.events.length)];
-                const p = (typeof characterController !== 'undefined') ? characterController.position : { x: 0, y: 1.7, z: 0 };
-                const a = Math.random() * Math.PI * 2, r = 14 + Math.random() * 26;
-                const x = p.x + Math.sin(a) * r, z = p.z + Math.cos(a) * r, y = kind === 'bird' ? 8 + Math.random() * 6 : 2 + Math.random() * 4;
-                const v = level * 0.6;
+                if (this._pointsFor !== this.presetId) this._buildPoints();
+                const p = (typeof characterController !== 'undefined') ? characterController.position : this._origin;
+                const ev = P.events;
+                let kind = null;
+                for (let n = 0, k = Math.floor(Math.random() * ev.length); n < ev.length; n++, k = (k + 1) % ev.length) {
+                    if (this._pickPoint(ev[k], p)) { kind = ev[k]; break; }
+                }
+                if (!kind) return;
+                this._evKind = kind;
+                this._evV = level * 0.6;
                 this.eventsPlayed++;
-                soundFX.at(x, y, z, () => {
-                    if (kind === 'bird') {
-                        const f = 2400 + Math.random() * 1600;
-                        for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) soundFX.playTone(f, f * (1.15 + Math.random() * 0.3), 0.09, 'sine', 0.05 * v, i * 0.13);
-                    } else if (kind === 'bell') {
-                        const f = 300 + Math.random() * 200;
-                        soundFX.playTone(f, f, 2.4, 'sine', 0.06 * v, 0);
-                        soundFX.playTone(f * 2.76, f * 2.76, 1.6, 'sine', 0.025 * v, 0);
-                    } else if (kind === 'chime') {
-                        const f = 900 + Math.random() * 500;
-                        for (let i = 0; i < 3; i++) soundFX.playTone(f * (1 + i * 0.26), f * (1 + i * 0.26), 1.2, 'triangle', 0.03 * v, i * 0.18);
-                    } else if (kind === 'drip') {
-                        const f = 1300 + Math.random() * 700;
-                        soundFX.playTone(f, f * 0.55, 0.12, 'sine', 0.06 * v, 0);
-                    } else if (kind === 'creak') {
-                        const f = 140 + Math.random() * 80;
-                        soundFX.playTone(f, f * 0.7, 0.9, 'sawtooth', 0.03 * v, 0);
-                    } else if (kind === 'neon') {
-                        soundFX.playTone(120, 120, 0.7, 'square', 0.02 * v, 0);
-                        soundFX.playTone(240, 240, 0.5, 'square', 0.012 * v, 0.1);
+                if (!this._playEv) this._playEv = () => this._play(this._evKind, this._evV);
+                soundFX.at(this._pt.x, this._pt.y, this._pt.z, this._playEv);
+            },
+
+            // The one-shot sounds (played inside soundFX.at, so placed in 3D). V2.2: moved out of
+            // _scheduleAmbience unchanged
+            _play: function (kind, v) {
+                if (kind === 'bird') {
+                    const f = 2400 + Math.random() * 1600;
+                    for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) soundFX.playTone(f, f * (1.15 + Math.random() * 0.3), 0.09, 'sine', 0.05 * v, i * 0.13);
+                } else if (kind === 'bell') {
+                    const f = 300 + Math.random() * 200;
+                    soundFX.playTone(f, f, 2.4, 'sine', 0.06 * v, 0);
+                    soundFX.playTone(f * 2.76, f * 2.76, 1.6, 'sine', 0.025 * v, 0);
+                } else if (kind === 'chime') {
+                    const f = 900 + Math.random() * 500;
+                    for (let i = 0; i < 3; i++) soundFX.playTone(f * (1 + i * 0.26), f * (1 + i * 0.26), 1.2, 'triangle', 0.03 * v, i * 0.18);
+                } else if (kind === 'drip') {
+                    const f = 1300 + Math.random() * 700;
+                    soundFX.playTone(f, f * 0.55, 0.12, 'sine', 0.06 * v, 0);
+                } else if (kind === 'creak') {
+                    const f = 140 + Math.random() * 80;
+                    soundFX.playTone(f, f * 0.7, 0.9, 'sawtooth', 0.03 * v, 0);
+                } else if (kind === 'neon') {
+                    soundFX.playTone(120, 120, 0.7, 'square', 0.02 * v, 0);
+                    soundFX.playTone(240, 240, 0.5, 'square', 0.012 * v, 0.1);
+                }
+            },
+
+            // V2.2: a point of this kind in earshot (12-45 m from p), at random, into _pt; false if there is
+            // none. Allocates nothing.
+            _pickPoint: function (kind, p) {
+                const a = this.points[kind];
+                if (!a) return false;
+                let n = 0;
+                for (let i = 0; i < a.length; i += 3) if (this._inEarshot(a, i, p)) n++;
+                if (!n) return false;
+                let k = Math.floor(Math.random() * n);
+                for (let i = 0; i < a.length; i += 3) {
+                    if (!this._inEarshot(a, i, p) || k-- > 0) continue;
+                    this._pt.x = a[i]; this._pt.y = a[i + 1]; this._pt.z = a[i + 2];
+                    return true;
+                }
+                return false;
+            },
+            _inEarshot: function (a, i, p) {
+                const dx = a[i] - p.x, dy = a[i + 1] - p.y, dz = a[i + 2] - p.z, d2 = dx * dx + dy * dy + dz * dz;
+                return d2 >= 12 * 12 && d2 <= 45 * 45;
+            },
+
+            // V2.2: this map's sound points (MAP_SOUND_POINTS), once per map: a flat [x, y, z, ...] list per
+            // kind. A point inside a solid piece (or a missing one) is left out and counted in pointsDropped;
+            // one within 1 m of a point already on its list is the same point.
+            _buildPoints: function () {
+                const id = this.presetId;
+                this._pointsFor = id;
+                this.points = {};
+                this.pointsDropped = 0;
+                const spec = MAP_SOUND_POINTS[id], M = MAP_PRESETS[id];
+                if (!spec || !M) return;
+                const K = this._kit(M), lists = spec(K);
+                for (const kind in lists) {
+                    const out = [];
+                    for (const q of lists[kind]) {
+                        if (!q || !(isFinite(q[0]) && isFinite(q[1]) && isFinite(q[2])) || K.solid(q[0], q[1], q[2])) { this.pointsDropped++; continue; }
+                        let same = false;
+                        for (let i = 0; i < out.length && !same; i += 3) same = Math.hypot(out[i] - q[0], out[i + 1] - q[1], out[i + 2] - q[2]) < 1;
+                        if (!same) out.push(q[0], q[1], q[2]);
                     }
-                });
+                    if (out.length) this.points[kind] = out;
+                }
+            },
+
+            // V2.2: the helpers MAP_SOUND_POINTS reads a map with: its plan (open floor, [x0, x1, z0, z1] by
+            // name), its layout and callouts, its preset's data, and the pieces its build put down (map boxes
+            // and cylinders, by their bounds). Used only while a map's points are built.
+            _kit: function (M) {
+                const P = M.plan || {}, L = M.layout || mapLayout(), pieces = mapPieces, near = [];
+                const rects = Object.keys(P).map((k) => P[k]);
+                const over = (b, x, z) => x > b.min.x && x < b.max.x && z > b.min.z && z < b.max.z;
+                // The arena's own walls (1 m thick and a whole side long) are no roof or landmark
+                const wall = (b) => Math.max(b.max.x - b.min.x, b.max.z - b.min.z) >= 90 && Math.min(b.max.x - b.min.x, b.max.z - b.min.z) <= 1.5;
+                const mid = (r) => [(r[0] + r[1]) / 2, (r[2] + r[3]) / 2];
+                const K = {
+                    M: M, L: L, P: P,
+                    // Inside a solid piece, or any other fixed collider (Lotus's stone doors, props)?
+                    solid: (x, y, z) => pieces.some((p) => over(p.bounds, x, z) && y > p.bounds.min.y && y < p.bounds.max.y) ||
+                        collisionIndex.query(x, z, x, z, near).some((r) => r.kind === 'static' && x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ && y > r.minY && y < r.maxY),
+                    // The top of whatever stands highest at (x, z): a roof, a deck, a fountain (0: the floor)
+                    floor: (x, z) => {
+                        let top = 0;
+                        for (const p of pieces) if (!wall(p.bounds) && over(p.bounds, x, z) && p.bounds.max.y > top) top = p.bounds.max.y;
+                        return top;
+                    },
+                    // The underside of the lowest piece over (x, z) above head height: a lintel, a beam, a roof
+                    ceil: (x, z) => {
+                        let c = Infinity;
+                        for (const p of pieces) if (over(p.bounds, x, z) && p.bounds.min.y > 2.2 && p.bounds.min.y < c) c = p.bounds.min.y;
+                        return c;
+                    },
+                    // The middle of a plan area, [x, z]
+                    mid: (k) => mid(P[k]),
+                    // h metres over whatever stands highest at a spot [x, z]
+                    above: (s, h) => [s[0], K.floor(s[0], s[1]) + h, s[1]],
+                    // Hung drop metres under the lintel, beam or roof over a spot (none there: no point)
+                    hang: (s, drop) => { const c = K.ceil(s[0], s[1]); return c < Infinity ? [s[0], c - drop, s[1]] : null; },
+                    // Where the plan's other open areas meet this one: the middle of each shared edge, 0.5 m into the other
+                    mouths: (k) => {
+                        const r = P[k], out = [];
+                        for (const s of rects) {
+                            if (s === r) continue;
+                            const x0 = Math.max(r[0], s[0]), x1 = Math.min(r[1], s[1]), z0 = Math.max(r[2], s[2]), z1 = Math.min(r[3], s[3]);
+                            if (x1 - x0 >= 1 && z0 === z1) out.push([(x0 + x1) / 2, z0 + (s[2] < r[2] ? -0.5 : 0.5)]);
+                            else if (z1 - z0 >= 1 && x0 === x1) out.push([x0 + (s[0] < r[0] ? -0.5 : 0.5), (z0 + z1) / 2]);
+                        }
+                        return out;
+                    },
+                    // The four corners of these plan areas, inset from both walls, at height y
+                    corners: (keys, inset, y) => {
+                        const out = [];
+                        for (const k of keys) {
+                            const r = P[k];
+                            if (r) for (const x of [r[0] + inset, r[1] - inset]) for (const z of [r[2] + inset, r[3] - inset]) out.push([x, y, z]);
+                        }
+                        return out;
+                    },
+                    // Over the middle of each bigger open area (150 m2 or more: courts, sites, spawns, long lanes), y up
+                    open: (y) => rects.filter((r) => (r[1] - r[0]) * (r[3] - r[2]) >= 150).map((r) => [mid(r)[0], y, mid(r)[1]]),
+                    // Over the roofs: the middle of each bigger building block (60 m2 or more) the plan raises, h over its top
+                    roofs: (h) => planToBlocks(P).filter((r) => (r[1] - r[0]) * (r[3] - r[2]) >= 60).map((r) => K.above(mid(r), h)),
+                    // The landmarks above the roofs (any piece over 11 m, the arena's walls aside): h over the top of each
+                    // piece up there with nothing standing on it, one within 2 m; test(width), if given, picks by its width
+                    tops: (h, test) => {
+                        const up = pieces.filter((p) => p.bounds.max.y > 11 && !wall(p.bounds)), out = [];
+                        for (const p of up) {
+                            const b = p.bounds, x = (b.min.x + b.max.x) / 2, z = (b.min.z + b.max.z) / 2;
+                            if (test && !test(Math.min(b.max.x - b.min.x, b.max.z - b.min.z))) continue;
+                            if (up.some((q) => q !== p && q.bounds.min.y >= b.max.y - 0.7 && over(q.bounds, x, z))) continue;
+                            if (out.some((t) => Math.hypot(t[0] - x, t[2] - z) < 2)) continue;
+                            out.push([x, b.max.y + h, z]);
+                        }
+                        return out;
+                    },
+                    // h over the tip of each cylinder standing on another piece with its top between lo and hi (spires)
+                    spires: (lo, hi, h) => pieces.filter((p) => p.shape === 'cylinder' && p.bounds.min.y > 0.5 && p.bounds.max.y > lo && p.bounds.max.y < hi)
+                        .map((p) => [p.x, p.bounds.max.y + h, p.z]),
+                    // drop metres under the middle of each overhead box over the plan's open floor whose underside is
+                    // between lo and hi (the chokepoints' beams and lintels)
+                    beams: (lo, hi, drop) => {
+                        const out = [];
+                        for (const p of pieces) {
+                            const b = p.bounds, x = (b.min.x + b.max.x) / 2, z = (b.min.z + b.max.z) / 2;
+                            if (p.shape !== 'box' || b.min.y < lo || b.min.y > hi) continue;
+                            if (rects.some((r) => x > r[0] && x < r[1] && z > r[2] && z < r[3])) out.push([x, b.min.y - drop, z]);
+                        }
+                        return out;
+                    },
+                    // The middle of the 1 m cells of a plan area whose callout (the layout's zoneName) at height y is name
+                    zone: (name, k, y) => {
+                        const r = P[k];
+                        if (!r || !L.zoneName) return null;
+                        let sx = 0, sz = 0, n = 0;
+                        for (let x = r[0] + 0.5; x < r[1]; x += 1) for (let z = r[2] + 0.5; z < r[3]; z += 1) if (L.zoneName(x, y, z) === name) { sx += x; sz += z; n++; }
+                        return n ? [sx / n, sz / n] : null;
+                    }
+                };
+                return K;
             }
         };
 
