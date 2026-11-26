@@ -5171,6 +5171,17 @@
                                     <button class="settings-pill-opt" data-botdiff="radiant">RADIANT (AIMBOT)</button>
                                 </div>
                             </div>
+                            <!-- V2.2: Bots Use Map Mechanics (off by default) -->
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Bots Use Map Mechanics</strong>
+                                    <small>Bots take Bind's teleporters when quicker, climb Icebox's and Split's ropes to hold a deck, open Lotus's doors on their way (defenders sometimes shut them behind them) and, attacking, shoot Lotus's breakable wall open</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-bot-mech-pills">
+                                    <button class="settings-pill-opt active" data-botmech="off">OFF</button>
+                                    <button class="settings-pill-opt" data-botmech="on">ON</button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="settings-section-box">
@@ -6311,6 +6322,7 @@
                 hudScale: 100,         // V1.7: HUD Size % (80-130)
                 weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx' | level rewards: 'ember' | 'glacier' | 'neontide' | 'onyx' | workshop: 'custom1'..'custom3'
                 botDifficulty: 'gold', // 'iron' | 'gold' | 'immortal' | 'radiant'
+                botMechanics: 'off',   // V2.2: Bots Use Map Mechanics, 'off' (default) | 'on'
                 infiniteAbilities: false,
                 infiniteUlt: false,
                 infiniteAmmo: false,
@@ -14449,6 +14461,674 @@
             }
         };
 
+        // =============================================
+        // V2.2 Bots Use Map Mechanics (Settings > Practice, off by default)
+        // =============================================
+        // With the setting on, bots use the maps' mechanics as you do:
+        //   Bind's teleporters: a bot whose route is quicker through a pad (the walk to it and on from its
+        //     exit, against the walk) steps on it and comes out at the exit facing the layout's way, with a
+        //     flash at both ends and the pad's sounds placed in 3D; then a reuse wait like yours.
+        //   Lotus's doors: a shut door on a bot's best route (a link from a spot on one side to a spot on
+        //     the other through the open door, with the turn's time on top) is opened as you open it (the
+        //     same turn, sound and walk-grid refresh), waited for and gone through; defenders sometimes
+        //     close a door behind them.
+        //   Lotus's breakable wall: an attacker whose route is shorter through it stands off, faces it and
+        //     fires until it breaks, then goes through.
+        //   Icebox's and Split's ropes: one bot per side at a time (a defender whose spot has a rope deck
+        //     near it, or an attacker passing one on its way in) climbs a rope at your speed, holds an angle
+        //     from the deck and comes back down the rope when the round moves on.
+        // Walking stays on the walk grid: each move is a link or a small state on the bot round it, and
+        // every state has a time limit and a way back to the normal update. Off, none of this runs: the
+        // bots' routes, timings and random numbers are exactly as before. The bot's animAction ('climb' on
+        // a rope, 'push' at a door, null after) and animActionAt (gameNow() when it changed) tell the
+        // animation code what it is doing.
+        const BOT_MECH = {
+            navSpeed: 3,              // m/s: what a second spent on a move costs on a route (bots run 1-4 m/s)
+            evalMs: 2600,             // how often a routing bot weighs its route against the mechanics
+            margin: 4,                // a link has to save this many metres and a tenth of the walk
+            tpCost: 2,                // stepping onto a pad
+            tpReuseMs: 3200,          // a bot's wait before it uses a pad again (yours)
+            doorSpot: 4,              // where a bot stands to turn a door: this far along its lane from the pivot
+            doorLink: 9.2,            // the walk from there to the same spot on the other side, past the open slab
+            doorTurnS: 3.2,           // the 2.4 s turn and a little
+            pushMs: 5600,             // the longest a bot waits at a door
+            closeChance: 0.35,        // a defender shuts a door it has just walked through
+            wallSpot: 3.5,            // how far a bot stands off the breakable wall
+            wallShotMs: 150,
+            wallDamage: 32,
+            wallS: 3,                 // aiming and shooting it down
+            wallMs: 9000,             // the longest a bot shoots at it
+            climbSpeed: 13.5,         // m/s up a rope (yours)
+            ropeOut: 0.35,            // a climber stands this far out from the cable
+            ropeNear: 14,             // a defender whose spot is this close to a rope may hold its deck
+            ropeAttackNear: 8,        // an attacker passing this close may take the high spot...
+            attackPerchChance: 0.65,  // ...in about two rounds in three
+            holdDefendMs: [38000, 52000],
+            holdAttackMs: [16000, 26000],
+            unseenMs: 9000,           // you within 32 m but out of its sight this long: it comes down to hunt
+            perchGapMs: [14000, 24000]
+        };
+        const botMechanics = {
+            live: false,              // a bot may be in a move (cleared when the setting goes off)
+            layout: null,             // this tick's map layout
+            perchers: 0,              // bots on, or on their way up to, a rope deck
+            perchMode: null, perchRound: -1, perchSide: null,   // the round the perches below count for
+            roundPerches: 0,
+            attackRoll: false,
+            nextPerchAt: 0,
+            doorTurnedAt: [0, 0, 0, 0],
+            stats: { teleports: 0, doorsOpened: 0, doorsClosed: 0, wallShots: 0, climbs: 0 },
+            _feet: null,
+            _viaA: 0,
+            _p: new THREE.Vector3(),
+            _aim: new THREE.Vector3(),
+
+            enabled: function () {
+                return !!(game.userSettings && game.userSettings.botMechanics === 'on');
+            },
+
+            // Every enemy's fields, set where it is created and each time it is (re)activated
+            reset: function (e) {
+                e.animAction = null;
+                e.animActionAt = 0;
+                e.mechState = null;   // null | via | push | wall | closeWait | close | toRope | climb | onTop | perch | back | down
+                e.mechAir = false;    // on a rope or a deck
+                e.mechKind = null;    // 'pad' | 'door' | 'wall' | 'rope'
+                e.mechIdx = -1;
+                e.mechX = 0; e.mechZ = 0;
+                e.mechUntil = 0;
+                e.mechLayout = null;
+                e.mechEvalAt = 0;
+                e.mechGoalX = 0; e.mechGoalZ = 0;
+                e.mechTpReadyAt = 0;
+                e.mechBanKey = null; e.mechBanUntil = 0;
+                e.mechCoolUntil = 0;
+                e.mechHoldMs = 0;
+                if (e.mechLane) e.mechLane.fill(0);
+                else e.mechLane = [0, 0, 0, 0];
+            },
+
+            // The bots' side: 'attack' (a Match you defend: they plant), 'defend' (a Match you attack,
+            // Retake, Wave: they hold the sites) or null (Deathmatch and the rest)
+            side: function () {
+                const m = game.gameMode;
+                if (m === 'match') return matchMode.active ? (matchMode.side === 'attack' ? 'defend' : 'attack') : null;
+                return (m === 'retake' || m === 'wave') ? 'defend' : null;
+            },
+
+            // Once per bot update, before the bots
+            beginTick: function (now) {
+                const L = mapLayout();
+                if (L !== this.layout) { this.layout = L; this._feet = null; this.perchers = 0; }
+                const doors = tacticalEnhancements.lotusDoors;
+                if (L.doors && doors) for (let i = 0; i < doors.length && i < 4; i++) if (doors[i].turning) this.doorTurnedAt[i] = now;
+                if (L.ropes) this._perchTick(L, now);
+            },
+
+            // One bot's tick (updateEnemies, after the blind and Range checks). 0: the update below moves it
+            // (perhaps to a pad, a door or the wall: steer); 1: moved here, on the floor (the map collision
+            // runs as usual); 2: off the floor, on a rope or a deck (no 2D push-out from the stack under it,
+            // no shove from other bots)
+            step: function (e, pos, player, distSq, now, dateNow, dt, arch, speedMult, turnMult, shotMult) {
+                const st = e.mechState;
+                if (!st) {
+                    if (this.layout.doors && this.side() === 'defend') this._doorBehind(e, pos, now);
+                    return 0;
+                }
+                if (e.mechLayout !== this.layout) { this.abort(e); return 1; }   // a new map under it
+                if (st === 'via') {
+                    if (now > e.mechUntil) this._giveUp(e, now, 15000);
+                    return 0;
+                }
+                if (st === 'closeWait') return this._closeWait(e, pos, now);
+                e.tier = 'near';
+                const scaleY = arch.scaleY || 1;
+                if (st === 'push') return this._push(e, pos, player, distSq, now, scaleY);
+                if (st === 'close') return this._close(e, pos, now);
+                if (st === 'wall') return this._wall(e, pos, player, distSq, now, scaleY);
+                if (st === 'toRope') return this._toRope(e, pos, player, distSq, now, scaleY, speedMult);
+                return this._air(e, pos, player, distSq, now, dateNow, dt, scaleY, turnMult, shotMult);
+            },
+
+            clear: function (e) {
+                e.mechState = null;
+                e.mechAir = false;
+                e.mechKind = null;
+                e.mechIdx = -1;
+                if (e.animAction === 'climb' || e.animAction === 'push') this._anim(e, null);
+            },
+            _anim: function (e, action) {
+                e.animAction = action;
+                e.animActionAt = gameNow();
+            },
+            _giveUp: function (e, now, banMs) {
+                if (e.mechKind && e.mechKind !== 'rope') { e.mechBanKey = e.mechKind + e.mechIdx; e.mechBanUntil = now + banMs; }
+                this.clear(e);
+                e.navLen = 0;
+            },
+            // Out of any move at once (the setting switched off, a new map): a live bot off the floor is put
+            // down at the foot of its rope
+            abort: function (e) {
+                const pos = e.mesh.position;
+                if (e.mechAir && e.isActive && !e.hit) {
+                    if (e.mechKind === 'rope' && e.mechLayout === mapLayout() && e.mechLayout.ropes) {
+                        const f = this._foot(e.mechLayout, e.mechIdx);
+                        pos.x = f.x; pos.z = f.z;
+                    }
+                    pos.y = 0;
+                    e.poseDirty = true;
+                    syncEnemyBroadphase(e);
+                }
+                this.clear(e);
+                e.navLen = 0;
+            },
+            releaseAll: function () {
+                for (let i = 0; i < enemyObjects.length; i++) if (enemyObjects[i].mechState) this.abort(enemyObjects[i]);
+                this.live = false;
+                this.perchers = 0;
+            },
+            // The bots wait (a Match between rounds): one on its way up a rope is put on the deck, one on its
+            // way down on the floor (one holding a deck stays; the next round puts every bot back on the floor)
+            settle: function () {
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i], st = e.mechState;
+                    if (!e.mechAir || st === 'perch' || !e.isActive || e.hit) continue;
+                    const L = e.mechLayout, rope = L && L.ropes && L.ropes[e.mechIdx];
+                    if (!rope || L !== mapLayout()) { this.abort(e); continue; }
+                    const pos = e.mesh.position;
+                    if (st === 'climb' || st === 'onTop') {
+                        pos.set(rope.exit.x, rope.topY - 0.2, rope.exit.z);
+                        this._anim(e, null);
+                        this._startPerch(e, performance.now());
+                    } else {
+                        const f = this._foot(L, e.mechIdx);
+                        pos.set(f.x, 0, f.z);
+                        this._land(e, performance.now());
+                    }
+                    e.poseDirty = true;
+                    syncEnemyBroadphase(e);
+                }
+            },
+
+            // The near update's sight test (from where the bot stands, deck or floor), at its rate
+            _sight: function (e, pos, player, distSq, now, scaleY) {
+                if (distSq > (e.archetype === 'sniper' ? 784 : 484)) { e.hasSight = false; return false; }
+                if (now >= (e.lastLosCheckAt || 0)) {
+                    e.lastLosCheckAt = now + 75 + (e.slot % 4) * 15;
+                    _enemyLosOrigin.set(pos.x, pos.y + 1.38 * scaleY, pos.z);
+                    _enemyLosTarget.set(player.x, player.y - 0.18, player.z);
+                    const d = _enemyLosOrigin.distanceTo(_enemyLosTarget);
+                    e.hasSight = !agentSystem.isBlockedBySmoke(_enemyLosOrigin, _enemyLosTarget) &&
+                        agentSystem.hasWallLineOfSight(_enemyLosOrigin, _enemyLosTarget, d);
+                }
+                return e.hasSight;
+            },
+            // Turn toward yaw by a share k of the way (the short way round); returns how far off it was
+            _turn: function (e, yaw, k) {
+                const r = e.mesh.rotation, d = Math.atan2(Math.sin(yaw - r.y), Math.cos(yaw - r.y));
+                r.y += d * Math.min(1, k);
+                return Math.abs(d);
+            },
+
+            // The waypoint for a bot routing to (gx, gz) (a fixed goal: tol 0; you, hunted: tol 3): the walk
+            // grid's, unless a pad, a door or the wall makes the way quicker; then it walks there first and
+            // uses it on arrival
+            steer: function (e, pos, gx, gz, now, tol) {
+                if (e.mechState === 'via' && !this._viaOk(e, gx, gz)) this.clear(e);
+                if (!e.mechState && (now >= e.mechEvalAt || (tol === 0 && Math.abs(gx - e.mechGoalX) + Math.abs(gz - e.mechGoalZ) > 1))) {
+                    this._evaluate(e, pos, gx, gz, now);
+                }
+                if (e.mechState === 'via') {
+                    const r = e.mechKind === 'pad' ? (this.layout.teleportRadius || 1.2) : 0.7;
+                    if (Math.hypot(e.mechX - pos.x, e.mechZ - pos.z) > r) return navGrid.steerTo(e, pos, e.mechX, e.mechZ, now, 0);
+                    this._arrive(e, pos, now);
+                    if (e.mechState) return navGrid.steerTo(e, pos, e.mechX, e.mechZ, now, 0);   // at the door or the wall
+                }
+                return navGrid.steerTo(e, pos, gx, gz, now, tol);
+            },
+            // A link still worth walking to: the same goal, and the door still shut or the wall standing
+            _viaOk: function (e, gx, gz) {
+                if (Math.abs(gx - e.mechGoalX) + Math.abs(gz - e.mechGoalZ) > 6) return false;
+                const te = tacticalEnhancements;
+                if (e.mechKind === 'door') {
+                    const d = te.lotusDoors[e.mechIdx];
+                    return !!(d && d.cfg) && !(d.isOpen && !d.turning);
+                }
+                if (e.mechKind === 'wall') return !!(te.breakWall && te.breakWall.cfg) && !te.breakWall.broken;
+                return true;
+            },
+            // Weigh the walk to (gx, gz) against the ways through this map's pads, its shut doors and (an
+            // attacker) its breakable wall, each a link from a spot on one side to a spot on the other with
+            // its time on top; the best one that saves enough becomes the bot's next stop
+            _evaluate: function (e, pos, gx, gz, now) {
+                e.mechEvalAt = now + BOT_MECH.evalMs + (e.slot % 4) * 230;
+                e.mechGoalX = gx; e.mechGoalZ = gz;
+                const L = this.layout, te = tacticalEnhancements;
+                const tps = L.teleporters || null, doors = L.doors ? te.lotusDoors : null;
+                const w = (L.breakWall && te.breakWall && te.breakWall.cfg && !te.breakWall.broken && this.side() === 'attack') ? te.breakWall : null;
+                if (!tps && !doors && !w) return;
+                const walk = navGrid.routeLength(pos.x, pos.z, gx, gz);
+                let best = walk < 0 ? Infinity : walk * 0.9 - BOT_MECH.margin;
+                if (best <= 0) return;
+                const banned = now < e.mechBanUntil ? e.mechBanKey : null;
+                let kind = null, idx = -1, sx = 0, sz = 0, toSpot = 0;
+                if (tps && now >= e.mechTpReadyAt) {
+                    for (let i = 0; i < tps.length; i++) {
+                        const t = tps[i];
+                        if (banned === 'pad' + i) continue;
+                        const c = this._via(pos, gx, gz, t.from.x, t.from.z, t.to.x, t.to.z, BOT_MECH.tpCost, best);
+                        if (c < best) { best = c; kind = 'pad'; idx = i; sx = t.from.x; sz = t.from.z; toSpot = this._viaA; }
+                    }
+                }
+                if (doors) {
+                    for (let i = 0; i < doors.length; i++) {
+                        const d = doors[i];
+                        if (!d.cfg || (d.isOpen && !d.turning) || banned === 'door' + i) continue;
+                        const ux = d.cfg.axis === 'z' ? 0 : 1, uz = 1 - ux, r = BOT_MECH.doorSpot;
+                        for (let s = -1; s <= 1; s += 2) {
+                            const c = this._via(pos, gx, gz, d.x + ux * s * r, d.z + uz * s * r, d.x - ux * s * r, d.z - uz * s * r,
+                                BOT_MECH.doorLink + BOT_MECH.doorTurnS * BOT_MECH.navSpeed, best);
+                            if (c < best) { best = c; kind = 'door'; idx = i; sx = d.x + ux * s * r; sz = d.z + uz * s * r; toSpot = this._viaA; }
+                        }
+                    }
+                }
+                if (w && banned !== 'wall0') {
+                    const c0 = w.cfg, thinZ = (c0.x1 - c0.x0) >= (c0.z1 - c0.z0);
+                    const cx = (c0.x0 + c0.x1) / 2, cz = (c0.z0 + c0.z1) / 2;
+                    const r = (thinZ ? c0.z1 - c0.z0 : c0.x1 - c0.x0) / 2 + BOT_MECH.wallSpot;
+                    for (let s = -1; s <= 1; s += 2) {
+                        const ax = thinZ ? cx : cx + s * r, az = thinZ ? cz + s * r : cz;
+                        const c = this._via(pos, gx, gz, ax, az, thinZ ? cx : cx - s * r, thinZ ? cz - s * r : cz,
+                            2 * r + BOT_MECH.wallS * BOT_MECH.navSpeed, best);
+                        if (c < best) { best = c; kind = 'wall'; idx = 0; sx = ax; sz = az; toSpot = this._viaA; }
+                    }
+                }
+                if (!kind) return;
+                e.mechState = 'via'; e.mechKind = kind; e.mechIdx = idx;
+                e.mechX = sx; e.mechZ = sz;
+                e.mechLayout = L;
+                e.mechUntil = now + Math.min(60000, 10000 + toSpot * 1000);
+                this.live = true;
+            },
+            // The walk by a link from (ax, az) to (bx, bz) that costs `extra` metres, or Infinity when it
+            // cannot beat `best` (straight lines first: most links are ruled out without planning a route)
+            _via: function (pos, gx, gz, ax, az, bx, bz, extra, best) {
+                const on = Math.hypot(gx - bx, gz - bz);
+                if (Math.hypot(ax - pos.x, az - pos.z) + on + extra >= best) return Infinity;
+                const a = navGrid.routeLength(pos.x, pos.z, ax, az);
+                if (a < 0 || a + on + extra >= best) return Infinity;
+                const b = navGrid.routeLength(bx, bz, gx, gz);
+                if (b < 0 || a + b + extra >= best) return Infinity;
+                this._viaA = a;
+                return a + b + extra;
+            },
+            _arrive: function (e, pos, now) {
+                if (e.mechKind === 'pad') { this._teleport(e, pos, now); return; }
+                enemyTactics.release(e);
+                e.aiState = 'engage';
+                e.mechUntil = now + (e.mechKind === 'door' ? BOT_MECH.pushMs : BOT_MECH.wallMs);
+                e.mechPushes = 0;
+                e.mechShotAt = now + 350;
+                e.mechState = e.mechKind === 'door' ? 'push' : 'wall';
+            },
+            // On a pad: out at its exit facing the layout's way (yaw is the way you would face; a bot faces
+            // its +z), a flash at both ends and the pad's sounds placed in 3D
+            _teleport: function (e, pos, now) {
+                const tp = this.layout.teleporters && this.layout.teleporters[e.mechIdx];
+                this.clear(e);
+                if (!tp || now < e.mechTpReadyAt) return;
+                this._flash(tp.from.x, tp.from.z, tp.color);
+                soundFX.at(tp.from.x, 1, tp.from.z, () => soundFX.teleporter());
+                pos.x = tp.to.x; pos.z = tp.to.z;
+                e.mesh.rotation.y = tp.to.yaw + Math.PI;
+                e.turnTarget = e.mesh.rotation.y;
+                this._flash(tp.to.x, tp.to.z, tp.color);
+                soundFX.at(tp.to.x, 1, tp.to.z, () => soundFX.teleporterExit());
+                e.mechTpReadyAt = now + BOT_MECH.tpReuseMs;
+                e.mechEvalAt = now + 1200;
+                e.navLen = 0;
+                e.poseDirty = true;
+                this.stats.teleports++;
+            },
+            _flash: function (x, z, hex) {
+                haloSystem.flash(x, 1.2, z, hex, 2.6, 420);
+                abilityLights.flash(x, 1.1, z, hex, 7, 2.4, 420);
+            },
+
+            // At a door's spot: turn it open (at most twice, if someone shuts it again), wait for the turn,
+            // then on through it; you in sight first, or too long: back to the normal update
+            _push: function (e, pos, player, distSq, now, scaleY) {
+                const d = tacticalEnhancements.lotusDoors[e.mechIdx];
+                if (!d || !d.cfg) { this.clear(e); return 1; }
+                if (this._sight(e, pos, player, distSq, now, scaleY)) { this.clear(e); return 0; }
+                this._turn(e, Math.atan2(d.x - pos.x, d.z - pos.z), 0.15);
+                if (!d.turning) {
+                    if (d.isOpen) { this.clear(e); e.navLen = 0; e.mechEvalAt = now + 1500; return 1; }
+                    if (e.mechPushes >= 2) { this._giveUp(e, now, 10000); return 1; }
+                    tacticalEnhancements.botTurnDoor(d, true);
+                    e.mechPushes++;
+                    this.stats.doorsOpened++;
+                    this._anim(e, 'push');
+                }
+                if (now > e.mechUntil) this._giveUp(e, now, 10000);
+                return 1;
+            },
+            // A defender walking through an open door may shut it behind it (see _closeWait)
+            _doorBehind: function (e, pos, now) {
+                const doors = tacticalEnhancements.lotusDoors;
+                if (!doors) return;
+                for (let i = 0; i < doors.length && i < 4; i++) {
+                    const d = doors[i];
+                    let s = 0;
+                    if (d.cfg) {
+                        const ux = d.cfg.axis === 'z' ? 0 : 1, uz = 1 - ux;
+                        const u = (pos.x - d.x) * ux + (pos.z - d.z) * uz, lat = (pos.x - d.x) * uz + (pos.z - d.z) * ux;
+                        if (Math.abs(lat) <= d.cfg.len / 2 + 0.5 && Math.abs(u) <= 6) s = u < 0 ? -1 : 1;
+                    }
+                    const prev = e.mechLane[i];
+                    e.mechLane[i] = s;
+                    if (!s || !prev || s === prev || !d.isOpen || d.turning) continue;
+                    // Through it: now and then, unless it has only just turned
+                    if (now - this.doorTurnedAt[i] < 1500 || Math.random() >= BOT_MECH.closeChance) continue;
+                    e.mechState = 'closeWait'; e.mechKind = 'door'; e.mechIdx = i; e.mechSign = s;
+                    e.mechUntil = now + 4000;
+                    e.mechLayout = this.layout;
+                    this.live = true;
+                    return;
+                }
+            },
+            // Walking on past the square the door sweeps, then turning round to shut it (nobody in the way)
+            _closeWait: function (e, pos, now) {
+                const d = tacticalEnhancements.lotusDoors[e.mechIdx];
+                if (!d || !d.cfg || !d.isOpen || d.turning || now > e.mechUntil) { this.clear(e); return 0; }
+                const ux = d.cfg.axis === 'z' ? 0 : 1, uz = 1 - ux;
+                const u = (pos.x - d.x) * ux + (pos.z - d.z) * uz, lat = (pos.x - d.x) * uz + (pos.z - d.z) * ux;
+                if (u * e.mechSign < 0 || Math.abs(lat) > d.cfg.len / 2 + 1.5) { this.clear(e); return 0; }   // back, or off another way
+                if (Math.abs(u) < BOT_MECH.doorSpot) return 0;
+                if (!this._doorClear(d, e)) { this.clear(e); return 0; }
+                enemyTactics.release(e);
+                e.aiState = 'engage';
+                e.tier = 'near';
+                e.mechState = 'close';
+                e.mechUntil = now + 750;
+                tacticalEnhancements.botTurnDoor(d, false);
+                this.stats.doorsClosed++;
+                this._anim(e, 'push');
+                return 1;
+            },
+            _close: function (e, pos, now) {
+                const d = tacticalEnhancements.lotusDoors[e.mechIdx];
+                if (d && d.cfg) this._turn(e, Math.atan2(d.x - pos.x, d.z - pos.z), 0.2);
+                if (now > e.mechUntil) {
+                    this.clear(e);
+                    e.mechBanKey = 'door' + e.mechIdx; e.mechBanUntil = now + 8000;   // not straight back through it
+                }
+                return 1;
+            },
+            // Nobody (you, a bot, a wingman) in a door's square or a step round it
+            _doorClear: function (d, except) {
+                const h = d.cfg.len / 2 + 1.2;
+                const inside = (x, z) => Math.abs(x - d.x) < h && Math.abs(z - d.z) < h;
+                if (inside(characterController.position.x, characterController.position.z)) return false;
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const o = enemyObjects[i];
+                    if (o !== except && o.isActive && !o.hit && inside(o.mesh.position.x, o.mesh.position.z)) return false;
+                }
+                const wm = tacticalEnhancements.wingmanBots || [];
+                for (let i = 0; i < wm.length; i++) if (wm[i].group && wm[i].group.visible && inside(wm[i].group.position.x, wm[i].group.position.z)) return false;
+                return true;
+            },
+
+            // Off the breakable wall: face it and fire until it breaks (then through it); you in sight
+            // first, or too long: back to the normal update
+            _wall: function (e, pos, player, distSq, now, scaleY) {
+                const w = tacticalEnhancements.breakWall;
+                if (!w || !w.cfg || w.broken) { this.clear(e); e.navLen = 0; e.mechEvalAt = now + 1500; return 1; }
+                if (this._sight(e, pos, player, distSq, now, scaleY)) { this.clear(e); return 0; }
+                if (now > e.mechUntil) { this._giveUp(e, now, 15000); return 1; }
+                const c = w.cfg;
+                const off = this._turn(e, Math.atan2((c.x0 + c.x1) / 2 - pos.x, (c.z0 + c.z1) / 2 - pos.z), 0.2);
+                if (now >= e.mechShotAt && off < 0.25) {
+                    this._shootWall(e, pos, w, scaleY, now);
+                    e.mechShotAt = now + BOT_MECH.wallShotMs;
+                }
+                return 1;
+            },
+            // A shot at the wall as enemyShoot fires one (flash, sound, trail, recoil, minimap ping), with
+            // the wall's own damage from a bullet
+            _shootWall: function (e, pos, w, scaleY, now) {
+                const c = w.cfg, t = this._aim, thinZ = (c.x1 - c.x0) >= (c.z1 - c.z0);
+                const y = 0.7 + Math.random() * Math.max(0.2, c.h - 1.6);
+                if (thinZ) t.set(c.x0 + 0.4 + Math.random() * Math.max(0, c.x1 - c.x0 - 0.8), y, pos.z < c.z0 ? c.z0 : c.z1);
+                else t.set(pos.x < c.x0 ? c.x0 : c.x1, y, c.z0 + 0.4 + Math.random() * Math.max(0, c.z1 - c.z0 - 0.8));
+                const eyeY = pos.y + 1.32 * scaleY;
+                const dx = t.x - pos.x, dy = t.y - eyeY, dz = t.z - pos.z, len = Math.hypot(dx, dy, dz) || 1;
+                const mx = pos.x + dx / len * 0.85, mz = pos.z + dz / len * 0.85;
+                e.animRecoil = 1;
+                e.lastFiredPingUntil = now + 1800;
+                acquireEnemyFlash(mx, eyeY, mz);
+                haloSystem.flash(mx, eyeY, mz, 0xffcc00, 1.2, ENEMY_FLASH_DURATION_MS);
+                soundFX.at(mx, eyeY, mz, () => soundFX.enemyGunshot());
+                _enemyShotOrigin.set(mx, eyeY, mz);
+                _enemyShotDirection.set(dx / len, dy / len, dz / len);
+                createBulletTrail(_enemyShotOrigin, _enemyShotDirection);
+                createHitEffect(t, true);
+                this.stats.wallShots++;
+                tacticalEnhancements.damageBreakWall(w, BOT_MECH.wallDamage, t);
+            },
+
+            // One bot per side at a time holds a rope deck: a defender whose spot has a rope near it, a few
+            // seconds into the round (and now and then later in it, after a gap), or an attacker passing a
+            // rope on its way in (in about two rounds in three, while another goes on); Match and Retake
+            _perchTick: function (L, now) {
+                let up = 0;
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    if (e.isActive && !e.hit && e.mechKind === 'rope') up++;
+                }
+                this.perchers = up;
+                const mode = game.gameMode, side = this.side();
+                if (!side || (mode !== 'match' && mode !== 'retake')) return;
+                const round = mode === 'match' ? matchMode.round : game.roundNumber;
+                if (mode !== this.perchMode || round !== this.perchRound || side !== this.perchSide) {
+                    this.perchMode = mode; this.perchRound = round; this.perchSide = side;
+                    this.roundPerches = 0;
+                    this.attackRoll = Math.random() < BOT_MECH.attackPerchChance;
+                    this.nextPerchAt = now + 2000 + Math.random() * 5000;
+                }
+                if (up > 0 || now < this.nextPerchAt) return;
+                if (mode === 'match' && (matchMode.phase !== 'live' || tacticalDirector.spikeState === 'planted')) return;
+                this.nextPerchAt = now + 2500;
+                if (side === 'attack' ? !this.attackRoll : (this.roundPerches > 0 && Math.random() < 0.5)) return;
+                let alive = 0;
+                for (let i = 0; i < enemyObjects.length; i++) if (enemyObjects[i].isActive && !enemyObjects[i].hit) alive++;
+                if (side === 'attack' && alive < 2) return;   // another one goes on to plant
+                let best = null, bestR = -1, bestD = Infinity;
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    if (!e.isActive || e.hit || e.mechState || e.hasSight || e.tier === 'near' || now < e.mechCoolUntil || e.blindedUntil > gameNow()) continue;
+                    const p = e.mesh.position;
+                    for (let r = 0; r < L.ropes.length; r++) {
+                        const f = this._foot(L, r), d = Math.hypot(f.x - p.x, f.z - p.z);
+                        if (side === 'defend' ? (Math.hypot(f.x - e.position.x, f.z - e.position.z) > BOT_MECH.ropeNear || d > BOT_MECH.ropeNear + 8)
+                            : d > BOT_MECH.ropeAttackNear) continue;
+                        if (d < bestD) { best = e; bestR = r; bestD = d; }
+                    }
+                }
+                if (!best) return;
+                const f = this._foot(L, bestR), len = navGrid.routeLength(best.mesh.position.x, best.mesh.position.z, f.x, f.z);
+                if (len < 0 || len > bestD * 1.8 + 6) return;   // the long way round a wall: not worth it
+                if (this.sendToRope(best, bestR, 0)) this.roundPerches++;
+            },
+            // Send a bot up rope r of this map's layout: it walks to the foot, climbs, holds the deck for
+            // holdMs (0: the usual time for its side, and only in a Match or Retake) and comes back down
+            sendToRope: function (e, r, holdMs) {
+                const L = mapLayout(), rope = L.ropes && L.ropes[r];
+                if (!rope || !e.isActive || e.hit) return false;
+                if (e.mechState) this.abort(e);
+                const f = this._foot(L, r), pos = e.mesh.position;
+                const len = navGrid.routeLength(pos.x, pos.z, f.x, f.z);
+                if (len < 0) return false;
+                this.layout = L;
+                e.mechState = 'toRope'; e.mechKind = 'rope'; e.mechIdx = r;
+                e.mechX = f.x; e.mechZ = f.z;
+                e.mechLayout = L;
+                e.mechHoldMs = holdMs || 0;
+                e.mechUntil = performance.now() + 6000 + len * 700;
+                enemyTactics.release(e);
+                e.aiState = 'engage';
+                e.navLen = 0;
+                this.live = true;
+                return true;
+            },
+            // Where rope r's climber stands: just out from the cable, clear of the stack and anything by it
+            _foot: function (L, r) {
+                if (!this._feet || this._feet.L !== L) this._feet = { L: L, pts: [] };
+                let f = this._feet.pts[r];
+                if (!f) {
+                    const rope = L.ropes[r], p = this._p;
+                    let ox = rope.x - rope.exit.x, oz = rope.z - rope.exit.z;
+                    const ol = Math.hypot(ox, oz) || 1;
+                    ox /= ol; oz /= ol;
+                    let k = BOT_MECH.ropeOut;
+                    for (; k < 2; k += 0.1) {
+                        p.set(rope.x + ox * k, 0, rope.z + oz * k);
+                        if (!resolveEnemyMapCollision(p, 0.7, true)) break;
+                    }
+                    f = this._feet.pts[r] = { x: rope.x + ox * k, z: rope.z + oz * k };
+                }
+                return f;
+            },
+            // To the rope's foot by route (seen on the way, it fights instead); then up
+            _toRope: function (e, pos, player, distSq, now, scaleY, speedMult) {
+                if (this._sight(e, pos, player, distSq, now, scaleY)) { this.clear(e); e.mechCoolUntil = now + 12000; return 0; }
+                if (now > e.mechUntil) { this.clear(e); e.mechCoolUntil = now + 20000; e.navLen = 0; return 0; }
+                if (Math.hypot(e.mechX - pos.x, e.mechZ - pos.z) <= 0.5) { this._startClimb(e, pos, now); return 2; }
+                const wp = navGrid.steerTo(e, pos, e.mechX, e.mechZ, now, 0);
+                this._turn(e, Math.atan2(wp.x - pos.x, wp.z - pos.z), 0.2);
+                enemyTactics._moveToward(pos, wp.x, wp.z, 0.065 * speedMult);
+                return 1;
+            },
+            _startClimb: function (e, pos, now) {
+                const rope = this.layout.ropes[e.mechIdx];
+                pos.x = e.mechX; pos.z = e.mechZ;
+                e.mesh.rotation.y = Math.atan2(rope.exit.x - pos.x, rope.exit.z - pos.z);   // facing the stack
+                e.mechState = 'climb';
+                e.mechAir = true;
+                e.mechUntil = now + 2500;
+                e.hasSight = false;
+                e.poseDirty = true;
+                this.stats.climbs++;
+                this._anim(e, 'climb');
+                tacticalEnhancements.playZiplineSound({ x: rope.x, y: 1.5, z: rope.z });
+            },
+            // On the rope and the deck: x, z and y set here every tick (nothing else moves it)
+            _air: function (e, pos, player, distSq, now, dateNow, dt, scaleY, turnMult, shotMult) {
+                const rope = this.layout.ropes && this.layout.ropes[e.mechIdx];
+                if (!rope) { this.abort(e); return 1; }
+                const deckY = rope.topY - 0.2, st = e.mechState, oldY = pos.y;
+                if (st === 'climb') {
+                    // Up the cable at your speed
+                    pos.x = e.mechX; pos.z = e.mechZ;
+                    pos.y = Math.min(deckY, pos.y + BOT_MECH.climbSpeed * dt);
+                    if (pos.y >= deckY || now > e.mechUntil) {
+                        pos.y = deckY;
+                        e.mechState = 'onTop';
+                        e.mechUntil = now + 1500;
+                        this._anim(e, null);
+                    }
+                } else if (st === 'onTop') {
+                    // Off at the exit, on the deck
+                    pos.y = deckY;
+                    if (enemyTactics._moveToward(pos, rope.exit.x, rope.exit.z, 6 * dt) === 0 || now > e.mechUntil) {
+                        pos.x = rope.exit.x; pos.z = rope.exit.z;
+                        this._startPerch(e, now);
+                    }
+                } else if (st === 'perch') {
+                    // Holding an angle: the way the other side comes, or you when it sees you (and fires)
+                    pos.x = rope.exit.x; pos.z = rope.exit.z; pos.y = deckY;
+                    if (this._sight(e, pos, player, distSq, now, scaleY)) {
+                        e.mechSeenAt = now;
+                        this._turn(e, Math.atan2(player.x - pos.x, player.z - pos.z), 0.065 * turnMult);
+                        if (dateNow - e.lastShot > e.shotDelay * shotMult) { e.lastShot = dateNow; enemyShoot(e); }
+                    } else this._turn(e, Math.atan2(e.mechWatchX - pos.x, e.mechWatchZ - pos.z), 0.04);
+                    if (this._perchDone(e, distSq, now)) { e.mechState = 'back'; e.mechUntil = now + 1500; }
+                } else if (st === 'back') {
+                    // Back over the edge to the cable...
+                    pos.y = deckY;
+                    this._turn(e, Math.atan2(e.mechX - pos.x, e.mechZ - pos.z), 0.25);
+                    if (enemyTactics._moveToward(pos, e.mechX, e.mechZ, 6 * dt) === 0 || now > e.mechUntil) {
+                        pos.x = e.mechX; pos.z = e.mechZ;
+                        e.mechState = 'down';
+                        e.mechVy = 0;
+                        e.mechUntil = now + 3000;
+                        this._anim(e, 'climb');
+                        tacticalEnhancements.playZiplineSound({ x: rope.x, y: deckY, z: rope.z });
+                    }
+                } else {
+                    // ...and down it to the floor, facing the stack
+                    pos.x = e.mechX; pos.z = e.mechZ;
+                    this._turn(e, Math.atan2(rope.exit.x - pos.x, rope.exit.z - pos.z), 0.3);
+                    e.mechVy = Math.min(BOT_MECH.climbSpeed, e.mechVy + 9.8 * dt);
+                    pos.y = Math.max(0, pos.y - e.mechVy * dt);
+                    if (pos.y <= 0 || now > e.mechUntil) { pos.y = 0; this._land(e, now); }
+                }
+                if (pos.y !== oldY) {
+                    e.poseDirty = true;
+                    if (e.mesh.visible) shadowManager.markMotion(pos.x, pos.y, pos.z, e.boundRadius, pos.x, oldY, pos.z);
+                }
+                return 2;
+            },
+            _startPerch: function (e, now) {
+                const side = this.side() || 'defend';
+                e.mechState = 'perch';
+                e.mechSide = side;
+                e.mechUntil = now + (e.mechHoldMs || _tacRand(side === 'attack' ? BOT_MECH.holdAttackMs : BOT_MECH.holdDefendMs));
+                e.mechSeenAt = now;
+                e.mechPlanted = tacticalDirector.spikeState === 'planted';
+                this._watchPoint(e);
+            },
+            // Time to come down: held long enough, hurt, the spike planted (or gone), you near and out of its
+            // sight a while, its site elsewhere now (three sites), the last attacker, the phase over
+            _perchDone: function (e, distSq, now) {
+                if (now >= e.mechUntil || e.health < e.maxHealth * 0.35) return true;
+                if (distSq < 1024 && now - e.mechSeenAt > BOT_MECH.unseenMs) return true;
+                if (e.mechHoldMs) return false;   // sent up for a set time
+                if ((tacticalDirector.spikeState === 'planted') !== e.mechPlanted) return true;
+                const mode = game.gameMode;
+                if (mode === 'match') {
+                    if (!matchMode.active || matchMode.phase !== 'live' || matchMode.rotateGoal(e)) return true;
+                    if (e.mechSide === 'attack' && matchMode.botsAlive() <= 1) return true;
+                    return false;
+                }
+                return mode !== 'retake';
+            },
+            _land: function (e, now) {
+                this.clear(e);
+                e.navLen = 0;
+                e.hasSight = false;
+                e.mechCoolUntil = now + 25000;
+                this.nextPerchAt = Math.max(this.nextPerchAt, now + _tacRand(BOT_MECH.perchGapMs));
+            },
+            // What a perched bot watches: 14 m along the route from the rope's foot toward the other side's
+            // spawn (your start in Retake), the way they come
+            _watchPoint: function (e) {
+                const L = this.layout, f = this._foot(L, e.mechIdx), td = tacticalDirector;
+                let to = L.spawns[e.mechSide === 'attack' ? 'defend' : 'attack'];
+                if (game.gameMode === 'retake' && L.retake && L.retake[td.activeSpikeSiteKey]) to = L.retake[td.activeSpikeSiteKey].player;
+                e.mechWatchX = to.x; e.mechWatchZ = to.z;
+                const path = navGrid.findPath(f.x, f.z, to.x, to.z);
+                if (!path) return;
+                let ax = f.x, az = f.z, left = 14;
+                for (let k = 0; k < path.length; k++) {
+                    const d = Math.hypot(path[k].x - ax, path[k].z - az);
+                    if (d >= left) { e.mechWatchX = ax + (path[k].x - ax) * left / d; e.mechWatchZ = az + (path[k].z - az) * left / d; return; }
+                    left -= d; ax = path[k].x; az = path[k].z;
+                    e.mechWatchX = ax; e.mechWatchZ = az;
+                }
+            }
+        };
+
         function createEnemyActor(defaultArchetype = 'standard') {
             const T = actorTemplates;
             const group = new THREE.Group();
@@ -14518,6 +15198,7 @@
             group.userData.shadowRadius = actor.boundRadius;
             for (const leaf of leaves) shootableOwners.set(leaf, { kind: 'enemy', actor: actor });
             enemyObjects.push(actor);
+            botMechanics.reset(actor);   // V2.2: its map-mechanics state and animAction (null / 0)
             return actor;
         }
         
@@ -15000,6 +15681,7 @@
             actor.animFlinch = 0;
             actor.animRecoil = 0;
             enemyTactics.reset(actor);
+            botMechanics.reset(actor);   // V2.2: no move left over from a past life (animAction null)
             restoreRestAppearance(actor);
             group.visible = true;
             actor.poseDirty = true;
@@ -40553,17 +41235,26 @@
             const patrolTime = time * 0.0005;
             const patrolSin = Math.sin(patrolTime);
             const patrolCos = Math.cos(patrolTime);
-            if (matchMode.botsFrozen()) return;
+            if (matchMode.botsFrozen()) {
+                if (botMechanics.live) botMechanics.settle();   // V2.2: no bot left hanging on a rope while they wait
+                return;
+            }
             // Bots head for this spot when they cannot see the player: the planted
             // spike (to defuse it) or, attacking in a Match, the site they will plant
             const postPlantDefuseGoal = ((game.gameMode === 'wave' || (game.gameMode === 'match' && matchMode.side === 'attack')) && typeof tacticalDirector !== 'undefined' && tacticalDirector.spikeState === 'planted')
                 ? tacticalDirector.activeSpikeSitePos
                 : matchMode.botGoal();
+            // V2.2: Bots Use Map Mechanics (Settings > Practice). Off, none of it runs; switched off with a
+            // bot on a rope or a deck, that bot is put back on the floor
+            const mechOn = botMechanics.enabled();
+            if (mechOn) botMechanics.beginTick(perfNow);
+            else if (botMechanics.live) botMechanics.releaseAll();
             
             for (let i = 0; i < enemyObjects.length; i++) {
                 const enemy = enemyObjects[i];
                 if (enemy.hit || !enemy.isActive) {
                     if (enemy.broadKeys) actorBroadphase.remove(enemy);
+                    if (mechOn && enemy.mechState) botMechanics.clear(enemy);   // V2.2: killed mid-move
                     continue;
                 }
                 // V2.1: this bot's fixed goal: the planted spike, or on a three-site map the site it
@@ -40625,8 +41316,15 @@
 
                 // Engage radius: Snipers engage up to 28m (784 sq), other archetypes up to 22m (484 sq)
                 const engageRangeSq = enemy.archetype === 'sniper' ? 784 : 484;
+                // V2.2: a bot at a door or the breakable wall, or on a rope or a deck, is moved by
+                // botMechanics (1: on the floor, 2: off it); 0 leaves it to the tiers below, which may send it
+                // by a pad, a door or the wall (botMechanics.steer)
+                const mech = mechOn ? botMechanics.step(enemy, pos, playerPosition, distanceToPlayerSq, perfNow, now, delta, arch,
+                    speedMult, slowMult * diffSpeedMult, diffShotDelayMult) : 0;
                 
-                if (distanceToPlayerSq <= engageRangeSq) {
+                if (mech) {
+                    // Moved by botMechanics this tick
+                } else if (distanceToPlayerSq <= engageRangeSq) {
                     enemy.tier = 'near';
                     const distanceToPlayer = Math.sqrt(distanceToPlayerSq) || 0.001;
                     const nx = dx / distanceToPlayer;
@@ -40702,7 +41400,8 @@
                         const sDist = Math.hypot(goal.x - pos.x, goal.z - pos.z) || 1;
                         if (sDist > 2.2) {
                             // V1.7: follow a route round walls instead of pushing into them
-                            const wp = navGrid.steer(enemy, pos, goal, perfNow);
+                            // V2.2: ...or by a pad, a door or the wall when that is quicker (Bots Use Map Mechanics)
+                            const wp = mechOn ? botMechanics.steer(enemy, pos, goal.x, goal.z, perfNow, 0) : navGrid.steer(enemy, pos, goal, perfNow);
                             const wdx = wp.x - pos.x, wdz = wp.z - pos.z;
                             const wd = Math.hypot(wdx, wdz) || 1;
                             pos.x += (wdx / wd) * 0.065 * speedMult + perpX * strafeStep * 0.25;
@@ -40712,8 +41411,10 @@
                         // Sight occluded by wall or smoke: flank laterally + advance to peek around cover.
                         // V1.8: with a wall in the way the bot goes round it by route (straight
                         // on it jammed against the wall); in the open it advances as before
-                        const wp = navGrid.steerTo(enemy, pos, playerPosition.x, playerPosition.z, perfNow, 3);
-                        if (navGrid.onLastLeg(enemy)) {
+                        // V2.2: (by a pad, a door or the wall when quicker: on its way to one, it follows the route)
+                        const wp = mechOn ? botMechanics.steer(enemy, pos, playerPosition.x, playerPosition.z, perfNow, 3)
+                            : navGrid.steerTo(enemy, pos, playerPosition.x, playerPosition.z, perfNow, 3);
+                        if (navGrid.onLastLeg(enemy) && !(mechOn && enemy.mechState === 'via')) {
                             const flankLateral = strafeStep * 1.15;
                             const flankForward = 0.042 * speedMult;
                             pos.x += perpX * flankLateral + nx * flankForward;
@@ -40740,7 +41441,9 @@
                     if (time >= enemy.nextDecisionAt) {
                         // V1.7: a fixed goal (site / planted spike) is reached by route, not straight line.
                         // V1.8: so is a player being hunted (re-planned as they move)
-                        const wp = goal
+                        // V2.2: ...by a pad, a door or the wall when quicker (Bots Use Map Mechanics)
+                        const wp = mechOn ? botMechanics.steer(enemy, pos, goalX, goalZ, perfNow, goal ? 0 : 3)
+                            : goal
                             ? navGrid.steer(enemy, pos, goal, perfNow)
                             : navGrid.steerTo(enemy, pos, goalX, goalZ, perfNow, 3);
                         const sx = wp.x - pos.x, sz = wp.z - pos.z, sd = Math.hypot(sx, sz) || 0.001;
@@ -40781,7 +41484,8 @@
                 }
 
                 // Resolve collision against map boxes (collisionIndex), cylinder pillars, and arena walls
-                if (pos.x !== oldX || pos.z !== oldZ) {
+                // (V2.2: not for a bot on a rope or a deck, mech 2)
+                if ((pos.x !== oldX || pos.z !== oldZ) && mech !== 2) {
                     const hitWall = resolveEnemyMapCollision(pos, 0.68);
                     if (hitWall && perfNow - (enemy.lastWallFlipAt || 0) > 260) {
                         enemy.strafeDir = -(enemy.strafeDir || 1);
@@ -40792,7 +41496,7 @@
                     let separated = false;   // V2.1
                     for (let j = 0; j < i; j++) {
                         const other = enemyObjects[j];
-                        if (!other.isActive || other.hit || other.tier === 'frozen') continue;
+                        if (!other.isActive || other.hit || other.tier === 'frozen' || (mechOn && other.mechAir)) continue;   // V2.2: nor one off the floor
                         const ox = pos.x - other.mesh.position.x;
                         const oz = pos.z - other.mesh.position.z;
                         const dSq = ox * ox + oz * oz;
@@ -47105,6 +47809,7 @@
             hudScale: 100,
             weaponSkin: 'standard',
             botDifficulty: 'gold',
+            botMechanics: 'off',      // V2.2: older saves get Off
             infiniteAbilities: false,
             infiniteUlt: false,
             infiniteAmmo: false,
@@ -51430,6 +52135,13 @@
                     showNotification(`Enemy Bot Difficulty set to ${(val || 'gold').toUpperCase()}`, 1800);
                     this.saveToStorage();
                 });
+                // V2.2: Bots Use Map Mechanics (off: a bot on a rope or a deck is put back on the floor)
+                this.bindPillGroup('setting-bot-mech-pills', 'data-botmech', (val) => {
+                    game.userSettings.botMechanics = val === 'on' ? 'on' : 'off';
+                    if (val !== 'on') botMechanics.releaseAll();
+                    showNotification(`Bots Use Map Mechanics: ${val === 'on' ? 'ON' : 'OFF'}`, 1800);
+                    this.saveToStorage();
+                });
 
                 this.bindPillGroup('setting-cheat-abilities-pills', 'data-infab', (val) => {
                     const on = (val === 'on');
@@ -52152,6 +52864,7 @@
                 setActivePill('setting-hud-hints-pills', 'data-hints', cfg.showHints ? 'show' : 'hide');
                 setActivePill('setting-hud-dmg-pills', 'data-dmgnums', cfg.showDamageNumbers ? 'show' : 'hide');
                 setActivePill('setting-bot-diff-pills', 'data-botdiff', cfg.botDifficulty || 'gold');
+                setActivePill('setting-bot-mech-pills', 'data-botmech', cfg.botMechanics === 'on' ? 'on' : 'off');   // V2.2
                 setActivePill('setting-cheat-abilities-pills', 'data-infab', cfg.infiniteAbilities ? 'on' : 'off');
                 setActivePill('setting-cheat-ult-pills', 'data-infult', cfg.infiniteUlt ? 'on' : 'off');
                 setActivePill('setting-cheat-ammo-pills', 'data-infammo', cfg.infiniteAmmo ? 'on' : 'off');
@@ -52510,7 +53223,8 @@
                 } catch (e) {}
             },
 
-            playZiplineSound: function() {
+            // V2.2: at, a bot on a rope: placed there in 3D (yours plays as before)
+            playZiplineSound: function(at) {
                 try {
                     soundFX.init();
                     if (!soundFX.ctx || soundFX.muted) return;
@@ -52524,7 +53238,7 @@
                     g.gain.setValueAtTime(0.08, now);
                     g.gain.exponentialRampToValueAtTime(0.001, now + 0.20);
                     osc.connect(g);
-                    g.connect(soundFX.masterGain || ctx.destination);
+                    g.connect(at ? this._placedOut(ctx, at) : (soundFX.masterGain || ctx.destination));
                     osc.start(now);
                     osc.stop(now + 0.21);
                 } catch (e) {}
@@ -52979,6 +53693,26 @@
                 d.crystalMat.color.setHex(hex).convertSRGBToLinear();
                 d.ringMat.color.setHex(hex).convertSRGBToLinear();
             },
+            // V2.2: a bot turns a door (Bots Use Map Mechanics): the turn your [F] starts (its state, the
+            // collider and the walk grid, the colour, the grind), with the grind placed at the door and no
+            // notification. False when it is already turning or already that way.
+            botTurnDoor: function(d, open) {
+                if (!d || !d.cfg || d.turning || d.isOpen === open) return false;
+                d.isOpen = open;
+                d.targetAngle = d.isOpen ? d.openAngle : d.closedAngle;
+                d.turning = true;
+                this._doorSolid(d, 'turning');
+                this._doorColour(d);
+                this.playStoneDoorTurn(2.4, { x: d.x, y: 3.3, z: d.z });
+                return true;
+            },
+            // V2.2: the node a placed sound's voices go to: through a 3D panner at at (x, y, z), as soundFX.at
+            // places the bots' other sounds (straight out when 3D audio is off)
+            _placedOut: function(ctx, at) {
+                const bus = ctx.createGain();
+                soundFX.at(at.x, at.y, at.z, () => soundFX._route(ctx, bus));
+                return bus;
+            },
 
             // V2.1: a breakable wall from the map's layout (layout.breakWall): solid to players, bots and
             // bullets until shot to pieces, then gone for the rest of the round (the walk grid is
@@ -53081,12 +53815,12 @@
                 showNotification(c.name + ' SMASHED: THE WAY THROUGH IS OPEN', 2200);
             },
             // The doors' grind: two detuned saws and a rumble for the length of the turn, then a thud (louder
-            // and longer than the old click)
-            playStoneDoorTurn: function(secs) {
+            // and longer than the old click). V2.2: at, a bot's door: placed there in 3D (yours plays as before)
+            playStoneDoorTurn: function(secs, at) {
                 try {
                     soundFX.init();
                     if (!soundFX.ctx || soundFX.muted) return;
-                    const ctx = soundFX.ctx, now = ctx.currentTime, out = soundFX.masterGain || ctx.destination;
+                    const ctx = soundFX.ctx, now = ctx.currentTime, out = at ? this._placedOut(ctx, at) : (soundFX.masterGain || ctx.destination);
                     for (const f of [61, 64.5, 41]) {
                         const osc = ctx.createOscillator(), g = ctx.createGain();
                         osc.type = f < 50 ? 'triangle' : 'sawtooth';
