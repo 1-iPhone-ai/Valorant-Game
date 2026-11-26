@@ -5,10 +5,11 @@ name: Game regression tests
 # warm-up, every agent ability and ultimate, all maps and atmosphere modes,
 # quality switching, and controller input (simulated gamepad).
 #
-# The suite takes over an hour in one go, so it runs as four parallel shards
-# (Node's --test-shard deals the test files out in turn, 9 each); each shard
-# keeps the 45 minute limit. The "test" job reports the combined result under
-# the same check name as before.
+# The suite takes well over an hour in one go, so it runs as five parallel
+# shards (Node's --test-shard deals the sorted test files out in turn, 8 or 9
+# each; five since V2.2, when four came to about 33 minutes on the longest);
+# each shard keeps the 45 minute limit. The "test" job reports the combined
+# result under the same check name as before.
 on:
   pull_request:
   push:
@@ -17,13 +18,13 @@ on:
 
 jobs:
   shard:
-    name: shard ${{ matrix.shard }}/4
+    name: shard ${{ matrix.shard }}/5
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
     defaults:
       run:
         working-directory: tests
@@ -36,7 +37,7 @@ jobs:
           cache-dependency-path: tests/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm test -- --test-shard=${{ matrix.shard }}/4
+      - run: npm test -- --test-shard=${{ matrix.shard }}/5
 
   test:
     needs: shard
