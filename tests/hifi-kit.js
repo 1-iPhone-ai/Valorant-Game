@@ -49,7 +49,7 @@ const RECIPES = {
     'sage.c': {}, 'sage.q': {}, 'sage.e': {}, 'sage.x': {},
     'killjoy.c': {}, 'killjoy.q': { target: [0, 12] }, 'killjoy.e': { target: [0, 8] }, 'killjoy.x': {},
     'cypher.c': { target: [0, 16] }, 'cypher.q': {}, 'cypher.e': { target: [0, 12] }, 'cypher.x': {},
-    'chamber.c': { target: [0, 14] }, 'chamber.q': { target: [0, 12], aim: [-0.08, 0] }, 'chamber.e': { again: 1600 }, 'chamber.x': { xFire: true, target: [0, 12], aim: [-0.08, 0] },
+    'chamber.c': { target: [0, 14] }, 'chamber.q': { target: [0, 12], aim: [-0.08, 0] }, 'chamber.e': { again: 1600 }, 'chamber.x': { xFire: true, at: [-40, 1.7, 10], aim: [-0.02, Math.PI], target: [-40, 24] },
     'deadlock.c': {}, 'deadlock.q': { target: [0, 12] }, 'deadlock.e': {}, 'deadlock.x': { target: [0, 12], aim: [-0.08, 0] },
     'vyse.c': { target: [0, 17] }, 'vyse.q': { again: 1400 }, 'vyse.e': {}, 'vyse.x': {},
     'veto.c': { again: 1600 }, 'veto.q': {}, 'veto.e': { target: [0, 12] }, 'veto.x': {}
