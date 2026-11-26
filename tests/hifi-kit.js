@@ -117,6 +117,11 @@ async function instrument(g) {
     });
 }
 
+// How long (real time) cast waits for game time to reach a second press or a shot. Game time moves at most
+// 67 ms a frame (the simulation's catch-up cap), and a frame with a role's whole set out can take 1-2 s of
+// software rendering on a loaded machine: a 1.5 s wait can then take over a minute.
+const WAIT_MS = 300000;
+
 /**
  * Cast one ability by key with its RECIPES entry (or opts: the same fields). Waits for a second
  * press, shots and so on. Returns null, or the error the cast threw.
@@ -169,12 +174,12 @@ async function cast(g, key, opts) {
     if (err) return err;
     if (r.fire) {
         for (let i = 0; i < r.fire; i++) {
-            await g.page.waitForFunction((ms) => gameNow() - window.__kitCastAt >= ms, (i + 1) * (r.fireMs || 120), { timeout: 60000, polling: 20 });
+            await g.page.waitForFunction((ms) => gameNow() - window.__kitCastAt >= ms, (i + 1) * (r.fireMs || 120), { timeout: WAIT_MS, polling: 20 });
             await g.evaluate(() => { game.lastShot = 0; shoot(); });
         }
     }
     if (r.again) {
-        await g.page.waitForFunction((ms) => gameNow() - window.__kitCastAt >= ms, r.again, { timeout: 60000, polling: 20 });
+        await g.page.waitForFunction((ms) => gameNow() - window.__kitCastAt >= ms, r.again, { timeout: WAIT_MS, polling: 20 });
         const e2 = await g.evaluate((key) => { try { agentSystem.castAbility(key.split('.')[1]); return null; } catch (e) { return e.message; } }, key);
         if (e2) return e2;
     }
