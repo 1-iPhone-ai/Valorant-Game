@@ -13369,16 +13369,17 @@
                 float bend = 0.3 * wWork + 0.3 * buckle;
                 float cl = sin(gp) * wClimb;
                 float pR = ph - dl, pL = ph + 3.14159265 - dl;
-                float hR = sin(pR) * stride * mf + bend + 0.45 * wClimb + 0.25 * cl + 0.3 * wPush;
-                float hL = sin(pL) * stride * mf + bend + 0.45 * wClimb - 0.25 * cl - 0.22 * wPush;
+                float hR = sin(pR) * stride * mf + bend + 0.12 * wWork + 0.45 * wClimb + 0.25 * cl + 0.3 * wPush;
+                float hL = sin(pL) * stride * mf + bend + 0.12 * wWork + 0.45 * wClimb - 0.25 * cl - 0.22 * wPush;
                 float kR = max(0.0, cos(pR)) * kneeAmt + 1.84 * bend + 0.8 * wClimb + 0.3 * cl + 0.42 * wPush;
                 float kL = max(0.0, cos(pL)) * kneeAmt + 1.84 * bend + 0.8 * wClimb - 0.3 * cl + 0.08 * wPush;
                 float rR = spread - sway / 0.92, rL = -spread - sway / 0.92;
-                // The pelvis sits so the lower foot stays on the floor (not while hanging on a rope)
+                // The pelvis sits so the lower foot stays on the floor (not while hanging on a rope),
+                // and goes back as the bot bends over its work, so the head stays over its feet
                 float footR = (0.42 * cos(hR) + 0.5 * cos(hR - kR)) * cos(rR);
                 float footL = (0.42 * cos(hL) + 0.5 * cos(hL - kL)) * cos(rL);
                 R = mat3(1.0);
-                T = vec3(sway, (max(footR, footL) - 0.92) * (1.0 - wClimb), 0.0);
+                T = vec3(sway, (max(footR, footL) - 0.92) * (1.0 - wClimb), 0.11 * wWork + 0.06 * wPush);
                 if (bone > 8.5) {
                     bool right = bone < 10.5;
                     float sd = right ? 1.0 : -1.0;
@@ -13392,13 +13393,13 @@
                 float breath = (0.5 + 0.5 * sin(idle)) * still;
                 float sYaw = clamp(aimY * 0.45, -0.5, 0.5) * (1.0 - gw);
                 float sPitch = instanceAnim.z * 0.26 + 0.1 * snap - 0.12 * buckle - 0.1 * run + 0.12 * aimP * (1.0 - gw)
-                    + 0.015 * breath - 0.2 * wWork - 0.2 * wPush - 0.05 * wReload - 0.06 * wCast + 0.06 * wClimb;
+                    + 0.015 * breath - 0.2 * wWork - 0.16 * wPush - 0.05 * wReload - 0.06 * wCast + 0.06 * wClimb;
                 float sRoll = -instanceAnim3.z + 0.5 * sway;
                 eaJoint(R, T, eaRY(sYaw) * eaRZ(sRoll) * eaRX(sPitch), vec3(0.0, 1.0, 0.0));
                 if (bone < 1.5) return;
                 if (bone < 2.5) {
                     float hYaw = clamp(aimY - sYaw, -1.1, 1.1) * (1.0 - wClimb) * (1.0 - wWork);
-                    float hPitch = 0.55 * aimP + 0.6 * snap - 0.3 * wWork + 0.45 * wClimb - 0.12 * wReload;
+                    float hPitch = 0.55 * aimP + 0.6 * snap - 0.15 * wWork + 0.45 * wClimb - 0.12 * wReload;
                     eaJoint(R, T, eaRY(hYaw) * eaRX(hPitch), vec3(0.0, 1.68, 0.0));
                     return;
                 }
@@ -13903,8 +13904,8 @@
                 const spread = (0.5 - 0.5 * Math.cos(ph)) * 0.26 * Math.abs(ms) * walk;
                 const bend = 0.3 * wWork + 0.3 * buckle, cl = Math.sin(gp) * wClimb;
                 const pR = ph - dl, pL = ph + Math.PI - dl;
-                const hR = Math.sin(pR) * stride * mf + bend + 0.45 * wClimb + 0.25 * cl + 0.3 * wPush;
-                const hL = Math.sin(pL) * stride * mf + bend + 0.45 * wClimb - 0.25 * cl - 0.22 * wPush;
+                const hR = Math.sin(pR) * stride * mf + bend + 0.12 * wWork + 0.45 * wClimb + 0.25 * cl + 0.3 * wPush;
+                const hL = Math.sin(pL) * stride * mf + bend + 0.12 * wWork + 0.45 * wClimb - 0.25 * cl - 0.22 * wPush;
                 const kR = Math.max(0, Math.cos(pR)) * kneeAmt + 1.84 * bend + 0.8 * wClimb + 0.3 * cl + 0.42 * wPush;
                 const kL = Math.max(0, Math.cos(pL)) * kneeAmt + 1.84 * bend + 0.8 * wClimb - 0.3 * cl + 0.08 * wPush;
                 const rR = spread - sway / 0.92, rL = -spread - sway / 0.92;
@@ -13914,12 +13915,12 @@
                 const breath = (0.5 + 0.5 * Math.sin(idle)) * still;
                 const sYaw = Math.max(-0.5, Math.min(0.5, aimY * 0.45)) * (1 - gw);
                 const sPitch = v[10] * 0.26 + 0.1 * snap - 0.12 * buckle - 0.1 * run + 0.12 * aimP * (1 - gw)
-                    + 0.015 * breath - 0.2 * wWork - 0.2 * wPush - 0.05 * wReload - 0.06 * wCast + 0.06 * wClimb;
+                    + 0.015 * breath - 0.2 * wWork - 0.16 * wPush - 0.05 * wReload - 0.06 * wCast + 0.06 * wClimb;
                 const sRoll = -v[8] + 0.5 * sway;
                 const hYaw = Math.max(-1.1, Math.min(1.1, aimY - sYaw)) * (1 - wClimb) * (1 - wWork);
-                const hPitch = 0.55 * aimP + 0.6 * snap - 0.3 * wWork + 0.45 * wClimb - 0.12 * wReload;
+                const hPitch = 0.55 * aimP + 0.6 * snap - 0.15 * wWork + 0.45 * wClimb - 0.12 * wReload;
                 const m = this._hm, q = this._hq;
-                out.makeTranslation(sway, (Math.max(footR, footL) - 0.92) * (1 - wClimb), 0);
+                out.makeTranslation(sway, (Math.max(footR, footL) - 0.92) * (1 - wClimb), 0.11 * wWork + 0.06 * wPush);
                 // joint about pivot P: translate(P) * Q * translate(-P)
                 q.makeRotationY(sYaw).multiply(m.makeRotationZ(sRoll)).multiply(m.makeRotationX(sPitch));
                 out.multiply(m.makeTranslation(0, 1.0, 0)).multiply(q).multiply(m.makeTranslation(0, -1.0, 0));

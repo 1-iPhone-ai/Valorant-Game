@@ -266,6 +266,14 @@ test('on: bots step, aim, gesture and react by zone; hit proxies and draw calls 
         P.set(-11, 1.7, 14);
         respawnEnemy(e);
         packEnemyBatches();
+        // The plant / defuse bend is shallow: the head (the chain the shader poses, at full weight)
+        // drops at most about 12 cm and stays over the feet, inside the 1.6-2.2 m head hit box
+        const hv = new Float32Array(12);
+        out.bendHead = [3, 4].map((code) => {
+            hv[6] = code + 0.99; hv[7] = 2;
+            const c = new THREE.Vector3(0, 1.93, 0).applyMatrix4(enhancedAnim._headMatrix(hv, new THREE.Matrix4()));
+            return { drop: 1.93 - c.y, forward: -c.z };
+        });
         return out;
     });
     assert.equal(r.saved, 'on', 'saved');
@@ -290,6 +298,7 @@ test('on: bots step, aim, gesture and react by zone; hit proxies and draw calls 
     assert.ok(Math.abs(r.idle[1] - r.idle[0]) > 0.5, `idle breathing moves on (${r.idle})`);
     assert.ok(r.fallFront < -0.6, `shot from in front, it falls away from you (${r.fallFront})`);
     assert.ok(r.fallBack > 0.6, `shot from behind, it falls forwards, away from you (${r.fallBack})`);
+    for (const h of r.bendHead) assert.ok(h.drop > 0.03 && h.drop <= 0.12 && h.forward < 0.15, `a shallow bend: the head drops ${h.drop.toFixed(3)} m, ${h.forward.toFixed(3)} m forward`);
 
     // Draw calls: bots and wingmen, off and on (the same pages and as many wingman meshes)
     const calls = await evaluate(() => {
