@@ -29057,7 +29057,9 @@
                 this.waylayLightspeedUntil = now + 2200;
                 this.dashFxUntil = now + 520;
                 soundFX.waylayDash();
+                abilityLook.tag = 'waylay.q';   // V2.2: Lightspeed's ring (High Fidelity)
                 this.spawnWindRing(characterController.position.x, characterController.position.y + 0.3, characterController.position.z, 0xfde047, 5.2, now);
+                abilityLook.tag = null;
                 if (game.health < game.maxHealth) {
                     game.health = Math.min(game.maxHealth, game.health + AGENT_TUNING.waylay.q.healHp);
                     updateHealthHUD();
@@ -29082,7 +29084,9 @@
                 rb.group.position.copy(rb.position);
                 rb.group.visible = true;
                 soundFX.waylayRefract();
+                abilityLook.tag = 'waylay.e';   // V2.2: Refract's ring (High Fidelity)
                 this.spawnWindRing(px, floorY + 0.15, pz, 0xfde047, 4.8, now);
+                abilityLook.tag = null;
                 showNotification("REFRACT CRYSTAL BEACON PLACED (14s) — Press [E] Again to Zip Back in Invulnerable Light!", 2100);
                 this.syncHud(now, true);
             },
@@ -29101,8 +29105,10 @@
                 rb.group.visible = false;
 
                 // Flash & hinder enemies near departure point
+                abilityLook.tag = 'waylay.e';   // V2.2: Refract's return, where you leave (High Fidelity)
                 this.spawnFlashBurst(oldX, oldY + 0.9, oldZ, 0xfde047, 5.5, 360, now);
                 this.spawnWindRing(oldX, oldY + 0.15, oldZ, 0x38bdf8, 5.8, now);
+                abilityLook.tag = null;
                 const rSq = AGENT_TUNING.waylay.e.returnRadiusM * AGENT_TUNING.waylay.e.returnRadiusM;
                 for (let i = 0; i < enemyObjects.length; i++) {
                     const e = enemyObjects[i];
@@ -29129,8 +29135,10 @@
                 updateHealthHUD();
 
                 soundFX.waylayRefract();
+                abilityLook.tag = 'waylay.e';   // V2.2: Refract's return, where you arrive (High Fidelity)
                 this.spawnFlashBurst(targetX, targetY + 0.9, targetZ, 0x38bdf8, 5.2, 380, now);
                 this.spawnWindRing(targetX, targetY + 0.15, targetZ, 0xfde047, 5.8, now);
+                abilityLook.tag = null;
                 showNotification("REFRACT LIGHT RETURN! Invulnerable Phase + Restored +25 HP & +20 Shield!", 2000);
                 this.syncHud(now, true);
             },
@@ -29163,7 +29171,9 @@
                 cp.mirageMesh.position.set(ox + fwdX * 2.5, 1.35, oz + fwdZ * 2.5);
                 cp.mirageMesh.rotation.y = yaw;
                 cp.group.visible = true;
+                abilityLook.tag = 'waylay.x';   // V2.2: Convergent Paths' ring (High Fidelity)
                 this.spawnWindRing(ox, 0.25, oz, 0xfde047, 9.0, now);
+                abilityLook.tag = null;
             },
 
             // --- Veto Bio-Mutant Sentinel Abilities (Crosscut [C], Chokehold [Q], Interceptor [E], Evolution [X]) ---
@@ -29575,7 +29585,9 @@
                     weapon.ammo = weapon.maxAmmo;
                     ammoValue.textContent = weapon.ammo;
                 }
+                abilityLook.tag = 'iso.e';   // V2.2: Double Tap's burst (High Fidelity)
                 this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.35, characterController.position.z, 0x8b5cf6, 4.2, 340, now);
+                abilityLook.tag = null;
                 soundFX.isoShield();
                 showNotification("DOUBLE TAP ACTIVE! Prismatic Flow Shield Absorbs Next Hit — Shoot Overhead Kill Orbs to Refresh!", 2400);
                 this.syncHud(now, true);
@@ -29614,8 +29626,10 @@
                             weapon.ammo = weapon.maxAmmo;
                             ammoValue.textContent = weapon.ammo;
                         }
+                        abilityLook.tag = 'iso.e';   // V2.2: a Double Tap orb shattered (High Fidelity)
                         this.spawnFlashBurst(io.position.x, io.position.y, io.position.z, 0xc084fc, 3.8, 340, now);
                         this.spawnWindRing(io.position.x, io.position.y, io.position.z, 0x8b5cf6, 3.4, now);
+                        abilityLook.tag = null;
                         soundFX.isoShield();
                         showNotification("DOUBLE TAP ORB SHATTERED! Prismatic Flow Shield + +50 Overshield Refreshed!", 2000);
                         this.syncHud(now, true);
@@ -29669,7 +29683,9 @@
                     bestEnemy.transformDirty = true;
                     bestEnemy.revealedUntil = Math.max(bestEnemy.revealedUntil, now + AGENT_DEFS.iso.abilities.x.durationMs);
                     bestEnemy.slowedUntil = Math.max(bestEnemy.slowedUntil, now + AGENT_TUNING.iso.x.targetSlowMs);
+                    abilityLook.tag = 'iso.x';   // V2.2: Kill Contract's burst on its target (High Fidelity)
                     this.spawnFlashBurst(tx, tFloor + 1.1, tz, 0xc084fc, 4.2, 380, now);
+                    abilityLook.tag = null;
                 }
 
                 // Suppress/blind outside enemies so Iso gets a true 1v1 duel!
@@ -30908,9 +30924,11 @@
                 const destY = this.yoruTether.position.y;
                 const destZ = this.yoruTether.position.z;
 
+                abilityLook.tag = 'yoru.e';   // V2.2: Gatecrash's portals and flash (High Fidelity)
                 this.spawnShadowPortal(originX, originY, originZ, now);
                 this.spawnShadowPortal(destX, destY, destZ, now);
                 this.spawnFlashBurst(destX, destY + 0.9, destZ, 0x3b82f6, 3.8, 320, now);
+                abilityLook.tag = null;
 
                 characterController.position.set(destX, destY + characterController.height, destZ);
                 characterController.prevSimPosition.copy(characterController.position);
@@ -31178,7 +31196,9 @@
                 this.dashFxUntil = now + 340;
 
                 // Deal 70 Satchel AoE damage around launch point & 3.5m forward
+                abilityLook.tag = 'raze.q';   // V2.2: Raze's Blast Pack blast (High Fidelity)
                 this.detonateExplosionAoE(px + _abilityForward.x * AGENT_TUNING.raze.q.blastAheadM, py, pz + _abilityForward.z * AGENT_TUNING.raze.q.blastAheadM, AGENT_TUNING.raze.q.radiusM, AGENT_TUNING.raze.q.maxDamage, "Blast Pack", 0xfb923c, AGENT_TUNING.raze.q.revealMs, now);
+                abilityLook.tag = null;
                 soundFX.blastPack();
                 showNotification("BLAST PACK SATCHEL JUMP! (Hold SPACE to Glide)", 1400);
             },
@@ -31330,7 +31350,9 @@
                         this.applyEnemyBlind(e, now, AGENT_TUNING.phoenix.e.blindMs);
                     }
                 }
+                abilityLook.tag = 'phoenix.e';   // V2.2: Phoenix's Blaze Step burst (High Fidelity)
                 this.spawnFlashBurst(originX, originY - 0.5, originZ, 0xff7b00, 3.2, 320, now);
+                abilityLook.tag = null;
 
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld);
@@ -31372,7 +31394,9 @@
             // --- Q: Jett Updraft / Phoenix Curveball Flash / Sova Shock Bolt / Sage Slow Orb ---
             castJettUpdraft: function(now) {
                 characterController.startUpdraft(AGENT_TUNING.jett.q.launchSpeedPerTick, AGENT_TUNING.jett.q.boostSec);
+                abilityLook.tag = 'jett.q';   // V2.2: Jett's Updraft ring (High Fidelity)
                 this.spawnWindRing(characterController.position.x, Math.max(0.15, characterController.position.y - 1.5), characterController.position.z, 0x38f6ff, 4.2, now);
+                abilityLook.tag = null;
                 this.dashFxUntil = now + 260;
                 soundFX.updraft();
                 showNotification("UPDRAFT! (Hold SPACE to Drift Glide)", 1400);
@@ -31487,6 +31511,7 @@
                 orb.position.set(worldPos.x, Math.max(AGENT_TUNING.reyna.q.orbMinHeightM, worldPos.y + AGENT_TUNING.reyna.q.orbHeightM), worldPos.z);
                 orb.startAt = now;
                 orb.expireAt = now + AGENT_TUNING.reyna.q.orbLifetimeMs;
+                orb.lookKey = 'reyna.q';   // V2.2: a soul orb is drawn by Devour's look (High Fidelity)
                 orb.group.position.copy(orb.position);
                 orb.group.visible = true;
             },
@@ -31542,6 +31567,7 @@
                     return;
                 }
                 this.consumeSoulOrb(orb, now);
+                if (this.soulTether) this.soulTether.lookKey = 'reyna.q';   // V2.2: Devour's tether (High Fidelity)
                 this.healPlayer(AGENT_TUNING.reyna.q.healHp, now);
                 game.maxShield = Math.max(game.maxShield || 25, 50);
                 game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.reyna.q.shieldHp);
@@ -31558,6 +31584,7 @@
                     return;
                 }
                 this.consumeSoulOrb(orb, now);
+                if (this.soulTether) this.soulTether.lookKey = 'reyna.e';   // V2.2: Dismiss's tether (High Fidelity)
                 // Existing intangible state: enemies cannot hit you and you move +45% faster
                 this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + AGENT_TUNING.reyna.e.intangibleMs);
                 this.dashFxUntil = now + 420;
@@ -31834,7 +31861,9 @@
                         st.e.rechargeEnd = 0;
                     }
                     this.revealAllEnemies(now, AGENT_TUNING.reyna.x.revealMs);
+                    abilityLook.tag = 'reyna.x';   // V2.2: Empress's burst (High Fidelity)
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.5, characterController.position.z, 0xc084fc, 4.5, 360, now);
+                    abilityLook.tag = null;
                     showNotification("THE HUNT BEGINS! EMPRESS ACTIVE (+35% Fire Rate + Auto-Devour & Dismiss Reset on Kill)!", 3400);
                 } else if (agentId === 'omen') {
                     game.ultChargesLeft = AGENT_TUNING.omen.x.blinkCount;
@@ -32005,7 +32034,9 @@
                         st.q.charges = st.q.maxCharges; st.q.rechargeEnd = 0;
                         st.e.charges = st.e.maxCharges; st.e.rechargeEnd = 0;
                     }
+                    abilityLook.tag = 'yoru.x';   // V2.2: Dimensional Drift's burst (High Fidelity)
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.4, characterController.position.z, 0x3b82f6, 5.2, 380, now);
+                    abilityLook.tag = null;
                     soundFX.yoruDrift();
                     showNotification("I'LL HANDLE THIS! DIMENSIONAL DRIFT ACTIVE (Invulnerable Rift Walk + Global X-Ray + +45% Speed)!", 3500);
                 } else if (agentId === 'neon') {
@@ -32016,7 +32047,9 @@
                         st.e.charges = st.e.maxCharges;
                         st.e.rechargeEnd = 0;
                     }
+                    abilityLook.tag = 'neon.x';   // V2.2: Overdrive's burst (High Fidelity)
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.4, characterController.position.z, 0x00f5d4, 5.5, 420, now);
+                    abilityLook.tag = null;
                     soundFX.neonOverdrive();
                     showNotification("OY! I'M PISSED! OVERDRIVE ACTIVE — Left-Click to fire 400 DPS Bio-Electric Lightning Beam!", 3600);
                 // V2.2: Chamber's numbers are in AGENT_TUNING.chamber
@@ -32589,6 +32622,7 @@
                         }
                         if (worldPos && this.soulTether) {
                             this.soulTether.active = true;
+                            this.soulTether.lookKey = 'reyna.x';   // V2.2: Empress's auto-devour tether (High Fidelity)
                             this.soulTether.origin.set(worldPos.x, Math.max(1.1, worldPos.y + 1.1), worldPos.z);
                             this.soulTether.startAt = now;
                             this.soulTether.expireAt = now + 950;
@@ -33358,7 +33392,9 @@
                     // Neon Relay Bolt double-shock ricochet: detonates Shock #1 on first bounce, then ricochets for Shock #2!
                     if (impacted && proj.type === 'relaybolt' && !proj.bounced) {
                         proj.bounced = true;
+                        abilityLook.tag = 'neon.q';   // V2.2: the Relay Bolt's first shock (High Fidelity; the second is carried by its detonation)
                         this.detonateRelayBoltShock(proj.position.x, proj.position.y, proj.position.z, false, now);
+                        abilityLook.tag = null;
                         proj.velocity.y = Math.max(AGENT_TUNING.neon.q.bounceMinUpMps, Math.abs(proj.velocity.y) * AGENT_TUNING.neon.q.bounceUpMult);
                         proj.velocity.x *= AGENT_TUNING.neon.q.bounceXZMult;
                         proj.velocity.z *= AGENT_TUNING.neon.q.bounceXZMult;
@@ -33975,7 +34011,9 @@
                         decoy.inUse = false;
                         decoy.group.visible = false;
                         soundFX.flashbang();
+                        abilityLook.tag = 'yoru.c';   // V2.2: Fakeout's flash (High Fidelity)
                         this.spawnFlashBurst(decoy.position.x, decoy.position.y + 1.1, decoy.position.z, 0x3b82f6, 5.5, 420, now);
+                        abilityLook.tag = null;
                         const flashRSq = AGENT_TUNING.yoru.c.flashRadiusM * AGENT_TUNING.yoru.c.flashRadiusM;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -34789,7 +34827,9 @@
                             iu.hitSet.add(e);
                             e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.iso.q.revealMs);
                             e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.iso.q.slowMs);
+                            abilityLook.tag = 'iso.q';   // V2.2: Undercut's hit (High Fidelity)
                             this.spawnFlashBurst(e.mesh.position.x, e.mesh.position.y + 1.1, e.mesh.position.z, 0x8b5cf6, 2.6, 280, now);
+                            abilityLook.tag = null;
                             damageEnemyActor(e, AGENT_TUNING.iso.q.damage, now, nowMs, "Undercut Fragile", false);
                             showNotification("UNDERCUT HIT! Hostile Fragile (+50% Vulnerable DMG) & Revealed for 6s!", 1600);
                         }
@@ -35821,8 +35861,10 @@
                         }
                         const midX = cp.origin.x + cp.dir.x * (cp.length * 0.5);
                         const midZ = cp.origin.z + cp.dir.z * (cp.length * 0.5);
+                        abilityLook.tag = 'waylay.x';   // V2.2: Convergent Paths' eruption (High Fidelity)
                         this.spawnFlashBurst(midX, 1.4, midZ, 0xfde047, 9.5, 450, now);
                         this.spawnWindRing(midX, 0.3, midZ, 0xf472b6, 12.0, now);
+                        abilityLook.tag = null;
                         showNotification(`CONVERGENT PATHS ERUPTED! ${hitCount} ${hitCount === 1 ? 'Hostile' : 'Hostiles'} Hindered & Blinded across 26m Corridor!`, 2300);
                     }
                 }
@@ -41600,7 +41642,9 @@
                     agentSystem.reynaDismissUntil = 0;
                     if (game.ultAgent === 'yoru') game.ultActiveUntil = abilityNow;
                     soundFX.yoruRift();
+                    abilityLook.tag = 'yoru.x';   // V2.2: the Drift's unmask flash (High Fidelity)
                     agentSystem.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.5, characterController.position.z, 0x3b82f6, 5.2, 360, abilityNow);
+                    abilityLook.tag = null;
                     for (let j = 0; j < enemyObjects.length; j++) {
                         const e = enemyObjects[j];
                         if (!e.isActive || e.hit) continue;
@@ -42567,7 +42611,9 @@
             if (typeof agentSystem !== 'undefined' && agentSystem.isoShieldActive && abilityNow < agentSystem.isoDoubleTapUntil) {
                 agentSystem.isoShieldActive = false;
                 soundFX.isoShieldBreak();
+                abilityLook.tag = 'iso.e';   // V2.2: the Double Tap shield breaking (High Fidelity)
                 agentSystem.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.3, characterController.position.z, 0x8b5cf6, 3.4, 280, abilityNow);
+                abilityLook.tag = null;
                 if (fxShield) {
                     fxShield.classList.add('active');
                     setTimeout(() => { fxShield.classList.remove('active'); }, 260);
@@ -50634,7 +50680,8 @@
         // V2.2: High Fidelity looks, DUELISTS (role block: Jett, Phoenix, Reyna, Raze, Yoru, Neon, Iso, Waylay)
         // =============================================
         // Looks only: defineLook, defineModel, addTimer and adapters (HIFI-CONTRACT.md). Each ability's
-        // tags go in its own spawn code. Converted here: iso.c, neon.e, raze.x (pilots).
+        // tags go in its own spawn code. Converted here: iso.c, neon.e, raze.x (pilots), then every other
+        // Duelist ability (stage 2, after the pilots).
         // ISO Contingency: a moving energy wall (the Classic 5.2 x 2.75 x 0.28 m box, 1.4 m up, turned with its group)
         abilityLook.defineLook('iso.c', {
             routes: {
@@ -50657,7 +50704,7 @@
         abilityLook.defineLook('neon.e', {
             routes: { ring: 'self', neonHighGear: { renderer: 'self', adapt: 'timer' } },
             styles: { self: { dash: true, color: 'theme:neon', hand: { mode: 2, color: 0x00f5d4, scale: 0.55 },
-                edge: { colA: 0x00f5d4, colB: 0x60a5fa, shimmer: true, k: 0.35 }, aura: { colA: 0x00f5d4, colB: 0x60a5fa, w: 1.1, h: 2.0 },
+                edge: { colA: 0x00f5d4, colB: 0x60a5fa, shimmer: true, k: 0.26 }, aura: { colA: 0x00f5d4, colB: 0x60a5fa, w: 1.1, h: 2.0 },   // V2.2: a softer edge (it was fairly strong)
                 motes: { every: 90, spec: { kind: 'spark', hex: 0x7df9ff, n: 2, life: 0.35, s0: 0.05, s1: 0.015, a0: 1, drag: 1.5, jitter: 3 } },
                 streaks: { every: 260, minSpeed: 5 } } }
         });
@@ -50687,10 +50734,608 @@
                     trail: [{ kind: 'ember', hex: 0xffb35c, life: 0.35, s0: 0.1, s1: 0.02, a0: 1, drag: 1.2, grav: 0, jx: 1.2, jy: 1.2, jz: 1.2 },
                         { kind: 'smoke', hex: 0x6b6560, life: 1.1, s0: 0.18, s1: 0.7, a0: 0.45, drag: 1.2, grav: -0.25, jx: 0.4, jy: 0.4, jz: 0.4 },
                         { kind: 'glow', hex: 0xffa64d, life: 0.16, s0: 0.45, s1: 0.1, a0: 0.9, drag: 0, grav: 0 }] },
-                blast: { preset: 'fire', aoe: true, sparks: { n: 40, hex: 0xffb066 }, dust: { n: 20, hex: 0x7d7267, s1: 2.2 },
+                blast: { preset: 'fire', aoe: true, coreA: 0xffa64d, coreB: 0xe0501a, sparks: { n: 40, hex: 0xffb066 }, dust: { n: 20, hex: 0x7d7267, s1: 2.2 },   // V2.2: a warmer fireball (the preset's read white)
                     smoke: { n: 18, hex: 0x3b3633, k: 0.6 }, shake: 1.2, scorch: { scale: 0.8, hex: 'theme:raze' } }
             }
         });
+
+        // V2.2: the rest of the Duelists (stage 2). Their tags and lookKey stamps are in each ability's own
+        // code; buffs that are only timers are keyed by their agent where the timer is shared. Adapters only
+        // read their items and allocate nothing.
+        (function () {
+            const L = abilityLook, PI = Math.PI;
+            // A custom model part: camera-facing quads of the billboard program in one draw, made per instance
+            // in the staged build (compiled in the warm steps with the rest). q holds 9 numbers a quad: centre
+            // x, y, z, width, height and its 4 params. mode 0: a glow (style 0 hot, 2 electric), 1: flame
+            // tongues, 9: a capsule of light (params 0.3, 0.7, width / height)
+            const glowQuads = function (kit, group, mode, style, colA, colB, fade, q) {
+                const n = q.length / 9, g = kit.L.quads(n, mode === 0 ? -0.5 : 0);
+                for (let i = 0; i < n; i++) { const o = i * 9; kit.L.setQuad(g, i, q[o], q[o + 1], q[o + 2], q[o + 3], q[o + 4], q[o + 5], q[o + 6], q[o + 7], q[o + 8]); }
+                kit.L.quadsDirty(g);
+                const mat = kit.L.shader('bb', { uMode: { value: mode }, uBB: { value: mode === 0 ? 0 : 1 }, uScale: { value: 1 }, uColA: { value: kit.L.lin(kit.L.hex(colA)) },
+                    uColB: { value: kit.L.lin(kit.L.hex(colB)) }, uFade: { value: fade }, uAge: { value: 0 }, uStyle: { value: style }, uSeed: { value: Math.random() } },
+                    { blending: THREE.AdditiveBlending });
+                const mesh = new THREE.Mesh(g, mat);
+                kit.group(group).add(mesh);
+                if (mode !== 0) kit.L.softObjects.push(mesh);   // flames and light read the depth: drawn in the Ultra post chain's soft pass
+            };
+            // n small crystals round a ring (an orbit of shards)
+            const shards = function (out, group, mat, n, r, y, size, tall) {
+                for (let k = 0; k < n; k++) {
+                    const a = k * PI * 2 / n;
+                    out.push({ group: group, shape: 'oct', size: [size], scale: [0.6, tall, 0.6], at: [Math.cos(a) * r, y + (k % 2 ? 0.08 : -0.08), Math.sin(a) * r], mat: mat });
+                }
+                return out;
+            };
+
+            // JETT Cloudburst: a small white-cyan orb trailing wind, then a clean white cloud (castSmokeProjectile;
+            // its colour names it, canister and cloud: no tags)
+            L.defineLook('jett.c', {
+                routes: { projectile: 'projectile', smoke: 'smoke' },
+                styles: {
+                    projectile: { orb: { style: 0, a: 0xf2feff, b: 'theme:jett', size: 0.45 },
+                        trail: [{ kind: 'glow', hex: 0x9ff3ff, life: 0.3, s0: 0.28, s1: 0.05, a0: 0.7, drag: 0, grav: 0 },
+                            { kind: 'smoke', hex: 0xd8eef2, life: 0.7, s0: 0.1, s1: 0.4, a0: 0.28, drag: 1.4, grav: -0.2, jx: 0.5, jy: 0.5, jz: 0.5 }] },
+                    smoke: { preset: 'pale', wisp: 'theme:jett' }
+                }
+            });
+            // JETT Updraft: its wind ring (tagged) is a dash straight up: streaks rising round the body, the wind
+            // swirl on the off-hand
+            L.defineLook('jett.q', {
+                routes: { ring: 'self' },
+                styles: { self: { dash: 'up', color: 'theme:jett', hand: { mode: 6, color: 0x38f6ff } } }
+            });
+            // JETT Blade Storm: the ultimate is a buff (no world visual): wind at the screen edge, glinting motes,
+            // speed lines while you run, the aura when seen from outside
+            L.addTimer('jettBladeStorm', { until: function () { return game.ultAgent === 'jett' ? game.ultActiveUntil : 0; }, key: 'jett.x' });
+            L.defineLook('jett.x', {
+                routes: { jettBladeStorm: { renderer: 'self', adapt: 'timer' } },
+                styles: { self: { color: 'theme:jett', edge: { colA: 0x38f6ff, colB: 0x0891b2, shimmer: true, k: 0.3 }, aura: { colA: 0x38f6ff, colB: 0xcffafe, w: 1.1, h: 2.0 },
+                    motes: { every: 110, spec: { kind: 'spark', hex: 0xe0fdff, n: 2, life: 0.35, s0: 0.05, s1: 0.012, a0: 1, drag: 1.2, jitter: 3 } },
+                    streaks: { every: 260, minSpeed: 5 } } }
+            });
+
+            // PHOENIX Blaze Step: the burst at your feet (tagged) is a small fire flash and a fire dash
+            L.defineLook('phoenix.e', {
+                routes: { flash: [{ renderer: 'flash' }, { renderer: 'self' }] },
+                styles: {
+                    flash: { core: 0xffd166, glow: 'theme:phoenix', coreSize: 0.7, streaks: 0.8, halo: { hex: 0xffe3a3, size: 4.5 }, light: { hex: 0xff9d2e, radius: 9 }, embers: { n: 14, hex: 0xffa338 } },
+                    self: { dash: true, color: 0xff9d2e, hand: { mode: 2, color: 0xff9d2e, scale: 0.6 } }
+                }
+            });
+            // PHOENIX Run It Back: the anchor is a stone brazier burning where you will come back (a column of light
+            // over it, a ring of runes turning on the floor); the rebirth burst (tagged) a big fire flash
+            (function () {
+                const parts = [
+                    { shape: 'cyl', size: [0.3, 0.38, 0.14], seg: 10, at: [0, 0.07, 0], mat: 'stone' },
+                    { shape: 'cyl', size: [0.11, 0.15, 0.52], seg: 10, at: [0, 0.4, 0], mat: 'stone' },
+                    { shape: 'cyl', size: [0.34, 0.15, 0.22], seg: 14, at: [0, 0.77, 0], mat: 'bronze' },
+                    { shape: 'torus', size: [0.335, 0.03], seg: [6, 24], at: [0, 0.88, 0], rot: [PI / 2, 0, 0], mat: 'bronze' },
+                    { shape: 'sphere', size: [0.27], seg: [14, 8], at: [0, 0.86, 0], scale: [1, 0.32, 1], mat: 'coal' },
+                    { group: 'runes', shape: 'torus', size: [1.3, 0.028], seg: [6, 56], rot: [PI / 2, 0, 0], mat: 'rune' }
+                ];
+                for (let k = 0; k < 6; k++) {
+                    const a = k * PI / 3;
+                    parts.push({ group: 'runes', shape: 'box', size: [0.2, 0.016, 0.06], at: [Math.cos(a) * 1.3, 0, Math.sin(a) * 1.3], rot: [0, -a, 0], mat: 'rune' });
+                }
+                const flames = [];
+                for (let k = 0; k < 5; k++) { const a = k * 2.513; flames.push(Math.cos(a) * 0.1, 0.84, Math.sin(a) * 0.1, 0.34 + (k % 2) * 0.08, 0.62 + (k % 3) * 0.12, k * 0.21, (k * 0.37) % 1, 0, 0); }
+                L.defineModel('phoenix.anchor', {
+                    count: 1,
+                    mats: { stone: { color: 0x2a2421, rough: 0.85, metal: 0.05 }, bronze: { color: 0x7c4a1e, rough: 0.38, metal: 0.8 }, coal: { light: 0xff7a1a }, rune: { glow: 0xffb347 } },
+                    groups: { runes: { at: [0, 0.04, 0], role: 'spin', axis: 'y', rate: 0.5 } },
+                    parts: parts,
+                    custom: function (kit) {
+                        glowQuads(kit, 'base', 1, 0, 0xffa63d, 0xc2410c, 1, flames);
+                        glowQuads(kit, 'base', 9, 0, 0xff9d2e, 0xffd166, 0.4, [0, 0, 0, 1.5, 2.8, 0.3, 0.7, 1.5 / 2.8, 0]);
+                    }
+                });
+            })();
+            L.defineLook('phoenix.x', {
+                routes: {
+                    // the anchor has no start time: it keeps the one it was bound at; the light blinks as the ultimate ends
+                    phoenixAnchor: { renderer: 'deployable', adapt: function (P, a, now) {
+                        P.x = a.position.x; P.y = a.position.y; P.z = a.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.remain = game.ultAgent === 'phoenix' ? game.ultActiveUntil - now : 1e9; P.alert = false; P.fade = 1;
+                    } },
+                    flash: 'flash'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'phoenix.anchor', unfoldMs: 350, lights: [0xff9d2e, 0xffd166, 0xffffff], lightY: 1.0, lightRadius: 4.5, lightK: 0.8, blinkMs: 2000,
+                        dust: { hex: 0x8d7a6a, n: 10 }, emit: { every: 80, spec: { kind: 'ember', hex: 0xffa338, n: 1, life: 1.0, s0: 0.06, s1: 0.015, a0: 1, drag: 0.5, grav: -1.2, up: 1.4, jitter: 0.7 } } },
+                    flash: { core: 0xffd98a, glow: 'theme:phoenix', coreSize: 1.3, streaks: 1.2, halo: { hex: 0xffe3a3, size: 8 }, light: { hex: 0xffa53d, radius: 16 }, embers: { n: 30, hex: 0xffa338 } }
+                }
+            });
+
+            // REYNA Leer: an eye of violet light where it lands, facing you (a slit pupil, a dark lid, a ring of
+            // thorns turning round it), lit up while it nearsights
+            (function () {
+                const parts = [
+                    { group: 'eye', shape: 'sphere', size: [0.4], seg: [20, 16], scale: [1, 1, 0.7], mat: 'iris' },
+                    { group: 'eye', shape: 'oct', size: [0.3], scale: [0.26, 1.1, 0.3], at: [0, 0, 0.26], mat: 'pupil' },
+                    { group: 'eye', shape: 'torus', size: [0.43, 0.06], seg: [10, 32], at: [0, 0, 0.06], mat: 'lid' },
+                    { group: 'ring', shape: 'torus', size: [0.68, 0.016], seg: [6, 40], mat: 'glint' }
+                ];
+                for (let k = 0; k < 4; k++) {
+                    const a = k * PI / 2 + PI / 4;
+                    parts.push({ group: 'ring', shape: 'oct', size: [0.07], scale: [0.5, 1.7, 0.5], at: [Math.cos(a) * 0.68, Math.sin(a) * 0.68, 0], rot: [0, 0, a - PI / 2], mat: 'glint' });
+                }
+                L.defineModel('reyna.eye', {
+                    count: 2,
+                    mats: { iris: { light: 0xa855f7 }, pupil: { color: 0x12041c, rough: 0.2, metal: 0.6 }, lid: { color: 0x2e1065, rough: 0.35, metal: 0.55, emissive: 0x1e0a3c }, glint: { glow: 0xf5d0fe } },
+                    groups: { eye: { at: [0, 0.45, 0], role: 'bob', amp: 0.04, rate: 0.8 }, ring: { at: [0, 0.45, 0], role: 'spin', axis: 'z', rate: 1.5 } },
+                    parts: parts,
+                    custom: function (kit) { glowQuads(kit, 'eye', 0, 0, 0xf5d0fe, 0xa855f7, 0.55, [0, 0, 0, 2.2, 2.2, 0.3, 0.6, 0, 0]); }
+                });
+            })();
+            L.defineLook('reyna.c', {
+                routes: {
+                    leerEyes: { renderer: 'deployable', adapt: function (P, e, now) {
+                        P.x = e.position.x; P.y = e.position.y - 0.45; P.z = e.position.z;
+                        P.yaw = Math.atan2(camera.position.x - e.position.x, camera.position.z - e.position.z); P.headYaw = NaN;
+                        P.start = e.startAt; P.remain = e.expireAt - now; P.alert = e.nextPulseAt - now < 120;
+                        const rem = e.expireAt - now;
+                        P.fade = Math.max(0.01, Math.min(1, (now - e.startAt) / 140) * (rem < 300 ? rem / 300 : 1));   // the Classic eye fades over its last moments
+                    } }
+                },
+                styles: { deployable: { preset: 'device', model: 'reyna.eye', unfoldMs: 0, lights: [0xa855f7, 0xf0abfc, 0xffffff], lightY: 0.45, lightRadius: 4, lightK: 0.6, blinkMs: 350, dust: null,
+                    emit: { every: 110, spec: { kind: 'glow', hex: 0xd8b4fe, n: 1, life: 0.8, s0: 0.12, s1: 0.02, a0: 0.8, drag: 1, jitter: 1.4 } } } }
+            });
+            // REYNA's soul tether (Devour, Dismiss and Empress's kills each stamp it): a beam of soul light from the
+            // orb to your chest, as the Classic one
+            const tether = function (P, t, now) {
+                const cc = characterController;
+                L.between(P, t.origin.x, t.origin.y, t.origin.z, cc.position.x, cc.position.y - 0.35, cc.position.z);
+                const rem = t.expireAt - now;
+                P.width = 0.8 + 0.2 * Math.sin(now * 0.025);
+                P.fade = Math.min(1, (now - t.startAt) / 80) * (rem < 250 ? Math.max(0, rem / 250) : 1);
+            };
+            // REYNA Devour: the soul orbs kills drop (her passive, stamped as they spawn: a hot violet orb), the
+            // tether, and a short heal glow while it feeds you (the tether's time; the Devour heal session too)
+            L.addTimer('reynaDevour', { until: function () { const t = agentSystem.soulTether; return t && t.active && t.lookKey === 'reyna.q' ? t.expireAt : 0; }, key: 'reyna.q' });
+            L.defineLook('reyna.q', {
+                routes: {
+                    soulTether: { renderer: 'beam', adapt: tether },
+                    soulOrbs: { renderer: 'projectile', adapt: function (P, o, now) {
+                        const g = o.group.position;
+                        P.x = g.x; P.y = g.y; P.z = g.z; P.vx = 0; P.vy = 0; P.vz = 0; P.age = (now - o.startAt) * 0.001;
+                    } },
+                    reynaDevour: { renderer: 'self', adapt: 'timer' },
+                    reynaDevourSession: { renderer: 'self', adapt: 'session' }
+                },
+                styles: {
+                    beam: { core: 0xfae8ff, glow: 0xc026d3, width: 0.32, jag: 0.07, origin: null, impact: null },
+                    projectile: { orb: { style: 0, a: 0xfdf4ff, b: 0xc026d3, size: 0.95 } },
+                    self: { edge: { colA: 0xc084fc, colB: 0xf5d0fe, k: 0.25 }, hand: { mode: 2, color: 0xe879f9, scale: 0.6 },
+                        motes: { every: 70, spec: { kind: 'glow', hex: 0xf0abfc, n: 2, life: 0.7, s0: 0.1, s1: 0.02, a0: 0.8, drag: 1, up: 0.8, jitter: 0.8 } } }
+                }
+            });
+            // REYNA Dismiss: the tether, then intangible (reynaDismissUntil, keyed by Reyna): a violet shimmer at the
+            // screen edge, a translucent aura seen from outside
+            L.addTimer('reynaDismiss', { until: function () { return game.activeAgent === 'reyna' ? agentSystem.reynaDismissUntil : 0; }, key: 'reyna.e' });
+            L.defineLook('reyna.e', {
+                routes: { soulTether: { renderer: 'beam', adapt: tether }, reynaDismiss: { renderer: 'self', adapt: 'timer' } },
+                styles: {
+                    beam: { core: 0xfae8ff, glow: 0xa21caf, width: 0.25, jag: 0.06, origin: null, impact: null },
+                    self: { edge: { colA: 0x7e22ce, colB: 0xe879f9, shimmer: true, k: 0.35 }, aura: { colA: 0x6b21a8, colB: 0xd8b4fe, w: 1.0, h: 2.0 }, hand: { mode: 2, color: 0xc084fc, scale: 0.5 } }
+                }
+            });
+            // REYNA Empress: the burst (tagged) a violet flash, the ultimate a buff (violet-red edge, aura, embers),
+            // and each kill's auto-devour tether (stamped)
+            L.addTimer('reynaEmpress', { until: function () { return game.ultAgent === 'reyna' ? game.ultActiveUntil : 0; }, key: 'reyna.x' });
+            L.defineLook('reyna.x', {
+                routes: { flash: 'flash', soulTether: { renderer: 'beam', adapt: tether }, reynaEmpress: { renderer: 'self', adapt: 'timer' } },
+                styles: {
+                    flash: { core: 0xf0abfc, glow: 'theme:reyna', coreSize: 0.9, streaks: 0.9, halo: { hex: 0xe9b5ff, size: 6 }, light: { hex: 0xc084fc, radius: 12 }, embers: { n: 18, hex: 0xe879f9 } },
+                    beam: { core: 0xffe4f1, glow: 0xdb2777, width: 0.28, jag: 0.08, origin: null, impact: null },
+                    self: { edge: { colA: 0xc026d3, colB: 0xfb7185, shimmer: true, k: 0.3 }, aura: { colA: 0xa21caf, colB: 0xf472b6, w: 1.15, h: 2.05 },
+                        motes: { every: 100, spec: { kind: 'ember', hex: 0xf0abfc, n: 1, life: 0.6, s0: 0.06, s1: 0.015, a0: 1, drag: 1, up: 0.6, jitter: 1.2 } } }
+                }
+            });
+
+            // RAZE Boom Bot: a chunky orange roller on two big wheels, a yellow dome eye (it turns hot when it locks
+            // on), then a fire blast (detonateExplosionAoE, tagged in the boom bots' step)
+            (function () {
+                const parts = [
+                    { shape: 'rbox', size: [0.46, 0.24, 0.5], radius: 0.08, seg: 2, at: [0, 0.22, 0], mat: 'body' },
+                    { shape: 'rbox', size: [0.38, 0.05, 0.4], radius: 0.02, seg: 2, at: [0, 0.355, -0.03], mat: 'dark' },
+                    { shape: 'rbox', size: [0.32, 0.1, 0.05], radius: 0.02, seg: 2, at: [0, 0.2, 0.255], mat: 'dark' },
+                    { shape: 'torus', size: [0.11, 0.022], seg: [6, 18], at: [0, 0.38, 0.06], rot: [PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'sphere', size: [0.1], seg: [12, 10], at: [0, 0.39, 0.06], mat: 'eye' },
+                    { shape: 'rbox', size: [0.09, 0.03, 0.02], radius: 0.008, at: [-0.12, 0.28, 0.252], rot: [0, 0, 0.5], mat: 'accent' },
+                    { shape: 'rbox', size: [0.09, 0.03, 0.02], radius: 0.008, at: [0.12, 0.28, 0.252], rot: [0, 0, -0.5], mat: 'accent' }
+                ];
+                for (let s = -1; s <= 1; s += 2) {
+                    parts.push({ group: 'wheels', shape: 'cyl', size: [0.16, 0.16, 0.08], seg: 16, at: [s * 0.28, 0, 0], rot: [0, 0, PI / 2], mat: 'dark' });
+                    parts.push({ group: 'wheels', shape: 'cyl', size: [0.075, 0.075, 0.09], seg: 10, at: [s * 0.285, 0, 0], rot: [0, 0, PI / 2], mat: 'accent' });
+                }
+                L.defineModel('raze.boombot', {
+                    count: 1,
+                    mats: { body: { color: 'theme:raze', rough: 0.45, metal: 0.2 }, dark: { color: 0x22262d, rough: 0.6, metal: 0.45 }, accent: { color: 0xfde047, rough: 0.4, metal: 0.15 }, eye: { light: 0xfde047 } },
+                    groups: { wheels: { at: [0, 0.16, 0], role: 'spin', axis: 'x', rate: 14 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('raze.c', {
+                routes: {
+                    boomBots: { renderer: 'deployable', adapt: function (P, bot, now) {
+                        P.x = bot.position.x; P.y = bot.position.y; P.z = bot.position.z; P.yaw = bot.group.rotation.y; P.headYaw = NaN;
+                        P.start = bot.startAt; P.remain = bot.expireAt - now; P.alert = !!bot.locked; P.fade = 1.15; P.shotAt = 0;   // the Classic bot's footprint
+                    } },
+                    flash: 'blast', ring: 'absorb'   // the blast draws its ring
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'raze.boombot', lights: [0xfde047, 0xff8a1f, 0xff3b1f], lightY: 0.42, lightRadius: 2.2, lightK: 0.5, unfoldMs: 180,
+                        emit: { every: 90, spec: { kind: 'spark', hex: 0xffb35c, n: 1, life: 0.3, s0: 0.04, s1: 0.012, a0: 1, drag: 1.2, grav: 6, up: 1, jitter: 1.5 } } },
+                    blast: { preset: 'fire', aoe: true, coreA: 0xffa64d, coreB: 0xe0501a, sparks: { n: 30, hex: 0xffb066 }, scorch: { scale: 0.65, hex: 'theme:raze' } }
+                }
+            });
+            // RAZE Blast Pack: the satchel's blast under you (tagged) is a fire blast and the jump's dash
+            L.defineLook('raze.q', {
+                routes: { flash: [{ renderer: 'blast' }, { renderer: 'self' }], ring: 'absorb' },
+                styles: {
+                    blast: { preset: 'fire', aoe: true, coreA: 0xffa64d, coreB: 0xe0501a, smoke: { n: 6, hex: 0x3b3633, k: 0.5 }, scorch: { scale: 0.5, hex: 'theme:raze' }, shake: 0.8 },
+                    self: { dash: true, color: 0xfb923c, hand: { mode: 2, color: 0xfb923c, scale: 0.55 } }
+                }
+            });
+
+            // YORU Fakeout: a stylised rift clone of you walking forward (a dark suit with blue rift seams, a lit
+            // visor, a soft blue aura, a rift ring under it), then its flash (tagged in the decoys' step)
+            L.defineModel('yoru.decoy', {
+                count: 2,
+                mats: { suit: { color: 0x1b2540, rough: 0.5, metal: 0.3, emissive: 0x13235a }, rift: { glow: 0x7fb4ff }, visor: { light: 0xbfdbfe } },
+                groups: { body: { at: [0, 0, 0], role: 'bob', amp: 0.035, rate: 2.7 } },
+                parts: [
+                    { group: 'body', shape: 'rbox', size: [0.15, 0.72, 0.17], radius: 0.05, at: [-0.11, 0.38, 0], mat: 'suit' },
+                    { group: 'body', shape: 'rbox', size: [0.15, 0.72, 0.17], radius: 0.05, at: [0.11, 0.38, 0], mat: 'suit' },
+                    { group: 'body', shape: 'rbox', size: [0.4, 0.2, 0.24], radius: 0.06, at: [0, 0.8, 0], mat: 'suit' },
+                    { group: 'body', shape: 'rbox', size: [0.5, 0.56, 0.28], radius: 0.09, at: [0, 1.17, 0], mat: 'suit' },
+                    { group: 'body', shape: 'rbox', size: [0.12, 0.6, 0.13], radius: 0.05, at: [-0.33, 1.1, 0], rot: [0, 0, 0.08], mat: 'suit' },
+                    { group: 'body', shape: 'rbox', size: [0.12, 0.6, 0.13], radius: 0.05, at: [0.33, 1.1, 0], rot: [0, 0, -0.08], mat: 'suit' },
+                    { group: 'body', shape: 'sphere', size: [0.15], seg: [14, 10], at: [0, 1.62, 0], mat: 'suit' },
+                    { group: 'body', shape: 'rbox', size: [0.2, 0.045, 0.05], radius: 0.015, at: [0, 1.64, 0.125], mat: 'visor' },
+                    { group: 'body', shape: 'rbox', size: [0.035, 0.46, 0.02], radius: 0.01, at: [0, 1.16, 0.145], mat: 'rift' },
+                    { group: 'body', shape: 'rbox', size: [0.44, 0.03, 0.02], radius: 0.01, at: [0, 1.36, 0.145], mat: 'rift' },
+                    { shape: 'torus', size: [0.5, 0.022], seg: [6, 36], at: [0, 0.03, 0], rot: [PI / 2, 0, 0], mat: 'rift' }
+                ],
+                custom: function (kit) { glowQuads(kit, 'base', 9, 0, 0x3b82f6, 0x93c5fd, 0.75, [0, 0, 0, 1.1, 2.0, 0.3, 0.7, 0.55, 0]); }
+            });
+            L.defineLook('yoru.c', {
+                routes: {
+                    yoruDecoys: { renderer: 'deployable', adapt: function (P, d, now) {
+                        P.x = d.position.x; P.y = d.position.y; P.z = d.position.z;
+                        P.yaw = Math.atan2(d.velocity.x, d.velocity.z); P.headYaw = NaN;   // it faces where it walks (as the Classic group)
+                        P.start = d.startAt; P.remain = d.expireAt - now; P.alert = false;
+                        const rem = d.expireAt - now;
+                        P.fade = Math.max(0.01, Math.min(1, (now - d.startAt) / 160) * (rem < 300 ? rem / 300 : 1));
+                    } },
+                    flash: 'flash'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'yoru.decoy', unfoldMs: 0, lights: [0xbfdbfe, 0xffffff, 0xffffff], lightY: 1.3, lightRadius: 2.4, lightK: 0.45, blinkMs: 600, dust: { hex: 0x60a5fa, n: 8 },
+                        emit: { every: 90, spec: { kind: 'glow', hex: 0x93c5fd, n: 1, life: 0.6, s0: 0.1, s1: 0.02, a0: 0.7, drag: 1.2, up: 0.6, jitter: 0.8 } } },
+                    flash: { core: 0xa5c8ff, glow: 'theme:yoru', coreSize: 1.0, streaks: 1.0, halo: { hex: 0x9cc2ff, size: 6.5 }, light: { hex: 0x3b82f6, radius: 14 }, embers: { n: 22, hex: 0x93c5fd } }
+                }
+            });
+            // YORU Blindside: an electric blue orb (it bounces once), then a blue flash (the shared flash detonation;
+            // its type names it: no tags)
+            L.defineLook('yoru.q', {
+                routes: { projectile: 'projectile', flash: 'flash' },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xbfdbfe, b: 'theme:yoru', size: 0.55 },
+                        trail: [{ kind: 'glow', hex: 0x60a5fa, life: 0.28, s0: 0.3, s1: 0.05, a0: 0.75, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0xbfdbfe, life: 0.22, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 1, jx: 1.2, jy: 1.2, jz: 1.2 }] },
+                    flash: { core: 0xa5c8ff, glow: 'theme:yoru', coreSize: 1.0, streaks: 1.1, halo: { hex: 0x9cc2ff, size: 6.5 }, light: { hex: 0x3b82f6, radius: 14 }, embers: { n: 20, hex: 0x93c5fd } }
+                }
+            });
+            // YORU Gatecrash: the tether is a rift crystal drifting ahead (a spinning core, an orbit of shards); the
+            // teleport (tagged) opens a rift on the floor where you leave and where you arrive (the two portals),
+            // a small flash, and the brief intangibility (reynaDismissUntil, keyed by Yoru outside his ultimate)
+            L.defineModel('yoru.rift', {
+                count: 1,
+                mats: { core: { light: 0x93c5fd }, shard: { glow: 0x3b82f6 } },
+                groups: { core: { at: [0, 0.6, 0], role: 'spin', axis: 'y', rate: 2.4 }, shards: { at: [0, 0.6, 0], role: 'spin', axis: 'y', rate: -1.3 } },
+                parts: shards([
+                    { group: 'core', shape: 'oct', size: [0.24], scale: [1, 1.6, 1], mat: 'core' },
+                    { group: 'shards', shape: 'torus', size: [0.42, 0.012], seg: [6, 36], rot: [PI / 2, 0, 0], mat: 'shard' },
+                    { shape: 'torus', size: [0.5, 0.02], seg: [6, 36], at: [0, 0.03, 0], rot: [PI / 2, 0, 0], mat: 'shard' }
+                ], 'shards', 'shard', 3, 0.42, 0, 0.07, 1.8),
+                custom: function (kit) { glowQuads(kit, 'core', 0, 2, 0xdbeafe, 0x3b82f6, 0.6, [0, 0, 0, 1.5, 1.5, 0.2, 0.5, 0, 0]); }
+            });
+            L.addTimer('yoruGatecrash', { until: function () { return game.activeAgent === 'yoru' && game.ultAgent !== 'yoru' ? agentSystem.reynaDismissUntil : 0; }, key: 'yoru.e' });
+            L.defineLook('yoru.e', {
+                routes: {
+                    yoruTether: { renderer: 'deployable', adapt: function (P, t, now) {
+                        P.x = t.position.x; P.y = t.position.y; P.z = t.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = t.startAt; P.remain = t.expireAt - now; P.alert = false;
+                        const rem = t.expireAt - now;
+                        P.fade = rem < 600 ? Math.max(0.01, rem / 600) : 1;   // the Classic fade
+                    } },
+                    // a portal (900 ms): a rift turning on the floor, closing as it ends
+                    shadowPortals: { renderer: 'groundZone', adapt: function (P, p, now) {
+                        P.x = p.position.x; P.y = p.position.y; P.z = p.position.z; P.r = 1.35; P.rect = 0; P.yaw = 0;
+                        P.start = p.startAt; P.end = p.expireAt; P.age = (now - p.startAt) * 0.001;
+                        const frac = Math.min(1, Math.max(0, (now - p.startAt) / Math.max(1, p.expireAt - p.startAt)));
+                        P.fade = Math.min(1, P.age * 10) * (1 - frac * frac);
+                    } },
+                    flash: 'flash',
+                    yoruGatecrash: { renderer: 'self', adapt: 'timer' }
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'yoru.rift', unfoldMs: 0, lights: [0x93c5fd, 0xdbeafe, 0xffffff], lightY: 0.6, lightRadius: 2.6, lightK: 0.5, blinkMs: 2000, dust: { hex: 0x3b82f6, n: 6 },
+                        emit: { every: 70, spec: { kind: 'glow', hex: 0x60a5fa, n: 1, life: 0.7, s0: 0.12, s1: 0.02, a0: 0.7, drag: 1, up: 0.4, jitter: 0.5 } } },
+                    groundZone: { preset: 'vortex', colA: 0x2563eb, colB: 0xbfdbfe, tongues: 'mote', blend: 'normal' },
+                    flash: { core: 0xa5c8ff, glow: 'theme:yoru', coreSize: 0.8, streaks: 0.8, halo: { hex: 0x9cc2ff, size: 5 }, light: { hex: 0x3b82f6, radius: 10 }, embers: { n: 14, hex: 0x93c5fd } },
+                    self: { edge: { colA: 0x1d4ed8, colB: 0x93c5fd, shimmer: true, k: 0.3 }, aura: { colA: 0x1e3a8a, colB: 0x60a5fa, w: 1.0, h: 2.0 } }
+                }
+            });
+            // YORU Dimensional Drift: its bursts (the start and the unmask when you shoot, tagged) are blue flashes;
+            // the drift a stealth buff (a dark blue shimmer at the screen edge, a translucent aura from outside)
+            L.addTimer('yoruDrift', { until: function () { return game.ultAgent === 'yoru' ? Math.min(agentSystem.reynaDismissUntil, game.ultActiveUntil) : 0; }, key: 'yoru.x' });
+            L.defineLook('yoru.x', {
+                routes: { flash: 'flash', yoruDrift: { renderer: 'self', adapt: 'timer' } },
+                styles: {
+                    flash: { core: 0xa5c8ff, glow: 'theme:yoru', coreSize: 1.1, streaks: 1.0, halo: { hex: 0x9cc2ff, size: 7 }, light: { hex: 0x3b82f6, radius: 14 }, embers: { n: 20, hex: 0x93c5fd } },
+                    self: { edge: { colA: 0x1e3a8a, colB: 0x3b82f6, shimmer: true, k: 0.4 }, aura: { colA: 0x1e3a8a, colB: 0x93c5fd, w: 1.1, h: 2.0 } }
+                }
+            });
+
+            // NEON Fast Lane: two bio-electric walls (the Classic 0.28 x 3.6 x 20 m boxes, at the middle of each
+            // wall's start and end) over the charged floor strip between them (one Classic object, two renderers:
+            // the strip is a ground zone turned with the lane; the walls' own floor decal would not turn)
+            L.defineLook('neon.c', {
+                routes: {
+                    fastLanes: [
+                        { renderer: 'wall', adapt: function (P, fl, now) {
+                            const yaw = fl.group.rotation.y, y = fl.center.y + 1.8;
+                            P.n = 2;
+                            let a = P.panels[0];
+                            a.x = (fl.leftStart.x + fl.leftEnd.x) * 0.5; a.y = y; a.z = (fl.leftStart.z + fl.leftEnd.z) * 0.5; a.sx = 0.28; a.sy = 3.6; a.sz = fl.length; a.yaw = yaw; a.shape = 'box';
+                            a = P.panels[1];
+                            a.x = (fl.rightStart.x + fl.rightEnd.x) * 0.5; a.y = y; a.z = (fl.rightStart.z + fl.rightEnd.z) * 0.5; a.sx = 0.28; a.sy = 3.6; a.sz = fl.length; a.yaw = yaw; a.shape = 'box';
+                            P.start = fl.startAt; P.maxHealth = 0;
+                            const rem = fl.expireAt - now;
+                            P.fade = rem < 550 ? Math.max(0, rem / 550) : 1;   // the Classic fade
+                        } },
+                        { renderer: 'groundZone', adapt: function (P, fl, now) {
+                            P.x = fl.center.x; P.y = fl.center.y; P.z = fl.center.z; P.r = fl.halfGap; P.rect = 1; P.rx = fl.halfGap + 0.15; P.rz = fl.length * 0.5; P.yaw = fl.group.rotation.y;
+                            P.start = fl.startAt; P.end = fl.expireAt; P.age = (now - fl.startAt) * 0.001;
+                            const rem = fl.expireAt - now;
+                            P.fade = (rem < 550 ? Math.max(0, rem / 550) : 1) * Math.min(1, P.age * 5);
+                        } }
+                    ]
+                },
+                styles: {
+                    wall: { preset: 'energy', colA: 0x0f3a46, colB: 'theme:neon', floor: -1,
+                        emit: { every: 60, spec: { kind: 'spark', hex: 0x99fff0, n: 2, life: 0.35, s0: 0.05, s1: 0.015, a0: 1, drag: 1, jitter: 4 } },
+                        end: { kind: 'glow', hex: 0x5eead4, n: 8, life: 0.5, s0: 0.3, s1: 0.05, a0: 0.7, drag: 1, jitter: 1 } },
+                    groundZone: { preset: 'field', colA: 0x0e7490, colB: 'theme:neon', tongues: null }
+                }
+            });
+            // NEON Relay Bolt: an electric orb, then two electric shocks (the bounce's is tagged in the projectile
+            // step, the detonation's carried): blasts of the shock's own 5.2 m
+            L.defineLook('neon.q', {
+                routes: { projectile: 'projectile', flash: 'blast', ring: 'absorb' },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xecfffb, b: 'theme:neon', size: 0.5 },
+                        trail: [{ kind: 'glow', hex: 0x2ee8cf, life: 0.25, s0: 0.3, s1: 0.05, a0: 0.75, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0x99fff0, life: 0.2, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 2, jx: 1.6, jy: 1.6, jz: 1.6 }] },
+                    blast: { preset: 'electric', aoe: true, rScale: 1, coreA: 0x9ffff0, coreB: 'theme:neon', ringB: 0x38bdf8, arcHex: 0x99fff0, sparks: { n: 24, hex: 0x99fff0 },
+                        halo: 0xccfff6, light: 0x00f5d4, shake: 0.7, scorch: { scale: 0.4, hex: 0x14201f } }
+                }
+            });
+            // NEON Overdrive: the lightning beam (neonBeam, stamped where it fires: its group's turn and length), the
+            // start burst (tagged) a flash, the ultimate a buff (an electric edge, sparks, the aura from outside)
+            L.addTimer('neonOverdrive', { until: function () { return game.ultAgent === 'neon' ? game.ultActiveUntil : 0; }, key: 'neon.x' });
+            L.defineLook('neon.x', {
+                routes: {
+                    neonBeam: { renderer: 'beam', adapt: function (P, nb, now) {
+                        const o = nb.group.position;
+                        P.ox = o.x; P.oy = o.y; P.oz = o.z;
+                        P.q.copy(nb.group.quaternion);
+                        P.len = Math.max(0.5, nb.outerMesh.scale.z);
+                        const frac = Math.min(1, (now - nb.startAt) / Math.max(1, nb.expireAt - nb.startAt));
+                        P.fade = 1 - frac * 0.6; P.width = 1 - frac * 0.4;
+                    } },
+                    flash: 'flash',
+                    neonOverdrive: { renderer: 'self', adapt: 'timer' }
+                },
+                styles: {
+                    beam: { core: 0xfef08a, glow: 'theme:neon', width: 0.5, jag: 0.3, origin: { halo: 0xccfff6, light: 0x00f5d4 }, impact: null },   // the hit itself is the Classic one
+                    flash: { core: 0x99fff0, glow: 'theme:neon', coreSize: 1.0, streaks: 1.0, halo: { hex: 0x99fff0, size: 6 }, light: { hex: 0x00f5d4, radius: 13 }, embers: { n: 20, hex: 0x5eead4 } },
+                    self: { color: 'theme:neon', edge: { colA: 0x00f5d4, colB: 0x0ea5e9, shimmer: true, k: 0.32 }, aura: { colA: 0x00f5d4, colB: 0xfef08a, w: 1.15, h: 2.05 },
+                        motes: { every: 80, spec: { kind: 'spark', hex: 0xfef08a, n: 2, life: 0.3, s0: 0.05, s1: 0.015, a0: 1, drag: 1.5, jitter: 3.5 } } }
+                }
+            });
+
+            // ISO Undercut: the molecular bolt (its own pool) is an electric violet orb, the hit (tagged) a small flash
+            L.defineLook('iso.q', {
+                routes: {
+                    isoUndercutBolts: { renderer: 'projectile', adapt: function (P, iu, now) {
+                        P.x = iu.position.x; P.y = iu.position.y; P.z = iu.position.z;
+                        P.vx = iu.velocity.x; P.vy = iu.velocity.y; P.vz = iu.velocity.z;
+                        P.age = (now - iu.startAt) * 0.001;
+                    } },
+                    flash: 'flash'
+                },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xf5f3ff, b: 'theme:iso', size: 0.7 },
+                        trail: [{ kind: 'glow', hex: 0xa78bfa, life: 0.3, s0: 0.35, s1: 0.05, a0: 0.75, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0xe9d5ff, life: 0.25, s0: 0.04, s1: 0.012, a0: 1, drag: 1.2, grav: 0, jx: 1.2, jy: 1.2, jz: 1.2 }] },
+                    flash: { core: 0xd6c6ff, glow: 'theme:iso', coreSize: 0.5, streaks: 0.6, halo: { hex: 0xd6c6ff, size: 3.5 }, light: { hex: 0x8b5cf6, radius: 8 }, embers: { n: 8, hex: 0xc4b5fd } }
+                }
+            });
+            // ISO Double Tap: its bursts (the cast, an orb shattered, the shield breaking: tagged) are violet flashes;
+            // the shield a buff while it is up (an edge, the aura, the off-hand); the kill orbs electric orbs
+            L.addTimer('isoDoubleTap', { until: function () { return game.activeAgent === 'iso' && agentSystem.isoShieldActive ? agentSystem.isoDoubleTapUntil : 0; }, key: 'iso.e' });
+            L.defineLook('iso.e', {
+                routes: {
+                    flash: 'flash', ring: 'absorb',   // the orb's ring: its flash draws the shatter
+                    isoDoubleTap: { renderer: 'self', adapt: 'timer' },
+                    isoEnergyOrbs: { renderer: 'projectile', adapt: function (P, io, now) {
+                        const g = io.group.position;
+                        P.x = g.x; P.y = g.y; P.z = g.z; P.vx = 0; P.vy = 0; P.vz = 0; P.age = (now - io.startAt) * 0.001;
+                    } }
+                },
+                styles: {
+                    flash: { core: 0xd6c6ff, glow: 'theme:iso', coreSize: 0.8, streaks: 0.8, halo: { hex: 0xd6c6ff, size: 5 }, light: { hex: 0x8b5cf6, radius: 10 }, embers: { n: 14, hex: 0xc4b5fd } },
+                    self: { edge: { colA: 0x8b5cf6, colB: 0x6d28d9, shimmer: true, k: 0.32 }, aura: { colA: 0x7c3aed, colB: 0xddd6fe, w: 1.1, h: 2.0 }, hand: { mode: 2, color: 0xa78bfa, scale: 0.6 } },
+                    projectile: { orb: { style: 2, a: 0xf5f3ff, b: 0xc084fc, size: 0.8 } }
+                }
+            });
+            // ISO Kill Contract: the arena (one Classic object, two renderers: a round energy wall 18 m across and
+            // 4.2 m tall, and its floor), the burst on the target (tagged) a flash, the duel a buff (the aura and
+            // motes; the shield's edge is Double Tap's, which the ultimate starts too)
+            L.addTimer('isoContract', { until: function () { const kc = agentSystem.isoKillContract; return game.ultAgent === 'iso' && kc && kc.active ? game.ultActiveUntil : 0; }, key: 'iso.x' });
+            L.defineLook('iso.x', {
+                routes: {
+                    isoKillContract: [
+                        { renderer: 'wall', adapt: function (P, kc, now) {
+                            const a = P.panels[0];
+                            P.n = 1;
+                            a.x = kc.position.x; a.y = kc.position.y + 2.1; a.z = kc.position.z; a.sx = kc.radius * 2; a.sy = 4.2; a.sz = kc.radius * 2; a.yaw = 0; a.shape = 'cyl';
+                            P.start = kc.startAt; P.maxHealth = 0;
+                            const rem = kc.expireAt - now;
+                            P.fade = rem < 500 ? Math.max(0, rem / 500) : 1;
+                        } },
+                        { renderer: 'groundZone', adapt: function (P, kc, now) {
+                            P.x = kc.position.x; P.y = kc.position.y; P.z = kc.position.z; P.r = kc.radius; P.rect = 0; P.yaw = 0;
+                            P.start = kc.startAt; P.end = kc.expireAt; P.age = (now - kc.startAt) * 0.001;
+                            const rem = kc.expireAt - now;
+                            P.fade = (rem < 500 ? Math.max(0, rem / 500) : 1) * Math.min(1, P.age * 4);
+                        } }
+                    ],
+                    flash: 'flash',
+                    isoContract: { renderer: 'self', adapt: 'timer' }
+                },
+                styles: {
+                    wall: { preset: 'energy', colA: 0x2e1065, colB: 'theme:iso', floor: -1, emit: null,
+                        end: { kind: 'glow', hex: 0xc4b5fd, n: 16, life: 0.6, s0: 0.35, s1: 0.05, a0: 0.8, drag: 1, jitter: 1 } },
+                    groundZone: { preset: 'field', colA: 0x6d28d9, colB: 0xddd6fe, tongues: 'mote' },
+                    flash: { core: 0xd6c6ff, glow: 'theme:iso', coreSize: 0.9, streaks: 0.9, halo: { hex: 0xd6c6ff, size: 5.5 }, light: { hex: 0x8b5cf6, radius: 11 }, embers: { n: 16, hex: 0xc4b5fd } },
+                    self: { aura: { colA: 0x6d28d9, colB: 0xc4b5fd, w: 1.2, h: 2.1 }, motes: { every: 110, spec: { kind: 'glow', hex: 0xc4b5fd, n: 1, life: 0.6, s0: 0.1, s1: 0.02, a0: 0.7, drag: 1, jitter: 1.2 } } }
+                }
+            });
+
+            // WAYLAY's crystal: a prism of light turning over a cyan halo (Refract's beacon; scaled down, Saturate's
+            // zones), and the big mirage crystal over Convergent Paths
+            L.defineModel('waylay.prism', {
+                count: 3,   // Refract's beacon and Saturate's two zones
+                mats: { prism: { light: 0xfde047 }, shard: { glow: 0xfffbe6 }, halo: { glow: 0x38bdf8 } },
+                groups: { crystal: { at: [0, 1.0, 0], role: 'spin', axis: 'y', rate: 1.6 }, orbit: { at: [0, 1.0, 0], role: 'spin', axis: 'y', rate: -1.1 }, halo: { at: [0, 0.06, 0], role: 'spin', axis: 'y', rate: -0.7 } },
+                parts: shards([
+                    { group: 'crystal', shape: 'oct', size: [0.4], scale: [0.8, 1.35, 0.8], mat: 'prism' },
+                    { group: 'halo', shape: 'torus', size: [0.95, 0.028], seg: [6, 48], rot: [PI / 2, 0, 0], mat: 'halo' }
+                ], 'orbit', 'shard', 4, 0.6, 0, 0.06, 1.6),
+                custom: function (kit) { glowQuads(kit, 'crystal', 0, 0, 0xfffbe6, 0xfde047, 0.6, [0, 0, 0, 1.7, 1.7, 0.4, 0.2, 0, 0]); }
+            });
+            L.defineModel('waylay.mirage', {
+                count: 1,
+                mats: { prism: { light: 0xfde047 }, shard: { glow: 0x7dd3fc } },
+                groups: { crystal: { at: [0, 1.35, 0], role: 'spin', axis: 'y', rate: 1.2 }, orbit: { at: [0, 1.35, 0], role: 'spin', axis: 'y', rate: -0.8 } },
+                parts: shards([{ group: 'crystal', shape: 'oct', size: [0.85], detail: 1, scale: [0.75, 1.25, 0.75], mat: 'prism' }], 'orbit', 'shard', 6, 1.35, 0, 0.1, 1.7),
+                custom: function (kit) { glowQuads(kit, 'crystal', 0, 0, 0xfffbe6, 0xfde047, 0.5, [0, 0, 0, 3.4, 3.4, 0.6, 0.3, 0, 0]); }
+            });
+            const prismStyle = { preset: 'device', model: 'waylay.prism', unfoldMs: 0, lights: [0xfde047, 0xfffbe6, 0xffffff], lightY: 0.8, lightRadius: 3, lightK: 0.5, blinkMs: 2000, dust: null };
+            // WAYLAY Saturate: a pale gold orb, then its field of light (one Classic object, two renderers: the
+            // field and its crystal) and its burst (the flash 0.5 m up: a prismatic blast); carried, no tags
+            L.defineLook('waylay.c', {
+                routes: {
+                    projectile: 'projectile',
+                    waylaySaturateZones: [
+                        { renderer: 'groundZone', adapt: function (P, sz, now) {
+                            P.x = sz.position.x; P.y = sz.position.y; P.z = sz.position.z; P.r = sz.radius; P.rect = 0; P.yaw = 0;
+                            P.start = sz.startAt; P.end = sz.expireAt; P.age = (now - sz.startAt) * 0.001;
+                            const rem = sz.expireAt - now;
+                            P.fade = (rem < 400 ? Math.max(0, rem / 400) : 1) * Math.min(1, P.age * 5);   // the Classic fade
+                        } },
+                        { renderer: 'deployable', adapt: function (P, sz, now) {
+                            P.x = sz.position.x; P.y = sz.position.y + 0.1; P.z = sz.position.z; P.yaw = 0; P.headYaw = NaN;
+                            P.start = sz.startAt; P.remain = sz.expireAt - now; P.alert = false;
+                            const rem = sz.expireAt - now;
+                            P.fade = 0.62 * Math.max(0.02, rem < 400 ? rem / 400 : 1);
+                        } }
+                    ],
+                    flash: { renderer: 'blast', adapt: function (P, f) {
+                        P.x = f.position.x; P.y = f.position.y - 0.5; P.z = f.position.z; P.R = f.maxRadius;
+                        P.fy = L.floorY(P.x, P.y + 0.5, P.z);
+                    } },
+                    ring: 'absorb'   // the blast draws its ring
+                },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xfffbe6, b: 'theme:waylay', size: 0.5 },
+                        trail: [{ kind: 'glow', hex: 0xfde68a, life: 0.28, s0: 0.3, s1: 0.05, a0: 0.75, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0x7dd3fc, life: 0.25, s0: 0.04, s1: 0.012, a0: 1, drag: 1.4, grav: 1, jx: 1.4, jy: 1.4, jz: 1.4 }] },
+                    groundZone: { preset: 'field', colA: 0x0ea5e9, colB: 'theme:waylay', tongues: 'mote',
+                        emit: { every: 120, spec: { kind: 'glow', hex: 0xfef3c7, n: 1, life: 0.9, s0: 0.1, s1: 0.02, a0: 0.8, drag: 1, up: 0.6, jitter: 0.4 } } },
+                    deployable: prismStyle,
+                    blast: { preset: 'cosmic', coreA: 0xfff3a0, coreB: 0xfde047, shellA: 0xfde047, shellB: 0x7dd3fc, ringB: 0xfde047, sparks: { n: 30, hex: 0xfef3c7, grav: 0.5 },
+                        smoke: null, halo: 0xfff7cc, light: 0xfde047, shake: 0.6, scorch: null }
+                }
+            });
+            // WAYLAY Lightspeed: its ring (tagged) is a gold dash; the lightspeed (waylayLightspeedUntil, keyed by
+            // Waylay: Refract's return and her ultimate grant it too) a buff: a gold edge, light motes, speed lines
+            L.addTimer('waylayLightspeed', { until: function () { return game.activeAgent === 'waylay' ? (agentSystem.waylayLightspeedUntil || 0) : 0; }, key: 'waylay.q' });
+            L.defineLook('waylay.q', {
+                routes: { ring: 'self', waylayLightspeed: { renderer: 'self', adapt: 'timer' } },
+                styles: { self: { dash: true, color: 'theme:waylay', hand: { mode: 2, color: 0xfde047, scale: 0.55 },
+                    edge: { colA: 0xfde047, colB: 0xf59e0b, shimmer: true, k: 0.3 }, aura: { colA: 0xfde047, colB: 0x7dd3fc, w: 1.1, h: 2.0 },
+                    motes: { every: 90, spec: { kind: 'glow', hex: 0xfffbe6, n: 1, life: 0.45, s0: 0.08, s1: 0.015, a0: 0.9, drag: 1.4, jitter: 2.5 } },
+                    streaks: { every: 240, minSpeed: 5 } } }
+            });
+            // WAYLAY Refract: the beacon is her prism; the return (tagged) flashes where you leave and arrive (its
+            // rings, and the beacon's at the cast, go to the flash and the prism)
+            L.defineLook('waylay.e', {
+                routes: {
+                    waylayRefractBeacon: { renderer: 'deployable', adapt: function (P, rb, now) {
+                        P.x = rb.position.x; P.y = rb.position.y; P.z = rb.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = rb.startAt; P.remain = rb.expireAt - now; P.alert = false;
+                        const rem = rb.expireAt - now;
+                        P.fade = rem < 500 ? Math.max(0.01, rem / 500) : 1;   // the Classic fade
+                    } },
+                    flash: 'flash', ring: 'absorb'
+                },
+                styles: {
+                    deployable: Object.assign({}, prismStyle, { lightY: 1.0, lightRadius: 3.2, lightK: 0.6, dust: { hex: 0xfde68a, n: 6 },
+                        emit: { every: 100, spec: { kind: 'glow', hex: 0xfef3c7, n: 1, life: 0.9, s0: 0.1, s1: 0.02, a0: 0.8, drag: 1, up: 0.7, jitter: 0.5 } } }),
+                    flash: { core: 0xfff3a0, glow: 'theme:waylay', coreSize: 0.9, streaks: 1.0, halo: { hex: 0xfff3a0, size: 6 }, light: { hex: 0xfde68a, radius: 12 }, embers: { n: 18, hex: 0x7dd3fc } }
+                }
+            });
+            // WAYLAY Convergent Paths: the corridor (one Classic object, two renderers: a field of light along the
+            // 8 x 26 m lane, brighter once it erupts, and the mirage crystal over it), the eruption (tagged) a
+            // prismatic blast in the middle of the lane; its rings go to the blast and the lane
+            L.defineLook('waylay.x', {
+                routes: {
+                    waylayConvergentPaths: [
+                        { renderer: 'groundZone', adapt: function (P, cp, now) {
+                            const half = cp.length * 0.5;
+                            P.x = cp.origin.x + cp.dir.x * half; P.y = cp.origin.y - 0.03; P.z = cp.origin.z + cp.dir.z * half;
+                            P.r = cp.halfWidth; P.rect = 1; P.rx = cp.halfWidth; P.rz = half; P.yaw = Math.atan2(cp.dir.x, cp.dir.z);
+                            P.start = cp.startAt; P.end = cp.expireAt; P.age = (now - cp.startAt) * 0.001;
+                            const rem = cp.expireAt - now;
+                            P.fade = (rem < 500 ? Math.max(0, rem / 500) : 1) * (cp.erupted ? 1 : 0.45 + 0.25 * Math.min(1, (now - cp.startAt) / Math.max(1, cp.eruptAt - cp.startAt)));
+                        } },
+                        { renderer: 'deployable', adapt: function (P, cp, now) {
+                            const m = cp.mirageMesh.position;
+                            P.x = m.x; P.y = m.y - 1.35; P.z = m.z; P.yaw = 0; P.headYaw = NaN;
+                            P.start = cp.startAt; P.remain = cp.expireAt - now; P.alert = cp.erupted;
+                            const rem = cp.expireAt - now;
+                            P.fade = rem < 500 ? Math.max(0.01, rem / 500) : 1;
+                        } }
+                    ],
+                    flash: { renderer: 'blast', adapt: function (P, f) {
+                        P.x = f.position.x; P.z = f.position.z; P.fy = L.floorY(P.x, f.position.y, P.z); P.y = P.fy + 0.3; P.R = f.maxRadius * 0.8;
+                    } },
+                    ring: 'absorb'
+                },
+                styles: {
+                    groundZone: { preset: 'field', colA: 0x0ea5e9, colB: 'theme:waylay', tongues: 'mote' },
+                    deployable: { preset: 'device', model: 'waylay.mirage', unfoldMs: 0, lights: [0xfde047, 0xfffbe6, 0xffffff], lightY: 1.35, lightRadius: 5, lightK: 0.6, blinkMs: 1000, dust: null },
+                    blast: { preset: 'cosmic', coreA: 0xfff3a0, coreB: 0xfde047, shellA: 0xfde047, shellB: 0xfde68a, ringB: 0xfde68a, sparks: { n: 40, hex: 0xfef3c7, grav: 0.5 },
+                        smoke: null, halo: 0xfff7cc, light: 0xfde047, shake: 1.0, scorch: null }
+                }
+            });
+        })();
         // V2.2: end of the Duelists' block
 
         // =============================================
