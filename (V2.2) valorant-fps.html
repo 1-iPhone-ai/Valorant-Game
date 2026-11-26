@@ -32620,11 +32620,13 @@
             // --- Pool Acquisition Helpers ---
             acquireProjectile: function() {
                 // V2.1: a projectile's fuse runs on its own simulated flight time from here (see stepSimulation)
+                // V2.2: it carries the ability tag it was cast under (High Fidelity), on to its detonation
                 for (let i = 0; i < this.projectiles.length; i++) {
                     if (!this.projectiles[i].inUse) {
                         this.projectiles[i].inUse = true;
                         this.projectiles[i].fuseT0 = gameNow();
                         this.projectiles[i].flightMs = 0;
+                        this.projectiles[i].lookKey = abilityLook.tag;
                         return this.projectiles[i];
                     }
                 }
@@ -32632,6 +32634,7 @@
                 p.inUse = true;
                 p.fuseT0 = gameNow();
                 p.flightMs = 0;
+                p.lookKey = abilityLook.tag;
                 return p;
             },
 
@@ -32650,7 +32653,7 @@
                 item.mesh.scale.set(0.4, 0.4, 0.4);
                 item.mesh.visible = true;
                 item.lookKey = abilityLook.tag;   // V2.0: the ability this ring belongs to (High Fidelity draws its own)
-                if (!abilityLook.claims(item)) fxKit.ring(x, y, z, colorHex, Math.min(6, maxScale || 1));   // V1.7 dust + sparks
+                if (!abilityLook.claims(item, 'ring')) fxKit.ring(x, y, z, colorHex, Math.min(6, maxScale || 1));   // V1.7 dust + sparks (V2.2: when its look routes rings)
                 else abilityLook.bindNow(item, 'ring', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
@@ -32661,8 +32664,8 @@
                 }
                 item.inUse = true;
                 item.position.set(x, Math.max(radius * 0.65, y), z);
-                item.lookKey = abilityLook.smokeKey(colorHex);   // V2.0: High Fidelity draws Omen's Dark Cover
-                if (!abilityLook.claims(item)) fxKit.smokeCloud(x, item.position.y, z, colorHex, radius);   // V1.7 rolling puffs
+                item.lookKey = abilityLook.smokeKey(colorHex);   // V2.0: High Fidelity draws Omen's Dark Cover (V2.2: the tag, or the smoke's colour)
+                if (!abilityLook.claims(item, 'smoke')) fxKit.smokeCloud(x, item.position.y, z, colorHex, radius);   // V1.7 rolling puffs
                 item.radius = radius;
                 item.startAt = now;
                 item.expireAt = now + durationMs;
@@ -32725,6 +32728,7 @@
                 item.isNanoswarm = isNanoswarm;
                 item.isIncendiary = isIncendiary;
                 item.isSnakeBite = isSnakeBite;
+                item.lookKey = abilityLook.tag;   // V2.2: the ability this zone belongs to (High Fidelity; a projectile's tag carries on to its detonation)
                 item.position.set(x, Math.max(0.02, y), z);
                 item.radius = isIncendiary ? AGENT_TUNING.brimstone.q.radiusM : (isSnakeBite ? AGENT_TUNING.viper.c.radiusM : (isNanoswarm ? AGENT_TUNING.killjoy.c.radiusM : AGENT_TUNING.phoenix.c.radiusM));
                 item.startAt = now;
@@ -32747,6 +32751,7 @@
                 item.inUse = true;
                 item.position.set(x, Math.max(0.02, y), z);
                 item.radius = AGENT_TUNING.sage.q.radiusM;
+                item.lookKey = abilityLook.tag;   // V2.2: the ability this zone belongs to (High Fidelity: Sage's Slow Orb, Chamber's Trademark and Tour De Force)
                 item.startAt = now;
                 item.expireAt = now + AGENT_TUNING.sage.q.lifetimeMs;
                 item.nextTickAt = now + AGENT_TUNING.sage.q.firstTickMs;
@@ -32772,7 +32777,7 @@
                 item.mesh.scale.set(0.3, 0.3, 0.3);
                 item.mesh.visible = true;
                 item.lookKey = abilityLook.tag;   // V2.0: the ability this burst belongs to (High Fidelity draws its own)
-                if (!abilityLook.claims(item)) fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
+                if (!abilityLook.claims(item, 'flash')) fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
                 else abilityLook.bindNow(item, 'flash', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
@@ -32801,6 +32806,7 @@
                 proj.inUse = false;
                 proj.mesh.visible = false;
                 const p = proj.position;
+                abilityLook.tag = proj.lookKey || null;   // V2.2: what the detonation spawns belongs to the ability the projectile was cast for (High Fidelity)
 
                 if (proj.type === 'smoke') {
                     this.spawnSmokeSphere(p.x, p.y, p.z, proj.smokeColor || 0x38f6ff, proj.smokeRadius || 4.6, proj.smokeDurationMs || 8500, now);
@@ -32959,6 +32965,7 @@
                     const floorY = this.findSupportFloorY(p.x, p.y, p.z);
                     this.spawnMiksMPulse(p.x, floorY, p.z, now);
                 }
+                abilityLook.tag = null;   // V2.2
             },
 
             _colScratch: [],
@@ -36021,7 +36028,7 @@
                     s.innerMat.opacity = 0.12 * fade;
                     s.ringMat.opacity = 0.72 * fade;
                     // V2.0: no Classic puffs around a High Fidelity smoke (its volume ends at the sphere)
-                    if (grow >= 1 && !abilityLook.claims(s)) fxKit.smokeShell(s.position.x, s.position.y, s.position.z, s.outerMat.color, s.radius, Math.min(0.05, delta || 0.016), fade);
+                    if (grow >= 1 && !abilityLook.claims(s, 'smoke')) fxKit.smokeShell(s.position.x, s.position.y, s.position.z, s.outerMat.color, s.radius, Math.min(0.05, delta || 0.016), fade);   // V2.2: when its look routes smokes
 
                     if (characterController.position.distanceToSquared(s.position) <= (s.radius * 0.95) * (s.radius * 0.95)) {
                         playerInSmoke = true;
@@ -46960,8 +46967,8 @@
         //    colliders). In High Fidelity only their materials stop drawing (material.visible), and a
         //    High Fidelity visual follows the same transform and state. Gameplay never reads these.
         //  - One renderer per effect type, the look tags of AGENT_TUNING: smoke, wall, groundZone,
-        //    projectile, blast, flash, beam, pulse, deployable, self. CONVERTED lists the abilities
-        //    that have a High Fidelity look; every other ability keeps its Classic look.
+        //    projectile, blast, flash, beam, pulse, deployable, self. Every other ability keeps its
+        //    Classic look.
         //  - Everything is pooled and pre-built the first time High Fidelity is used, in small steps
         //    (all at once inside the boot warm-up when High Fidelity is on at start). Every shader is
         //    an unlit ShaderMaterial (one program each, whatever the light count) or reuses the
@@ -46970,6 +46977,23 @@
         //  - Lights on floors and walls go through abilityLights, particles and camera shake through
         //    fxKit, glare through the pooled glow quads (haloSystem), soft edges through the Ultra
         //    post chain's depth (the same layer-2 pass ultraFX uses for soft particles).
+        // V2.2: a registry instead of hard-coded lists, so an ability is converted from outside this
+        // module (the four role blocks after it), without editing it:
+        //  - addSource(kind, { list | one, live, stamp, key }): where Classic items of a kind live
+        //    (an agentSystem pool or single object); every pool and single that holds ability visuals
+        //    is registered below, under its agentSystem name (the V2.0 kinds keep their short names);
+        //  - addKey(kind, fn): which ability an item belongs to; a shared spawn (acquireProjectile,
+        //    spawnFlashBurst, spawnWindRing, spawnSmokeSphere, spawnMollyZone, spawnSlowZone) stamps
+        //    item.lookKey with abilityLook.tag, which ability code sets around the call, and a
+        //    projectile's tag carries on to everything its detonation spawns;
+        //  - addTimer(kind, { until, key }): a buff that is only a timer (agentSystem.xxxUntil);
+        //  - defineLook(key, { routes, styles }): which renderer draws each kind of item of that
+        //    ability (with an adapter for a new item shape, and the Classic materials to hide), and
+        //    its style on each renderer;
+        //  - defineModel(name, { count, mats, groups, parts, custom }): a device built from parts for
+        //    the deployable renderer (and models for the projectile renderer).
+        // HIFI-CONTRACT.md (the V2.2 PR 3 notes) documents the API, every renderer's parameters and
+        // styles, the budget and the rules.
         const abilityLook = {
             mode: 'classic',          // what is drawn now
             wanted: 'classic',        // what the setting asks for (High Fidelity waits for its build)
@@ -46987,11 +47011,23 @@
             tex: {}, U: null, R: {},
             mats: [],                 // every material we own (for the compile step)
             bound: 0,
+            problems: [],             // V2.2: a look that could not be drawn (no adapter, no model): the tests read it
             _v: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
             _c: new THREE.Color(), _c2: new THREE.Color(), _m: new THREE.Matrix4(), _q: new THREE.Quaternion(), _e: new THREE.Euler(),
 
-            // The abilities with a High Fidelity look (agent.slot). Their look is AGENT_TUNING's tag
-            // (V2.2: every agent is in AGENT_TUNING now, Sage, Sova, Breach and Killjoy included).
+            // V2.2: the registry (filled after this object: the shared sources, the ten proof
+            // abilities, then the four role blocks)
+            SOURCES: {},              // kind -> { kind, list, one, live, stamp, keys: [fn], used }
+            SOURCE_LIST: [],          // the sources in scan order
+            LOOKS: {},                // ability key -> { key, routes: { kind: route }, styles: { renderer: style }, _st }
+            MODELS: {},               // model name -> definition (built in the staged build)
+            MODEL_LIST: [],
+            PROJ_TYPES: {},           // projectile type -> ability key (projectileType)
+            SMOKE_COLORS: {},         // smoke colour -> ability key (smokeColor): canisters and their clouds
+
+            // The V2.0 proof abilities (the tests list them). Their look tags are AGENT_TUNING's (V2.2:
+            // every agent is in AGENT_TUNING now). V2.2: every converted ability, these ten
+            // included, is in LOOKS (defineLook); converted() reads that.
             CONVERTED: {
                 'omen.e': null, 'sage.c': null, 'phoenix.c': null, 'sova.q': null,
                 'raze.e': null, 'phoenix.q': null, 'sova.x': null, 'breach.e': null,
@@ -47002,12 +47038,121 @@
                 const a = key.split('.');
                 return (AGENT_TUNING[a[0]] && AGENT_TUNING[a[0]][a[1]] && AGENT_TUNING[a[0]][a[1]].look) || [];
             },
-            converted: function (key) { return !!key && Object.prototype.hasOwnProperty.call(this.CONVERTED, key); },
-            // A pooled visual High Fidelity draws instead of its Classic look (and its Classic particles)
-            claims: function (item) { return this.mode === 'hifi' && !!item && this.converted(item.lookKey); },
-            // Omen's Dark Cover is the only smoke cast in this colour
-            smokeKey: function (colorHex) { return colorHex === 0x6d28d9 ? 'omen.e' : null; },
+            converted: function (key) { return !!key && Object.prototype.hasOwnProperty.call(this.LOOKS, key); },
+            // A pooled visual High Fidelity draws instead of its Classic look (and its Classic particles).
+            // V2.2: kind ('flash', 'ring', 'smoke', ...) asks whether its look routes that kind of item
+            claims: function (item, kind) {
+                if (this.mode !== 'hifi' || !item || !item.lookKey) return false;
+                return kind ? !!this.routeOf(kind, item.lookKey) : this.converted(item.lookKey);
+            },
+            // The ability a smoke belongs to: the tag around its spawn, or its colour (smokeColor)
+            smokeKey: function (colorHex) { return this.tag || this.SMOKE_COLORS[colorHex] || null; },
 
+            // ---------------------------------------------------------------- V2.2: the registry API
+            // A kind of Classic item: spec.list() returns a pooled array, or spec.one() a single object
+            // (or null). spec.live(it, now): is it out (default: it.inUse or it.active); spec.stamp(it):
+            // changes when the item is reused for a new cast (default: it.startAt); spec.key: an ability
+            // key, or fn(it) -> key | null (more with addKey). Adding a kind twice merges the specs.
+            addSource: function (kind, spec) {
+                let s = this.SOURCES[kind];
+                if (!s) {
+                    s = { kind: kind, list: null, one: null, live: null, stamp: null, keys: [], used: false };
+                    this.SOURCES[kind] = s;
+                    this.SOURCE_LIST.push(s);
+                    for (const k in this.LOOKS) if (this.LOOKS[k].routes[kind]) s.used = true;
+                }
+                if (spec.list) s.list = spec.list;
+                if (spec.one) s.one = spec.one;
+                if (spec.live) s.live = spec.live;
+                if (spec.stamp) s.stamp = spec.stamp;
+                if (spec.key) this.addKey(kind, spec.key);
+                return s;
+            },
+            // Which ability an item of a kind belongs to: fn(it) -> key | null, or a key for every item.
+            // Tried in order after the item's own tag (item.lookKey).
+            addKey: function (kind, fn) {
+                const s = this.SOURCES[kind] || this.addSource(kind, {});
+                s.keys.push(typeof fn === 'function' ? fn : function () { return fn; });
+            },
+            // A buff that is only a timer: spec.until() returns the game time it lasts until; spec.key
+            // its ability. Binds a small item { active, startAt, expireAt } while now < until().
+            addTimer: function (kind, spec) {
+                const it = { active: false, startAt: 0, expireAt: 0, lookKey: null, timer: true };
+                this.addSource(kind, {
+                    one: function () { return it; },
+                    live: function (t, now) {
+                        const u = spec.until();
+                        if (u > now) { if (!t.active) { t.active = true; t.startAt = now; } t.expireAt = u; return true; }
+                        t.active = false;
+                        return false;
+                    },
+                    key: spec.key
+                });
+                return it;
+            },
+            // A projectile type (agentSystem.projectiles[i].type) -> its ability (for casts that are not tagged)
+            projectileType: function (type, key) { this.PROJ_TYPES[type] = key; },
+            // A smoke colour -> its ability: the canister (castSmokeProjectile) and the cloud (spawnSmokeSphere)
+            smokeColor: function (colorHex, key) { this.SMOKE_COLORS[colorHex] = key; },
+            // An ability's High Fidelity look.
+            //   routes: { kind: 'renderer' | { renderer, adapt(P, item, now, binding), hide, keep } }
+            //     hide: Classic materials to stop drawing (default: everything under item.group or
+            //     item.mesh): an array of item fields (each an Object3D), or fn(item, out) that pushes
+            //     materials; keep: item fields whose materials stay drawn (a hit flash, a marker).
+            //   styles: { renderer: { preset, ... } } (each renderer's parameters, HIFI-CONTRACT.md)
+            defineLook: function (key, spec) {
+                const look = { key: key, routes: {}, styles: spec.styles || {}, _st: {} };
+                for (const kind in (spec.routes || {})) {
+                    const r = spec.routes[kind];
+                    look.routes[kind] = typeof r === 'string' ? { renderer: r } : r;
+                    const s = this.SOURCES[kind];
+                    if (s) s.used = true;
+                }
+                this.LOOKS[key] = look;
+                return look;
+            },
+            // A model for the deployable (and projectile) renderers, built from parts in the staged build
+            defineModel: function (name, spec) {
+                if (this.MODELS[name]) return this.MODELS[name];
+                const m = Object.assign({ name: name, count: 2, mats: {}, groups: {}, parts: [] }, spec, { pool: [], built: false });
+                this.MODELS[name] = m;
+                this.MODEL_LIST.push(m);
+                return m;
+            },
+            routeOf: function (kind, key) {
+                const l = key ? this.LOOKS[key] : null;
+                return (l && l.routes[kind]) || null;
+            },
+            source: function (kind) { return this.SOURCES[kind] || null; },
+            allSources: function () { return this.SOURCE_LIST; },
+            // An ability's style on a renderer: the renderer's preset, then the look's own values,
+            // resolved once (colours to linear) and kept
+            styleOf: function (key, rname) {
+                const look = this.LOOKS[key];
+                if (!look) return null;
+                let st = look._st[rname];
+                if (st) return st;
+                const r = this.R[rname];
+                const raw = look.styles[rname] || {};
+                const base = (r && r.PRESETS && r.PRESETS[raw.preset || r.DEFAULT]) || {};
+                st = Object.assign({}, base, raw);
+                if (r && r.resolve) r.resolve(st);
+                look._st[rname] = st;
+                return st;
+            },
+            // The adapter that fills a renderer's parameters from an item: the route's own, or the
+            // renderer's default for that kind (null: this item cannot be drawn, it stays Classic)
+            adapterFor: function (b, ADAPT, kind, rname) {
+                const a = (b && b.route && b.route.adapt) || ADAPT[kind] || null;
+                if (!a) this.problem(rname + ': no adapter for ' + kind + ' (' + (b && b.key) + ')');
+                return a;
+            },
+            problem: function (msg) { if (this.problems.indexOf(msg) < 0) this.problems.push(msg); },
+            // A colour given as a number, or 'theme:agent' for an agent's theme colour
+            hex: function (c) {
+                if (typeof c === 'string' && c.indexOf('theme:') === 0) return this.theme(c.slice(6));
+                return c === undefined || c === null ? 0xffffff : c;
+            },
             supported: function () {
                 if (this.forceUnsupported) return false;
                 const caps = renderer.capabilities;
@@ -47132,77 +47277,64 @@
                     this.frameUniforms(now);
                     this.syncLayers();
                     this.bound = 0;
-                    const A = agentSystem;
-                    this.scan(A.projectiles, 'projectile', now, dt);
-                    this.scan(A.smokes, 'smoke', now, dt);
-                    this.scan(A.mollies, 'molly', now, dt);
-                    this.scan(A.iceWalls, 'wall', now, dt);
-                    this.scan(A.flashes, 'flash', now, dt);
-                    this.scan(A.windRings, 'ring', now, dt);
-                    this.scan(A.breachFaultLines, 'fault', now, dt);
-                    this.scan(A.kjTurrets, 'turret', now, dt);
-                    if (A.sovaBeam) this.scanOne(A.sovaBeam, 'beam', now, dt);
-                    if (tacticalDirector.botHazardsPool) this.scan(tacticalDirector.botHazardsPool, 'hazard', now, dt);
+                    // V2.2: every registered source that a look routes (the V2.0 ten's first, in their old order)
+                    const S = this.SOURCE_LIST;
+                    for (let i = 0; i < S.length; i++) {
+                        const s = S[i];
+                        if (!s.used) continue;
+                        if (s.list) this.scan(s.list(), s.kind, now, dt);
+                        else if (s.one) { const o = s.one(); if (o) this.scanOne(o, s.kind, now, dt); }
+                    }
                     for (const k in this.R) this.R[k].tick(now, dt);
                 }
                 if (this.uiDirty) this.syncUI();
             },
 
-            // A Classic item -> the converted ability it belongs to (null: draw it Classic)
-            keyOf: function (kind, it) {
-                switch (kind) {
-                    case 'projectile':
-                        if (!it.inUse) return null;
-                        if (it.type === 'smoke') return it.smokeColor === 0x6d28d9 ? 'omen.e' : null;
-                        if (it.type === 'molly') return 'phoenix.c';
-                        if (it.type === 'flash') return 'phoenix.q';
-                        if (it.type === 'shock') return 'sova.q';
-                        if (it.type === 'paintshell') return 'raze.e';
-                        return null;
-                    case 'smoke': case 'flash': case 'ring':
-                        return (it.inUse && this.converted(it.lookKey)) ? it.lookKey : null;
-                    case 'molly': return (it.inUse && !it.isNanoswarm && !it.isIncendiary && !it.isSnakeBite) ? 'phoenix.c' : null;
-                    case 'wall': return it.inUse ? 'sage.c' : null;
-                    case 'fault': return it.inUse ? 'breach.e' : null;
-                    case 'turret': return it.inUse ? 'killjoy.e' : null;
-                    case 'beam': return it.active ? 'sova.x' : null;
-                    case 'hazard': return (it.inUse && it.type === 'flash') ? 'phoenix.q' : null;
+            // A Classic item -> the converted ability it belongs to (null: draw it Classic). V2.2: the
+            // item's tag when its look routes this kind, else the kind's resolvers (addKey), in order
+            keyOf: function (kind, it, now) {
+                const s = this.SOURCES[kind];
+                if (!s || !it) return null;
+                if (!(s.live ? s.live(it, now === undefined ? gameNow() : now) : (it.inUse === true || it.active === true))) return null;
+                const tag = it.lookKey;
+                if (tag && this.routeOf(kind, tag)) return tag;
+                const ks = s.keys;
+                for (let i = 0; i < ks.length; i++) {
+                    const k = ks[i](it);
+                    if (k) return this.routeOf(kind, k) ? k : null;
                 }
                 return null;
             },
+            // Changes when a pooled item is reused for a new cast
             stampOf: function (kind, it) {
-                if (kind === 'projectile') return it.spawnAt;
-                if (kind === 'hazard') return it.startTime;
-                return it.startAt;
+                const s = this.SOURCES[kind];
+                return (s && s.stamp) ? s.stamp(it) : it.startAt;
             },
-            // Which renderer draws a kind of item (flash bursts and wind rings depend on the ability)
+            // Which renderer draws a kind of item for an ability (V2.2: its look's route)
             route: function (kind, key) {
-                switch (kind) {
-                    case 'projectile': return 'projectile';
-                    case 'smoke': return 'smoke';
-                    case 'molly': return 'groundZone';
-                    case 'wall': return 'wall';
-                    case 'beam': return 'beam';
-                    case 'fault': return 'pulse';
-                    case 'turret': return 'deployable';
-                    case 'hazard': return 'flash';
-                    case 'flash':
-                        if (key === 'phoenix.q') return 'flash';
-                        if (key === 'sova.q' || key === 'raze.e') return 'blast';
-                        return 'absorb';            // Sage's shatter flash: the wall renderer draws the shatter
-                    case 'ring':
-                        if (key === 'jett.e') return 'self';
-                        return 'absorb';            // Paint Shells, Fault Line, Turret: their renderer draws it
-                }
-                return 'absorb';
+                const r = this.routeOf(kind, key);
+                return r ? r.renderer : null;
             },
-            // The Classic materials of an item (collected once): hidden while High Fidelity draws it
-            classicMats: function (kind, it) {
-                if (it._hfMats) return it._hfMats;
-                const list = [];
-                const root = it.group || it.mesh;
-                if (root) root.traverse((o) => { if (o.material && list.indexOf(o.material) < 0) list.push(o.material); });
+            // The Classic materials of an item: hidden while High Fidelity draws it. V2.2: by default
+            // everything under its group (or mesh); a route can name the fields to hide or keep.
+            // Collected when the item is bound for a different route; the list is reused.
+            classicMats: function (kind, it, rt) {
+                const spec = (rt && (rt.hide || rt.keep)) ? rt : null;
+                if (it._hfMats && it._hfMatsFor === spec) return it._hfMats;
+                const list = it._hfMats || [];
+                list.length = 0;
+                const add = (o) => { if (o && o.material && list.indexOf(o.material) < 0) list.push(o.material); };
+                let keepMats = null;
+                if (spec && spec.keep) {
+                    keepMats = [];
+                    for (const f of spec.keep) if (it[f] && it[f].isObject3D) it[f].traverse((o) => { if (o.material) keepMats.push(o.material); });
+                }
+                if (spec && typeof spec.hide === 'function') spec.hide(it, list);
+                else if (spec && spec.hide) { for (const f of spec.hide) if (it[f] && it[f].isObject3D) it[f].traverse(add); }
+                else { const root = it.group || it.mesh; if (root) root.traverse(add); }
+                if (keepMats) for (let i = list.length - 1; i >= 0; i--) if (keepMats.indexOf(list[i]) >= 0) list.splice(i, 1);
                 it._hfMats = list;
+                it._hfMatsFor = spec;
                 return list;
             },
             scan: function (list, kind, now, dt) {
@@ -47210,7 +47342,7 @@
                 for (let i = 0; i < list.length; i++) this.scanOne(list[i], kind, now, dt);
             },
             scanOne: function (it, kind, now, dt) {
-                const key = this.keyOf(kind, it);
+                const key = this.keyOf(kind, it, now);
                 let b = it._hf;
                 if (b && b.on && (b.key !== key || b.stamp !== this.stampOf(kind, it))) this.unbind(it, true);
                 if (key && !(b && b.on)) b = this.bind(it, kind, key, now);
@@ -47221,13 +47353,15 @@
                 b.r.sync(b, it, now, dt);
             },
             bind: function (it, kind, key, now) {
-                const b = it._hf || (it._hf = { on: false, key: null, kind: kind, stamp: 0, r: null, inst: null, mats: null });
-                const r = this.R[this.route(kind, key)];
+                const b = it._hf || (it._hf = { on: false, key: null, kind: kind, stamp: 0, r: null, inst: null, mats: null, route: null });
+                const rt = this.routeOf(kind, key);
+                const r = rt ? this.R[rt.renderer] : null;
                 if (!r) return null;
-                const inst = r.acquire(key, it, now, kind);
+                b.route = rt; b.key = key; b.kind = kind;   // V2.2: the renderer reads the route (its adapter) as it acquires
+                const inst = r.acquire(key, it, now, kind, b);
                 if (!inst) return null;     // pool exhausted: this one stays Classic
-                b.on = true; b.key = key; b.kind = kind; b.stamp = this.stampOf(kind, it); b.r = r; b.inst = inst;
-                b.mats = this.classicMats(kind, it);
+                b.on = true; b.stamp = this.stampOf(kind, it); b.r = r; b.inst = inst;
+                b.mats = this.classicMats(kind, it, rt);
                 return b;
             },
             // natural: the Classic item ended or was reused (a High Fidelity tail may play);
@@ -47241,10 +47375,12 @@
                 b.inst = null;
             },
             unbindAll: function () {
-                const A = agentSystem;
-                const lists = [A.projectiles, A.smokes, A.mollies, A.iceWalls, A.flashes, A.windRings, A.breachFaultLines, A.kjTurrets, tacticalDirector.botHazardsPool];
-                for (const list of lists) if (list) for (const it of list) this.unbind(it, false);
-                if (A.sovaBeam) this.unbind(A.sovaBeam, false);
+                const S = this.SOURCE_LIST;
+                for (let i = 0; i < S.length; i++) {
+                    const s = S[i];
+                    if (s.list) { const l = s.list(); if (l) for (let j = 0; j < l.length; j++) this.unbind(l[j], false); }
+                    else if (s.one) { const o = s.one(); if (o) this.unbind(o, false); }
+                }
                 for (const k in this.R) if (this.R[k].clear) this.R[k].clear();
             },
 
@@ -47259,7 +47395,6 @@
                 if (this.mode !== 'hifi' || !this.R.self) return;
                 this.R.self.dash(sx, enemy.mesh.position.y, sz, enemy.mesh.position.x, enemy.mesh.position.y, enemy.mesh.position.z, now, false);
             },
-
             // ---------------------------------------------------------------- shared per-frame uniforms
             frameUniforms: function (now) {
                 const U = this.U;
@@ -48954,6 +49089,63 @@
                 return self;
             }
         };
+
+        // V2.2: the High Fidelity sources: every agentSystem pool and single object that holds an
+        // ability's visuals, and the bots' hazards. The V2.0 kinds keep their short names (in their old
+        // scan order); every other kind is its agentSystem name. A role block adds keys and looks to these.
+        (function () {
+            const L = abilityLook;
+            L.addSource('projectile', {
+                list: function () { return agentSystem.projectiles; },
+                stamp: function (p) { return p.spawnAt; },
+                // a cast that was not tagged: by its type (projectileType), a smoke canister by its colour (smokeColor)
+                key: function (p) { return p.type === 'smoke' ? (L.SMOKE_COLORS[p.smokeColor] || null) : (L.PROJ_TYPES[p.type] || null); }
+            });
+            L.addSource('smoke', { list: function () { return agentSystem.smokes; } });
+            L.addSource('molly', { list: function () { return agentSystem.mollies; } });
+            L.addSource('wall', { list: function () { return agentSystem.iceWalls; } });
+            L.addSource('flash', { list: function () { return agentSystem.flashes; } });
+            L.addSource('ring', { list: function () { return agentSystem.windRings; } });
+            L.addSource('fault', { list: function () { return agentSystem.breachFaultLines; } });
+            L.addSource('turret', { list: function () { return agentSystem.kjTurrets; } });
+            L.addSource('beam', { one: function () { return agentSystem.sovaBeam; } });
+            L.addSource('hazard', { list: function () { return tacticalDirector.botHazardsPool; }, stamp: function (h) { return h.startTime; } });
+            const lists = ['slowZones', 'recons', 'soulOrbs', 'leerEyes', 'paranoiaWaves', 'shadowPortals', 'boomBots', 'trapwires', 'spycams', 'stimBeacons',
+                'toxicScreens', 'yoruDecoys', 'fastLanes', 'trademarks', 'kayoFragments', 'zeroPointBlades', 'skyePredators', 'skyeHawks', 'skyeSeekers',
+                'fadeProwlers', 'fadeSeizeZones', 'fadeHaunts', 'breachAftershocks', 'isoContingencyWalls', 'isoUndercutBolts', 'isoEnergyOrbs',
+                'gekkoMoshPits', 'gekkoWingman', 'gekkoDizzy', 'gekkoGlobules', 'deadlockGravNets', 'deadlockSensors', 'deadlockBarriers',
+                'harborCascades', 'harborCoves', 'harborHighTides', 'astraGravityWells', 'astraNovaPulses', 'vyseShears', 'vyseArcRoses', 'vyseRazorvines',
+                'tejoStealthDrones', 'tejoGuidedSalvos', 'waylaySaturateZones', 'vetoChokeholds', 'vetoInterceptors', 'miksMPulses'];
+            for (const n of lists) L.addSource(n, { list: function () { return agentSystem[n]; } });
+            const ones = ['kjLockdown', 'orbitalStrike', 'vipersPit', 'yoruTether', 'neonBeam', 'chamberAnchor', 'skyeRegrowthSession', 'fadeNightfallWave',
+                'breachRollingThunder', 'isoKillContract', 'gekkoThrash', 'deadlockCocoon', 'harborReckoning', 'astraCosmicDivide', 'vyseSteelGarden',
+                'tejoArmageddon', 'waylayRefractBeacon', 'waylayConvergentPaths', 'vetoCrosscutAnchor', 'vetoEvolutionAura', 'miksHarmonizeHalo',
+                'miksBassquake', 'phoenixAnchor', 'soulTether', 'sageHealSession', 'reynaDevourSession'];
+            for (const n of ones) L.addSource(n, { one: function () { return agentSystem[n]; } });
+        })();
+
+        // V2.2: the ten proof abilities (V2.0), converted the way a role block converts one
+        abilityLook.projectileType('molly', 'phoenix.c');
+        abilityLook.projectileType('flash', 'phoenix.q');
+        abilityLook.projectileType('shock', 'sova.q');
+        abilityLook.projectileType('paintshell', 'raze.e');
+        abilityLook.smokeColor(0x6d28d9, 'omen.e');
+        abilityLook.addKey('molly', function (m) { return (!m.isNanoswarm && !m.isIncendiary && !m.isSnakeBite) ? 'phoenix.c' : null; });
+        abilityLook.addKey('wall', 'sage.c');
+        abilityLook.addKey('fault', 'breach.e');
+        abilityLook.addKey('turret', 'killjoy.e');
+        abilityLook.addKey('beam', 'sova.x');
+        abilityLook.addKey('hazard', function (h) { return h.type === 'flash' ? 'phoenix.q' : null; });
+        abilityLook.defineLook('omen.e', { routes: { projectile: 'projectile', smoke: 'smoke' } });
+        abilityLook.defineLook('sage.c', { routes: { wall: 'wall', flash: 'absorb' } });   // the shatter flash: the wall draws its shatter
+        abilityLook.defineLook('phoenix.c', { routes: { projectile: 'projectile', molly: 'groundZone' } });
+        abilityLook.defineLook('sova.q', { routes: { projectile: 'projectile', flash: 'blast' } });
+        abilityLook.defineLook('raze.e', { routes: { projectile: 'projectile', flash: 'blast', ring: 'absorb' } });   // the blast draws its ring
+        abilityLook.defineLook('phoenix.q', { routes: { projectile: 'projectile', flash: 'flash', hazard: 'flash' } });
+        abilityLook.defineLook('sova.x', { routes: { beam: 'beam' } });
+        abilityLook.defineLook('breach.e', { routes: { fault: 'pulse', ring: 'absorb' } });   // the quake draws its rings
+        abilityLook.defineLook('killjoy.e', { routes: { turret: 'deployable', ring: 'absorb' } });
+        abilityLook.defineLook('jett.e', { routes: { ring: 'self' } });
 
         // Initialize the optimized game
         // Debug populations. Not used by normal play. Counts are the totals to reach,
