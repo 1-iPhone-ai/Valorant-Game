@@ -30340,7 +30340,9 @@
                 characterController.startDash(dirX, AGENT_TUNING.neon.e.dashDirY, dirZ, AGENT_TUNING.neon.e.dashSpeedPerTick, AGENT_TUNING.neon.e.dashSec);
                 this.neonHighGearUntil = Math.max(this.neonHighGearUntil, now + AGENT_TUNING.neon.e.hasteMs);
                 this.dashFxUntil = now + 320;
+                abilityLook.tag = 'neon.e';   // V2.2: Neon's High Gear slide (High Fidelity)
                 this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.4), characterController.position.z, 0x00f5d4, 4.0, now);
+                abilityLook.tag = null;
                 soundFX.neonSlide();
                 showNotification("HIGH GEAR ELECTRIC SLIDE! (+45% Sprint Speed & +25% Rapid Fire for 6.5s)", 1700);
             },
@@ -34085,8 +34087,10 @@
                         kf.pulsesLeft--;
                         kf.nextPulseAt = now + AGENT_TUNING.kayo.c.pulseIntervalMs;
                         soundFX.kayoFragment();
+                        abilityLook.tag = 'kayo.c';   // V2.2: KAY/O's FRAG/ment pulse (High Fidelity draws it)
                         this.spawnWindRing(kf.position.x, kf.position.y + 0.1, kf.position.z, 0x6366f1, kf.radius * 0.95, now);
                         this.spawnFlashBurst(kf.position.x, kf.position.y + 0.35, kf.position.z, 0x38bdf8, kf.radius * 0.85, 280, now);
+                        abilityLook.tag = null;
                         const rSq = kf.radius * kf.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -50489,6 +50493,266 @@
                 parts: parts
             });
         })();
+
+        // =============================================
+        // V2.2: High Fidelity looks, DUELISTS (role block: Jett, Phoenix, Reyna, Raze, Yoru, Neon, Iso, Waylay)
+        // =============================================
+        // Looks only: defineLook, defineModel, addTimer and adapters (HIFI-CONTRACT.md). Each ability's
+        // tags go in its own spawn code. Converted here: iso.c, neon.e, raze.x (pilots).
+        // ISO Contingency: a moving energy wall (the Classic 5.2 x 2.75 x 0.28 m box, 1.4 m up, turned with its group)
+        abilityLook.defineLook('iso.c', {
+            routes: {
+                isoContingencyWalls: { renderer: 'wall', adapt: function (P, ic, now) {
+                    const g = ic.group, a = P.panels[0];
+                    P.n = 1;
+                    a.x = g.position.x; a.y = g.position.y + 1.4; a.z = g.position.z; a.sx = 5.2; a.sy = 2.75; a.sz = 0.28; a.yaw = g.rotation.y;
+                    P.start = ic.startAt; P.maxHealth = 0;
+                    const rem = ic.expireAt - now;
+                    P.fade = rem < 400 ? Math.max(0, rem / 400) : 1;   // the Classic fade
+                } }
+            },
+            styles: { wall: { preset: 'energy', colA: 0x2e1065, colB: 'theme:iso', floor: -1,
+                emit: { every: 70, spec: { kind: 'spark', hex: 0xd8b4fe, n: 2, life: 0.35, s0: 0.05, s1: 0.015, a0: 1, drag: 1, jitter: 4 } },
+                end: { kind: 'glow', hex: 0xc4b5fd, n: 10, life: 0.5, s0: 0.3, s1: 0.05, a0: 0.8, drag: 1, jitter: 1 } } }
+        });
+        // NEON High Gear: the slide's ring is a dash in Neon's colours; the haste (neonHighGearUntil) a buff:
+        // a shimmer at the screen edge, sparks and speed lines while you run, light on the off-hand
+        abilityLook.addTimer('neonHighGear', { until: function () { return agentSystem.neonHighGearUntil; }, key: 'neon.e' });
+        abilityLook.defineLook('neon.e', {
+            routes: { ring: 'self', neonHighGear: { renderer: 'self', adapt: 'timer' } },
+            styles: { self: { dash: true, color: 'theme:neon', hand: { mode: 2, color: 0x00f5d4, scale: 0.55 },
+                edge: { colA: 0x00f5d4, colB: 0x60a5fa, shimmer: true, k: 0.35 }, aura: { colA: 0x00f5d4, colB: 0x60a5fa, w: 1.1, h: 2.0 },
+                motes: { every: 90, spec: { kind: 'spark', hex: 0x7df9ff, n: 2, life: 0.35, s0: 0.05, s1: 0.015, a0: 1, drag: 1.5, jitter: 3 } },
+                streaks: { every: 260, minSpeed: 5 } } }
+        });
+        // RAZE Showstopper: a modelled rocket with an exhaust, then a big fire blast (detonateExplosionAoE)
+        (function () {
+            const fins = [];
+            for (let k = 0; k < 4; k++) {
+                const a = k * Math.PI / 2 + Math.PI / 4;
+                fins.push({ shape: 'box', size: [0.02, 0.15, 0.13], at: [Math.cos(a) * 0.1, Math.sin(a) * 0.1, -0.25], rot: [0, 0, a + Math.PI / 2], mat: 'dark' });
+            }
+            abilityLook.defineModel('raze.rocket', {
+                count: 2,
+                mats: { body: { color: 'theme:raze', rough: 0.42, metal: 0.25 }, dark: { color: 0x2a2f37, rough: 0.6, metal: 0.5 }, glow: { glow: 0xffd27a } },
+                parts: [
+                    { shape: 'cyl', size: [0.09, 0.09, 0.6], seg: 14, rot: [Math.PI / 2, 0, 0], mat: 'body' },
+                    { shape: 'cone', size: [0.09, 0.22], seg: 14, at: [0, 0, 0.41], rot: [Math.PI / 2, 0, 0], mat: 'body' },
+                    { shape: 'cyl', size: [0.095, 0.095, 0.05], seg: 14, at: [0, 0, 0.17], rot: [Math.PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'cyl', size: [0.06, 0.08, 0.07], seg: 12, at: [0, 0, -0.33], rot: [Math.PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'sphere', size: [0.065], seg: [10, 8], at: [0, 0, -0.37], mat: 'glow' }
+                ].concat(fins)
+            });
+        })();
+        abilityLook.defineLook('raze.x', {
+            routes: { projectile: 'projectile', flash: 'blast', ring: 'absorb' },   // the blast draws its ring
+            styles: {
+                projectile: { model: 'raze.rocket', spin: { axis: 'z', rate: 7 },
+                    trail: [{ kind: 'ember', hex: 0xffb35c, life: 0.35, s0: 0.1, s1: 0.02, a0: 1, drag: 1.2, grav: 0, jx: 1.2, jy: 1.2, jz: 1.2 },
+                        { kind: 'smoke', hex: 0x6b6560, life: 1.1, s0: 0.18, s1: 0.7, a0: 0.45, drag: 1.2, grav: -0.25, jx: 0.4, jy: 0.4, jz: 0.4 },
+                        { kind: 'glow', hex: 0xffa64d, life: 0.16, s0: 0.45, s1: 0.1, a0: 0.9, drag: 0, grav: 0 }] },
+                blast: { preset: 'fire', aoe: true, sparks: { n: 40, hex: 0xffb066 }, dust: { n: 20, hex: 0x7d7267, s1: 2.2 },
+                    smoke: { n: 18, hex: 0x3b3633, k: 0.6 }, shake: 1.2, scorch: { scale: 0.8, hex: 'theme:raze' } }
+            }
+        });
+        // V2.2: end of the Duelists' block
+
+        // =============================================
+        // V2.2: High Fidelity looks, CONTROLLERS (role block: Omen, Brimstone, Viper, Clove, Harbor, Astra, Miks)
+        // =============================================
+        // Looks only (HIFI-CONTRACT.md). Converted here: viper.q, brimstone.x (pilots).
+        // VIPER Poison Cloud: a gas canister, then a toxic cloud (castSmokeProjectile; its colour names it)
+        abilityLook.defineModel('viper.canister', {
+            count: 2,
+            mats: { body: { color: 0x1f2d24, rough: 0.5, metal: 0.45 }, cap: { color: 0x3f4a42, rough: 0.4, metal: 0.6 }, acid: { glow: 0x4ade80 } },
+            parts: [
+                { shape: 'cyl', size: [0.075, 0.075, 0.22], seg: 12, rot: [Math.PI / 2, 0, 0], mat: 'body' },
+                { shape: 'cyl', size: [0.06, 0.078, 0.04], seg: 12, at: [0, 0, 0.13], rot: [Math.PI / 2, 0, 0], mat: 'cap' },
+                { shape: 'cyl', size: [0.078, 0.06, 0.04], seg: 12, at: [0, 0, -0.13], rot: [Math.PI / 2, 0, 0], mat: 'cap' },
+                { shape: 'torus', size: [0.077, 0.012], seg: [6, 18], at: [0, 0, 0.05], mat: 'acid' },
+                { shape: 'torus', size: [0.077, 0.012], seg: [6, 18], at: [0, 0, -0.05], mat: 'acid' }
+            ]
+        });
+        abilityLook.defineLook('viper.q', {
+            routes: { projectile: 'projectile', smoke: 'smoke' },
+            styles: {
+                projectile: { model: 'viper.canister', spin: { axis: 'x', rate: 12 },
+                    trail: [{ kind: 'smoke', hex: 0x2f6b3c, life: 0.8, s0: 0.12, s1: 0.4, a0: 0.4, drag: 1.4, grav: -0.2, jx: 0.4, jy: 0.4, jz: 0.4 },
+                        { kind: 'glow', hex: 0x4ade80, life: 0.25, s0: 0.2, s1: 0.04, a0: 0.7, drag: 0, grav: 0 }] },
+                smoke: { preset: 'toxic' }
+            }
+        });
+        // BRIMSTONE Orbital Strike: one Classic object, two renderers: a laser from the sky (thin while it
+        // winds up) and the ground it burns
+        abilityLook.defineLook('brimstone.x', {
+            routes: {
+                orbitalStrike: [
+                    { renderer: 'beam', adapt: function (P, os, now) {
+                        P.ox = os.position.x; P.oy = os.position.y + 24; P.oz = os.position.z;
+                        abilityLook.dirQ(P.q, 0, -1, 0);
+                        P.len = 24;
+                        const ready = now >= os.beamActiveAt, rem = os.expireAt - now;
+                        P.width = ready ? 0.9 + 0.12 * Math.sin(now * 0.03) : 0.22;
+                        P.fade = (rem < 500 ? Math.max(0, rem / 500) : 1) * (ready ? 1 : 0.45);
+                    } },
+                    { renderer: 'groundZone', adapt: function (P, os, now) {
+                        P.x = os.position.x; P.y = os.position.y; P.z = os.position.z; P.r = os.radius; P.rect = 0; P.yaw = 0;
+                        P.start = os.startAt; P.end = os.expireAt; P.age = (now - os.startAt) * 0.001;
+                        const rem = os.expireAt - now;
+                        P.fade = (rem < 500 ? Math.max(0, rem / 500) : 1) * (now >= os.beamActiveAt ? 1 : 0.3);
+                    } }
+                ]
+            },
+            styles: {
+                beam: { core: 0xfff7d6, glow: 0xff6a1a, width: 5.5, jag: 0, origin: null, impact: null },
+                groundZone: { preset: 'fire', colA: 0xb91c1c, colB: 0xff8a2a, scorch: { hex: 0x2b1a12, scale: 1.0, holdMs: 8000 } }
+            }
+        });
+        // V2.2: end of the Controllers' block
+
+        // =============================================
+        // V2.2: High Fidelity looks, INITIATORS (role block: Sova, KAY/O, Skye, Fade, Breach, Gekko, Tejo)
+        // =============================================
+        // Looks only (HIFI-CONTRACT.md). Converted here: sova.e, kayo.c, breach.q (pilots).
+        // SOVA Recon Bolt: the arrow (a cyan tip), then the bolt stuck where it landed (its eye turning) and
+        // its sonar pulses (one Classic item, two renderers)
+        (function () {
+            const fins = [];
+            for (let k = 0; k < 3; k++) {
+                const a = k * Math.PI * 2 / 3;
+                fins.push({ shape: 'box', size: [0.006, 0.16, 0.07], at: [Math.cos(a) * 0.035, 0.15, Math.sin(a) * 0.035], rot: [0, -a, 0], mat: 'fin' });   // the fletching, under the eye
+            }
+            abilityLook.defineModel('sova.reconBolt', {
+                count: 2,
+                mats: { metal: { color: 0x8b95a1, rough: 0.32, metal: 0.85 }, fin: { color: 'theme:sova', rough: 0.45, metal: 0.25 }, eye: { light: 0x7dd3fc } },
+                groups: { eye: { at: [0, 0.32, 0], role: 'spin', axis: 'y', rate: 2.5 } },
+                parts: [
+                    { shape: 'cyl', size: [0.016, 0.016, 0.62], seg: 8, at: [0, 0, 0], mat: 'metal' },
+                    { shape: 'cone', size: [0.045, 0.12], seg: 10, at: [0, -0.36, 0], rot: [Math.PI, 0, 0], mat: 'metal' },
+                    { group: 'eye', shape: 'oct', size: [0.075], mat: 'eye' },
+                    { group: 'eye', shape: 'torus', size: [0.1, 0.008], seg: [6, 20], rot: [Math.PI / 2, 0, 0], mat: 'metal' }
+                ].concat(fins)
+            });
+        })();
+        abilityLook.defineLook('sova.e', {
+            routes: {
+                projectile: 'projectile',
+                recons: [
+                    { renderer: 'pulse', adapt: function (P, r, now) {
+                        P.shape = 1; P.x = r.position.x; P.y = r.position.y; P.z = r.position.z; P.R = r.maxRadius;
+                        const age = now - r.pulseStartAt;
+                        P.front = age <= 1100 ? age / 1100 : -1;   // the Classic sphere's 1.1 s sweep
+                        P.after = age * 0.001;
+                        P.charge = 0.35 + 0.25 * Math.sin(now * 0.008);
+                        const rem = r.expireAt - now;
+                        P.fade = rem < 400 ? Math.max(0, rem / 400) : 1;
+                        P.wave = r.pulseStartAt;
+                    } },
+                    { renderer: 'deployable', adapt: function (P, r, now) {
+                        P.x = r.position.x; P.y = r.position.y - 0.12; P.z = r.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = r.startAt; P.remain = r.expireAt - now; P.alert = now - r.pulseStartAt < 350; P.fade = 1;
+                    } }
+                ]
+            },
+            styles: {
+                projectile: { preset: 'arrow', tip: { a: 0xf0fbff, b: 0x38bdf8 },
+                    trail: [{ kind: 'spark', hex: 0x9be7ff, life: 0.22, s0: 0.05, s1: 0.015, a0: 1, drag: 2, grav: 2, jx: 1.2, jy: 1.2, jz: 1.2 },
+                        { kind: 'glow', at: 'pos', hex: 0x38bdf8, life: 0.18, s0: 0.25, s1: 0.05, a0: 0.6, drag: 0, grav: 0 }] },
+                pulse: { preset: 'sonar' },
+                deployable: { preset: 'device', model: 'sova.reconBolt', lights: [0x38bdf8, 0xe0f7ff, 0xffffff], lightY: 0.35, lightRadius: 2.5, lightK: 0.6, dust: { hex: 0x8d8579, n: 6 }, unfoldMs: 0 }
+            }
+        });
+        // KAY/O FRAG/ment: a modelled frag, the zone it sticks to (an electric field) and its four pulses (blasts)
+        abilityLook.defineModel('kayo.frag', {
+            count: 2,
+            mats: { body: { color: 0x2b2f3a, rough: 0.45, metal: 0.7 }, plate: { color: 0x9ca3af, rough: 0.35, metal: 0.8 }, core: { glow: 0x7dd3fc } },
+            parts: [
+                { shape: 'cyl', size: [0.085, 0.085, 0.16], seg: 6, rot: [Math.PI / 2, 0, 0], mat: 'body' },
+                { shape: 'cyl', size: [0.09, 0.09, 0.03], seg: 6, at: [0, 0, 0.07], rot: [Math.PI / 2, 0, 0], mat: 'plate' },
+                { shape: 'cyl', size: [0.09, 0.09, 0.03], seg: 6, at: [0, 0, -0.07], rot: [Math.PI / 2, 0, 0], mat: 'plate' },
+                { shape: 'torus', size: [0.088, 0.01], seg: [4, 6], mat: 'core' },
+                { shape: 'sphere', size: [0.035], seg: [8, 6], at: [0, 0, 0.095], mat: 'core' }
+            ]
+        });
+        abilityLook.defineLook('kayo.c', {
+            routes: {
+                projectile: 'projectile',
+                kayoFragments: { renderer: 'groundZone', adapt: function (P, kf, now) {
+                    P.x = kf.position.x; P.y = kf.position.y; P.z = kf.position.z; P.r = kf.radius; P.rect = 0; P.yaw = 0;
+                    P.start = kf.startAt; P.end = kf.expireAt; P.age = (now - kf.startAt) * 0.001;
+                    const rem = kf.expireAt - now;
+                    P.fade = (rem < 400 ? Math.max(0, rem / 400) : 1) * Math.min(1, P.age * 6);
+                } },
+                flash: 'blast', ring: 'absorb'   // each pulse: a flash burst (its blast) and a ring (drawn by the blast)
+            },
+            styles: {
+                projectile: { model: 'kayo.frag', spin: { axis: 'z', rate: 14 },
+                    trail: [{ kind: 'spark', hex: 0x93c5fd, life: 0.25, s0: 0.05, s1: 0.015, a0: 1, drag: 2, grav: 2, jx: 1.2, jy: 1.2, jz: 1.2 }] },
+                groundZone: { preset: 'field', colA: 0x4338ca, colB: 0x7dd3fc },
+                blast: { preset: 'electric', aoe: true, rScale: 1 / 0.85, coreA: 0xeef2ff, coreB: 0x6366f1, ringB: 0x818cf8, arcHex: 0xc7d2fe,
+                    sparks: { n: 20, hex: 0xa5b4fc }, dust: { n: 6, hex: 0x8a8f96, s1: 1.1 }, smoke: { n: 2, hex: 0x5b6573, k: 0.3 }, halo: 0xe0e7ff, light: 0x818cf8, shake: 0.7, scorch: null }
+            }
+        });
+        // BREACH Flashpoint: a fast charge (an electric orb) and an orange flash (the shared flash detonation)
+        abilityLook.defineLook('breach.q', {
+            routes: { projectile: 'projectile', flash: 'flash' },
+            styles: {
+                projectile: { orb: { style: 2, a: 0xfff1d6, b: 'theme:breach', size: 0.55 },
+                    trail: [{ kind: 'glow', hex: 0xfb923c, life: 0.28, s0: 0.32, s1: 0.05, a0: 0.8, drag: 0, grav: 0 },
+                        { kind: 'spark', hex: 0xffc58a, life: 0.2, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 1, jx: 1.4, jy: 1.4, jz: 1.4 }] },
+                flash: { core: 0xffe0b8, glow: 'theme:breach', halo: { hex: 0xffe4c4, size: 6 }, light: { hex: 0xff8a3d, radius: 14 }, embers: { n: 16, hex: 0xff9b4a }, streaks: 1.15 }
+            }
+        });
+        // V2.2: end of the Initiators' block
+
+        // =============================================
+        // V2.2: High Fidelity looks, SENTINELS (role block: Sage, Killjoy, Cypher, Chamber, Deadlock, Vyse, Veto)
+        // =============================================
+        // Looks only (HIFI-CONTRACT.md). Converted here: sage.q, killjoy.q (pilots).
+        // SAGE Slow Orb: a frost orb, then a field of crystal goo (the shared slow zone pool: its tag says whose)
+        abilityLook.defineLook('sage.q', {
+            routes: { projectile: 'projectile', slowZones: 'groundZone' },
+            styles: {
+                projectile: { orb: { style: 2, a: 0xecfeff, b: 'theme:sage', size: 0.5 },
+                    trail: [{ kind: 'glow', hex: 0x5eead4, life: 0.3, s0: 0.3, s1: 0.05, a0: 0.8, drag: 0, grav: 0 },
+                        { kind: 'spark', hex: 0xccfbf1, life: 0.3, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 3, jx: 1, jy: 1, jz: 1 }] },
+                groundZone: { preset: 'slow', colA: 0x0f766e, colB: 0xccfbf1,
+                    emit: { every: 150, spec: { kind: 'glow', hex: 0x99f6e4, n: 1, life: 1.0, s0: 0.12, s1: 0.03, a0: 0.8, drag: 1, up: 0.5, jitter: 0.3 } } }
+            }
+        });
+        // KILLJOY Alarmbot: a modelled bot rolling on its wheels (eye lit while it hunts), then an electric blast
+        (function () {
+            const parts = [
+                { shape: 'rbox', size: [0.42, 0.2, 0.5], radius: 0.06, seg: 2, at: [0, 0.17, 0], mat: 'body' },
+                { shape: 'rbox', size: [0.34, 0.05, 0.4], radius: 0.02, seg: 2, at: [0, 0.29, 0], mat: 'accent' },
+                { shape: 'rbox', size: [0.3, 0.06, 0.05], radius: 0.02, seg: 2, at: [0, 0.17, 0.26], mat: 'accent' },
+                { group: 'head', shape: 'sphere', size: [0.13], seg: [14, 10], mat: 'body' },
+                { group: 'head', shape: 'cyl', size: [0.012, 0.012, 0.16], seg: 6, at: [0.06, 0.15, -0.04], mat: 'dark' },
+                { group: 'head', shape: 'sphere', size: [0.05], seg: [10, 8], at: [0, 0.02, 0.11], mat: 'eye' }
+            ];
+            for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push({ group: 'wheels', shape: 'cyl', size: [0.085, 0.085, 0.06], seg: 12, at: [sx * 0.24, 0, sz * 0.16], rot: [0, 0, Math.PI / 2], mat: 'dark' });
+            abilityLook.defineModel('killjoy.alarmbot', {
+                count: 2,
+                mats: { body: { color: 0xe5e7eb, rough: 0.4, metal: 0.5 }, accent: { color: 'theme:killjoy', rough: 0.35, metal: 0.2 }, dark: { color: 0x1c2128, rough: 0.55, metal: 0.45 }, eye: { light: 0xe879f9 } },
+                groups: { head: { at: [0, 0.36, 0], role: 'bob', amp: 0.015, rate: 3 }, wheels: { at: [0, 0.085, 0], role: 'spin', axis: 'x', rate: 9 } },
+                parts: parts
+            });
+        })();
+        abilityLook.defineLook('killjoy.q', {
+            routes: {
+                boomBots: { renderer: 'deployable', adapt: function (P, bot, now) {
+                    P.x = bot.position.x; P.y = bot.position.y; P.z = bot.position.z; P.yaw = bot.group.rotation.y; P.headYaw = NaN;
+                    P.start = bot.startAt; P.remain = bot.expireAt - now; P.alert = !!bot.locked; P.fade = 1; P.shotAt = 0;
+                } },
+                flash: 'blast', ring: 'absorb'
+            },
+            styles: {
+                deployable: { preset: 'device', model: 'killjoy.alarmbot', lights: [0xe879f9, 0xfacc15, 0xff5a4d], lightY: 0.4, lightRadius: 2, lightK: 0.5, unfoldMs: 200 },
+                blast: { preset: 'electric', aoe: true, coreA: 0xfef9c3, coreB: 0xfacc15, ringB: 0xfde047, arcHex: 0xfef08a, sparks: { n: 24, hex: 0xfde68a },
+                    halo: 0xfef9c3, light: 0xfacc15, scorch: { scale: 0.4, hex: 0x1b1c22 } }
+            }
+        });
+        // V2.2: end of the Sentinels' block
 
         // Initialize the optimized game
         // Debug populations. Not used by normal play. Counts are the totals to reach,
