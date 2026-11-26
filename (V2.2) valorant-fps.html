@@ -49038,6 +49038,7 @@
                             if (!L.takeStyle(p, key, 'wall', b, this.ADAPT, kind)) return null;
                             const st = p.st, P = p.P;
                             P.start = now; P.health = 1; P.maxHealth = 0; P.fade = 1;
+                            P.panels[0].shape = P.panels[1].shape = 'box';   // V2.2: a round wall's shape is not carried over to the next item this instance draws (adapters that never set it, Sage's included, mean a box)
                             p.adapt(P, w, now, b);
                             p.busy = true; p.wall = w; p.isIce = !!st.ice;
                             p.lastHp = P.health; p.start = P.start || now; p.hitAt = -1e9;
