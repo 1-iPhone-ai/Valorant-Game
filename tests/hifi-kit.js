@@ -21,13 +21,17 @@ const { boot, programState } = require('./harness');
 //   tough: the target survives its hits (a hit, not a kill: the bots stay the same from cast to cast and
 //   in both looks' passes of measure); away: every bot is moved far off first (an ability that goes off
 //   when one comes close stays out until its second press).
+// The default spot faces a crate 4 m ahead (z 18): shots and ground creatures cannot reach a target at z < 18
+// from it. A creature that must reach a bot before it ends (Boom Bot, Alarmbot, Trailblazer, Prowler: each vanishes at
+// its time limit without its burst) is cast down the open corridor at x = -40 instead, with the other bots
+// moved off, so the one it hunts is the target ahead and not whichever bot the boot left within reach.
 const SPOT = [0, 1.7, 22];
 const RECIPES = {
     // Duelists
     'jett.c': {}, 'jett.q': {}, 'jett.e': {}, 'jett.x': {},
     'phoenix.c': {}, 'phoenix.q': {}, 'phoenix.e': { target: [0, 20] }, 'phoenix.x': {},
     'reyna.c': { target: [0, 12] }, 'reyna.q': { orb: [1.5, 20] }, 'reyna.e': { orb: [1.5, 20] }, 'reyna.x': {},
-    'raze.c': { target: [0, 12] }, 'raze.q': {}, 'raze.e': {}, 'raze.x': { xFire: true, at: [-40, 1.7, 0], aim: [0.02, Math.PI] },
+    'raze.c': { at: [-40, 1.7, 10], aim: [-0.3, Math.PI], away: true, target: [-40, 22] }, 'raze.q': {}, 'raze.e': {}, 'raze.x': { xFire: true, at: [-40, 1.7, 0], aim: [0.02, Math.PI] },
     'yoru.c': { target: [0, 14] }, 'yoru.q': {}, 'yoru.e': { again: 1600 }, 'yoru.x': {},
     'neon.c': {}, 'neon.q': {}, 'neon.e': {}, 'neon.x': { fire: 6, fireMs: 120, target: [0, 12] },
     'iso.c': { target: [0, 14] }, 'iso.q': { target: [0, 14] }, 'iso.e': {}, 'iso.x': { target: [0, 18], aim: [-0.05, 0] },
@@ -43,14 +47,14 @@ const RECIPES = {
     // Initiators
     'sova.c': {}, 'sova.q': {}, 'sova.e': {}, 'sova.x': { xFire: true },
     'kayo.c': {}, 'kayo.q': {}, 'kayo.e': {}, 'kayo.x': {},
-    'skye.c': {}, 'skye.q': { target: [0, 12] }, 'skye.e': { again: 700 }, 'skye.x': { target: [0, 12] },
-    'fade.c': { target: [0, 13] }, 'fade.q': {}, 'fade.e': {}, 'fade.x': {},
+    'skye.c': {}, 'skye.q': { at: [-40, 1.7, 10], aim: [-0.3, Math.PI], away: true, target: [-40, 20] }, 'skye.e': { again: 700 }, 'skye.x': { target: [0, 12] },
+    'fade.c': { at: [-40, 1.7, 10], aim: [-0.3, Math.PI], away: true, target: [-40, 21] }, 'fade.q': {}, 'fade.e': {}, 'fade.x': {},
     'breach.c': {}, 'breach.q': {}, 'breach.e': {}, 'breach.x': {},
     'gekko.c': {}, 'gekko.q': { target: [0, 12] }, 'gekko.e': { target: [0, 14] }, 'gekko.x': { again: 1500 },
     'tejo.c': { again: 1500 }, 'tejo.q': {}, 'tejo.e': {}, 'tejo.x': {},
     // Sentinels
     'sage.c': {}, 'sage.q': {}, 'sage.e': {}, 'sage.x': {},
-    'killjoy.c': {}, 'killjoy.q': { target: [0, 12] }, 'killjoy.e': { target: [0, 8] }, 'killjoy.x': {},
+    'killjoy.c': {}, 'killjoy.q': { at: [-40, 1.7, 10], aim: [-0.3, Math.PI], away: true, target: [-40, 22] }, 'killjoy.e': { target: [0, 8] }, 'killjoy.x': {},
     'cypher.c': { target: [0, 16] }, 'cypher.q': {}, 'cypher.e': { target: [0, 12] }, 'cypher.x': {},
     'chamber.c': { target: [0, 14] }, 'chamber.q': { target: [0, 12], aim: [-0.08, 0] }, 'chamber.e': { again: 1600 }, 'chamber.x': { xFire: true, at: [-40, 1.7, 10], aim: [-0.02, Math.PI], target: [-40, 24], tough: true },
     'deadlock.c': {}, 'deadlock.q': { target: [0, 12] }, 'deadlock.e': {}, 'deadlock.x': { target: [0, 12], aim: [-0.08, 0] },
