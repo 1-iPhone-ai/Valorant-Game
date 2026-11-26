@@ -28043,8 +28043,10 @@
                 gw.inUse = false;
                 gw.group.visible = false;
                 soundFX.gekkoWingman();
+                abilityLook.tag = 'gekko.q';   // V2.2: Gekko's Wingman concuss (High Fidelity draws it)
                 this.spawnFlashBurst(gw.position.x, 0.85, gw.position.z, 0xfacc15, 5.8, 340, now);
                 this.spawnWindRing(gw.position.x, 0.25, gw.position.z, 0xa3e635, 5.8, now);
+                abilityLook.tag = null;
                 const rSq = AGENT_TUNING.gekko.q.radiusM * AGENT_TUNING.gekko.q.radiusM;
                 let hitCount = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
@@ -28132,8 +28134,10 @@
                     game.ultAgent = null;
                 }
                 soundFX.gekkoThrash();
+                abilityLook.tag = 'gekko.x';   // V2.2: Gekko's Thrash lunge (High Fidelity draws it)
                 this.spawnFlashBurst(gt.position.x, 1.0, gt.position.z, 0xa3e635, 7.5, 420, now);
                 this.spawnWindRing(gt.position.x, 0.3, gt.position.z, 0xa3e635, 7.8, now);
+                abilityLook.tag = null;
                 const rSq = AGENT_TUNING.gekko.x.radiusM * AGENT_TUNING.gekko.x.radiusM;
                 let detained = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
@@ -28806,8 +28810,10 @@
                 const dx = drone.position.x;
                 const dy = drone.position.y;
                 const dz = drone.position.z;
+                abilityLook.tag = 'tejo.c';   // V2.2: Tejo's Stealth Drone EMP (High Fidelity draws it)
                 this.spawnFlashBurst(dx, dy, dz, 0x38bdf8, 8.5, 420, now);
                 this.spawnWindRing(dx, 0.25, dz, 0xf59e0b, 11.0, now);
+                abilityLook.tag = null;
 
                 const nowMs = Date.now();
                 const rSq = AGENT_TUNING.tejo.c.radiusM * AGENT_TUNING.tejo.c.radiusM;
@@ -28915,7 +28921,9 @@
                     gs.ringMesh.scale.set(gs.radius, 1, gs.radius);
                     gs.group.position.copy(gs.position);
                     gs.group.visible = true;
+                    abilityLook.tag = 'tejo.e';   // V2.2: Tejo's Guided Salvo lock-on ring (High Fidelity draws its own)
                     this.spawnWindRing(tx, floorY + 0.15, tz, 0xf59e0b, 5.4, now);
+                    abilityLook.tag = null;
                 }
                 soundFX.tejoSalvo();
                 showNotification("GUIDED SALVO LOCKED — Twin Target Zones Firing 3 Autonomous Missile Pulses Each!", 2000);
@@ -28944,7 +28952,9 @@
                 ta.waveMesh.position.set(ox, 1.8, oz);
                 ta.waveMesh.rotation.y = yaw;
                 ta.group.visible = true;
+                abilityLook.tag = 'tejo.x';   // V2.2: Tejo's Armageddon call-in ring (High Fidelity draws its own)
                 this.spawnWindRing(ox, 0.25, oz, 0xf97316, 8.5, now);
+                abilityLook.tag = null;
             },
 
             // --- Waylay Prismatic Light Duelist Abilities (Saturate [C], Lightspeed [Q], Refract [E], Convergent Paths [X]) ---
@@ -30096,8 +30106,10 @@
                 const px = characterController.position.x;
                 const py = Math.max(0.1, characterController.position.y - 1.3);
                 const pz = characterController.position.z;
+                abilityLook.tag = 'kayo.x';   // V2.2: KAY/O's NULL/cmd pulse (High Fidelity draws it)
                 this.spawnWindRing(px, py, pz, 0x6366f1, 14.0, now);
                 this.spawnFlashBurst(px, py + 0.5, pz, 0x818cf8, 5.5, 340, now);
+                abilityLook.tag = null;
                 soundFX.kayoSuppress();
                 const rSq = AGENT_TUNING.kayo.x.radiusM * AGENT_TUNING.kayo.x.radiusM;
                 for (let i = 0; i < enemyObjects.length; i++) {
@@ -30122,7 +30134,9 @@
                 this.skyeRegrowthSession.ticksLeft = AGENT_TUNING.skye.c.tickCount;
                 this.skyeRegrowthSession.nextTickAt = now + AGENT_TUNING.skye.c.firstTickMs;
                 this.healFxUntil = now + 3200;
+                abilityLook.tag = 'skye.c';   // V2.2: Skye's Regrowth ring (High Fidelity draws its own)
                 this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.45), characterController.position.z, 0x4ade80, 4.8, now);
+                abilityLook.tag = null;
                 soundFX.revive();
                 showNotification("REGROWTH TRINKET ACTIVE! (+97 HP Emerald Mend + +25 Overshield)", 2000);
             },
@@ -30197,8 +30211,10 @@
                 sh.inUse = false;
                 sh.group.visible = false;
                 const p = sh.position;
+                abilityLook.tag = 'skye.e';   // V2.2: Skye's Guiding Light flash (High Fidelity draws it)
                 this.spawnFlashBurst(p.x, p.y, p.z, 0x4ade80, 5.8, 400, now);
                 this.spawnWindRing(p.x, Math.max(0.1, p.y - 0.3), p.z, 0xfef08a, 5.0, now);
+                abilityLook.tag = null;
                 soundFX.flash();
                 let blindedCount = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
@@ -34173,7 +34189,9 @@
                     if (!zb.pulsed && now >= zb.detonateAt) {
                         zb.pulsed = true;
                         soundFX.kayoSuppress();
+                        abilityLook.tag = 'kayo.e';   // V2.2: KAY/O's ZERO/point pulse (High Fidelity draws it)
                         this.spawnWindRing(zb.position.x, Math.max(0.1, zb.position.y), zb.position.z, 0x6366f1, zb.radius * 0.65, now);
+                        abilityLook.tag = null;
                         let suppressedCount = 0;
                         const rSq = zb.radius * zb.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -34207,7 +34225,9 @@
                     this.healPlayer(AGENT_TUNING.skye.c.healPerTickHp, now);
                     this.skyeRegrowthSession.ticksLeft--;
                     this.skyeRegrowthSession.nextTickAt = now + AGENT_TUNING.skye.c.tickMs;
+                    abilityLook.tag = 'skye.c';   // V2.2: Skye's Regrowth tick ring (High Fidelity draws its own)
                     this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.45), characterController.position.z, 0x4ade80, 4.2, now);
+                    abilityLook.tag = null;
                     if (this.skyeRegrowthSession.ticksLeft <= 0) {
                         this.skyeRegrowthSession.active = false;
                     }
@@ -34246,7 +34266,9 @@
                             sp.inUse = false;
                             sp.group.visible = false;
                             soundFX.skyePredator();
+                            abilityLook.tag = 'skye.q';   // V2.2: Skye's Trailblazer pounce (High Fidelity draws its blast)
                             const hitCount = this.detonateExplosionAoE(sp.position.x, sp.position.y + AGENT_TUNING.skye.q.blastHeightM, sp.position.z, AGENT_TUNING.skye.q.radiusM, AGENT_TUNING.skye.q.maxDamage, "Trailblazer", 0x4ade80, AGENT_TUNING.skye.q.revealMs, now);
+                            abilityLook.tag = null;
                             for (let j = 0; j < enemyObjects.length; j++) {
                                 const e = enemyObjects[j];
                                 if (!e.isActive || e.hit) continue;
@@ -34352,8 +34374,10 @@
                         if (dist <= AGENT_TUNING.skye.x.triggerRadiusM) {
                             ss.inUse = false;
                             ss.group.visible = false;
+                            abilityLook.tag = 'skye.x';   // V2.2: Skye's Seeker reaching its target (High Fidelity draws it)
                             this.spawnFlashBurst(ss.position.x, ss.position.y + 0.5, ss.position.z, 0x4ade80, 5.5, 420, now);
                             this.spawnWindRing(ss.position.x, ss.position.y + 0.1, ss.position.z, 0x10b981, 5.2, now);
+                            abilityLook.tag = null;
                             soundFX.skyeHawkHit();
                             for (let j = 0; j < enemyObjects.length; j++) {
                                 const e = enemyObjects[j];
@@ -34410,8 +34434,10 @@
                             fp.inUse = false;
                             fp.group.visible = false;
                             soundFX.fadeProwler();
+                            abilityLook.tag = 'fade.c';   // V2.2: Fade's Prowler bite (High Fidelity draws it)
                             this.spawnFlashBurst(fp.position.x, fp.position.y + 0.4, fp.position.z, 0xa855f7, 4.8, 360, now);
                             this.spawnWindRing(fp.position.x, fp.position.y + 0.1, fp.position.z, 0xc084fc, 4.5, now);
+                            abilityLook.tag = null;
                             for (let j = 0; j < enemyObjects.length; j++) {
                                 const e = enemyObjects[j];
                                 if (!e.isActive || e.hit) continue;
@@ -34498,7 +34524,9 @@
                     if (now >= fh.nextPulseAt) {
                         fh.nextPulseAt = now + AGENT_TUNING.fade.e.pulseIntervalMs;
                         soundFX.fadeHaunt();
+                        abilityLook.tag = 'fade.e';   // V2.2: Fade's Haunt scan ring (High Fidelity draws its own)
                         this.spawnWindRing(fh.position.x, Math.max(0.1, fh.position.y), fh.position.z, 0xa855f7, 9.5, now);
+                        abilityLook.tag = null;
                         let hauntedCount = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -34560,8 +34588,10 @@
                         ba.blastsLeft--;
                         ba.nextBlastAt = now + AGENT_TUNING.breach.c.blastIntervalMs;
                         soundFX.breachAftershock();
+                        abilityLook.tag = 'breach.c';   // V2.2: Breach's Aftershock blast (High Fidelity draws it)
                         this.spawnFlashBurst(ba.position.x, ba.position.y + 0.8, ba.position.z, 0xfb923c, ba.radius * 1.1, 320, now);
                         this.spawnWindRing(ba.position.x, ba.position.y + 0.1, ba.position.z, 0xf97316, ba.radius, now);
+                        abilityLook.tag = null;
                         const rSq = ba.radius * ba.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -34651,8 +34681,10 @@
                         rt.currentWavePos.set(wx, floorY, wz);
                         rt.group.position.copy(rt.currentWavePos);
                         soundFX.breachThunder();
+                        abilityLook.tag = 'breach.x';   // V2.2: a Rolling Thunder wave (High Fidelity's quake draws it)
                         this.spawnWindRing(wx, floorY + 0.12, wz, 0xf97316, 7.2, now);
                         this.spawnFlashBurst(wx, floorY + 0.6, wz, 0xfb923c, 5.5, 320, now);
+                        abilityLook.tag = null;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
                             if (!e.isActive || e.hit || rt.hitSet.has(e)) continue;
@@ -34788,8 +34820,10 @@
                     if (!mp.erupted && now >= mp.eruptAt) {
                         mp.erupted = true;
                         soundFX.gekkoMosh();
+                        abilityLook.tag = 'gekko.c';   // V2.2: Gekko's Mosh Pit eruption (High Fidelity draws it)
                         this.spawnFlashBurst(mp.position.x, 0.9, mp.position.z, 0xa3e635, mp.radius * 0.95, 360, now);
                         this.spawnWindRing(mp.position.x, 0.35, mp.position.z, 0xa3e635, mp.radius * 1.05, 340, now);
+                        abilityLook.tag = null;
                         let hits = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -34911,8 +34945,10 @@
                         if (targetE) {
                             gd.hitSet.add(targetE);
                             soundFX.gekkoDizzy();
+                            abilityLook.tag = 'gekko.e';   // V2.2: Gekko's Dizzy spit and its hit (High Fidelity draws them)
                             this.spawnFlashBurst(gd.position.x, gd.position.y, gd.position.z, 0x38bdf8, 2.2, 220, now);
                             this.spawnFlashBurst(targetE.mesh.position.x, targetE.mesh.position.y + 1.4, targetE.mesh.position.z, 0xa3e635, 2.8, 280, now);
+                            abilityLook.tag = null;
                             targetE.blindedUntil = Math.max(targetE.blindedUntil, now + AGENT_TUNING.gekko.e.blindMs);
                             targetE.revealedUntil = Math.max(targetE.revealedUntil, now + AGENT_TUNING.gekko.e.revealMs);
                             targetE.slowedUntil = Math.max(targetE.slowedUntil, now + AGENT_TUNING.gekko.e.slowMs);
@@ -35622,8 +35658,10 @@
                         gs.pulsesLeft--;
                         gs.nextPulseAt = now + AGENT_TUNING.tejo.e.pulseIntervalMs;
                         soundFX.tejoSalvo();
+                        abilityLook.tag = 'tejo.e';   // V2.2: a Guided Salvo strike (High Fidelity draws it)
                         this.spawnFlashBurst(gs.position.x, 0.9, gs.position.z, 0xf59e0b, gs.radius * 0.9, 320, now);
                         this.spawnWindRing(gs.position.x, 0.25, gs.position.z, 0xfbbf24, gs.radius, now);
+                        abilityLook.tag = null;
                         const rSq = gs.radius * gs.radius;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -35655,8 +35693,10 @@
                         ta.currentWavePos.set(wx, 0.2, wz);
                         ta.waveMesh.position.set(0, 1.8, distAlong);
                         soundFX.tejoArmageddon();
+                        abilityLook.tag = 'tejo.x';   // V2.2: an Armageddon bombing wave (High Fidelity draws it)
                         this.spawnFlashBurst(wx, 1.2, wz, 0xf59e0b, 6.4, 380, now);
                         this.spawnWindRing(wx, 0.3, wz, 0xef4444, 6.8, now);
+                        abilityLook.tag = null;
                         const perpX = -ta.dir.z;
                         const perpZ = ta.dir.x;
                         let hitWave = 0;
@@ -50758,6 +50798,728 @@
                 flash: { core: 0xffe0b8, glow: 'theme:breach', halo: { hex: 0xffe4c4, size: 6 }, light: { hex: 0xff8a3d, radius: 14 }, embers: { n: 16, hex: 0xff9b4a }, streaks: 1.15 }
             }
         });
+        // V2.2: the Initiators' other 22 abilities. Each creature and device is a model of its own, built
+        // from its Classic piece's shape, size and colours; pops, zones and pulses use the shared renderers.
+        // Their tags are in each ability's spawn code; the adapters only read the Classic items (and keep
+        // what they work out once per cast on the binding), and allocate nothing.
+        (function () {
+            const L = abilityLook, PI = Math.PI;
+
+            // SOVA Shroud Orb: a charged pale-blue orb, then a clean pale cloud with Sova's blue in its wisps
+            // (castSmokeProjectile: the canister and the cloud are Sova's by their colour)
+            L.defineLook('sova.c', {
+                routes: { projectile: 'projectile', smoke: 'smoke' },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xd6ecff, b: 'theme:sova', size: 0.85 },
+                        trail: [{ kind: 'glow', hex: 0x7cc4ff, life: 0.3, s0: 0.28, s1: 0.05, a0: 0.75, drag: 0, grav: 0 },
+                            { kind: 'smoke', hex: 0xb9c6cf, life: 0.7, s0: 0.1, s1: 0.32, a0: 0.28, drag: 1.4, grav: -0.2, jx: 0.3, jy: 0.3, jz: 0.3 }] },
+                    smoke: { preset: 'pale', body: 0x9fb4c8, wisp: 'theme:sova' }
+                }
+            });
+
+            // KAY/O FLASH/drive: a modelled flash canister, then an indigo-white pop (the shared flash detonation)
+            L.defineModel('kayo.flashdrive', {
+                count: 2,
+                mats: { body: { color: 0xd1d5db, rough: 0.35, metal: 0.7 }, dark: { color: 0x1f2330, rough: 0.5, metal: 0.5 }, glow: { glow: 0xa5b4fc } },
+                parts: [
+                    { shape: 'cyl', size: [0.065, 0.065, 0.19], seg: 12, rot: [PI / 2, 0, 0], mat: 'body' },
+                    { shape: 'cyl', size: [0.07, 0.07, 0.03], seg: 12, at: [0, 0, 0.075], rot: [PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'cyl', size: [0.07, 0.07, 0.03], seg: 12, at: [0, 0, -0.075], rot: [PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'torus', size: [0.067, 0.011], seg: [6, 18], mat: 'glow' },
+                    { shape: 'cyl', size: [0.028, 0.04, 0.05], seg: 8, at: [0, 0, 0.115], rot: [PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'sphere', size: [0.022], seg: [8, 6], at: [0, 0, 0.142], mat: 'glow' }
+                ]
+            });
+            L.defineLook('kayo.q', {
+                routes: { projectile: 'projectile', flash: 'flash' },
+                styles: {
+                    projectile: { model: 'kayo.flashdrive', spin: { axis: 'x', rate: 10 },
+                        trail: [{ kind: 'spark', hex: 0xc7d2fe, life: 0.22, s0: 0.04, s1: 0.012, a0: 1, drag: 2, grav: 2, jx: 1, jy: 1, jz: 1 },
+                            { kind: 'glow', at: 'pos', hex: 0x818cf8, life: 0.16, s0: 0.22, s1: 0.04, a0: 0.55, drag: 0, grav: 0 }] },
+                    flash: { core: 0x818cf8, glow: 0x4338ca, coreSize: 1.05, streaks: 1.1, halo: { hex: 0x818cf8, size: 6.5 }, light: { hex: 0x6366f1, radius: 14 }, embers: { n: 18, hex: 0x818cf8 } }
+                }
+            });
+
+            // KAY/O ZERO/point: a thrown knife (tumbling), then the blade stuck where it landed (its light blinking
+            // through the windup) and its suppression pulse: one Classic item, two renderers
+            L.defineModel('kayo.blade', {
+                count: 2,
+                mats: { steel: { color: 0xcfd4dd, rough: 0.2, metal: 0.95 }, grip: { color: 0x1f2330, rough: 0.6, metal: 0.4 }, edge: { glow: 0x818cf8 } },
+                parts: [
+                    { shape: 'cone', size: [0.045, 0.36], seg: 4, at: [0, 0, 0.2], rot: [PI / 2, 0, 0], scale: [1, 1, 0.3], mat: 'steel' },   // the blade, flat
+                    { shape: 'rbox', size: [0.12, 0.024, 0.028], radius: 0.01, seg: 2, at: [0, 0, 0.012], mat: 'grip' },                      // the guard
+                    { shape: 'torus', size: [0.03, 0.007], seg: [6, 14], mat: 'edge' },                                                       // a lit collar
+                    { shape: 'cyl', size: [0.018, 0.021, 0.15], seg: 8, at: [0, 0, -0.07], rot: [PI / 2, 0, 0], mat: 'grip' },                // the grip
+                    { shape: 'sphere', size: [0.026], seg: [8, 6], at: [0, 0, -0.155], mat: 'edge' }                                          // the pommel
+                ]
+            });
+            L.defineModel('kayo.bladeStuck', {
+                count: 2,
+                mats: { steel: { color: 0xcfd4dd, rough: 0.2, metal: 0.95 }, grip: { color: 0x1f2330, rough: 0.6, metal: 0.4 }, edge: { glow: 0x818cf8 }, light: { light: 0x818cf8 } },
+                groups: { turn: { at: [0, 0, 0], role: 'spin', axis: 'y', rate: 2.6 } },
+                parts: [
+                    { group: 'turn', shape: 'cone', size: [0.09, 0.7], seg: 4, at: [0, -0.12, 0], rot: [PI, 0, 0], scale: [1, 1, 0.3], mat: 'steel' },   // point down, where the Classic 0.85 m cone is
+                    { group: 'turn', shape: 'rbox', size: [0.23, 0.045, 0.05], radius: 0.015, seg: 2, at: [0, 0.245, 0], mat: 'grip' },
+                    { group: 'turn', shape: 'torus', size: [0.055, 0.012], seg: [6, 14], at: [0, 0.245, 0], rot: [PI / 2, 0, 0], mat: 'edge' },
+                    { group: 'turn', shape: 'cyl', size: [0.03, 0.035, 0.26], seg: 8, at: [0, 0.4, 0], mat: 'grip' },
+                    { group: 'turn', shape: 'sphere', size: [0.048], seg: [10, 8], at: [0, 0.55, 0], mat: 'light' }                                     // its status light
+                ]
+            });
+            L.defineLook('kayo.e', {
+                routes: {
+                    projectile: 'projectile',
+                    zeroPointBlades: [
+                        { renderer: 'deployable', adapt: function (P, zb) {
+                            P.x = zb.position.x; P.y = zb.position.y; P.z = zb.position.z; P.yaw = 0; P.headYaw = NaN;
+                            P.start = zb.startAt; P.alert = !zb.pulsed; P.remain = zb.pulsed ? 1e9 : 0; P.fade = 1;   // blinking (alert) through the windup
+                        } },
+                        { renderer: 'pulse', adapt: function (P, zb, now) {
+                            P.shape = 1; P.x = zb.position.x; P.y = zb.position.y; P.z = zb.position.z; P.R = zb.radius;
+                            const t = now - zb.detonateAt;
+                            P.charge = t < 0 ? Math.min(1, (now - zb.startAt) / Math.max(1, zb.detonateAt - zb.startAt)) : Math.max(0, 1 - t / 300);
+                            P.front = t >= 0 && t <= 650 ? t / 650 : -1;   // the Classic sphere's 650 ms sweep
+                            P.after = Math.max(0, t) * 0.001;
+                            const rem = zb.expireAt - now;
+                            P.fade = rem < 300 ? Math.max(0, rem / 300) : 1;
+                            P.wave = zb.detonateAt;
+                        } }
+                    ],
+                    ring: 'absorb'   // the pulse's ring (step 2V): the pulse draws it
+                },
+                styles: {
+                    projectile: { model: 'kayo.blade', spin: { axis: 'x', rate: 16 },
+                        trail: [{ kind: 'spark', hex: 0xa5b4fc, life: 0.2, s0: 0.035, s1: 0.01, a0: 1, drag: 2, grav: 1, jx: 0.8, jy: 0.8, jz: 0.8 },
+                            { kind: 'glow', at: 'pos', hex: 0x6366f1, life: 0.14, s0: 0.2, s1: 0.04, a0: 0.5, drag: 0, grav: 0 }] },
+                    deployable: { preset: 'device', model: 'kayo.bladeStuck', unfoldMs: 0, lights: [0x818cf8, 0xe0e7ff, 0xffffff], lightY: 0.5, lightRadius: 2.6, lightK: 0.7, dust: { hex: 0x8d8579, n: 6 },
+                        emit: { every: 45, spec: { kind: 'spark', hex: 0xa5b4fc, n: 2, life: 0.25, s0: 0.04, s1: 0.01, a0: 1, drag: 2, jitter: 3 } } },   // crackling while it is out
+                    pulse: { preset: 'sonar', colA: 'theme:kayo', colB: 0xe0e7ff, shellA: 0x4f46e5, shellB: 0x312e81, ring: 0x818cf8, eruptLight: 0x818cf8 }
+                }
+            });
+
+            // KAY/O NULL/cmd: the ultimate (a timer) as an indigo shimmer at the screen's edge, sparks round the
+            // body and a glow seen from outside; each 2.5 s pulse (and the revive's burst, tagged by
+            // tryPhoenixRebirth) as a scan sphere of its 24 m reach, over the burst's own life
+            L.addTimer('kayoNullCmd', { until: function () { return game.ultAgent === 'kayo' ? game.ultActiveUntil : 0; }, key: 'kayo.x' });
+            L.defineLook('kayo.x', {
+                routes: {
+                    flash: { renderer: 'pulse', adapt: function (P, f, now) {
+                        P.shape = 1; P.x = f.position.x; P.y = f.position.y; P.z = f.position.z; P.R = AGENT_TUNING.kayo.x.radiusM;
+                        const t = now - f.startAt;
+                        P.front = Math.min(1, t / Math.max(1, f.expireAt - f.startAt));
+                        P.after = t * 0.001; P.charge = Math.max(0, 1 - t / 220); P.fade = 1; P.wave = f.startAt;
+                    } },
+                    ring: 'absorb',
+                    kayoNullCmd: { renderer: 'self', adapt: 'timer' }
+                },
+                styles: {
+                    pulse: { preset: 'sonar', colA: 'theme:kayo', colB: 0xe0e7ff, shellA: 0x4f46e5, shellB: 0x1e1b4b, ring: 0x818cf8, eruptLight: 0x6366f1 },
+                    self: { edge: { colA: 0x4f46e5, colB: 0x818cf8, shimmer: true, k: 0.18 }, aura: { colA: 0x6366f1, colB: 0xa5b4fc, w: 1.2, h: 2.1 },
+                        motes: { every: 110, spec: { kind: 'spark', hex: 0xa5b4fc, n: 2, life: 0.4, s0: 0.05, s1: 0.015, a0: 1, drag: 1.5, jitter: 2.5 } } }
+                }
+            });
+
+            // SKYE Regrowth: the heal session as green light round you (motes rising, a glow seen from outside,
+            // the off-hand lit on the cast gesture), and each of its rings (the cast's and each tick's) a small
+            // green wave out from your feet over the ring's own 420 ms, as wide as the Classic ring
+            L.defineLook('skye.c', {
+                routes: {
+                    skyeRegrowthSession: { renderer: 'self', adapt: 'session' },
+                    ring: { renderer: 'pulse', adapt: function (P, w, now) {
+                        const m = w.mesh.position, t = now - w.startAt;
+                        P.shape = 1; P.x = m.x; P.y = m.y; P.z = m.z; P.R = w.maxScale;
+                        P.front = Math.min(1, t / Math.max(1, w.expireAt - w.startAt)); P.after = t * 0.001; P.charge = 0;
+                        P.fade = 0.6 * (1 - P.front * 0.6); P.wave = w.startAt;   // soft: seven of them in 3 s, passing through you
+                    } }
+                },
+                styles: {
+                    self: { hand: { mode: 2, color: 0x86efac, scale: 0.6 }, aura: { colA: 0x22c55e, colB: 0xd9f99d, w: 1.3, h: 2.1 },
+                        motes: { every: 80, spec: { kind: 'glow', hex: 0x86efac, n: 2, life: 1.0, s0: 0.09, s1: 0.02, a0: 0.9, drag: 1.2, up: 1.1, jitter: 0.5 } } },
+                    pulse: { preset: 'sonar', colA: 0x4ade80, colB: 0xecfccb, shellA: 0x22c55e, shellB: 0x14532d, ring: 0x86efac, eruptLight: 0x15803d }
+                }
+            });
+
+            // SKYE Trailblazer: a lean green beast bounding over the floor (its eyes lit, leaves of light behind
+            // it), then the pounce: a concussive green blast (detonateExplosionAoE: its flash and ring)
+            (function () {
+                const parts = [
+                    { shape: 'rbox', size: [0.34, 0.3, 0.74], radius: 0.12, seg: 3, at: [0, 0.48, -0.04], mat: 'fur' },             // the body
+                    { shape: 'rbox', size: [0.3, 0.3, 0.3], radius: 0.12, seg: 3, at: [0, 0.52, 0.28], mat: 'fur' },                // the chest
+                    { shape: 'rbox', size: [0.24, 0.21, 0.28], radius: 0.08, seg: 3, at: [0, 0.62, 0.5], mat: 'fur' },              // the head
+                    { shape: 'rbox', size: [0.15, 0.11, 0.17], radius: 0.045, seg: 2, at: [0, 0.57, 0.67], mat: 'fur' },            // the muzzle
+                    { shape: 'cone', size: [0.055, 0.15], seg: 4, at: [0.08, 0.78, 0.45], rot: [-0.3, 0, -0.25], mat: 'fur' },      // the ears
+                    { shape: 'cone', size: [0.055, 0.15], seg: 4, at: [-0.08, 0.78, 0.45], rot: [-0.3, 0, 0.25], mat: 'fur' },
+                    { shape: 'sphere', size: [0.028], seg: [8, 6], at: [0.065, 0.655, 0.635], mat: 'eye' },                          // the eyes (its light)
+                    { shape: 'sphere', size: [0.028], seg: [8, 6], at: [-0.065, 0.655, 0.635], mat: 'eye' },
+                    { shape: 'box', size: [0.05, 0.025, 0.66], at: [0, 0.64, -0.02], mat: 'glow' },                                  // a glowing stripe down the back
+                    { shape: 'cone', size: [0.06, 0.48], seg: 6, at: [0, 0.62, -0.58], rot: [-(PI / 2 - 0.5), 0, 0], mat: 'fur' }    // the tail, up and back
+                ];
+                for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+                    parts.push({ shape: 'rbox', size: [0.09, 0.38, 0.1], radius: 0.035, seg: 2, at: [sx * 0.12, 0.2, sz * 0.25], rot: [sz * 0.3, 0, 0], mat: 'fur' });   // the legs, mid-bound
+                }
+                L.defineModel('skye.trailblazer', {
+                    count: 2,
+                    mats: { fur: { color: 0x1f7a3c, rough: 0.7, metal: 0.05, emissive: 0x062e14 }, glow: { glow: 0xbef264 }, eye: { light: 0xd9f99d } },
+                    groups: { base: { at: [0, 0, 0], role: 'bob', amp: 0.07, rate: 3.2 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('skye.q', {
+                routes: {
+                    skyePredators: { renderer: 'deployable', adapt: function (P, sp, now) {
+                        P.x = sp.position.x; P.y = sp.position.y; P.z = sp.position.z; P.yaw = Math.atan2(sp.velocity.x, sp.velocity.z); P.headYaw = NaN;
+                        P.start = sp.startAt; P.remain = sp.expireAt - now; P.alert = false; P.fade = 1;
+                    } },
+                    flash: 'blast', ring: 'absorb'   // the pounce (detonateExplosionAoE): its flash is the blast, its ring the blast's
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'skye.trailblazer', unfoldMs: 0, lights: [0xd9f99d, 0xfef08a, 0xffffff], lightY: 0.5, lightRadius: 2.2, lightK: 0.4, blinkMs: 500,
+                        dust: { hex: 0x6b7a5a, n: 6 }, emit: { every: 70, spec: { kind: 'glow', hex: 0x86efac, n: 1, life: 0.7, s0: 0.1, s1: 0.02, a0: 0.85, drag: 1.4, up: 0.5, jitter: 0.6 } } },
+                    blast: { preset: 'concussive', aoe: true, coreA: 0xdcfce7, coreB: 0x22c55e, shellA: 0x86efac, shellB: 0x15803d, ringB: 0x4ade80,
+                        sparks: { n: 16, hex: 0xbbf7d0 }, dust: { n: 16, hex: 0x6b7a5a, s1: 2.0 }, smoke: { n: 4, hex: 0x3d4a3a, k: 0.35 }, halo: 0xdcfce7, light: 0x4ade80, shake: 1.0, scorch: null }
+                }
+            });
+
+            // SKYE Guiding Light: a hawk of light on the Classic one's path (a green-gold trail), then the flash
+            // where it bursts (detonateSkyeHawk: its flash and ring)
+            L.defineModel('skye.hawk', {
+                count: 2,
+                mats: { plume: { glow: 0x4ade80 }, wing: { glow: 0xbbf7d0 }, gold: { glow: 0xfde047 } },
+                parts: [
+                    { shape: 'sphere', size: [0.1], seg: [12, 8], scale: [0.85, 0.75, 2.2], mat: 'plume' },                                         // the body
+                    { shape: 'sphere', size: [0.072], seg: [10, 8], at: [0, 0.035, 0.22], mat: 'plume' },                                          // the head
+                    { shape: 'cone', size: [0.028, 0.09], seg: 6, at: [0, 0.02, 0.32], rot: [PI / 2, 0, 0], mat: 'gold' },                         // the beak
+                    { shape: 'rbox', size: [0.6, 0.02, 0.2], radius: 0.008, seg: 1, at: [0.32, 0.04, -0.03], rot: [0, 0.35, 0.18], mat: 'wing' },   // the wings, swept back
+                    { shape: 'rbox', size: [0.6, 0.02, 0.2], radius: 0.008, seg: 1, at: [-0.32, 0.04, -0.03], rot: [0, -0.35, -0.18], mat: 'wing' },
+                    { shape: 'rbox', size: [0.18, 0.022, 0.12], radius: 0.008, seg: 1, at: [0.6, 0.095, -0.14], rot: [0, 0.5, 0.18], mat: 'gold' },  // gold tips
+                    { shape: 'rbox', size: [0.18, 0.022, 0.12], radius: 0.008, seg: 1, at: [-0.6, 0.095, -0.14], rot: [0, -0.5, -0.18], mat: 'gold' },
+                    { shape: 'cone', size: [0.1, 0.24], seg: 3, at: [0, 0.01, -0.3], rot: [PI / 2, 0, 0], scale: [1, 1, 0.22], mat: 'wing' }        // the tail fan
+                ]
+            });
+            L.defineLook('skye.e', {
+                routes: {
+                    skyeHawks: { renderer: 'projectile', adapt: function (P, sh, now) {
+                        P.x = sh.position.x; P.y = sh.position.y; P.z = sh.position.z;
+                        P.vx = sh.velocity.x; P.vy = sh.velocity.y; P.vz = sh.velocity.z; P.age = (now - sh.startAt) * 0.001;
+                    } },
+                    flash: 'flash', ring: 'absorb'
+                },
+                styles: {
+                    projectile: { model: 'skye.hawk', trailMs: 24,
+                        trail: [{ kind: 'glow', hex: 0x86efac, life: 0.42, s0: 0.3, s1: 0.04, a0: 0.75, drag: 0.5, grav: 0, jx: 0.3, jy: 0.3, jz: 0.3 },
+                            { kind: 'spark', at: 'pos', hex: 0xfef08a, life: 0.5, s0: 0.05, s1: 0.012, a0: 1, drag: 1.2, grav: -0.5, jx: 1.2, jy: 1.2, jz: 1.2 }] },
+                    flash: { core: 0x4ade80, glow: 0x15803d, coreSize: 1.0, streaks: 1.0, halo: { hex: 0xbef264, size: 6.5 }, light: { hex: 0x4ade80, radius: 14 }, embers: { n: 20, hex: 0xfde047 } }
+                }
+            });
+
+            // SKYE Seekers: three emerald seeds of light hovering after their prey (petals turning round a lit
+            // core, tendrils trailing), then a green flash where each one catches it (step 2AA: flash and ring;
+            // the Classic ring stays drawn, as it marks the hit's reach)
+            (function () {
+                const petal = (a) => function () {
+                    const g = new THREE.ConeGeometry(0.1, 0.34, 5);
+                    g.scale(1, 1, 0.35); g.translate(0, 0.17, 0); g.rotateX(0.62); g.translate(0, -0.06, 0.1); g.rotateY(a);
+                    return g;
+                };
+                const tendril = (a) => function () {
+                    const g = new THREE.ConeGeometry(0.02, 0.42, 5);
+                    g.rotateX(PI); g.translate(0, -0.3, 0); g.rotateZ(0.15); g.translate(0.06, 0, 0); g.rotateY(a);
+                    return g;
+                };
+                const parts = [{ group: 'turn', shape: 'sphere', size: [0.055], seg: [10, 8], at: [0, 0.17, 0], mat: 'leaf' }];
+                for (let k = 0; k < 3; k++) {
+                    parts.push({ group: 'turn', geometry: petal(k * PI * 2 / 3), mat: 'leaf' });
+                    parts.push({ group: 'turn', geometry: tendril(k * PI * 2 / 3 + PI / 3), mat: 'leaf' });
+                }
+                parts.push({ shape: 'sphere', size: [0.13], seg: [14, 10], mat: 'core' });   // the core (its light)
+                L.defineModel('skye.seeker', {
+                    count: 3,
+                    mats: { leaf: { glow: 0x10b981 }, core: { light: 0xbbf7d0 } },
+                    groups: { turn: { at: [0, 0, 0], role: 'spin', axis: 'y', rate: 2.4 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('skye.x', {
+                routes: {
+                    skyeSeekers: { renderer: 'deployable', adapt: function (P, ss, now) {
+                        P.x = ss.position.x; P.y = ss.position.y; P.z = ss.position.z; P.yaw = Math.atan2(ss.velocity.x, ss.velocity.z); P.headYaw = NaN;
+                        P.start = ss.startAt; P.remain = ss.expireAt - now; P.alert = !!ss.targetEnemy; P.fade = 1;
+                    } },
+                    flash: 'flash', ring: { renderer: 'absorb', keep: ['mesh'] }   // its ring stays drawn: the 5.5 m reach of the hit (the pop does not draw it)
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'skye.seeker', unfoldMs: 0, lights: [0xbbf7d0, 0xecfccb, 0xffffff], lightY: 0, lightRadius: 2.4, lightK: 0.45, blinkMs: 600, dust: null,
+                        emit: { every: 90, spec: { kind: 'glow', hex: 0x34d399, n: 1, life: 0.8, s0: 0.1, s1: 0.02, a0: 0.8, drag: 1.2, jitter: 0.4, grav: 0.6 } } },
+                    flash: { core: 0x34d399, glow: 0x047857, coreSize: 0.9, streaks: 0.9, halo: { hex: 0x6ee7b7, size: 5.5 }, light: { hex: 0x10b981, radius: 12 }, embers: { n: 16, hex: 0x34d399 } }
+                }
+            });
+
+            // FADE Prowler: a dark, low hunting beast (spines down its back, violet eyes) trailing shadow, then the
+            // bite: a violet-black pop (step 2BB: its flash and ring; the Classic ring stays drawn, as it marks the
+            // bite's reach)
+            (function () {
+                const parts = [
+                    { shape: 'rbox', size: [0.3, 0.26, 0.78], radius: 0.1, seg: 3, at: [0, 0.44, -0.04], mat: 'hide' },                       // the body
+                    { shape: 'rbox', size: [0.34, 0.32, 0.32], radius: 0.12, seg: 3, at: [0, 0.48, 0.26], mat: 'hide' },                      // the shoulders
+                    { shape: 'rbox', size: [0.22, 0.17, 0.32], radius: 0.06, seg: 2, at: [0, 0.42, 0.52], rot: [0.28, 0, 0], mat: 'hide' },   // the head, held low
+                    { shape: 'rbox', size: [0.17, 0.05, 0.22], radius: 0.02, seg: 2, at: [0, 0.32, 0.6], rot: [0.12, 0, 0], mat: 'hide' },    // the jaw
+                    { shape: 'sphere', size: [0.026], seg: [8, 6], at: [0.065, 0.455, 0.66], mat: 'eye' },                                     // the eyes (its light)
+                    { shape: 'sphere', size: [0.026], seg: [8, 6], at: [-0.065, 0.455, 0.66], mat: 'eye' },
+                    { shape: 'cone', size: [0.035, 0.66], seg: 6, at: [0, 0.5, -0.72], rot: [-PI / 2 + 0.25, 0, 0], mat: 'hide' }              // the tail, low
+                ];
+                for (let k = 0; k < 5; k++) parts.push({ shape: 'cone', size: [0.035, 0.2 - k * 0.025], seg: 4, at: [0, 0.64 - k * 0.025, 0.28 - k * 0.16], rot: [-0.55, 0, 0], mat: 'spine' });
+                for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push({ shape: 'rbox', size: [0.07, 0.38, 0.08], radius: 0.03, seg: 2, at: [sx * 0.13, 0.19, sz * 0.26], rot: [-sz * 0.25, 0, 0], mat: 'hide' });
+                L.defineModel('fade.prowler', {
+                    count: 2,
+                    mats: { hide: { color: 0x030106, rough: 0.3, metal: 0.55 }, spine: { glow: 0x7e22ce }, eye: { light: 0xe9d5ff } },   // kit colours are linear: near black
+                    groups: { base: { at: [0, 0, 0], role: 'bob', amp: 0.045, rate: 2.6 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('fade.c', {
+                routes: {
+                    fadeProwlers: { renderer: 'deployable', adapt: function (P, fp, now) {
+                        P.x = fp.position.x; P.y = fp.position.y; P.z = fp.position.z; P.yaw = Math.atan2(fp.velocity.x, fp.velocity.z); P.headYaw = NaN;
+                        P.start = fp.startAt; P.remain = fp.expireAt - now; P.alert = false; P.fade = 1;
+                    } },
+                    flash: 'flash', ring: { renderer: 'absorb', keep: ['mesh'] }   // its ring stays drawn: the 4.6 m reach of the bite (the pop does not draw it)
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'fade.prowler', unfoldMs: 0, lights: [0xd8b4fe, 0xf0abfc, 0xffffff], lightK: 0, blinkMs: 500,
+                        dust: { hex: 0x2e1065, n: 8 }, emit: { every: 60, spec: { kind: 'smoke', hex: 0x1e0b33, n: 1, life: 0.9, s0: 0.22, s1: 0.65, a0: 0.5, drag: 1.6, up: 0.35, jitter: 0.3 } } },
+                    flash: { core: 0xa855f7, glow: 0x4c1d95, coreSize: 0.85, streaks: 0.8, halo: { hex: 0xa855f7, size: 5 }, light: { hex: 0xa855f7, radius: 11 }, embers: { n: 14, hex: 0x7e22ce } }
+                }
+            });
+
+            // FADE Seize: a dark orb, then a nightmare vortex on the floor (its arms turning in to a dark core)
+            L.defineLook('fade.q', {
+                routes: { projectile: 'projectile', fadeSeizeZones: { renderer: 'groundZone', adapt: 'slowZones' }, ring: 'absorb' },
+                styles: {
+                    projectile: { orb: { style: 1, a: 0x12041f, b: 'theme:fade', size: 0.62, blend: 'normal' },
+                        trail: [{ kind: 'smoke', hex: 0x2e1065, life: 0.8, s0: 0.18, s1: 0.55, a0: 0.5, drag: 1.5, grav: -0.15, jx: 0.35, jy: 0.35, jz: 0.35 },
+                            { kind: 'glow', hex: 0xc084fc, life: 0.22, s0: 0.2, s1: 0.04, a0: 0.6, drag: 0, grav: 0 }] },
+                    groundZone: { preset: 'vortex', colA: 0x6d28d9, colB: 0xf0abfc,
+                        emit: { every: 140, spec: { kind: 'smoke', hex: 0x1e0b33, n: 1, life: 1.3, s0: 0.3, s1: 0.9, a0: 0.42, drag: 1.2, up: 0.45, jitter: 0.3, grav: -0.1 } } }
+                }
+            });
+
+            // FADE Haunt: a dark orb, then a watching eye hanging where it burst (turning to the nearest bot in its
+            // reach, else to you; its slit iris lit on each scan) and each 850 ms scan as a violet sphere of its
+            // 30 m reach: one Classic item, two renderers
+            (function () {
+                const parts = [
+                    { group: 'head', shape: 'sphere', size: [0.22], seg: [18, 14], mat: 'orb' },                                         // the eyeball
+                    { group: 'head', shape: 'sphere', size: [0.13], seg: [16, 10], at: [0, 0, 0.185], scale: [1, 1, 0.3], mat: 'iris' },   // the iris (its light)
+                    { group: 'head', shape: 'sphere', size: [0.06], seg: [10, 8], at: [0, 0, 0.222], scale: [0.35, 1, 0.25], mat: 'dark' } // a slit pupil
+                ];
+                for (let k = 0; k < 8; k++) {
+                    const b = k * PI / 4;
+                    parts.push({ group: 'head', shape: 'cone', size: [0.024, 0.15], seg: 4, at: [Math.cos(b) * 0.25, Math.sin(b) * 0.25, 0.07], rot: [0, 0, b - PI / 2], mat: 'dark' });   // thorns round the eye
+                }
+                L.defineModel('fade.eye', {
+                    count: 2,
+                    mats: { orb: { color: 0x170a22, rough: 0.2, metal: 0.3, emissive: 0x08020e }, dark: { color: 0x07030c, rough: 0.5, metal: 0.2 }, iris: { light: 0xc084fc } },
+                    groups: { head: { at: [0, 0, 0], role: 'head' } },   // it turns to what it watches
+                    parts: parts
+                });
+            })();
+            L.defineLook('fade.e', {
+                routes: {
+                    projectile: 'projectile',
+                    fadeHaunts: [
+                        { renderer: 'deployable', adapt: function (P, fh, now) {
+                            P.x = fh.position.x; P.y = fh.position.y; P.z = fh.position.z; P.yaw = 0;
+                            // it watches the nearest bot in its reach (the ones it reveals), else the viewer, sweeping
+                            let best = AGENT_TUNING.fade.e.rangeM * AGENT_TUNING.fade.e.rangeM, tx = camera.position.x, tz = camera.position.z;
+                            for (let i = 0; i < enemyObjects.length; i++) {
+                                const e = enemyObjects[i];
+                                if (!e.isActive || e.hit) continue;
+                                const dx = e.mesh.position.x - fh.position.x, dz = e.mesh.position.z - fh.position.z, d = dx * dx + dz * dz;
+                                if (d < best) { best = d; tx = e.mesh.position.x; tz = e.mesh.position.z; }
+                            }
+                            P.headYaw = Math.atan2(tx - fh.position.x, tz - fh.position.z);
+                            const rem = fh.expireAt - now;
+                            P.start = fh.startAt; P.remain = rem; P.alert = now - (fh.nextPulseAt - AGENT_TUNING.fade.e.pulseIntervalMs) < 260;   // lit up on each scan
+                            P.fade = rem < 400 ? Math.max(0.01, rem / 400) : Math.min(1, 0.3 + (now - fh.startAt) / 250);   // opens, then closes as it ends
+                        } },
+                        { renderer: 'pulse', adapt: function (P, fh, now) {
+                            const t = now - (fh.nextPulseAt - AGENT_TUNING.fade.e.pulseIntervalMs);   // since the last scan
+                            P.shape = 1; P.x = fh.position.x; P.y = fh.position.y; P.z = fh.position.z; P.R = AGENT_TUNING.fade.e.rangeM;
+                            P.front = t >= 0 && t <= 700 ? t / 700 : -1; P.after = Math.max(0, t) * 0.001; P.charge = 0.4;
+                            const rem = fh.expireAt - now;
+                            P.fade = rem < 400 ? Math.max(0, rem / 400) : 1;
+                            P.wave = fh.nextPulseAt;
+                        } }
+                    ],
+                    ring: 'absorb'   // each scan's ring (step 2DD): the pulse draws it
+                },
+                styles: {
+                    projectile: { orb: { style: 1, a: 0x1a0b2e, b: 0xc084fc, size: 0.5, blend: 'normal' },
+                        trail: [{ kind: 'smoke', hex: 0x2e1065, life: 0.6, s0: 0.14, s1: 0.45, a0: 0.45, drag: 1.5, grav: -0.15, jx: 0.3, jy: 0.3, jz: 0.3 },
+                            { kind: 'glow', hex: 0xe9d5ff, life: 0.2, s0: 0.18, s1: 0.03, a0: 0.6, drag: 0, grav: 0 }] },
+                    deployable: { preset: 'device', model: 'fade.eye', unfoldMs: 0, scan: 0.6, idleRate: 2.2, trackRate: 6, lights: [0xc084fc, 0xf5d0fe, 0xffffff], lightY: -0.35, lightRadius: 3, lightK: 0.4, blinkMs: 0, dust: null,
+                        emit: { every: 120, spec: { kind: 'smoke', hex: 0x1e0b33, n: 1, life: 1.1, s0: 0.15, s1: 0.5, a0: 0.4, drag: 1.4, grav: 0.4, jitter: 0.3 } } },
+                    pulse: { preset: 'sonar', colA: 'theme:fade', colB: 0xf3e8ff, shellA: 0x9333ea, shellB: 0x3b0764, ring: 0xc084fc, eruptLight: 0xa855f7 }
+                }
+            });
+
+            // FADE Nightfall: the wave's body as a dark rolling curtain on the Classic 10.5 x 3.2 m box, over a
+            // violet quake front sweeping the corridor it crosses (from where it set out, kept for the cast, to
+            // 26 m/s x 1.85 s along its direction): one Classic item, two renderers
+            L.defineLook('fade.x', {
+                routes: {
+                    fadeNightfallWave: [{ renderer: 'wall', adapt: function (P, nw, now) {
+                        const a = P.panels[0];
+                        P.n = 1;
+                        a.x = nw.position.x; a.y = nw.position.y + 1.6; a.z = nw.position.z; a.sx = 10.5; a.sy = 3.2; a.sz = 0.65; a.yaw = nw.group.rotation.y; a.shape = 'box';
+                        P.start = nw.startAt; P.maxHealth = 0;
+                        const rem = nw.expireAt - now;
+                        P.fade = rem < 400 ? Math.max(0, rem / 400) : 1;   // the Classic fade
+                    } }, { renderer: 'pulse', adapt: function (P, nw, now, b) {
+                        const T = AGENT_TUNING.fade.x, len = T.speedMps * T.lifetimeMs * 0.001;
+                        if (b.nfAt !== nw.startAt) {
+                            b.nfAt = nw.startAt;
+                            const back = T.speedMps * Math.max(0, now - nw.startAt) * 0.001;
+                            b.nfX = nw.position.x - nw.direction.x * back; b.nfY = nw.position.y; b.nfZ = nw.position.z - nw.direction.z * back;
+                        }
+                        P.shape = 0; P.sx = b.nfX; P.sy = b.nfY; P.sz = b.nfZ;
+                        P.ex = b.nfX + nw.direction.x * len; P.ez = b.nfZ + nw.direction.z * len; P.W = 10.5; P.H = 3.4;
+                        const along = (nw.position.x - b.nfX) * nw.direction.x + (nw.position.z - b.nfZ) * nw.direction.z;
+                        P.charge = 0; P.front = Math.max(0, Math.min(1, along / len)); P.after = (now - nw.startAt) * 0.001;
+                        const rem = nw.expireAt - now;
+                        P.fade = rem < 400 ? Math.max(0, rem / 400) : 1;   // the Classic fade
+                        P.wave = nw.startAt;
+                    } }]
+                },
+                styles: {
+                    wall: { preset: 'gas', colA: 0x050109, colB: 0x581c87, floor: -1,
+                        emit: { every: 50, spec: { kind: 'smoke', hex: 0x12051f, n: 3, life: 1.1, s0: 0.5, s1: 1.4, a0: 0.5, drag: 1.4, up: 0.4, jitter: 0.6, grav: -0.1 } } },
+                    pulse: { preset: 'quake', colA: 0x7e22ce, colB: 0xe9d5ff, eruptLight: 0xa855f7, shake: 0.35, dust: 0x2e1065, sparks: 0xc084fc }
+                }
+            });
+
+            // BREACH Aftershock: the charge planted through the wall as a hot field on the floor (embers rising),
+            // then its three blasts (step 2FF: a flash and a ring each)
+            L.defineLook('breach.c', {
+                routes: {
+                    breachAftershocks: { renderer: 'groundZone', adapt: function (P, ba, now) {
+                        P.x = ba.position.x; P.y = ba.position.y; P.z = ba.position.z; P.r = ba.radius; P.rect = 0; P.yaw = 0;
+                        P.start = ba.startAt; P.end = ba.expireAt; P.age = (now - ba.startAt) * 0.001;
+                        const rem = ba.expireAt - now;
+                        P.fade = (rem < 350 ? Math.max(0, rem / 350) : 1) * Math.min(1, P.age * 5);   // the Classic fade
+                    } },
+                    flash: 'blast', ring: 'absorb'
+                },
+                styles: {
+                    groundZone: { preset: 'field', colA: 0xea580c, colB: 0xfed7aa,
+                        emit: { every: 60, spec: { kind: 'ember', hex: 0xfdba74, n: 2, life: 0.7, s0: 0.06, s1: 0.02, a0: 1, drag: 0.6, up: 3, jitter: 0.8, grav: -1 } } },
+                    blast: { preset: 'concussive', rScale: 1 / 1.1, coreA: 0xffedd5, coreB: 'theme:breach', shellA: 0xf97316, shellB: 0x9a3412, ringB: 0xfb923c,
+                        sparks: { n: 14, hex: 0xfdba74 }, dust: { n: 16, hex: 0x8a7a68, s1: 2.0 }, smoke: { n: 4, hex: 0x6b6760, k: 0.35 }, halo: 0xffedd5, light: 0xfb923c, shake: 0.9, scorch: null }
+                }
+            });
+
+            // BREACH Rolling Thunder: one quake corridor 14 m wide and 34 m long whose front rolls out through the
+            // six waves (each wave's flash and ring: the corridor draws them, with its light and shake)
+            L.defineLook('breach.x', {
+                routes: {
+                    breachRollingThunder: { renderer: 'pulse', adapt: function (P, rt, now, b) {
+                        const T = AGENT_TUNING.breach.x, len = 34;
+                        if (b.rtAt !== rt.startAt) { b.rtAt = rt.startAt; b.rtY = L.floorY(rt.origin.x, rt.origin.y, rt.origin.z); }
+                        P.shape = 0; P.sx = rt.origin.x; P.sy = b.rtY; P.sz = rt.origin.z;
+                        P.ex = rt.origin.x + rt.direction.x * len; P.ez = rt.origin.z + rt.direction.z * len; P.W = 14; P.H = 5;
+                        const k = (now - rt.startAt - T.firstWaveMs) / T.waveIntervalMs;   // waves gone by (and the way to the next)
+                        P.front = k < 0 ? -1 : Math.min(1, (T.waveStartM + Math.min(T.waveCount - 1, k) * T.waveSpacingM) / len);
+                        P.charge = Math.max(0, P.front);
+                        P.after = k < 0 ? 0 : Math.max(0, now - (rt.nextWaveAt - T.waveIntervalMs)) * 0.001;   // the ground behind the front glows again at each wave
+                        const rem = rt.expireAt - now;
+                        P.fade = rem < 400 ? Math.max(0, rem / 400) : 1;   // the Classic fade
+                        P.wave = rt.wavesLeft;
+                    } },
+                    flash: 'absorb', ring: 'absorb'
+                },
+                styles: { pulse: { preset: 'quake' } }
+            });
+
+            // GEKKO: a globule (gekkoGlobules, left by Wingman, Dizzy and Thrash: its kind is its ability's slot)
+            // as a bobbing glow in its creature's colour, light motes rising off it
+            const GLOBULE = { q: 'gekko.q', e: 'gekko.e', x: 'gekko.x' };
+            L.addKey('gekkoGlobules', function (g) { return GLOBULE[g.kind] || null; });
+            const globule = function (P, gg, now) {
+                P.x = gg.position.x; P.y = gg.position.y + 0.45 + Math.sin(now * 0.004 + gg.spawnedAt) * 0.1; P.z = gg.position.z;
+                P.vx = 0; P.vy = 0; P.vz = 0; P.age = (now - gg.spawnedAt) * 0.001;
+            };
+            const globuleStyle = function (core, col) {
+                return { orb: { style: 0, a: core, b: col, size: 0.75 }, trailMs: 120,
+                    trail: [{ kind: 'glow', at: 'pos', hex: col, life: 0.9, s0: 0.07, s1: 0.02, a0: 0.8, drag: 1, grav: -0.8, jx: 0.5, jy: 0.2, jz: 0.5 }] };
+            };
+
+            // GEKKO Mosh Pit: a little goo creature thrown in an arc, the acid pool it spreads into, then the
+            // eruption: a toxic blast (step 2MM: its flash and ring)
+            L.defineModel('gekko.blob', {
+                count: 2,
+                mats: { goo: { color: 0x84cc16, rough: 0.25, metal: 0.05, emissive: 0x1a2e05 }, eye: { glow: 0xf7fee7 }, dark: { color: 0x1a2e05, rough: 0.5, metal: 0.1 } },
+                parts: [
+                    { shape: 'sphere', size: [0.13], seg: [14, 10], scale: [1, 0.82, 1.15], mat: 'goo' },
+                    { shape: 'sphere', size: [0.06], seg: [10, 8], at: [0.07, 0.08, -0.06], mat: 'goo' },
+                    { shape: 'sphere', size: [0.05], seg: [10, 8], at: [-0.08, 0.06, -0.08], mat: 'goo' },
+                    { shape: 'cyl', size: [0.014, 0.018, 0.09], seg: 6, at: [0.045, 0.12, 0.08], rot: [0.5, 0, -0.3], mat: 'goo' },   // eye stalks
+                    { shape: 'cyl', size: [0.014, 0.018, 0.09], seg: 6, at: [-0.045, 0.12, 0.08], rot: [0.5, 0, 0.3], mat: 'goo' },
+                    { shape: 'sphere', size: [0.03], seg: [8, 6], at: [0.06, 0.165, 0.105], mat: 'eye' },
+                    { shape: 'sphere', size: [0.03], seg: [8, 6], at: [-0.06, 0.165, 0.105], mat: 'eye' },
+                    { shape: 'sphere', size: [0.013], seg: [6, 4], at: [0.064, 0.168, 0.13], mat: 'dark' },
+                    { shape: 'sphere', size: [0.013], seg: [6, 4], at: [-0.064, 0.168, 0.13], mat: 'dark' }
+                ]
+            });
+            L.defineLook('gekko.c', {
+                routes: {
+                    projectile: 'projectile',
+                    gekkoMoshPits: { renderer: 'groundZone', adapt: function (P, mp, now) {
+                        P.x = mp.position.x; P.y = mp.position.y; P.z = mp.position.z; P.r = mp.radius; P.rect = 0; P.yaw = 0;
+                        P.start = mp.startAt; P.end = mp.expireAt; P.age = (now - mp.startAt) * 0.001;
+                        const rem = mp.expireAt - now;
+                        P.fade = (rem < 250 ? Math.max(0, rem / 250) : 1) * Math.min(1, P.age * 5);   // the Classic fade
+                    } },
+                    flash: 'blast', ring: 'absorb'
+                },
+                styles: {
+                    projectile: { model: 'gekko.blob', spin: { axis: 'x', rate: 7 },
+                        trail: [{ kind: 'glow', hex: 0xbef264, life: 0.3, s0: 0.18, s1: 0.04, a0: 0.6, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0xd9f99d, life: 0.35, s0: 0.04, s1: 0.012, a0: 1, drag: 1, grav: 6, jx: 0.8, jy: 0.4, jz: 0.8 }] },
+                    groundZone: { preset: 'toxic', colA: 0x4d7c0f, colB: 0xd9f99d, scorch: null },
+                    blast: { preset: 'toxic', rScale: 1 / 0.95, coreA: 0xecfccb, coreB: 'theme:gekko', ringB: 0xbef264, sparks: { n: 26, hex: 0xd9f99d },
+                        dust: { n: 10, hex: 0x3f5f3a, s1: 1.5 }, smoke: { n: 8, hex: 0x26401a, k: 0.5 }, halo: 0xecfccb, light: 0xa3e635, shake: 1.0, scorch: { scale: 0.5, hex: 0x16301c } }
+                }
+            });
+
+            // GEKKO Wingman: a round little creature waddling after its target (big lit eyes, a lime crest), then its
+            // concuss: a yellow blast (detonateGekkoWingman: its flash and ring), and its globule
+            (function () {
+                const parts = [
+                    { shape: 'sphere', size: [0.34], seg: [18, 14], at: [0, 0.42, 0], scale: [1, 0.92, 1.05], mat: 'skin' },   // the body
+                    { shape: 'sphere', size: [0.085], seg: [12, 10], at: [0.13, 0.55, 0.27], mat: 'eye' },                     // big eyes
+                    { shape: 'sphere', size: [0.085], seg: [12, 10], at: [-0.13, 0.55, 0.27], mat: 'eye' },
+                    { shape: 'sphere', size: [0.035], seg: [8, 6], at: [0.14, 0.555, 0.35], mat: 'dark' },
+                    { shape: 'sphere', size: [0.035], seg: [8, 6], at: [-0.14, 0.555, 0.35], mat: 'dark' },
+                    { shape: 'cone', size: [0.06, 0.16], seg: 6, at: [0, 0.8, 0.04], rot: [-0.3, 0, 0], mat: 'crest' },        // a crest over the top
+                    { shape: 'cone', size: [0.05, 0.13], seg: 6, at: [0, 0.78, -0.1], rot: [-0.6, 0, 0], mat: 'crest' },
+                    { shape: 'cone', size: [0.045, 0.11], seg: 6, at: [0, 0.71, -0.22], rot: [-1.0, 0, 0], mat: 'crest' },
+                    { shape: 'cone', size: [0.045, 0.11], seg: 6, at: [0, 0.6, -0.33], rot: [-1.4, 0, 0], mat: 'crest' },     // on down its back
+                    { shape: 'cone', size: [0.04, 0.1], seg: 6, at: [0, 0.46, -0.38], rot: [-1.8, 0, 0], mat: 'crest' },
+                    { shape: 'sphere', size: [0.07], seg: [10, 8], at: [0, 0.26, -0.34], mat: 'crest' }                          // a little tail
+                ];
+                for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push({ shape: 'sphere', size: [0.09], seg: [10, 8], at: [sx * 0.16, 0.07, sz * 0.13], scale: [1, 0.7, 1.25], mat: 'dark' });   // stubby feet
+                L.defineModel('gekko.wingman', {
+                    count: 2,
+                    mats: { skin: { color: 0xf5b90b, rough: 0.55, metal: 0.05, emissive: 0x3a2600 }, dark: { color: 0x5a2d0c, rough: 0.6, metal: 0.05 }, eye: { glow: 0xfffbeb },
+                        crest: { color: 0xa3e635, rough: 0.45, metal: 0.05, emissive: 0x1a2e05 } },
+                    groups: { base: { at: [0, 0, 0], role: 'bob', amp: 0.05, rate: 3.4 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('gekko.q', {
+                routes: {
+                    gekkoWingman: { renderer: 'deployable', adapt: function (P, gw, now) {
+                        P.x = gw.position.x; P.y = gw.group.position.y; P.z = gw.position.z; P.yaw = Math.atan2(gw.dirX, gw.dirZ); P.headYaw = NaN;
+                        P.start = gw.startAt; P.remain = gw.expireAt - now; P.alert = false; P.fade = 1;
+                    } },
+                    flash: 'blast', ring: 'absorb',
+                    gekkoGlobules: { renderer: 'projectile', adapt: globule }
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'gekko.wingman', unfoldMs: 0, lightK: 0, dust: { hex: 0x8d8579, n: 6 } },
+                    blast: { preset: 'concussive', rScale: 1, coreA: 0xfef9c3, coreB: 0xfacc15, shellA: 0xfde047, shellB: 0xca8a04, ringB: 0xfde047,
+                        sparks: { n: 16, hex: 0xd9f99d }, dust: { n: 14, hex: 0x8a8279, s1: 1.8 }, smoke: { n: 3, hex: 0x6b6760, k: 0.3 }, halo: 0xfef9c3, light: 0xfacc15, shake: 0.9, scorch: null },
+                    projectile: globuleStyle(0xfefce8, 0xfacc15)
+                }
+            });
+
+            // GEKKO Dizzy: a small blue flyer with a glowing back (its fins beating), each spit and its hit a small
+            // blue-lime pop (step 2OO), and its globule
+            L.defineModel('gekko.dizzy', {
+                count: 2,
+                mats: { skin: { color: 0x38bdf8, rough: 0.4, metal: 0.05, emissive: 0x062a3d }, glow: { glow: 0xd9f99d } },
+                groups: { fins: { at: [0, 0.02, -0.02], role: 'bob', amp: 0.07, rate: 5 } },
+                parts: [
+                    { shape: 'sphere', size: [0.24], seg: [16, 12], scale: [1, 0.8, 1.2], mat: 'skin' },                              // the body
+                    { shape: 'sphere', size: [0.13], seg: [12, 10], at: [0, 0.14, -0.05], scale: [1.1, 0.6, 1.6], mat: 'glow' },      // the glowing back
+                    { shape: 'sphere', size: [0.055], seg: [10, 8], at: [0.1, 0.06, 0.24], mat: 'glow' },                             // the eyes
+                    { shape: 'sphere', size: [0.055], seg: [10, 8], at: [-0.1, 0.06, 0.24], mat: 'glow' },
+                    { shape: 'cone', size: [0.08, 0.24], seg: 6, at: [0, 0.02, -0.34], rot: [-PI / 2, 0, 0], scale: [1, 1, 0.3], mat: 'skin' },   // the tail
+                    { group: 'fins', shape: 'sphere', size: [0.2], seg: [12, 8], at: [0.3, 0, 0], rot: [0, 0, 0.25], scale: [1.4, 0.15, 0.9], mat: 'skin' },
+                    { group: 'fins', shape: 'sphere', size: [0.2], seg: [12, 8], at: [-0.3, 0, 0], rot: [0, 0, -0.25], scale: [1.4, 0.15, 0.9], mat: 'skin' }
+                ]
+            });
+            L.defineLook('gekko.e', {
+                routes: {
+                    gekkoDizzy: { renderer: 'deployable', adapt: function (P, gd, now) {
+                        P.x = gd.position.x; P.y = gd.position.y; P.z = gd.position.z; P.yaw = Math.atan2(gd.velocity.x, gd.velocity.z); P.headYaw = NaN;
+                        P.start = gd.startAt; P.remain = gd.expireAt - now; P.alert = false; P.fade = 1;
+                    } },
+                    flash: 'flash',   // each spit (at Dizzy) and its hit (at the target)
+                    gekkoGlobules: { renderer: 'projectile', adapt: globule }
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'gekko.dizzy', unfoldMs: 0, lightK: 0, dust: null,
+                        emit: { every: 50, spec: { kind: 'glow', hex: 0xbef264, n: 1, life: 0.5, s0: 0.12, s1: 0.03, a0: 0.8, drag: 1.2, jitter: 0.4 } } },
+                    flash: { core: 0xbef264, glow: 0x0ea5e9, coreSize: 0.5, streaks: 0.45, halo: { hex: 0xd9f99d, size: 3 }, light: { hex: 0x38bdf8, radius: 7 }, embers: { n: 8, hex: 0xbef264 } },
+                    projectile: globuleStyle(0xf7fee7, 0xa3e635)
+                }
+            });
+
+            // GEKKO Thrash: a big finned creature swimming along the floor where you steer it, then the lunge: a
+            // toxic blast (detonateGekkoThrash: its flash and ring), and its globule
+            (function () {
+                const fin = (x, y, z, rx, rz, flat, len, w) => ({ shape: 'cone', size: [w, len], seg: 3, at: [x, y, z], rot: [rx, 0, rz], scale: flat, mat: 'fin' });
+                const upright = [0.2, 1, 1], level = [1, 1, 0.25];
+                const parts = [
+                    { shape: 'sphere', size: [0.36], seg: [20, 14], at: [0, 0, 0.1], scale: [1, 0.82, 1.45], mat: 'skin' },        // the body
+                    { shape: 'cone', size: [0.31, 0.75], seg: 14, at: [0, 0.02, -0.55], rot: [-PI / 2, 0, 0], scale: [1, 1, 0.8], mat: 'skin' },   // tapering to the tail: 1.6 m in all
+                    { shape: 'sphere', size: [0.26], seg: [16, 10], at: [0, -0.12, 0.5], scale: [1.15, 0.55, 1.2], mat: 'dark' },   // the jaw
+                    { shape: 'sphere', size: [0.05], seg: [10, 8], at: [0.2, 0.1, 0.52], mat: 'eye' },                             // the eyes (its light)
+                    { shape: 'sphere', size: [0.05], seg: [10, 8], at: [-0.2, 0.1, 0.52], mat: 'eye' },
+                    fin(0, 0.42, -0.02, -0.45, 0, upright, 0.46, 0.2),                                                                // the dorsal fin
+                    fin(0, 0.16, -1.02, -PI / 2 + 0.6, 0, upright, 0.56, 0.22),                                                       // the tail, two lobes
+                    fin(0, -0.1, -1.0, -PI / 2 - 0.6, 0, upright, 0.46, 0.2),
+                    fin(0.3, -0.12, 0.12, -0.6, -1.1, level, 0.3, 0.12),                                                             // side fins
+                    fin(-0.3, -0.12, 0.12, -0.6, 1.1, level, 0.3, 0.12)
+                ];
+                for (let k = 0; k < 6; k++) {
+                    const x = (k - 2.5) * 0.07;
+                    parts.push({ shape: 'cone', size: [0.018, 0.06], seg: 4, at: [x, -0.07, 0.6 - Math.abs(x) * 0.5], rot: [PI, 0, 0], mat: 'eye' });   // teeth
+                }
+                L.defineModel('gekko.thrash', {
+                    count: 1,
+                    mats: { skin: { color: 0xe11d48, rough: 0.45, metal: 0.1, emissive: 0x3b0712 }, dark: { color: 0x3f0a15, rough: 0.5, metal: 0.1 }, fin: { glow: 0xa3e635 }, eye: { light: 0xecfccb } },
+                    groups: { base: { at: [0, 0, 0], role: 'bob', amp: 0.06, rate: 2.2 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('gekko.x', {
+                routes: {
+                    gekkoThrash: { renderer: 'deployable', adapt: function (P, gt, now) {
+                        P.x = gt.position.x; P.y = gt.group.position.y; P.z = gt.position.z; P.yaw = Math.atan2(gt.dirX, gt.dirZ); P.headYaw = NaN;
+                        P.start = gt.startAt; P.remain = gt.expireAt - now; P.alert = false; P.fade = 1;
+                    } },
+                    flash: 'blast', ring: 'absorb',
+                    gekkoGlobules: { renderer: 'projectile', adapt: globule }
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'gekko.thrash', unfoldMs: 0, lights: [0xecfccb, 0xffffff, 0xffffff], lightY: 0, lightRadius: 2.6, lightK: 0.4, blinkMs: 800, dust: { hex: 0x8d8579, n: 10 },
+                        emit: { every: 60, spec: { kind: 'glow', hex: 0xbef264, n: 1, life: 0.6, s0: 0.12, s1: 0.03, a0: 0.7, drag: 1.4, up: 0.3, jitter: 0.5 } } },
+                    blast: { preset: 'toxic', rScale: 1, coreA: 0xecfccb, coreB: 'theme:gekko', ringB: 0xbef264, sparks: { n: 28, hex: 0xd9f99d },
+                        dust: { n: 14, hex: 0x3f5f3a, s1: 1.8 }, smoke: { n: 8, hex: 0x26401a, k: 0.5 }, halo: 0xecfccb, light: 0xa3e635, shake: 1.2, scorch: null },
+                    projectile: globuleStyle(0xfff1f2, 0xf43f5e)
+                }
+            });
+
+            // TEJO Stealth Drone: a quad drone with ducted fans flying where you steer it (its camera eye lit),
+            // then the EMP: a blue scan sphere of its 11 m reach over the burst's life (its flash; the ring with it)
+            (function () {
+                const parts = [
+                    { shape: 'rbox', size: [0.34, 0.13, 0.46], radius: 0.05, seg: 2, mat: 'shell' },                                  // the body
+                    { shape: 'rbox', size: [0.2, 0.06, 0.26], radius: 0.025, seg: 2, at: [0, 0.085, -0.02], mat: 'dark' },             // the canopy
+                    { shape: 'rbox', size: [0.14, 0.08, 0.06], radius: 0.02, seg: 2, at: [0, -0.02, 0.24], mat: 'dark' },              // the sensor
+                    { shape: 'sphere', size: [0.035], seg: [10, 8], at: [0, -0.02, 0.272], mat: 'eye' },                               // its camera (its light)
+                    { shape: 'box', size: [0.2, 0.012, 0.02], at: [0, -0.068, 0.0], mat: 'glow' }                                      // a light under it
+                ];
+                for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+                    parts.push({ shape: 'box', size: [0.045, 0.03, 0.3], at: [sx * 0.2, 0.01, sz * 0.22], rot: [0, Math.atan2(sx, sz * 1.1), 0], mat: 'dark' });   // the arms
+                    parts.push({ shape: 'torus', size: [0.13, 0.022], seg: [6, 20], at: [sx * 0.34, 0.03, sz * 0.36], rot: [PI / 2, 0, 0], mat: 'shell' });          // the fan ducts
+                    parts.push({ shape: 'torus', size: [0.1, 0.008], seg: [4, 18], at: [sx * 0.34, 0.03, sz * 0.36], rot: [PI / 2, 0, 0], mat: 'glow' });            // the fans, spun to a blur
+                }
+                L.defineModel('tejo.drone', {
+                    count: 2,
+                    mats: { shell: { color: 0xd97706, rough: 0.4, metal: 0.45 }, dark: { color: 0x1f2430, rough: 0.5, metal: 0.55 }, glow: { glow: 0x7dd3fc }, eye: { light: 0x38bdf8 } },
+                    groups: { base: { at: [0, 0, 0], role: 'bob', amp: 0.05, rate: 1.4 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('tejo.c', {
+                routes: {
+                    tejoStealthDrones: { renderer: 'deployable', adapt: function (P, td, now) {
+                        P.x = td.position.x; P.y = td.group.position.y; P.z = td.position.z; P.yaw = Math.atan2(td.dirX, td.dirZ); P.headYaw = NaN;
+                        P.start = td.startAt; P.remain = td.expireAt - now; P.alert = false; P.fade = 1;
+                    } },
+                    flash: { renderer: 'pulse', adapt: function (P, f, now) {
+                        P.shape = 1; P.x = f.position.x; P.y = f.position.y; P.z = f.position.z; P.R = AGENT_TUNING.tejo.c.radiusM;
+                        const t = now - f.startAt;
+                        P.front = Math.min(1, t / Math.max(1, f.expireAt - f.startAt));
+                        P.after = t * 0.001; P.charge = Math.max(0, 1 - t / 200); P.fade = 1; P.wave = f.startAt;
+                    } },
+                    ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'tejo.drone', unfoldMs: 0, lights: [0x38bdf8, 0xfbbf24, 0xff5a4d], lightY: -0.2, lightRadius: 2.2, lightK: 0.4, blinkMs: 900, dust: null },
+                    pulse: { preset: 'sonar', colA: 0x38bdf8, colB: 0xe0f2fe, shellA: 0x0284c7, shellB: 0xb45309, ring: 0x38bdf8, eruptLight: 0x38bdf8 }
+                }
+            });
+
+            // TEJO Special Delivery: a sticky grenade (a lit band, adhesive pads), then a concussive amber blast
+            // (detonateTejoSpecialDelivery, carried by the projectile's key: its flash and ring)
+            L.defineModel('tejo.sticky', {
+                count: 2,
+                mats: { shell: { color: 0xe08a0b, rough: 0.4, metal: 0.35 }, dark: { color: 0x20242c, rough: 0.55, metal: 0.5 }, glow: { glow: 0xfde68a } },
+                parts: [
+                    { shape: 'rbox', size: [0.13, 0.13, 0.22], radius: 0.055, seg: 3, mat: 'shell' },
+                    { shape: 'cyl', size: [0.058, 0.058, 0.03], seg: 12, at: [0, 0, 0.11], rot: [PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'cyl', size: [0.058, 0.058, 0.03], seg: 12, at: [0, 0, -0.11], rot: [PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'torus', size: [0.07, 0.01], seg: [6, 18], mat: 'glow' },
+                    { shape: 'sphere', size: [0.024], seg: [8, 6], at: [0.068, 0, 0.05], mat: 'dark' },
+                    { shape: 'sphere', size: [0.024], seg: [8, 6], at: [-0.068, 0, 0.05], mat: 'dark' },
+                    { shape: 'sphere', size: [0.024], seg: [8, 6], at: [0, 0.068, -0.05], mat: 'dark' },
+                    { shape: 'sphere', size: [0.024], seg: [8, 6], at: [0, -0.068, -0.05], mat: 'dark' }
+                ]
+            });
+            L.defineLook('tejo.q', {
+                routes: { projectile: 'projectile', flash: 'blast', ring: 'absorb' },
+                styles: {
+                    projectile: { model: 'tejo.sticky', spin: { axis: 'x', rate: 9 },
+                        trail: [{ kind: 'spark', hex: 0xfcd34d, life: 0.22, s0: 0.045, s1: 0.012, a0: 1, drag: 1.5, grav: 3, jx: 1, jy: 1, jz: 1 },
+                            { kind: 'smoke', hex: 0x6b6560, life: 0.6, s0: 0.08, s1: 0.3, a0: 0.3, drag: 1.4, grav: -0.2, jx: 0.3, jy: 0.3, jz: 0.3 }] },
+                    blast: { preset: 'concussive', rScale: 1, coreA: 0xfef3c7, coreB: 'theme:tejo', shellA: 0xfcd34d, shellB: 0xb45309, ringB: 0xfbbf24,
+                        sparks: { n: 18, hex: 0xfcd34d }, dust: { n: 16, hex: 0x8a8279, s1: 2.0 }, smoke: { n: 5, hex: 0x5a524a, k: 0.4 }, halo: 0xfef3c7, light: 0xf59e0b, shake: 1.1, scorch: null }
+                }
+            });
+
+            // TEJO Guided Salvo: two amber target zones, each struck three times by a fire blast (step 2GGG: a
+            // flash and a ring each); the lock-on rings of the cast are drawn by the zones
+            L.defineLook('tejo.e', {
+                routes: {
+                    tejoGuidedSalvos: { renderer: 'groundZone', adapt: function (P, gs, now) {
+                        P.x = gs.position.x; P.y = gs.position.y; P.z = gs.position.z; P.r = gs.radius; P.rect = 0; P.yaw = 0;
+                        P.start = gs.startAt; P.end = gs.expireAt; P.age = (now - gs.startAt) * 0.001;
+                        const rem = gs.expireAt - now;
+                        P.fade = (rem < 350 ? Math.max(0, rem / 350) : 1) * Math.min(1, P.age * 5);   // the Classic fade
+                    } },
+                    flash: 'blast', ring: 'absorb'
+                },
+                styles: {
+                    groundZone: { preset: 'field', colA: 0xd97706, colB: 0xfde68a },
+                    blast: { preset: 'fire', rScale: 1 / 0.9, coreA: 0xffd27a, coreB: 0xea580c, ringB: 0xfbbf24, sparks: { n: 22, hex: 0xffc766 },
+                        dust: { n: 12, hex: 0x7d7267, s1: 1.7 }, smoke: { n: 8, hex: 0x3b3633, k: 0.5 }, halo: 0xffe7a8, light: 0xf59e0b, shake: 0.9, scorch: null }
+                }
+            });
+
+            // TEJO Armageddon: the Classic 11 x 28 m target corridor as an amber field on the floor, then each
+            // bombing wave a fire blast (step 2HHH: a flash and a ring each); the call-in ring with it. No scorch
+            // per wave: six of them held 9 s cost more draws than the whole ultimate needs
+            L.defineLook('tejo.x', {
+                routes: {
+                    tejoArmageddon: { renderer: 'groundZone', adapt: function (P, ta, now) {
+                        const fm = ta.floorMesh;   // the Classic floor plane: its centre and turn
+                        P.x = fm.position.x; P.y = fm.position.y - 0.03; P.z = fm.position.z; P.rect = 1; P.rx = 5.5; P.rz = 14; P.r = 14; P.yaw = fm.rotation.y;
+                        P.start = ta.startAt; P.end = ta.expireAt; P.age = (now - ta.startAt) * 0.001;
+                        const rem = ta.expireAt - now;
+                        P.fade = (rem < 400 ? Math.max(0, rem / 400) : 1) * Math.min(1, P.age * 4);   // the Classic fade
+                    } },
+                    flash: 'blast', ring: 'absorb'
+                },
+                styles: {
+                    groundZone: { preset: 'field', colA: 0xea580c, colB: 0xfde68a },
+                    blast: { preset: 'fire', rScale: 1, coreA: 0xffd27a, coreB: 0xea580c, ringB: 0xff7a1a, sparks: { n: 24, hex: 0xffb066 },
+                        dust: { n: 12, hex: 0x7d7267, s1: 1.8 }, smoke: { n: 10, hex: 0x3b3633, k: 0.55 }, halo: 0xffe0a0, light: 0xff8a3d, shake: 1.0, scorch: null }
+                }
+            });
+        })();
         // V2.2: end of the Initiators' block
 
         // =============================================
