@@ -50286,6 +50286,12 @@
                 const edge = new THREE.Mesh(edgeQ, edgeMat);
                 edge.position.set(0, 0, -0.3);
                 edge.visible = false; edge.frustumCulled = false; edge.renderOrder = 6;
+                // V2.2: drawn 0.3 m ahead of the camera that draws it, whatever the weapon does. The viewmodel group
+                // it hangs from dips and turns with the weapon's poses (and with the weapon's own angle order), which
+                // slid the quad off the view as a band. Its world matrix is set here, before the renderer derives its
+                // model-view matrix from it (the scene's matrix update has already run by then).
+                const edgeAhead = new THREE.Matrix4().makeTranslation(0, 0, -0.3);
+                edge.onBeforeRender = function (r, s, cam) { edge.matrixWorld.multiplyMatrices(cam.matrixWorld, edgeAhead); };
                 const edgeState = { owner: null, fade: 0 };
                 const swirlMat = L.shader('bb', { uMode: { value: 6 }, uBB: { value: 0 }, uScale: { value: 0.16 }, uColA: { value: wind.clone() }, uColB: { value: wind.clone() }, uFade: { value: 0 }, uAge: { value: 0 }, uStyle: { value: 0 }, uSeed: { value: 0 } },
                     { blending: THREE.AdditiveBlending, depthTest: false }, true);
