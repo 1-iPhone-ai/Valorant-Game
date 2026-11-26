@@ -28360,7 +28360,9 @@
                         hw.moveUntil = now;
                         hw.expireAt = Math.max(hw.expireAt, now + AGENT_TUNING.harbor.c.anchorLifetimeMs);
                         stopped = true;
+                        abilityLook.tag = 'harbor.c';   // V2.2: the Cascade anchoring (High Fidelity)
                         this.spawnWindRing(hw.position.x, hw.position.y + 0.15, hw.position.z, 0x06b6d4, 4.2, now);
+                        abilityLook.tag = null;
                     }
                 }
                 if (stopped) {
@@ -28472,7 +28474,9 @@
 
                 this.healPlayer(AGENT_TUNING.harbor.e.healHp, now);
                 soundFX.harborWave();
+                abilityLook.tag = 'harbor.e';   // V2.2: High Tide's ring (High Fidelity)
                 this.spawnWindRing(sx, 0.2, sz, 0x06b6d4, 4.0, now);
+                abilityLook.tag = null;
                 showNotification("HIGH TIDE WALL DEPLOYED — 22m Hydro-Wall Blocking Vision & Slowing Hostiles (+12 HP)!", 1950);
             },
 
@@ -28497,7 +28501,9 @@
                 hr.discMesh.scale.set(hr.radius, 1, hr.radius);
                 hr.group.position.copy(hr.position);
                 hr.group.visible = true;
+                abilityLook.tag = 'harbor.x';   // V2.2: Reckoning's ring (High Fidelity)
                 this.spawnWindRing(sx, 0.25, sz, 0x22d3ee, 10.0, now);
+                abilityLook.tag = null;
             },
 
             // --- Astra Cosmic Controller Abilities (Gravity Well [C], Nova Pulse [Q], Nebula / Dissipate [E], Cosmic Divide [X]) ---
@@ -28521,7 +28527,9 @@
                 gw.group.position.copy(gw.position);
                 gw.group.visible = true;
                 soundFX.astraGravity();
+                abilityLook.tag = 'astra.c';   // V2.2: the Gravity Well's ring (High Fidelity)
                 this.spawnWindRing(hit.x, hit.y + 0.15, hit.z, 0xa855f7, 6.8, now);
+                abilityLook.tag = null;
                 showNotification("GRAVITY WELL ACTIVATED — Pulling Hostiles to Center & Imploding for Fragile Vulnerability!", 1950);
             },
 
@@ -28543,7 +28551,9 @@
                 np.group.position.copy(np.position);
                 np.group.visible = true;
                 soundFX.astraStar();
+                abilityLook.tag = 'astra.q';   // V2.2: Nova Pulse's ring (High Fidelity)
                 this.spawnWindRing(hit.x, hit.y + 0.15, hit.z, 0xeab308, 6.6, now);
+                abilityLook.tag = null;
                 showNotification("NOVA PULSE CHARGING — Detonates 6.6m Astral Concuss Nova in 0.65s!", 1750);
             },
 
@@ -28551,7 +28561,9 @@
             castAstraNebula: function(now) {
                 const hit = this.getAimGroundPoint(AGENT_TUNING.astra.e.rangeM);
                 this.spawnSmokeSphere(hit.x, hit.y + AGENT_TUNING.astra.e.heightM, hit.z, 0xa855f7, AGENT_TUNING.astra.e.radiusM, AGENT_TUNING.astra.e.lifetimeMs, now);
+                abilityLook.tag = 'astra.e';   // V2.2: Nebula's ring (High Fidelity)
                 this.spawnWindRing(hit.x, hit.y + 0.15, hit.z, 0xeab308, 5.2, now);
+                abilityLook.tag = null;
                 this.healPlayer(AGENT_TUNING.astra.e.healHp, now);
                 soundFX.astraStar();
                 showNotification("NEBULA / DISSIPATE DEPLOYED — 4.9m Cosmic Smoke Sphere Blinds & Slows Hostiles Inside!", 1850);
@@ -28581,8 +28593,10 @@
                 cd.group.position.set(cx, 0, cz);
                 cd.group.rotation.y = yaw;
                 cd.group.visible = true;
+                abilityLook.tag = 'astra.x';   // V2.2: Cosmic Divide's flash and ring (High Fidelity)
                 this.spawnFlashBurst(cx, 2.2, cz, 0xeab308, 6.5, 420, now);
                 this.spawnWindRing(cx, 0.25, cz, 0xa855f7, 9.5, now);
+                abilityLook.tag = null;
             },
 
             // --- Vyse Liquid-Metal Sentinel Abilities (Shear [C], Arc Rose [Q], Razorvine [E], Steel Garden [X]) ---
@@ -29435,7 +29449,9 @@
                     this.miksHarmonizeHalo.group.visible = true;
                 }
                 soundFX.miksHarmonize();
+                abilityLook.tag = 'miks.q';   // V2.2: Harmonize's ring (High Fidelity)
                 this.spawnWindRing(characterController.position.x, characterController.position.y - 1.2, characterController.position.z, 0xec4899, 5.5, now);
+                abilityLook.tag = null;
                 showNotification("HARMONIZE SONIC STIM ACTIVE (7.5s) — +35% Haste, +25% Rapid Fire & Refreshes on Every Kill!", 2000);
             },
 
@@ -29444,7 +29460,9 @@
                 const hit = this.getAimGroundPoint(AGENT_TUNING.miks.e.rangeM);
                 const floorY = this.findSupportFloorY(hit.x, hit.y + 1.5, hit.z);
                 this.spawnSmokeSphere(hit.x, floorY + AGENT_TUNING.miks.e.heightM, hit.z, 0xec4899, AGENT_TUNING.miks.e.radiusM, AGENT_TUNING.miks.e.lifetimeMs, now);
+                abilityLook.tag = 'miks.e';   // V2.2: Waveform's ring (High Fidelity)
                 this.spawnWindRing(hit.x, floorY + 0.15, hit.z, 0x22d3ee, 6.2, now);
+                abilityLook.tag = null;
                 soundFX.miksWaveform();
 
                 const rSq = AGENT_TUNING.miks.e.hitRadiusM * AGENT_TUNING.miks.e.hitRadiusM;
@@ -29491,7 +29509,9 @@
                 bq.group.rotation.set(0, yaw, 0);
                 bq.waveFrontMesh.position.set(0, 1.1, -2.0);
                 bq.group.visible = true;
+                abilityLook.tag = 'miks.x';   // V2.2: Bassquake's ring (High Fidelity)
                 this.spawnWindRing(ox, 0.25, oz, 0xec4899, 9.5, now);
+                abilityLook.tag = null;
             },
 
             // --- Iso Prismatic Duelist Abilities (Contingency [C], Undercut [Q], Double Tap [E] + Shootable Kill Orbs, Kill Contract [X]) ---
@@ -29669,8 +29689,10 @@
                 game.shield = AGENT_TUNING.clove.c.shieldHp;
                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
                 this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + AGENT_TUNING.clove.c.hasteMs);
+                abilityLook.tag = 'clove.c';   // V2.2: Pick-Me-Up's burst and ring (High Fidelity)
                 this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.35, characterController.position.z, 0xf472b6, 4.4, 340, now);
                 this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.45), characterController.position.z, 0xf472b6, 4.6, now);
+                abilityLook.tag = null;
                 soundFX.clovePickMeUp();
                 showNotification("PICK-ME-UP ACTIVE! +50 Overheal + +50 Overshield & +35% Haste for 8s!", 2200);
                 this.syncHud(now, true);
@@ -29738,7 +29760,9 @@
             castCloveRuse: function(now) {
                 const hit = this.getAimGroundPoint(AGENT_TUNING.clove.e.rangeM);
                 this.spawnSmokeSphere(hit.x, hit.y, hit.z, 0xf472b6, AGENT_TUNING.clove.e.radiusM, AGENT_TUNING.clove.e.lifetimeMs, now);
+                abilityLook.tag = 'clove.e';   // V2.2: Ruse's ring (High Fidelity)
                 this.spawnWindRing(hit.x, Math.max(0.1, hit.y + 0.08), hit.z, 0xf472b6, 5.0, now);
+                abilityLook.tag = null;
                 showNotification("RUSE TWILIGHT CLOUD DEPLOYED (10.5s Vision Block + Decay Slow)", 1700);
             },
 
@@ -31019,7 +31043,9 @@
                     ammoValue.textContent = weapon.ammo;
                 }
 
+                abilityLook.tag = 'brimstone.c';   // V2.2: the Stim Beacon's deploy ring (High Fidelity)
                 this.spawnWindRing(sx, floorY + 0.1, sz, 0xf97316, 4.5, now);
+                abilityLook.tag = null;
                 soundFX.stimBeacon();
                 showNotification("STIM BEACON DEPLOYED! +25% Rapid Fire + Speed Boost + Instant Ammo Top-Up!", 1800);
             },
@@ -31547,8 +31573,10 @@
                 const originX = characterController.position.x;
                 const originY = Math.max(0.05, characterController.position.y - characterController.height);
                 const originZ = characterController.position.z;
+                abilityLook.tag = isUlt ? 'omen.x' : 'omen.c';   // V2.2: Omen's two portals (High Fidelity)
                 this.spawnShadowPortal(originX, originY, originZ, now);
                 this.spawnShadowPortal(hit.x, hit.y, hit.z, now);
+                abilityLook.tag = null;
                 characterController.position.set(hit.x, hit.y + characterController.height, hit.z);
                 characterController.prevSimPosition.copy(characterController.position);
                 characterController.velocity.set(0, 0, 0);
@@ -32093,8 +32121,10 @@
                     }
                     this.reynaDismissUntil = Math.max(this.reynaDismissUntil, now + AGENT_TUNING.clove.x.intangibleMs);
                     this.clovePickMeUpUntil = Math.max(this.clovePickMeUpUntil, now + def.abilities.x.durationMs);
+                    abilityLook.tag = 'clove.x';   // V2.2: Not Dead Yet's burst and ring (High Fidelity)
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.4, characterController.position.z, 0xf472b6, 5.8, 440, now);
                     this.spawnWindRing(characterController.position.x, Math.max(0.1, characterController.position.y - 1.45), characterController.position.z, 0xf472b6, 6.2, now);
+                    abilityLook.tag = null;
                     soundFX.cloveRevive();
                     showNotification("YOU HAD YOUR FUN, MY TURN! NOT DEAD YET ACTIVE (Immortal Butterfly Phase + +35% Speed + Self-Revive Ready)!", 3600);
                 } else if (agentId === 'gekko') {
@@ -35334,8 +35364,10 @@
                                 const dz = e.mesh.position.z - hr.position.z;
                                 if (dx * dx + dz * dz <= rSq) {
                                     geyserHits++;
+                                    abilityLook.tag = 'harbor.x';   // V2.2: a Reckoning geyser (High Fidelity)
                                     this.spawnFlashBurst(e.mesh.position.x, 1.0, e.mesh.position.z, 0x06b6d4, 3.6, 320, now);
                                     this.spawnWindRing(e.mesh.position.x, 0.2, e.mesh.position.z, 0xfacc15, 3.8, now);
+                                    abilityLook.tag = null;
                                     this.applyEnemyBlind(e, now, AGENT_TUNING.harbor.x.blindMs);
                                     e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.harbor.x.slowMs);
                                     e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.harbor.x.revealMs);
@@ -35363,8 +35395,10 @@
                     if (!gw.imploded && now >= gw.implodeAt) {
                         gw.imploded = true;
                         soundFX.astraGravity();
+                        abilityLook.tag = 'astra.c';   // V2.2: the Gravity Well's implosion (High Fidelity)
                         this.spawnFlashBurst(gw.position.x, 0.95, gw.position.z, 0xeab308, gw.radius * 0.92, 360, now);
                         this.spawnWindRing(gw.position.x, 0.25, gw.position.z, 0xa855f7, gw.radius, now);
+                        abilityLook.tag = null;
                         let pulled = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -35416,8 +35450,10 @@
                     if (!np.detonated && now >= np.detonateAt) {
                         np.detonated = true;
                         soundFX.astraNova();
+                        abilityLook.tag = 'astra.q';   // V2.2: the Nova Pulse going off (High Fidelity)
                         this.spawnFlashBurst(np.position.x, 0.95, np.position.z, 0xeab308, np.radius, 360, now);
                         this.spawnWindRing(np.position.x, 0.25, np.position.z, 0xa855f7, np.radius, now);
+                        abilityLook.tag = null;
                         const rSq = np.radius * np.radius;
                         let concussed = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -35943,7 +35979,9 @@
                                 damageEnemyActor(e, AGENT_TUNING.miks.c.damagePerTick, now, nowMs, "M-Pulse Resonance", false);
                             }
                         }
+                        abilityLook.tag = 'miks.c';   // V2.2: an M-Pulse pulse (High Fidelity)
                         this.spawnWindRing(mp.position.x, mp.position.y + 0.15, mp.position.z, 0x22d3ee, mp.radius, now);
+                        abilityLook.tag = null;
                     }
                 }
 
@@ -35971,8 +36009,10 @@
                         bq.currentWavePos.set(wx, 0.04, wz);
                         bq.waveFrontMesh.position.z = -(2.0 + stepDist); // local forward
                         soundFX.miksBassquake();
+                        abilityLook.tag = 'miks.x';   // V2.2: a Bassquake drop (High Fidelity)
                         this.spawnFlashBurst(wx, 1.2, wz, 0xec4899, 7.2, 420, now);
                         this.spawnWindRing(wx, 0.25, wz, 0x22d3ee, 10.5, now);
+                        abilityLook.tag = null;
 
                         const rSq = AGENT_TUNING.miks.x.waveRadiusM * AGENT_TUNING.miks.x.waveRadiusM;
                         let hitCount = 0;
@@ -50655,10 +50695,10 @@
         // =============================================
         // V2.2: High Fidelity looks, CONTROLLERS (role block: Omen, Brimstone, Viper, Clove, Harbor, Astra, Miks)
         // =============================================
-        // Looks only (HIFI-CONTRACT.md). Converted here: viper.q, brimstone.x (pilots).
+        // Looks only (HIFI-CONTRACT.md). Converted here: all 27 (viper.q and brimstone.x were the pilots).
         // VIPER Poison Cloud: a gas canister, then a toxic cloud (castSmokeProjectile; its colour names it)
         abilityLook.defineModel('viper.canister', {
-            count: 2,
+            count: 3,   // V2.2: Poison Cloud's and both Snake Bites' (viper.c uses it too)
             mats: { body: { color: 0x1f2d24, rough: 0.5, metal: 0.45 }, cap: { color: 0x3f4a42, rough: 0.4, metal: 0.6 }, acid: { glow: 0x4ade80 } },
             parts: [
                 { shape: 'cyl', size: [0.075, 0.075, 0.22], seg: 12, rot: [Math.PI / 2, 0, 0], mat: 'body' },
@@ -50703,6 +50743,561 @@
                 groundZone: { preset: 'fire', colA: 0xb91c1c, colB: 0xff8a2a, scorch: { hex: 0x2b1a12, scale: 1.0, holdMs: 8000 } }
             }
         });
+        // V2.2: the Controllers' other 25 abilities. Each adapter fills P in place from its Classic item and
+        // allocates nothing. Timers that other agents share (reynaDismissUntil, brimStimUntil,
+        // clovePickMeUpUntil) count only while their own agent holds them (HIFI-MAP.md). The buffs use no
+        // screen edge: it hangs from the weapon group, whose turn is off the view's once you look up or down
+        (function () {
+            const L = abilityLook;
+            const sat = function (v) { return v < 0 ? 0 : (v > 1 ? 1 : v); };
+            // the Classic fade over an item's last ms
+            const out = function (rem, ms) { return rem < ms ? Math.max(0, rem / ms) : 1; };
+            // a round zone at an item's position: radius r, in over inMs, out over its last outMs
+            const zoneAt = function (P, it, now, r, inMs, outMs) {
+                P.x = it.position.x; P.y = it.position.y; P.z = it.position.z; P.r = r; P.rect = 0; P.yaw = 0;
+                P.start = it.startAt; P.end = it.expireAt; P.age = (now - it.startAt) * 0.001;
+                P.fade = out(it.expireAt - now, outMs) * sat((now - it.startAt) / inMs);
+            };
+            // one wall panel: a box centred at x, y, z, sized sx (across), sy (up), sz (along), turned by yaw
+            const panel = function (P, x, y, z, sx, sy, sz, yaw) {
+                const a = P.panels[0];
+                P.n = 1;
+                a.x = x; a.y = y; a.z = z; a.sx = sx; a.sy = sy; a.sz = sz; a.yaw = yaw; a.shape = 'box';
+                P.maxHealth = 0;
+            };
+            // a strip of ground under a wall: centre x, y, z, half sizes rx across and rz along, turned by yaw (a
+            // ground zone turns with the wall; the wall's own floor decal covers its bounding square)
+            const strip = function (P, x, y, z, rx, rz, yaw) {
+                P.x = x; P.y = y; P.z = z; P.r = Math.max(rx, rz); P.rect = 1; P.rx = rx; P.rz = rz; P.yaw = yaw;
+            };
+            const TIMER = { renderer: 'self', adapt: 'timer' };
+            const ultOf = function (agent) { return game.ultAgent === agent && game.ultActiveUntil > gameNow(); };
+
+            // ---------------------------------------------------------------- OMEN
+            // Shrouded Step and From the Shadows: each step's two portals (shadowPortals, tagged in
+            // castOmenShroudedStep) are pools of shadow on the floor with a violet column over each (the Classic
+            // pillar: lower, wider and fainter over its 900 ms), smoke and motes rising out of them; the
+            // intangible moment (reynaDismissUntil) and the ultimate are buffs
+            L.addTimer('omenStep', { until: function () { return game.activeAgent === 'omen' && !ultOf('omen') ? agentSystem.reynaDismissUntil : 0; }, key: 'omen.c' });
+            L.addTimer('omenUlt', { until: function () { return game.ultAgent === 'omen' ? game.ultActiveUntil : 0; }, key: 'omen.x' });
+            const portal = [
+                { renderer: 'groundZone', adapt: function (P, p, now) {
+                    const f = sat((now - p.startAt) / Math.max(1, p.expireAt - p.startAt));
+                    zoneAt(P, p, now, 1.3 * (1 + 0.6 * f), 90, 1);   // the Classic ring: 1.15 m, wider as it closes
+                    P.fade *= 1 - f * f;
+                } },
+                { renderer: 'beam', adapt: function (P, p, now) {
+                    const f = sat((now - p.startAt) / Math.max(1, p.expireAt - p.startAt));
+                    P.ox = p.position.x; P.oy = p.position.y; P.oz = p.position.z;
+                    L.dirQ(P.q, 0, 1, 0);
+                    P.len = 2.4 * Math.max(0.15, 1 - f * 0.6);   // the Classic pillar: 2.2 m, lower and wider as it closes
+                    P.width = 1 + 0.5 * f;
+                    P.fade = (1 - f) * sat((now - p.startAt) / 90);
+                } }
+            ];
+            const portalZone = { preset: 'vortex', colA: 0x4338ca, colB: 0x6d28d9, tongues: 'mote', blend: 'normal',
+                emit: { every: 30, spec: { kind: 'smoke', hex: 0x4a3a8c, n: 4, life: 0.9, s0: 0.35, s1: 1.2, a0: 1, drag: 1.2, up: 2.4, jitter: 0.45, grav: -0.5 } } };
+            const portalColumn = { core: 0x120e30, glow: 0x6d28d9, width: 1.5, jag: 0, origin: null, impact: null };
+            L.defineLook('omen.c', {
+                routes: { shadowPortals: portal, omenStep: TIMER },
+                styles: {
+                    groundZone: portalZone,
+                    beam: portalColumn,
+                    self: { hand: { mode: 6, color: 0x818cf8, scale: 0.75 },
+                        aura: { colA: 0x312e81, colB: 0x818cf8, w: 1.1, h: 2.0 },
+                        motes: { every: 60, spec: { kind: 'glow', hex: 0x818cf8, n: 2, life: 0.6, s0: 0.14, s1: 0.03, a0: 0.8, drag: 1.5, up: 0.7, jitter: 0.7 } } }
+                }
+            });
+            L.defineLook('omen.x', {
+                routes: { shadowPortals: portal, omenUlt: TIMER },
+                styles: {
+                    groundZone: portalZone,
+                    beam: portalColumn,
+                    self: { aura: { colA: 0x1e1b4b, colB: 0x818cf8, w: 1.2, h: 2.1 },
+                        motes: { every: 150, spec: { kind: 'smoke', hex: 0x241c3d, n: 1, life: 0.8, s0: 0.12, s1: 0.4, a0: 0.35, drag: 1.5, up: 0.6, jitter: 0.5 } } }
+                }
+            });
+            // Paranoia: the shadow wave (paranoiaWaves, 24 m/s through walls) is a dark orb with a violet rim
+            // leaving a wake of shadow (the nearsight it gives is the bots' screen effect: Classic)
+            L.defineLook('omen.q', {
+                routes: { paranoiaWaves: { renderer: 'projectile', adapt: function (P, w, now) {
+                    P.x = w.position.x; P.y = w.position.y; P.z = w.position.z;
+                    P.vx = w.velocity.x; P.vy = w.velocity.y; P.vz = w.velocity.z;
+                    P.age = (now - w.startAt) * 0.001;
+                } } },
+                styles: { projectile: { orb: { style: 1, a: 0x05030c, b: 0x5b4fd6, size: 2.5, blend: 'normal' }, trailMs: 24,
+                    trail: [{ kind: 'smoke', hex: 0x1c1436, life: 0.8, s0: 0.8, s1: 2.0, a0: 1, drag: 2.2, grav: 0, jx: 1.6, jy: 1.6, jz: 1.6 },
+                        { kind: 'smoke', hex: 0x3b2f73, life: 0.55, s0: 0.4, s1: 1.3, a0: 0.9, drag: 1.4, grav: 0, jx: 3.2, jy: 3.2, jz: 3.2 },
+                        { kind: 'glow', hex: 0x6366f1, life: 0.28, s0: 1.4, s1: 0.3, a0: 0.5, drag: 0, grav: 0 }] } }
+            });
+
+            // ---------------------------------------------------------------- BRIMSTONE
+            // Stim Beacon: a modelled beacon (its stim crystal turns, and burns brighter while you stand in its
+            // aura) on a field of orange light the size of the aura; its deploy ring goes; the stim
+            // (brimStimUntil, while Brimstone) is a buff
+            (function () {
+                const parts = [
+                    { shape: 'cyl', size: [0.24, 0.31, 0.3], seg: 14, at: [0, 0.15, 0], mat: 'body' },
+                    { shape: 'cyl', size: [0.16, 0.24, 0.1], seg: 14, at: [0, 0.35, 0], mat: 'body' },
+                    { shape: 'torus', size: [0.285, 0.024], seg: [6, 24], at: [0, 0.22, 0], rot: [Math.PI / 2, 0, 0], mat: 'plate' },
+                    { shape: 'cyl', size: [0.07, 0.09, 0.08], seg: 10, at: [0, 0.44, 0], mat: 'plate' },
+                    { group: 'core', shape: 'oct', size: [0.14], mat: 'core' }
+                ];
+                for (let k = 0; k < 3; k++) {
+                    const a = k * Math.PI * 2 / 3;
+                    parts.push({ shape: 'rbox', size: [0.08, 0.05, 0.17], radius: 0.015, seg: 2, at: [Math.sin(a) * 0.3, 0.025, Math.cos(a) * 0.3], rot: [0, a, 0], mat: 'body' });
+                    parts.push({ shape: 'box', size: [0.022, 0.26, 0.022], at: [Math.sin(a) * 0.12, 0.6, Math.cos(a) * 0.12], rot: [Math.cos(a) * 0.3, 0, -Math.sin(a) * 0.3], mat: 'plate' });
+                }
+                L.defineModel('brimstone.beacon', {
+                    count: 2,
+                    mats: { body: { color: 0x2f3338, rough: 0.45, metal: 0.7 }, plate: { color: 'theme:brimstone', rough: 0.4, metal: 0.35 }, core: { light: 0xffa14a } },
+                    groups: { core: { at: [0, 0.66, 0], role: 'spin', axis: 'y', rate: 1.6 } },
+                    parts: parts
+                });
+            })();
+            L.addTimer('brimstoneStim', { until: function () { return game.activeAgent === 'brimstone' ? agentSystem.brimStimUntil : 0; }, key: 'brimstone.c' });
+            L.defineLook('brimstone.c', {
+                routes: {
+                    stimBeacons: [
+                        { renderer: 'groundZone', adapt: function (P, b, now) { zoneAt(P, b, now, b.radius, 350, 600); } },
+                        { renderer: 'deployable', adapt: function (P, b, now) {
+                            P.x = b.position.x; P.y = b.position.y; P.z = b.position.z; P.yaw = 0; P.headYaw = NaN; P.shotAt = 0;
+                            P.start = b.startAt; P.remain = b.expireAt - now; P.fade = 1;
+                            const c = characterController.position, dx = c.x - b.position.x, dz = c.z - b.position.z;
+                            P.alert = dx * dx + dz * dz <= b.radius * b.radius;
+                        } }
+                    ],
+                    ring: 'absorb',
+                    brimstoneStim: TIMER
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'brimstone.beacon', lights: [0xff8a2a, 0xffc06a, 0xffffff], lightY: 0.66, lightRadius: 4, lightK: 0.7, unfoldMs: 300,
+                        dust: { hex: 0x8d8579, n: 12 }, emit: { every: 150, spec: { kind: 'ember', hex: 0xffa14a, n: 1, life: 0.9, s0: 0.05, s1: 0.015, a0: 1, drag: 0.6, up: 1.3, jitter: 0.5 } } },
+                    groundZone: { preset: 'field', colA: 0x5a1d0a, colB: 0xf97316, tongues: 'mote' },
+                    self: { hand: { mode: 2, color: 0xffa14a, scale: 0.6 },
+                        aura: { colA: 0xc2410c, colB: 0xfdba74, w: 1.1, h: 2.0 }, color: 0xfb923c, streaks: { every: 280, minSpeed: 5.5 },
+                        motes: { every: 110, spec: { kind: 'ember', hex: 0xffa14a, n: 1, life: 0.55, s0: 0.05, s1: 0.015, a0: 1, drag: 1, up: 1.2, jitter: 0.8 } } }
+                }
+            });
+            // Incendiary: a modelled grenade with a lit fuse, then a napalm fire, a deeper red than Phoenix's
+            // (owned by its type, its zone by the detonation: no tags)
+            L.defineModel('brimstone.grenade', {
+                count: 1,
+                mats: { body: { color: 0x3a332e, rough: 0.5, metal: 0.55 }, band: { color: 'theme:brimstone', rough: 0.4, metal: 0.3 }, fuse: { glow: 0xffb35c } },
+                parts: [
+                    { shape: 'rbox', size: [0.21, 0.21, 0.3], radius: 0.085, seg: 3, mat: 'body' },
+                    { shape: 'cyl', size: [0.112, 0.112, 0.06], seg: 14, at: [0, 0, 0.02], rot: [Math.PI / 2, 0, 0], mat: 'band' },
+                    { shape: 'cyl', size: [0.042, 0.055, 0.07], seg: 10, at: [0, 0, 0.18], rot: [Math.PI / 2, 0, 0], mat: 'band' },
+                    { shape: 'sphere', size: [0.042], seg: [8, 6], at: [0, 0, 0.225], mat: 'fuse' }
+                ]
+            });
+            L.defineLook('brimstone.q', {
+                routes: { projectile: 'projectile', molly: 'groundZone' },
+                styles: {
+                    projectile: { model: 'brimstone.grenade', spin: { axis: 'x', rate: 13 },
+                        trail: [{ kind: 'ember', hex: 0xff8a1f, life: 0.45, s0: 0.06, s1: 0.02, a0: 1, drag: 0.8, grav: -1, jx: 0.8, jz: 0.8, up: 0.4, upRand: 0.8 },
+                            { kind: 'smoke', hex: 0x3a2a22, life: 0.8, s0: 0.15, s1: 0.5, a0: 0.3, drag: 1.2, grav: -0.4, jx: 0.4, jz: 0.4, up: 0.3 }] },
+                    groundZone: { preset: 'fire', colA: 0x991b1b, colB: 'theme:brimstone', scorch: { hex: 0x2b1a12, scale: 1.0, holdMs: 8000 } }
+                }
+            });
+            // Sky Smoke: a modelled smoke canister, then a smoke lit warm from inside (owned by its colour)
+            L.defineModel('brimstone.canister', {
+                count: 2,
+                mats: { body: { color: 0x2b2a28, rough: 0.5, metal: 0.6 }, band: { color: 0xd97706, rough: 0.45, metal: 0.3 }, vent: { glow: 0xfbbf24 } },
+                parts: [
+                    { shape: 'cyl', size: [0.068, 0.068, 0.24], seg: 12, rot: [Math.PI / 2, 0, 0], mat: 'body' },
+                    { shape: 'cyl', size: [0.072, 0.072, 0.045], seg: 12, at: [0, 0, 0.07], rot: [Math.PI / 2, 0, 0], mat: 'band' },
+                    { shape: 'cyl', size: [0.072, 0.072, 0.045], seg: 12, at: [0, 0, -0.07], rot: [Math.PI / 2, 0, 0], mat: 'band' },
+                    { shape: 'cyl', size: [0.05, 0.062, 0.035], seg: 10, at: [0, 0, 0.135], rot: [Math.PI / 2, 0, 0], mat: 'vent' }
+                ]
+            });
+            L.defineLook('brimstone.e', {
+                routes: { projectile: 'projectile', smoke: 'smoke' },
+                styles: {
+                    projectile: { model: 'brimstone.canister', spin: { axis: 'x', rate: 11 },
+                        trail: [{ kind: 'smoke', hex: 0x6b5a4a, life: 0.7, s0: 0.1, s1: 0.4, a0: 0.4, drag: 1.4, grav: -0.2, jx: 0.4, jy: 0.4, jz: 0.4 },
+                            { kind: 'glow', hex: 0xfbbf24, life: 0.2, s0: 0.18, s1: 0.04, a0: 0.6, drag: 0, grav: 0 }] },
+                    smoke: { preset: 'fire', body: 0x4d3b2d, wisp: 0xf0b070, glow: 0xff8a2a, glowK: 0.22 }
+                }
+            });
+
+            // ---------------------------------------------------------------- VIPER
+            // Snake Bite: the pilot's gas canister (one pool serves both) dripping acid, then a pool of acid
+            L.defineLook('viper.c', {
+                routes: { projectile: 'projectile', molly: 'groundZone' },
+                styles: {
+                    projectile: { model: 'viper.canister', spin: { axis: 'x', rate: 14 },
+                        trail: [{ kind: 'spark', hex: 0x86efac, life: 0.45, s0: 0.05, s1: 0.02, a0: 1, drag: 0.6, grav: 9.8, jx: 0.6, jy: 0.3, jz: 0.6 },
+                            { kind: 'glow', hex: 0x4ade80, life: 0.22, s0: 0.22, s1: 0.04, a0: 0.7, drag: 0, grav: 0 }] },
+                    groundZone: { preset: 'toxic', colA: 0x15803d, colB: 0xbef264, scorch: { hex: 0x1a2e1f, scale: 0.9, holdMs: 5000 },
+                        emit: { every: 140, spec: { kind: 'smoke', hex: 0x2f6b3c, n: 1, life: 1.4, s0: 0.3, s1: 0.9, a0: 0.3, drag: 1.2, up: 0.5, jitter: 0.3 } } }
+                }
+            });
+            // Toxic Screen: a gas wall on the Classic 0.42 x 3.6 m box along the aim, rising as it forms, over a
+            // strip of acid along its base
+            L.defineLook('viper.e', {
+                routes: { toxicScreens: [
+                    { renderer: 'groundZone', adapt: function (P, s, now) {
+                        strip(P, s.center.x, s.center.y, s.center.z, 0.75, s.length * 0.5 + 0.3, s.group.rotation.y);
+                        P.start = s.startAt; P.end = s.expireAt; P.age = (now - s.startAt) * 0.001;
+                        P.fade = out(s.expireAt - now, 600) * sat(P.age * 4);
+                    } },
+                    { renderer: 'wall', adapt: function (P, s, now) {
+                        panel(P, s.center.x, s.center.y + 1.8, s.center.z, 0.42, 3.6, s.length, s.group.rotation.y);
+                        P.start = s.startAt; P.fade = out(s.expireAt - now, 600);
+                    } }
+                ] },
+                styles: {
+                    wall: { preset: 'gas', colA: 0x14532d, colB: 0x86efac, floor: -1,
+                        emit: { every: 120, spec: { kind: 'smoke', hex: 0x3f8f4f, n: 3, life: 1.8, s0: 0.5, s1: 1.4, a0: 0.3, drag: 1.4, up: 0.5, jitter: 0.4, grav: -0.2 } },
+                        form: { kind: 'smoke', hex: 0x4ade80, n: 14, life: 1.0, s0: 0.4, s1: 1.2, a0: 0.4, drag: 2, up: 1.5, jitter: 1 } },
+                    groundZone: { preset: 'toxic', colA: 0x166534, colB: 0x86efac, tongues: null, scorch: null }
+                }
+            });
+            // Viper's Pit: the gameplay sphere (14 m around where she stood: the one sight lines stop at) as a
+            // toxic cloud you can half see through, over a pool of toxin
+            L.defineLook('viper.x', {
+                routes: { vipersPit: [
+                    { renderer: 'smoke', adapt: function (P, v, now) {
+                        P.x = v.position.x; P.y = v.position.y; P.z = v.position.z; P.r = v.radius;
+                        P.fade = out(v.expireAt - now, 800) * sat((now - v.startAt) / 300);
+                    } },
+                    { renderer: 'groundZone', adapt: function (P, v, now) { zoneAt(P, v, now, v.radius, 300, 800); P.fade *= 0.6; } }
+                ] },
+                styles: {
+                    smoke: { preset: 'toxic', opacity: 0.55, glowK: 0.12 },
+                    groundZone: { preset: 'toxic', colA: 0x14532d, colB: 0x22c55e, tongues: null, scorch: null }
+                }
+            });
+
+            // ---------------------------------------------------------------- CLOVE
+            // Pick-Me-Up: the burst at your chest is a pink flash (a dash or an updraft would leave afterimages of a
+            // move you do not make), its ring goes, and the haste (clovePickMeUpUntil, while Clove and not in her
+            // ultimate) is a buff: an aura seen from outside, rising motes, speed lines while you run
+            L.addTimer('clovePickMeUp', { until: function () { return game.activeAgent === 'clove' && !ultOf('clove') ? agentSystem.clovePickMeUpUntil : 0; }, key: 'clove.c' });
+            L.defineLook('clove.c', {
+                routes: { flash: 'flash', ring: 'absorb', clovePickMeUp: TIMER },
+                styles: { flash: { core: 0xffe4f2, glow: 'theme:clove', coreSize: 0.7, streaks: 0.4, halo: { hex: 0xfbcfe8, size: 3.5 }, light: { hex: 0xf472b6, radius: 8 }, embers: { n: 16, hex: 0xf9a8d4 } },
+                    self: { color: 0xf9a8d4, hand: { mode: 2, color: 0xf472b6, scale: 0.6 },
+                    aura: { colA: 0xdb2777, colB: 0xfbcfe8, w: 1.1, h: 2.0 },
+                    motes: { every: 120, spec: { kind: 'glow', hex: 0xf9a8d4, n: 1, life: 1.0, s0: 0.07, s1: 0.02, a0: 0.9, drag: 0.8, up: 0.8, jitter: 0.4 } },
+                    streaks: { every: 260, minSpeed: 5.5 } } }
+            });
+            // Meddle: a pink essence orb, then a pink and violet burst (spawnCloveMeddleBurst, carried by the
+            // detonation: its flash 0.4 m up, 6.2 m), its ring drawn by the blast
+            L.defineLook('clove.q', {
+                routes: { projectile: 'projectile', flash: 'blast', ring: 'absorb' },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xfff0f8, b: 'theme:clove', size: 0.55 },
+                        trail: [{ kind: 'glow', hex: 0xf472b6, life: 0.3, s0: 0.3, s1: 0.05, a0: 0.8, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0xd8b4fe, life: 0.3, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 1, jx: 1.2, jy: 1.2, jz: 1.2 }] },
+                    blast: { preset: 'cosmic', rScale: 0.92, coreA: 0xffe4f2, coreB: 0xf472b6, shellA: 0xec4899, shellB: 0x9333ea, ringB: 0xf472b6,
+                        sparks: { n: 26, hex: 0xfbcfe8, grav: 0.5 }, smoke: { n: 5, hex: 0x4a1030, k: 0.45 }, halo: 0xfce7f3, light: 0xf472b6 }
+                }
+            });
+            // Ruse: a twilight smoke, deep magenta lit pink from inside (owned by its colour); its ring goes
+            L.defineLook('clove.e', {
+                routes: { smoke: 'smoke', ring: 'absorb' },
+                styles: { smoke: { preset: 'cosmic', body: 0x4a1030, wisp: 'theme:clove', glow: 0xf472b6, glowK: 0.35, stars: 0.5 } }
+            });
+            // Not Dead Yet: the cast's burst (and the revives', tagged in tryPhoenixRebirth) is a pink flash, its
+            // ring goes, and the ultimate is a buff
+            L.addTimer('cloveUlt', { until: function () { return game.ultAgent === 'clove' ? game.ultActiveUntil : 0; }, key: 'clove.x' });
+            L.defineLook('clove.x', {
+                routes: { flash: 'flash', ring: 'absorb', cloveUlt: TIMER },
+                styles: {
+                    flash: { core: 0xffe4f2, glow: 'theme:clove', coreSize: 1.1, streaks: 0.8, halo: { hex: 0xfce7f3, size: 6 }, light: { hex: 0xf472b6, radius: 14 }, embers: { n: 26, hex: 0xf9a8d4 } },
+                    self: { aura: { colA: 0xdb2777, colB: 0xfce7f3, w: 1.2, h: 2.1 },
+                        motes: { every: 100, spec: { kind: 'glow', hex: 0xf9a8d4, n: 1, life: 1.1, s0: 0.08, s1: 0.02, a0: 0.9, drag: 0.8, up: 0.9, jitter: 0.5 } },
+                        color: 0xf9a8d4, streaks: { every: 260, minSpeed: 5.5 } }
+                }
+            });
+
+            // ---------------------------------------------------------------- HARBOR
+            // a ring that splashes: a small water blast where it spawns (Cascade anchoring, Cove landing)
+            const splash = { renderer: 'blast', adapt: function (P, r) {
+                const m = r.mesh.position;
+                P.x = m.x; P.y = m.y; P.z = m.z; P.R = Math.min(4, r.maxScale * 0.6); P.fy = L.floorY(m.x, m.y + 0.5, m.z);
+            } };
+            const splashStyle = { preset: 'splash', shellB: 0x06b6d4, sparks: { n: 26, hex: 0xd6f3ff, up: 4, upRand: 5 }, dust: { n: 8, hex: 0xcfe8f5, s1: 1.2 }, shake: 0.3 };
+            // Cascade: a water wall on the Classic 6.8 x 3.2 x 0.45 m box as it rolls forward, spray off its
+            // crest; anchoring it (C again: its ring, tagged in stopHarborCascade) splashes
+            L.defineLook('harbor.c', {
+                routes: {
+                    harborCascades: { renderer: 'wall', adapt: function (P, h, now) {
+                        panel(P, h.position.x, h.position.y + 1.6, h.position.z, 6.8, 3.2, 0.45, h.group.rotation.y);
+                        P.start = h.startAt; P.fade = out(h.expireAt - now, 450);
+                    } },
+                    ring: splash
+                },
+                styles: {
+                    wall: { preset: 'water', colA: 0x0c4a6e, colB: 0x7dd3fc, floor: -1,
+                        emit: { every: 60, spec: { kind: 'spark', hex: 0xd6f3ff, n: 3, life: 0.7, s0: 0.05, s1: 0.02, a0: 0.9, drag: 0.6, up: 3, jitter: 1.6, grav: 9.8 } },
+                        form: { kind: 'spark', hex: 0xd6f3ff, n: 24, life: 0.8, s0: 0.06, s1: 0.02, a0: 1, drag: 0.5, up: 4, jitter: 2.5, grav: 9.8 },
+                        end: { kind: 'dust', hex: 0xcfe8f5, n: 12, life: 1.1, s0: 0.5, s1: 1.5, a0: 0.4, drag: 1.5, up: 0.6, jitter: 0.6 } },
+                    blast: splashStyle
+                }
+            });
+            // Cove: a water orb, then the dome (the gameplay sphere, 5 m: the one sight lines stop at) as a shell
+            // of water with a bright rim, fainter once its shield breaks; it lands with a splash (its ring,
+            // carried by the detonation)
+            L.defineLook('harbor.q', {
+                routes: {
+                    projectile: 'projectile',
+                    harborCoves: { renderer: 'smoke', adapt: function (P, c, now) {
+                        P.x = c.position.x; P.y = c.position.y; P.z = c.position.z; P.r = c.radius * (0.2 + 0.8 * sat((now - c.startAt) / 220));
+                        P.fade = out(c.expireAt - now, 500) * (c.shieldHp > 0 ? 1 : 0.45);
+                    } },
+                    ring: splash
+                },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xecfeff, b: 'theme:harbor', size: 0.6 },
+                        trail: [{ kind: 'spark', hex: 0xbae6fd, life: 0.4, s0: 0.05, s1: 0.02, a0: 1, drag: 0.6, grav: 9.8, jx: 0.6, jy: 0.4, jz: 0.6 },
+                            { kind: 'glow', hex: 0x22d3ee, life: 0.25, s0: 0.3, s1: 0.05, a0: 0.7, drag: 0, grav: 0 }] },
+                    smoke: { preset: 'water', glow: 0x22d3ee, wisp: 0x67e8f9 },
+                    blast: splashStyle
+                }
+            });
+            // High Tide: a water wall on the Classic 0.28 x 3.3 m box from its start to its end (on the floor at
+            // 0, as Classic), a wet strip along its base; its cast ring goes
+            L.defineLook('harbor.e', {
+                routes: {
+                    harborHighTides: [
+                        { renderer: 'groundZone', adapt: function (P, t, now) {
+                            const g = t.group;
+                            strip(P, g.position.x, g.position.y, g.position.z, 0.9, t.length * 0.5 + 0.4, g.rotation.y);
+                            P.start = t.startAt; P.end = t.expireAt; P.age = (now - t.startAt) * 0.001;
+                            P.fade = out(t.expireAt - now, 500) * sat(P.age * 3);
+                        } },
+                        { renderer: 'wall', adapt: function (P, t, now) {
+                            const g = t.group;
+                            panel(P, g.position.x, g.position.y + 1.65, g.position.z, 0.28, 3.3, t.length, g.rotation.y);
+                            P.start = t.startAt; P.fade = out(t.expireAt - now, 500);
+                        } }
+                    ],
+                    ring: 'absorb'
+                },
+                styles: {
+                    wall: { preset: 'water', colA: 0x0c4a6e, colB: 0x7dd3fc, floor: -1,
+                        form: { kind: 'spark', hex: 0xd6f3ff, n: 40, life: 0.8, s0: 0.06, s1: 0.02, a0: 1, drag: 0.5, up: 4, jitter: 2.5, grav: 9.8 } },
+                    groundZone: { preset: 'water', tongues: null }
+                }
+            });
+            // Reckoning: the moving pool as water (bubbling, its caustics staying with the world as it moves), a
+            // golden spire at its heart whose light flares as each geyser comes, and each geyser (its flash and
+            // ring, tagged in the 2YY step) a column of water; the cast's ring goes
+            (function () {
+                L.defineModel('harbor.spire', {
+                    count: 1,
+                    mats: { gold: { color: 0xd4a017, rough: 0.28, metal: 0.9, emissive: 0x3a2600 }, light: { light: 0x67e8f9 } },
+                    groups: { rings: { at: [0, 0, 0], role: 'spin', axis: 'y', rate: 1.3 }, core: { at: [0, 2.75, 0], role: 'bob', amp: 0.08, rate: 0.8 } },
+                    parts: [
+                        { shape: 'cyl', size: [0.5, 0.65, 0.12], seg: 16, at: [0, 0.06, 0], mat: 'gold' },
+                        { shape: 'cone', size: [0.3, 2.3], seg: 8, at: [0, 1.27, 0], mat: 'gold' },
+                        { group: 'rings', shape: 'torus', size: [0.56, 0.03], seg: [6, 28], at: [0, 0.95, 0], rot: [Math.PI / 2 + 0.22, 0, 0], mat: 'gold' },
+                        { group: 'rings', shape: 'torus', size: [0.42, 0.025], seg: [6, 24], at: [0, 1.65, 0], rot: [Math.PI / 2 - 0.2, 0, 0.15], mat: 'gold' },
+                        { group: 'rings', shape: 'torus', size: [0.28, 0.02], seg: [6, 20], at: [0, 2.25, 0], rot: [Math.PI / 2 + 0.18, 0, -0.1], mat: 'gold' },
+                        { group: 'core', shape: 'oct', size: [0.13], mat: 'light' }
+                    ]
+                });
+            })();
+            L.defineLook('harbor.x', {
+                routes: {
+                    harborReckoning: [
+                        { renderer: 'groundZone', adapt: function (P, h, now) { zoneAt(P, h, now, h.radius, 300, 500); P.y = Math.max(0, h.position.y - 0.04); } },
+                        { renderer: 'deployable', adapt: function (P, h, now) {
+                            P.x = h.position.x; P.y = Math.max(0, h.position.y - 0.04); P.z = h.position.z; P.yaw = 0; P.headYaw = NaN; P.shotAt = 0;
+                            P.start = h.startAt; P.remain = h.expireAt - now; P.fade = out(h.expireAt - now, 500);
+                            P.alert = now > h.nextGeyserAt - 300;   // flares as a geyser comes
+                        } }
+                    ],
+                    flash: 'blast',
+                    ring: 'absorb'
+                },
+                styles: {
+                    groundZone: { preset: 'water', colA: 0x0e7490, colB: 0xe0f2fe,
+                        emit: { every: 90, spec: { kind: 'spark', hex: 0xd6f3ff, n: 2, life: 0.6, s0: 0.05, s1: 0.02, a0: 0.9, drag: 0.6, up: 2.5, jitter: 1.2, grav: 9.8 } } },
+                    deployable: { preset: 'device', model: 'harbor.spire', lights: [0x22d3ee, 0xfde047, 0xffffff], lightY: 2.75, lightRadius: 7, lightK: 0.8, unfoldMs: 400, blinkMs: 1000,
+                        dust: { hex: 0xcfe8f5, n: 14 } },
+                    blast: { preset: 'splash', rScale: 1, shellB: 0x06b6d4, ringB: 0x67e8f9, sparks: { n: 40, hex: 0xd6f3ff, up: 5, upRand: 6 }, dust: { n: 10, hex: 0xcfe8f5, s1: 1.4 },
+                        halo: 0xe0f2fe, light: 0x22d3ee, shake: 0.6 }
+                }
+            });
+
+            // ---------------------------------------------------------------- ASTRA
+            const astraBlast = { preset: 'cosmic', rScale: 1, coreA: 0xfff7cc, coreB: 0xa855f7, shellA: 0xeab308, shellB: 0x8b5cf6, ringB: 0xfacc15,
+                sparks: { n: 30, hex: 0xfde68a, grav: 0.5 }, smoke: { n: 4, hex: 0x3b1d5e, k: 0.4 }, halo: 0xfef3c7, light: 0xa78bfa };
+            // Gravity Well: a violet vortex with a gold rim, its gold core hovering over it; at the implosion (its
+            // flash and ring, tagged in the 2ZZ step) the core pops and a cosmic blast goes off; the cast's ring goes
+            L.defineLook('astra.c', {
+                routes: {
+                    astraGravityWells: [
+                        { renderer: 'groundZone', adapt: function (P, g, now) { zoneAt(P, g, now, g.radius, 250, 350); } },
+                        { renderer: 'flash', adapt: function (P, g) { P.x = g.position.x; P.y = g.position.y + 0.7; P.z = g.position.z; P.go = g.imploded; P.dur = 380; } }
+                    ],
+                    flash: 'blast',
+                    ring: 'absorb'
+                },
+                styles: {
+                    groundZone: { preset: 'vortex', colA: 0x7c3aed, colB: 0xfde68a, tongues: 'mote' },
+                    flash: { core: 0xfff7cc, glow: 'theme:astra', orbSize: 1.6, coreSize: 0.7, streaks: 0.5, halo: { hex: 0xfde68a, size: 3.5 }, light: { hex: 0xeab308, radius: 9 }, embers: { n: 10, hex: 0xfde68a } },
+                    blast: astraBlast
+                }
+            });
+            // Nova Pulse: the star (a gold orb) charges over a faint pool of violet starlight with a gold rim (the
+            // Classic ring), then pops into a cosmic blast (its flash and ring, tagged in the 2AAA step); the cast's
+            // ring goes
+            L.defineLook('astra.q', {
+                routes: {
+                    astraNovaPulses: [
+                        { renderer: 'groundZone', adapt: function (P, n, now) { zoneAt(P, n, now, n.radius, 200, 300); P.fade *= 0.6; } },
+                        { renderer: 'flash', adapt: function (P, n) { P.x = n.position.x; P.y = n.position.y + 0.72; P.z = n.position.z; P.go = n.detonated; P.dur = 360; } }
+                    ],
+                    flash: 'blast',
+                    ring: 'absorb'
+                },
+                styles: {
+                    flash: { core: 0xfffbe6, glow: 'theme:astra', orbSize: 2.2, coreSize: 0.6, streaks: 0, halo: { hex: 0xfde68a, size: 3 }, light: { hex: 0xeab308, radius: 8 }, embers: { n: 14, hex: 0xfde68a } },
+                    groundZone: { preset: 'slow', colA: 0x6d28d9, colB: 0xfde68a, tongues: 'mote' },
+                    blast: astraBlast
+                }
+            });
+            // Nebula: a cosmic smoke full of stars (owned by its colour); its ring goes
+            L.defineLook('astra.e', {
+                routes: { smoke: 'smoke', ring: 'absorb' },
+                styles: { smoke: { preset: 'cosmic' } }
+            });
+            // Cosmic Divide: a starry violet wall on the Classic 56 x 7.5 x 0.22 m box across the view, gold sparks
+            // along its base as it rises over a gold trim (a strip turned with it); its flash is a gold flash, its
+            // ring goes
+            L.defineLook('astra.x', {
+                routes: {
+                    astraCosmicDivide: [
+                        { renderer: 'groundZone', adapt: function (P, d, now) {   // the gold trim along its base
+                            const g = d.group;
+                            strip(P, g.position.x, g.position.y, g.position.z, d.halfLength, 0.35, g.rotation.y);
+                            P.start = d.startAt; P.end = d.expireAt; P.age = (now - d.startAt) * 0.001;
+                            P.fade = out(d.expireAt - now, 600) * sat(P.age * 3);
+                        } },
+                        { renderer: 'wall', adapt: function (P, d, now) {
+                            const g = d.group;
+                            panel(P, g.position.x, g.position.y + 3.75, g.position.z, d.halfLength * 2, 7.5, 0.22, g.rotation.y);
+                            P.start = d.startAt; P.fade = out(d.expireAt - now, 600);
+                        } }
+                    ],
+                    flash: 'flash',
+                    ring: 'absorb'
+                },
+                styles: {
+                    groundZone: { preset: 'field', colA: 0x854d0e, colB: 0xfacc15 },
+                    wall: { preset: 'cosmic', colA: 0x1e1b4b, colB: 0xa855f7,
+                        emit: { every: 60, spec: { kind: 'glow', hex: 0xfde68a, n: 2, life: 1.4, s0: 0.12, s1: 0.03, a0: 0.8, drag: 1, jitter: 0.4 } },
+                        form: { kind: 'spark', hex: 0xfde68a, n: 60, life: 1.0, s0: 0.07, s1: 0.02, a0: 1, drag: 0.8, up: 1.5, jitter: 1.5 } },
+                    flash: { core: 0xfff7cc, glow: 'theme:astra', coreSize: 1.2, streaks: 1.3, halo: { hex: 0xfef3c7, size: 7 }, light: { hex: 0xeab308, radius: 16 }, embers: { n: 24, hex: 0xfde68a } }
+                }
+            });
+
+            // ---------------------------------------------------------------- MIKS
+            const miksBlast = { preset: 'concussive', rScale: 0.9, coreA: 0xffffff, coreB: 0xf472b6, shellA: 0xec4899, shellB: 0x22d3ee, ringB: 0x22d3ee,
+                sparks: { n: 14, hex: 0xf9a8d4 }, dust: { n: 12, hex: 0x8a8279, s1: 1.8 }, smoke: null, halo: 0xfce7f3, light: 0xec4899, shake: 0.9 };
+            // M-Pulse: a pink energy orb, a concussive burst where it lands (its flash and ring, carried by the
+            // detonation), then a modelled emitter bobbing to the beat whose pulses (every 600 ms: their rings,
+            // tagged in the 2PPP step) are scan spheres. The Classic range ring (ringMesh: the radius its pulses
+            // heal and hit in) stays drawn, as the spheres only sweep out to it
+            const MIKS_TICK = AGENT_TUNING.miks.c.tickMs;
+            const pulseAt = function (mp) { return Math.max(mp.startAt, mp.nextPulseAt - MIKS_TICK); };   // the last pulse (the landing counts)
+            L.defineModel('miks.emitter', {
+                count: 2,
+                mats: { body: { color: 0x241f2b, rough: 0.4, metal: 0.6 }, cone: { color: 'theme:miks', rough: 0.35, metal: 0.2, emissive: 0x4a0b28 }, ring: { light: 0x22d3ee } },
+                groups: { head: { at: [0, 0.42, 0], role: 'bob', amp: 0.05, rate: 1.0 / (MIKS_TICK * 0.001) } },
+                parts: [
+                    { group: 'head', shape: 'cyl', size: [0.17, 0.21, 0.2], seg: 18, mat: 'body' },
+                    { group: 'head', shape: 'cyl', size: [0.21, 0.21, 0.04], seg: 18, at: [0, -0.12, 0], mat: 'body' },
+                    { group: 'head', shape: 'cone', size: [0.15, 0.09], seg: 18, at: [0, 0.145, 0], mat: 'cone' },
+                    { group: 'head', shape: 'sphere', size: [0.045], seg: [10, 8], at: [0, 0.2, 0], mat: 'cone' },
+                    { group: 'head', shape: 'torus', size: [0.19, 0.018], seg: [6, 28], at: [0, 0.06, 0], rot: [Math.PI / 2, 0, 0], mat: 'ring' },
+                    { group: 'head', shape: 'torus', size: [0.215, 0.014], seg: [6, 28], at: [0, -0.08, 0], rot: [Math.PI / 2, 0, 0], mat: 'ring' }
+                ]
+            });
+            L.defineLook('miks.c', {
+                routes: {
+                    projectile: 'projectile',
+                    miksMPulses: [
+                        { renderer: 'pulse', keep: ['ringMesh'], adapt: function (P, mp, now) {
+                            const last = pulseAt(mp), age = now - last;
+                            P.shape = 1; P.x = mp.position.x; P.y = mp.position.y + 0.42; P.z = mp.position.z; P.R = mp.radius;
+                            P.front = age <= 520 ? age / 520 : -1;
+                            P.after = age * 0.001;
+                            P.charge = 0.4 + 0.3 * Math.sin(now * 0.0105);
+                            P.fade = out(mp.expireAt - now, 400);
+                            P.wave = last;
+                        } },
+                        { renderer: 'deployable', adapt: function (P, mp, now) {
+                            P.x = mp.position.x; P.y = mp.position.y; P.z = mp.position.z; P.yaw = 0; P.headYaw = NaN; P.shotAt = 0;
+                            P.start = mp.startAt; P.remain = mp.expireAt - now; P.fade = out(mp.expireAt - now, 400);
+                            P.alert = now - pulseAt(mp) < 180;   // its light jumps on each beat
+                        } }
+                    ],
+                    flash: 'blast',
+                    ring: 'absorb'
+                },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xfff0f8, b: 'theme:miks', size: 0.5 },
+                        trail: [{ kind: 'glow', hex: 0xec4899, life: 0.28, s0: 0.28, s1: 0.05, a0: 0.8, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0x67e8f9, life: 0.25, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 1, jx: 1.2, jy: 1.2, jz: 1.2 }] },
+                    pulse: { preset: 'sonar', colA: 'theme:miks', colB: 0x67e8f9, shellA: 0xf472b6, shellB: 0x0e7490, ring: 0x22d3ee, eruptLight: 0xec4899 },
+                    deployable: { preset: 'device', model: 'miks.emitter', lights: [0x22d3ee, 0xf472b6, 0xffffff], lightY: 0.45, lightRadius: 3, lightK: 0.6, unfoldMs: 0, dust: { hex: 0x8d8579, n: 8 } },
+                    blast: miksBlast
+                }
+            });
+            // Harmonize: the halo (miksHarmonizeHalo) is a buff: an aura, notes of light, speed lines; its ring goes
+            L.defineLook('miks.q', {
+                routes: { miksHarmonizeHalo: TIMER, ring: 'absorb' },
+                styles: { self: { aura: { colA: 0xec4899, colB: 0x22d3ee, w: 1.2, h: 2.1 },
+                    motes: { every: 100, spec: { kind: 'glow', hex: 0x67e8f9, n: 1, life: 0.8, s0: 0.07, s1: 0.02, a0: 1, drag: 1, up: 1.0, jitter: 0.7 } },
+                    streaks: { every: 260, minSpeed: 5.5 }, color: 0xf472b6, hand: { mode: 2, color: 0xec4899, scale: 0.6 } } }
+            });
+            // Waveform: a dark magenta smoke wrapped in a pink equalizer grid, cyan inside (owned by its colour); its
+            // ring goes
+            L.defineLook('miks.e', {
+                routes: { smoke: 'smoke', ring: 'absorb' },
+                styles: { smoke: { preset: 'cage', body: 0x3b0a24, wisp: 0x22d3ee, glow: 0xec4899, glowK: 0.8, opacity: 0.75, grid: 6 } }
+            });
+            // Bassquake: the lane (12 x 30 m along the aim) as a pink field, its drops rolling down it as a quake
+            // front (wavesFired: the 2RRR step's own count), each drop (its flash and ring, tagged) a concussive
+            // blast; the cast's ring goes
+            const BQ_WAVE = AGENT_TUNING.miks.x.waveIntervalMs, BQ_STEP = AGENT_TUNING.miks.x.waveSpacingM;
+            L.defineLook('miks.x', {
+                routes: {
+                    miksBassquake: [
+                        { renderer: 'groundZone', adapt: function (P, q, now) {
+                            const half = q.length * 0.5;
+                            strip(P, q.origin.x + q.dir.x * half, Math.max(0, q.origin.y - 0.04), q.origin.z + q.dir.z * half, q.halfWidth, half, Math.atan2(q.dir.x, q.dir.z));
+                            P.start = q.startAt; P.end = q.expireAt; P.age = (now - q.startAt) * 0.001;
+                            P.fade = out(q.expireAt - now, 450) * sat(P.age * 4);
+                        } },
+                        { renderer: 'pulse', adapt: function (P, q, now) {
+                            const k = q.wavesFired, last = q.nextWaveAt - BQ_WAVE;
+                            P.shape = 0; P.sx = q.origin.x; P.sy = Math.max(0, q.origin.y - 0.04); P.sz = q.origin.z;
+                            P.ex = q.origin.x + q.dir.x * q.length; P.ez = q.origin.z + q.dir.z * q.length; P.W = q.halfWidth * 2; P.H = 4;
+                            // each drop rolls the front on from the last one (7 m a drop)
+                            P.front = k > 0 ? Math.min(1, (k - 1 + sat((now - last) / 300)) * BQ_STEP / q.length) : -1;
+                            P.charge = Math.max(0, P.front);
+                            P.after = k > 0 ? (now - last) * 0.001 : 0;
+                            P.fade = out(q.expireAt - now, 450);
+                            P.wave = k;
+                        } }
+                    ],
+                    flash: 'blast',
+                    ring: 'absorb'
+                },
+                styles: {
+                    groundZone: { preset: 'field', colA: 0x9d174d, colB: 0xf9a8d4 },
+                    pulse: { preset: 'quake', colA: 'theme:miks', colB: 0x67e8f9, eruptLight: 0xec4899, shake: 0.5, dust: 0x8a7a68, sparks: 0xf9a8d4 },
+                    blast: miksBlast
+                }
+            });
+        })();
         // V2.2: end of the Controllers' block
 
         // =============================================
