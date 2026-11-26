@@ -5,7 +5,7 @@ const { boot, closeBrowser, programState } = require('./harness');
 
 after(closeBrowser);
 
-// V2.2 Bots Use Map Mechanics (Settings > Practice, off by default): with it on, bots take Bind's
+// V2.2 Bots Use Map Mechanics (Settings > Custom & Cheats, with Bot Skill; off by default): with it on, bots take Bind's
 // teleporters, climb Icebox's and Split's ropes to hold a deck, open Lotus's doors and (attacking) shoot
 // its breakable wall open; with it off nothing about the bots changes.
 //
@@ -131,6 +131,33 @@ const SCENARIOS = () => {
             if (p.y > out.maxY) out.maxY = p.y;
         });
         out.doorNow = [d.isOpen, d.turning];
+        return out;
+    });
+    // Lotus in Wave (the bots defend): a bot rushing the spike at A walks through Lion Gate, open; it may
+    // shut it behind it (every time here)
+    window.__lotusClose = () => __det((sim) => {
+        tacticalEnhancements.toggleWingmanAI(false);
+        game.botAbilityAI = false;
+        tacticalDirector.setGameMode('wave');
+        if (game.mapPreset !== 'lotus') rebuildMapPreset('lotus');
+        tacticalEnhancements.resetMapMechanics();
+        const te = tacticalEnhancements, d = te.lotusDoors[0], td = tacticalDirector;
+        const e = __solo(-26, -12);
+        td.spikeState = 'planted';
+        td.activeSpikeSitePos.set(9, 0, -41);
+        __put(-5, -20);   // (in the rock between the lanes: in range, never in sight)
+        const chance = BOT_MECH.closeChance;
+        BOT_MECH.closeChance = 1;
+        const out = { open: d.isOpen && !d.turning, push: 0, through: null, shutAt: null };
+        try {
+            out.secs = sim(40, () => Math.hypot(e.mesh.position.x - 9, e.mesh.position.z + 41) < 3, (k, t) => {
+                const p = e.mesh.position;
+                if (e.animAction === 'push') out.push++;
+                if (out.through === null && p.z < d.z - 1 && Math.abs(p.x - d.x) < 3) out.through = t;
+                if (out.shutAt === null && !d.isOpen) out.shutAt = { t, z: p.z, clearOfSweep: Math.max(Math.abs(p.x - d.x), Math.abs(p.z - d.z)) > d.cfg.len / 2 + 0.68 };
+            });
+        } finally { BOT_MECH.closeChance = chance; td.spikeState = 'unplanted'; }
+        out.door = [d.isOpen, d.turning];
         return out;
     });
     // Lotus: the bots planted at A; an attacker on A hunts you in the Bell Loft, past the Incense Wall
@@ -325,7 +352,7 @@ test('ON: Icebox and Split ropes: a bot climbs each at your speed to its deck, h
     assert.deepEqual(errors, []);
 });
 
-test('ON: Bind teleporters and Lotus doors and wall: a bot takes the pad when quicker, opens a shut door and goes through, and an attacker shoots the wall open and goes through, each reaching its goal', { timeout: 600000 }, async () => {
+test('ON: Bind teleporters and Lotus doors and wall: a bot takes the pad when quicker, opens a shut door and goes through, a defender shuts one behind it, and an attacker shoots the wall open and goes through, each reaching its goal', { timeout: 600000 }, async () => {
     const { page, errors, frames, evaluate } = await boot({ quality: 'low' });
     await evaluate(HELPERS);
     await evaluate(SCENARIOS);
@@ -359,6 +386,13 @@ test('ON: Bind teleporters and Lotus doors and wall: a bot takes the pad when qu
         assert.ok(r.secs > 0 && r.secs < 40, `${name}: reaches its goal (${r.secs} s; the walk round is ${r.walk.toFixed(1)} m)`);
         assert.deepEqual([r.doorNow[0], r.maxY, r.climb], [true, 0, 0]);
     }
+    const c = await evaluate(() => __lotusClose());
+    assert.equal(c.open, true, 'Lion Gate open at first');
+    assert.ok(c.through !== null, 'the defender goes through it');
+    assert.ok(c.shutAt && c.shutAt.t > c.through && c.shutAt.clearOfSweep, `and shuts it behind it, clear of its sweep (${JSON.stringify(c.shutAt)})`);
+    assert.ok(c.push > 20 && c.push < 90, `animAction 'push' while it turns it (${c.push} ticks)`);
+    assert.deepEqual(c.door[0], false, 'shut');
+    assert.ok(c.secs > 0 && c.secs < 30, `then on to its goal (${c.secs} s)`);
     const w = await evaluate(() => __lotusWall());
     assert.equal(w.goal, null, 'post-plant, it hunts you');
     assert.ok(w.whole, 'the wall stands at first');
@@ -409,6 +443,9 @@ test('OFF: the same scenarios: no bot climbs, teleports, opens a door or shoots 
         assert.deepEqual([r.everOpen, r.through, r.push, r.climb, r.maxY], [false, null, 0, 0, 0], `Lotus door ${di}: never opened, never through it`);
         assert.ok(r.secs > 0 && r.secs < 70, `Lotus door ${di}: goes round to its goal (${r.secs} s)`);
     }
+    const c = await evaluate(() => __lotusClose());
+    assert.deepEqual([c.open, c.shutAt, c.push, c.door[0]], [true, null, 0, true], 'Lion Gate: walked through, left open');
+    assert.ok(c.secs > 0 && c.secs < 30, `on to its goal (${c.secs} s)`);
     const w = await evaluate(() => __lotusWall());
     assert.deepEqual([w.hits, w.broken, w.through, w.maxY, w.anim], [0, false, null, 0, 0], 'the wall: never shot, never through');
     assert.ok(w.maxX > 38 && w.seenAt !== null, `goes the long way round to you (x ${w.maxX.toFixed(1)}, ${w.seenAt} s)`);
