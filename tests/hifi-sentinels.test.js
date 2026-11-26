@@ -15,9 +15,7 @@ require('./hifi-kit').roleTest('Sentinels', {
     'chamber.c': ['chamber.c>deployable', 'chamber.c>groundZone', 'chamber.c>flash'],
     'chamber.q': ['chamber.q>beam'],
     'chamber.e': ['chamber.e>deployable', 'chamber.e>flash', 'chamber.e>self', 'chamber.e>groundZone'],
-    // its kill's slow zone needs a sniper hit, and a shot finds bots through the shot broadphase: the kit's
-    // bots are frozen, so a target the kit moves is never filed there again (no hit, no zone in this test)
-    'chamber.x': ['chamber.x>beam', 'chamber.x>flash'],
+    'chamber.x': ['chamber.x>beam', 'chamber.x>flash', 'chamber.x>groundZone'],
     'deadlock.c': ['deadlock.c>projectile', 'deadlock.c>groundZone', 'deadlock.c>deployable'],
     'deadlock.q': ['deadlock.q>deployable', 'deadlock.q>blast'],
     'deadlock.e': ['deadlock.e>wall', 'deadlock.e>deployable'],

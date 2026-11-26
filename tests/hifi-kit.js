@@ -143,6 +143,8 @@ async function cast(g, key, opts) {
                     window.__kitTarget = e;
                     e.mesh.position.set(r.target[0], 0, r.target[1]);
                     e.poseDirty = true;
+                    // bots are frozen, so no enemy update files the moved one again where shots look for actors
+                    syncEnemyBroadphase(e);
                 }
             }
             if (r.orb) agentSystem.onActorEliminated('enemy', new THREE.Vector3(r.orb[0], 0, r.orb[1]));
