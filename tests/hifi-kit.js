@@ -17,7 +17,10 @@ const { boot, programState } = require('./harness');
 //   at: eye position; aim: [pitch, yaw]; again: press the same key again after this many ms of game
 //   time (two-stage abilities); fire: shots fired (left click) after the press, every fireMs;
 //   target: put an enemy at [x, z] (absolute; bots are frozen by bootHifi); orb: drop a soul orb at
-//   [x, z] first (Reyna); xFire: X is pressed a second time at once (ultimates that fire on X).
+//   [x, z] first (Reyna); xFire: X is pressed a second time at once (ultimates that fire on X);
+//   tough: the target survives its hits (a hit, not a kill: the bots stay the same from cast to cast and
+//   in both looks' passes of measure); away: every bot is moved far off first (an ability that goes off
+//   when one comes close stays out until its second press).
 const SPOT = [0, 1.7, 22];
 const RECIPES = {
     // Duelists
@@ -49,9 +52,9 @@ const RECIPES = {
     'sage.c': {}, 'sage.q': {}, 'sage.e': {}, 'sage.x': {},
     'killjoy.c': {}, 'killjoy.q': { target: [0, 12] }, 'killjoy.e': { target: [0, 8] }, 'killjoy.x': {},
     'cypher.c': { target: [0, 16] }, 'cypher.q': {}, 'cypher.e': { target: [0, 12] }, 'cypher.x': {},
-    'chamber.c': { target: [0, 14] }, 'chamber.q': { target: [0, 12], aim: [-0.08, 0] }, 'chamber.e': { again: 1600 }, 'chamber.x': { xFire: true, at: [-40, 1.7, 10], aim: [-0.02, Math.PI], target: [-40, 24] },
+    'chamber.c': { target: [0, 14] }, 'chamber.q': { target: [0, 12], aim: [-0.08, 0] }, 'chamber.e': { again: 1600 }, 'chamber.x': { xFire: true, at: [-40, 1.7, 10], aim: [-0.02, Math.PI], target: [-40, 24], tough: true },
     'deadlock.c': {}, 'deadlock.q': { target: [0, 12] }, 'deadlock.e': {}, 'deadlock.x': { target: [0, 12], aim: [-0.08, 0] },
-    'vyse.c': { target: [0, 17] }, 'vyse.q': { again: 1400 }, 'vyse.e': {}, 'vyse.x': {},
+    'vyse.c': { target: [0, 17] }, 'vyse.q': { again: 1400, away: true }, 'vyse.e': {}, 'vyse.x': {},
     'veto.c': { again: 1600 }, 'veto.q': {}, 'veto.e': { target: [0, 12] }, 'veto.x': {}
 };
 
@@ -136,6 +139,14 @@ async function cast(g, key, opts) {
             camera.position.copy(cc.position);   // casts start at the camera, which follows the player next frame
             camera.rotation.set(aim[0], aim[1], 0, 'YXZ');
             if (cc.targetRotation) cc.targetRotation.y = aim[1];
+            if (r.away) {
+                for (const x of enemyObjects) {
+                    if (!x.isActive || x.hit) continue;
+                    x.mesh.position.set(40, 0, -40);
+                    x.poseDirty = true;
+                    syncEnemyBroadphase(x);
+                }
+            }
             if (r.target) {
                 const e = window.__kitTarget && window.__kitTarget.isActive && !window.__kitTarget.hit ? window.__kitTarget
                     : enemyObjects.find((x) => x.isActive && !x.hit);
@@ -143,6 +154,7 @@ async function cast(g, key, opts) {
                     window.__kitTarget = e;
                     e.mesh.position.set(r.target[0], 0, r.target[1]);
                     e.poseDirty = true;
+                    if (r.tough) e.health = Math.max(e.health, 1e6);
                     // bots are frozen, so no enemy update files the moved one again where shots look for actors
                     syncEnemyBroadphase(e);
                 }
