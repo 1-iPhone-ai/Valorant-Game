@@ -13398,11 +13398,13 @@
             }
         }
         
+        // V2.2: up to 10 m (it was 4): a bot holding a 5.2 m rope deck (Bots Use Map Mechanics) stands
+        // with its head at about 7.5 m and must never be culled
         function enemyChunkBox(cx, cz) {
             const pad = 4;
             return new THREE.Box3(
                 new THREE.Vector3(cx * ENEMY_CHUNK_SIZE - pad, -12, cz * ENEMY_CHUNK_SIZE - pad),
-                new THREE.Vector3((cx + 1) * ENEMY_CHUNK_SIZE + pad, 4, (cz + 1) * ENEMY_CHUNK_SIZE + pad)
+                new THREE.Vector3((cx + 1) * ENEMY_CHUNK_SIZE + pad, 10, (cz + 1) * ENEMY_CHUNK_SIZE + pad)
             );
         }
         
