@@ -18801,7 +18801,8 @@
                 o.pz += s.z; o.rx += s.p; o.rz += s.r; o.py += s.y;
                 // Landing dip
                 const grounded = characterController.grounded !== false;
-                if (grounded && !this.wasGrounded) s.vy -= 0.7;
+                if (enhancedAnim.on) eaFP.onGround(s, grounded, this.wasGrounded);   // V2.2: a jump lift, a landing by how hard
+                else if (grounded && !this.wasGrounded) s.vy -= 0.7;
                 this.wasGrounded = grounded;
                 // Sprint: gun lowered and turned in
                 const moving = game.keys.w || game.keys.a || game.keys.s || game.keys.d;
@@ -18826,6 +18827,8 @@
                         this.pose(c.kind, p, w, o, hand);
                     }
                 }
+                // V2.2 Enhanced Animations: ADS arc, slide/crouch cant, breathing, the off hand at work
+                if (enhancedAnim.on) eaFP.apply(now, dt, o, hand);
                 // Ability cast gesture (off-hand) layered on top
                 castFX.apply(now, o, hand);
                 model.position.x += o.px; model.position.y += o.py; model.position.z += o.pz;
@@ -18904,6 +18907,7 @@
                     return;
                 }
                 if (kind === 'reload' && w) {
+                    if (enhancedAnim.on && eaFP.reload(p, w, o, hand)) return;   // V2.2: a reload per gun type
                     // Tilt in, work the gun, tilt out
                     const tilt = _seg(p, 0, 0.14) * (1 - _seg(p, 0.86, 1));
                     o.rz += 0.5 * tilt * hand;
@@ -19164,7 +19168,9 @@
             },
 
             // kind: 'cast' | 'ult' | 'tap'
-            start: function (kind, colorHex) {
+            // V2.2: abilityKey ('agent.slot') picks a throw, place or activate gesture for a cast
+            // while Enhanced Animations is on
+            start: function (kind, colorHex, abilityKey) {
                 if (!this.group || !this.CLIPS[kind]) return;
                 // An ultimate in progress is not cut short by a flick
                 if (this.active && this.active.kind === 'ult' && kind !== 'ult' && performance.now() - this.active.start < this.active.dur * 0.75) return;
@@ -19172,6 +19178,7 @@
                 this.haloMat.color.copy(col);
                 this.coreMat.color.copy(col).lerp(new THREE.Color(0xffffff), 0.65);
                 this.active = { kind: kind, start: performance.now(), dur: this.CLIPS[kind], burst: false, hex: col.getHex() };
+                if (enhancedAnim.on && kind === 'cast' && abilityKey) this.active.variant = eaFP.castVariant(abilityKey);   // V2.2
                 if (vmAnim.clip && vmAnim.clip.kind === 'inspect') vmAnim.finishClip(game.weapons[game.activeWeapon]);
             },
 
@@ -19245,7 +19252,8 @@
                     this.hide();
                     return;
                 }
-                const up = this._pose(a.kind, p, now);
+                // V2.2: Enhanced Animations' throw / place / activate gestures for a cast
+                const up = (a.variant && enhancedAnim.on) ? eaFP.castPose(this, a.variant, p, now) : this._pose(a.kind, p, now);
                 // The ultimate's release shakes the view a little (Camera Shake setting applies)
                 if (a.kind === 'ult' && !a.burst && p >= 0.68) {
                     a.burst = true;
@@ -19259,6 +19267,316 @@
                 o.px += 0.035 * aside * hand;
                 o.rz += -0.32 * aside * hand;
                 o.rx += -0.12 * aside;
+            }
+        };
+
+        // =============================================
+        // V2.2 Enhanced Animations, first person (enhancedAnim.on; off, nothing here runs):
+        // bob and sway from how fast you really move (walking into a wall does not bob), a lift
+        // on a jump and a dip on landing (by how hard you land), a cant while sliding or
+        // crouched, an arc into and out of aiming down sights, a reload per gun type (rifle,
+        // SMG, pistol, sniper bolt, shotgun shells), the off hand for throws, placing and
+        // activating abilities (castFX), planting, defusing, mantling, ropes and doors, and
+        // breathing at rest. Every offset rides on vmAnim's, which is taken off again each frame,
+        // so the gun returns exactly to its rest pose.
+        // =============================================
+        const eaFP = {
+            lastX: NaN, lastZ: NaN, lastT: 0,
+            speed: 0, lateral: 0, bobPh: 0, idle: 0, slide: 0, airVy: 0,
+            breath: { py: 0, rx: 0 },      // this frame's breathing offset (the rest pose is rest + this)
+            offKind: null, offW: 0, offT: 0, _doorAt: -1e9,
+
+            reset: function () {
+                this.lastX = NaN; this.speed = 0; this.lateral = 0; this.idle = 0; this.slide = 0; this.airVy = 0;
+                this.breath.py = 0; this.breath.rx = 0;
+                if (this.offKind) { this.offKind = null; this.offW = 0; if (!castFX.active) castFX.hide(); }
+            },
+
+            // In place of applyWeaponBobbingBase: the same placement and ADS blend, the bob and the
+            // strafe tilt from the speed the camera really moved (relative to your walking speed)
+            base: function (time) {
+                const weapon = game.weapons[game.activeWeapon];
+                const model = weapon ? weapon.model : null;
+                if (!model) return;
+                const cc = characterController;
+                const dt = Math.min(0.1, Math.max(0, (time - (this.lastT || time)) / 1000));
+                this.lastT = time;
+                const px = camera.position.x, pz = camera.position.z;
+                let vx = 0, vz = 0;
+                if (dt > 0 && this.lastX === this.lastX) { vx = (px - this.lastX) / dt; vz = (pz - this.lastZ) / dt; }
+                this.lastX = px; this.lastZ = pz;
+                const walkTop = Math.max(0.5, cc.terminalSpeed(cc.walkSpeed * (cc.speedMultiplier || 1)) * 60);
+                let sp = Math.hypot(vx, vz) / walkTop;
+                if (sp > 4) { sp = 0; vx = 0; vz = 0; }   // a teleport or a respawn
+                const yaw = camera.rotation.y;
+                const lat = (vx * Math.cos(yaw) - vz * Math.sin(yaw)) / walkTop;
+                const k = Math.min(1, dt * 12);
+                const grounded = cc.grounded !== false;
+                this.speed += ((grounded ? Math.min(1.8, sp) : 0) - this.speed) * k;
+                if (this.speed < 0.002) this.speed = 0;
+                this.lateral += (Math.max(-1.5, Math.min(1.5, lat)) - this.lateral) * k;
+                this.bobPh = (this.bobPh + dt * EA_TAU * 0.95 * this.speed) % EA_TAU;
+                const adsP = game.adsProgress || 0;
+                const hip = weapon.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
+                const ads = weapon.adsPos || hip;
+                const handSign = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                const baseX = (hip.x + (ads.x - hip.x) * adsP) * handSign;
+                const baseY = hip.y + (ads.y - hip.y) * adsP;
+                const baseZ = hip.z + (ads.z - hip.z) * adsP;
+                const bobUser = (game.userSettings && typeof game.userSettings.viewmodelBob === 'number') ? game.userSettings.viewmodelBob / 100 : 1;
+                const mag = this.speed * (1 - adsP * 0.72) * (1 - (cc.crouchBlend || 0) * 0.45) * bobUser * (weapon.isMelee ? 1.25 : 1);
+                const f = this.speed > 0.02 ? 0.22 : 0.16;
+                model.position.y = THREE.MathUtils.lerp(model.position.y, baseY + Math.sin(2 * this.bobPh) * 0.011 * mag, f);
+                model.position.x = THREE.MathUtils.lerp(model.position.x, baseX + Math.sin(this.bobPh) * 0.0075 * mag, f);
+                model.position.z = THREE.MathUtils.lerp(model.position.z, baseZ, f);
+                model.rotation.z = THREE.MathUtils.lerp(model.rotation.z, -0.035 * this.lateral * (1 - adsP * 0.72) * bobUser, this.speed > 0.02 ? 0.1 : 0.12);
+            },
+
+            // vmAnim.end, for the landing: a lift on a jump, a dip on landing scaled by the fall
+            onGround: function (s, grounded, was) {
+                const cc = characterController;
+                if (!grounded) {
+                    this.airVy = Math.min(this.airVy, cc.velocity.y);
+                    if (was && cc.velocity.y > 0.05) { s.vy += 0.75; s.vp -= 0.5; }
+                } else {
+                    if (!was) {
+                        const hard = Math.min(1, -this.airVy / 0.45);
+                        s.vy -= 0.35 + 1.1 * hard;
+                        s.vp += 0.25 + 0.7 * hard;
+                    }
+                    this.airVy = 0;
+                }
+            },
+
+            // vmAnim.end, before the cast gesture: ADS arc, slide and crouch cant, breathing, off hand
+            apply: function (now, dt, o, hand) {
+                const cc = characterController, adsP = game.adsProgress || 0;
+                const arc = (adsP > 0 && adsP < 1) ? Math.sin(Math.PI * adsP) : 0;
+                o.py += -0.022 * arc; o.rz += 0.1 * arc * hand; o.px += -0.012 * arc * hand;
+                this.slide += ((cc.slideTimer > 0 && cc.grounded !== false ? 1 : 0) - this.slide) * Math.min(1, dt * 10);
+                if (this.slide < 0.001) this.slide = 0;
+                const crouch = (cc.crouchBlend || 0) * (1 - this.slide);
+                o.rz += (0.2 * this.slide + 0.06 * crouch) * hand;
+                o.py += -0.025 * this.slide - 0.006 * crouch;
+                const keys = game.keys.w || game.keys.a || game.keys.s || game.keys.d || gamepadController.moveActive;
+                const still = this.speed < 0.05 && !keys && !vmAnim.clip && !game.reloading && cc.grounded !== false && !castFX.active && !this.offKind;
+                this.idle += ((still ? 1 : 0) - this.idle) * Math.min(1, dt * 2);
+                if (this.idle < 0.001) this.idle = 0;
+                const b = Math.sin(now * EA_TAU / 3800) * this.idle * (1 - adsP * 0.8);
+                this.breath.py = 0.0022 * b;
+                this.breath.rx = 0.006 * b;
+                o.py += this.breath.py;
+                o.rx += this.breath.rx;
+                this.offHand(now, dt, o, hand);
+            },
+
+            // ---- The off hand (castFX's hand) for planting, defusing, mantling, ropes and doors
+            _onRope: function () {
+                const te = tacticalEnhancements, cc = characterController;
+                if (!te.ropeGroup || !te.layoutRopes || !(game.keys.f || game.keys.space)) return false;
+                for (const r of te.layoutRopes) {
+                    const rope = r.rope;
+                    if (rope && Math.hypot(cc.position.x - rope.x, cc.position.z - rope.z) <= 2.65 && cc.position.y < rope.topY + 1.4) return true;
+                }
+                return false;
+            },
+            _defusing: function () {
+                const td = tacticalDirector, cc = characterController;
+                if (!(game.gameMode === 'retake' || (game.gameMode === 'match' && matchMode.playerDefuses()))) return false;
+                if (td.spikeState !== 'planted' || !game.keys.f || game.buyMenuOpen) return false;
+                return Math.hypot(cc.position.x - td.activeSpikeSitePos.x, cc.position.z - td.activeSpikeSitePos.z) <= td.spikeSiteRadius;
+            },
+            _pushing: function (now) {
+                const te = tacticalEnhancements, cc = characterController;
+                if (!te.lotusDoors || now - (te.lastInteractFAt || -1e9) > 1100) return false;
+                for (const d of te.lotusDoors) if (d.turning && Math.hypot(cc.position.x - d.x, cc.position.z - d.z) <= 4.4) return true;
+                return false;
+            },
+            offHand: function (now, dt, o, hand) {
+                const cc = characterController, td = tacticalDirector;
+                let kind = null;
+                if (cc.mantleT >= 0) kind = 'mantle';
+                else if (this._onRope()) kind = 'rope';
+                else if (td.spikeState === 'planting' && game.keys.f && !game.buyMenuOpen) kind = 'plant';
+                else if (this._defusing()) kind = 'defuse';
+                else if (this._pushing(now)) kind = 'door';
+                if (castFX.active) kind = null;   // a cast has the hand
+                if (kind && kind !== this.offKind && this.offW < 0.05) { this.offKind = kind; this.offT = 0; }
+                if (!this.offKind) return;
+                this.offW += ((kind === this.offKind ? 1 : 0) - this.offW) * Math.min(1, dt * 9);
+                if (this.offW < 0.01 && kind !== this.offKind) {
+                    this.offKind = null; this.offW = 0;
+                    if (!castFX.active) castFX.hide();
+                    return;
+                }
+                if (castFX.active) return;
+                this.offT += dt;
+                const t = this.offT, w = this.offW, R = castFX.REST;
+                let x = -0.14, y = -0.42, z = -0.48, rx = -1.1, ry = 0.2, rz = 0.1;
+                if (this.offKind === 'plant') {
+                    y += 0.025 * Math.max(0, Math.sin(t * 9));          // tapping the keys
+                } else if (this.offKind === 'defuse') {
+                    rz = 0.1 + 0.45 * Math.sin(t * 5);                   // working the device
+                    y += 0.012 * Math.sin(t * 10);
+                } else if (this.offKind === 'mantle') {
+                    const m = Math.max(0, cc.mantleT);
+                    const reach = 1 - _seg(m, 0.15, 0.85);               // on the ledge, then pushing down past it
+                    x = -0.18; y = -0.06 - 0.38 * (1 - reach); z = -0.56 + 0.08 * (1 - reach); rx = -1.45; ry = 0.1;
+                } else if (this.offKind === 'rope') {
+                    const c = (t / 0.36) % 1;                            // hand over hand: grab high, pull down
+                    const pull = c < 0.6 ? c / 0.6 : 1 - (c - 0.6) / 0.4;
+                    x = -0.07; y = 0.08 - 0.42 * pull; z = -0.42; rx = -0.25; ry = 0.1; rz = 0.2;
+                } else {                                                 // door: palm on the stone, shoving
+                    x = -0.13; y = -0.2; z = -0.55 - 0.03 * Math.sin(t * 7); rx = 0; ry = 0.15; rz = 0.05;
+                }
+                const g = castFX.group;
+                g.visible = w > 0.01;
+                g.position.set((R.x + (x - R.x) * w) * hand, R.y + (y - R.y) * w, R.z + (z - R.z) * w);
+                g.rotation.set(-0.55 * (1 - w) + rx * w, ry * w * hand, rz * w * hand);
+                g.scale.set(1.3 * hand, 1.3, 1.3);
+                castFX.halo.visible = castFX.core.visible = false;
+                // The gun goes low and aside while the hand works
+                const ads = 1 - (game.adsProgress || 0) * 0.6;
+                o.py += -0.1 * w * ads; o.px += 0.04 * w * hand; o.rz += -0.3 * w * hand; o.rx += -0.15 * w;
+            },
+
+            // castFX: which hand gesture a cast gets (by its look tags): a throw, placing, or activating
+            castVariant: function (key) {
+                let tags = null;
+                try { tags = abilityLook.lookOf(key); } catch (e) { tags = null; }
+                const t = tags && tags[0];
+                if (t === 'deployable' || t === 'wall') return 'place';
+                if (t === 'self' || t === 'pulse' || t === 'beam') return 'activate';
+                return 'throw';
+            },
+            // castFX.apply: the hand and its energy for that gesture at clip progress p; returns how
+            // far the gun is moved aside (0-1), as castFX._pose does
+            castPose: function (fx, variant, p, now) {
+                const R = fx.REST, hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                let up, x, y, z, rx, ry, rz, charge, flare;
+                if (variant === 'throw') {
+                    // Up, wind back over the shoulder, whip forward and down, follow through
+                    up = _seg(p, 0, 0.22, _ease.out) * (1 - _seg(p, 0.74, 1));
+                    const wind = _seg(p, 0.12, 0.38) * (1 - _seg(p, 0.4, 0.5));
+                    const whip = _seg(p, 0.4, 0.55, _ease.out) * (1 - _seg(p, 0.72, 0.95));
+                    x = R.x + (-0.17 - R.x) * up + 0.05 * wind;
+                    y = R.y + (-0.21 - R.y) * up + 0.11 * wind - 0.07 * whip;
+                    z = R.z + (-0.39 - R.z) * up + 0.12 * wind - 0.22 * whip;
+                    rx = -0.55 * (1 - up) + 0.45 * wind - 0.5 * whip; ry = 0.25 * (1 - whip); rz = 0.15 * (1 - up);
+                    charge = _seg(p, 0.12, 0.4) * (1 - _seg(p, 0.5, 0.56));
+                    flare = _bump(p, 0.52, 0.08) * 1.2;
+                } else if (variant === 'place') {
+                    // Reach low and forward, palm down, set it on the floor
+                    up = _seg(p, 0, 0.28, _ease.out) * (1 - _seg(p, 0.76, 1));
+                    const low = _seg(p, 0.22, 0.48) * (1 - _seg(p, 0.64, 0.86));
+                    x = R.x + (-0.12 - R.x) * up;
+                    y = R.y + (-0.3 - R.y) * up - 0.2 * low;
+                    z = R.z + (-0.45 - R.z) * up - 0.1 * low;
+                    rx = -0.55 * (1 - up) - 1.15 * low; ry = 0.2 * up; rz = 0.1 * (1 - up);
+                    charge = _seg(p, 0.1, 0.45) * (1 - _seg(p, 0.56, 0.62));
+                    flare = _bump(p, 0.56, 0.07);
+                } else {
+                    // Activate: the hand turns in front of the chest, a press, a pulse of light
+                    up = _seg(p, 0, 0.25, _ease.out) * (1 - _seg(p, 0.7, 1));
+                    const press = _bump(p, 0.46, 0.1);
+                    x = R.x + (-0.08 - R.x) * up;
+                    y = R.y + (-0.27 - R.y) * up - 0.025 * press;
+                    z = R.z + (-0.33 - R.z) * up + 0.02 * press;
+                    rx = -0.55 * (1 - up) - 0.8 * up; ry = -0.2 * up; rz = 0.6 * up;
+                    charge = _seg(p, 0.15, 0.45) * (1 - _seg(p, 0.58, 0.68));
+                    flare = _bump(p, 0.47, 0.1) * 1.4;
+                }
+                const g = fx.group;
+                g.visible = up > 0.01;
+                g.position.set(x * hand, y, z);
+                g.scale.set(1.3 * hand, 1.3, 1.3);
+                g.rotation.set(rx, ry * hand, rz * hand);
+                const fade = 1 - _seg(p, 0.7, 0.84);
+                const e = Math.min(1, charge + flare) * fade * (up > 0.01 ? 1 : 0);
+                const ox = x * hand + 0.012 * hand, oy = y + 0.07, oz = z - 0.05;
+                const haloS = (0.08 + 0.17 * charge + 0.2 * flare) * (1 + 0.08 * Math.sin(now * 0.025));
+                fx.halo.visible = fx.core.visible = e > 0.01;
+                fx.halo.position.set(ox, oy, oz);
+                fx.halo.scale.setScalar(haloS);
+                fx.halo.rotation.z = now * 0.002;
+                fx.core.position.set(ox, oy, oz - 0.002);
+                fx.core.scale.setScalar(haloS * 0.4);
+                fx.haloMat.opacity = Math.min(1, 1.1 * e);
+                fx.coreMat.opacity = Math.min(1, 1.1 * e);
+                for (const wsp of fx.wisps) wsp.visible = false;
+                return up;
+            },
+
+            // vmAnim.pose for a reload: a choreography per gun type. Returns false to leave it to
+            // the classic reload (a gun without a type)
+            gunClass: function (w) {
+                const cls = w && w.def && w.def.cls;
+                if (cls) return cls === 'heavy' ? 'rifle' : cls;
+                return game.activeWeapon === 'sniper' ? 'sniper' : (game.activeWeapon === 'pistol' ? 'pistol' : 'rifle');
+            },
+            reload: function (p, w, o, hand) {
+                if (!w || w.isMelee) return false;
+                const cls = this.gunClass(w);
+                const S = (a, b, f) => _seg(p, a, b, f);
+                const mag = (drop, y) => {
+                    if (!w.magazine) return;
+                    if (w.magRestY === undefined) w.magRestY = w.magazine.position.y;
+                    w.magazine.position.y = w.magRestY - y * drop;
+                };
+                if (cls === 'smg') {
+                    // Tipped up and out, a quick swap, a slap from below, the bolt slapped home
+                    const tilt = S(0, 0.1) * (1 - S(0.85, 1));
+                    o.rz += -0.35 * tilt * hand; o.rx += 0.18 * tilt; o.px += 0.02 * tilt * hand; o.py += 0.02 * tilt;
+                    const drop = p < 0.14 ? 0 : p < 0.24 ? S(0.14, 0.24) : p < 0.4 ? 1 : 1 - S(0.4, 0.52, _ease.out);
+                    mag(drop, 0.3);
+                    if (w.magazine) w.magazine.visible = !(p > 0.25 && p < 0.38);
+                    o.py += 0.03 * _bump(p, 0.53, 0.03); o.rx += 0.07 * _bump(p, 0.53, 0.03);
+                    o.rz += 0.16 * _bump(p, 0.72, 0.06) * hand; o.pz += 0.03 * _bump(p, 0.72, 0.04);
+                } else if (cls === 'pistol') {
+                    // Turned to the mag well, slide locked back, mag out and in, the slide snaps home
+                    const tilt = S(0, 0.12) * (1 - S(0.86, 1));
+                    o.ry += -0.3 * tilt * hand; o.rz += -0.25 * tilt * hand; o.py += -0.02 * tilt;
+                    const drop = p < 0.15 ? 0 : p < 0.25 ? S(0.15, 0.25) : p < 0.45 ? 1 : 1 - S(0.45, 0.58, _ease.out);
+                    mag(drop, 0.25);
+                    if (w.magazine) w.magazine.visible = !(p > 0.27 && p < 0.43);
+                    if (w.slide) {
+                        if (w.slideRestZ === undefined) w.slideRestZ = w.slide.position.z;
+                        w.slide.position.z = w.slideRestZ + 0.05 * S(0, 0.08) * (1 - S(0.7, 0.74));
+                    }
+                    o.pz += 0.025 * _bump(p, 0.73, 0.04); o.rx += -0.08 * _bump(p, 0.73, 0.04);
+                    o.py += 0.015 * _bump(p, 0.6, 0.04);
+                } else if (cls === 'sniper') {
+                    // Rolled and lifted; the bolt: up, back, a round pressed in, forward, down
+                    const tilt = S(0, 0.12) * (1 - S(0.86, 1));
+                    o.rz += 0.35 * tilt * hand; o.py += 0.03 * tilt; o.rx += 0.05 * tilt;
+                    o.rz += 0.2 * _bump(p, 0.22, 0.06) * hand;
+                    o.pz += 0.065 * _bump(p, 0.33, 0.07);
+                    o.py += -0.022 * _bump(p, 0.5, 0.08); o.rx += -0.04 * _bump(p, 0.5, 0.08);
+                    o.pz += -0.03 * _bump(p, 0.67, 0.05);
+                    o.rz += -0.16 * _bump(p, 0.76, 0.05) * hand;
+                } else if (cls === 'shotgun') {
+                    // Rolled over to the loading port, four shells pushed in, then the pump
+                    const tilt = S(0, 0.12) * (1 - S(0.82, 0.95));
+                    o.rz += -0.6 * tilt * hand; o.rx += 0.15 * tilt; o.py += 0.02 * tilt;
+                    for (let i = 0; i < 4; i++) {
+                        const b = _bump(p, 0.2 + i * 0.15, 0.05);
+                        o.py += 0.018 * b; o.rx += 0.045 * b; o.pz += -0.012 * b;
+                    }
+                    o.pz += 0.07 * _bump(p, 0.86, 0.05); o.rx += -0.05 * _bump(p, 0.86, 0.05);
+                } else {
+                    // Rifle: canted in, the mag pulled with a tug, the gun turned to meet the new one,
+                    // seated with a slap, the charging handle yanked
+                    const tilt = S(0, 0.12) * (1 - S(0.88, 1));
+                    o.rz += 0.45 * tilt * hand; o.rx += -0.1 * tilt; o.px += -0.03 * tilt * hand; o.py += 0.03 * tilt;
+                    const drop = p < 0.16 ? 0 : p < 0.3 ? S(0.16, 0.3) : p < 0.48 ? 1 : 1 - S(0.48, 0.62, _ease.out);
+                    mag(drop, 0.38);
+                    if (w.magazine) w.magazine.visible = !(p > 0.32 && p < 0.46);
+                    o.py += -0.02 * _bump(p, 0.2, 0.05);
+                    o.ry += -0.2 * _bump(p, 0.55, 0.12) * hand;
+                    o.py += 0.025 * _bump(p, 0.63, 0.035); o.rx += 0.06 * _bump(p, 0.63, 0.035);
+                    o.pz += 0.04 * _bump(p, 0.8, 0.05); o.rx += -0.07 * _bump(p, 0.8, 0.05);
+                }
+                return true;
             }
         };
 
@@ -19293,7 +19611,8 @@
             const model = weapon ? weapon.model : null;
             if (!model) return;
             vmAnim.begin(model);
-            applyWeaponBobbingBase(time, isMoving);
+            if (enhancedAnim.on) eaFP.base(time);   // V2.2: bob and sway from your real speed
+            else applyWeaponBobbingBase(time, isMoving);
             vmAnim.end(model, time);
         }
 
@@ -27211,8 +27530,8 @@
                 }
 
                 if (!this.consumeCharge(slotKey, now)) return;
-                // V1.7: off-hand cast gesture in the agent's colour
-                castFX.start('cast', def.themeColor);
+                // V1.7: off-hand cast gesture in the agent's colour (V2.2: which ability, for Enhanced Animations)
+                castFX.start('cast', def.themeColor, agentId + '.' + slotKey);
 
                 if (agentId === 'jett') {
                     if (slotKey === 'e') this.castJettTailwind(now);
@@ -50364,6 +50683,18 @@
                 g.rotation.y = yaw;
                 const s = Math.max(0.6, (cc.height || 1.7) / 1.7);
                 g.scale.set(1, s, 1);
+                // V2.2 Enhanced Animations: steps that follow the way you move (side steps, backwards),
+                // crouch-walking, a tuck in the air and a landing
+                if (enhancedAnim.on) {
+                    const dxm = eye.x - this.lastX, dzm = eye.z - this.lastZ;
+                    this.lastX = eye.x; this.lastZ = eye.z;
+                    eaBody.update(this, dt, dxm, dzm, yaw, s);
+                    if (Math.abs(g.position.x - ox) + Math.abs(g.position.y - oy) + Math.abs(g.position.z - oz) > 0.002 || this.amp > 0.02 || eaBody.air > 0.02 || eaBody.land > 0.02) {
+                        shadowManager.markMotion(g.position.x, g.position.y + 0.9, g.position.z, 1.0, ox, oy + 0.9, oz);
+                    }
+                    return;
+                }
+                if (eaBody.used) eaBody.clear(this);
                 // Walk: one leg cycle per 1.6 m moved; legs tuck in the air
                 const moved = Math.hypot(eye.x - this.lastX, eye.z - this.lastZ);
                 this.lastX = eye.x; this.lastZ = eye.z;
@@ -50382,6 +50713,63 @@
                 if (Math.abs(g.position.x - ox) + Math.abs(g.position.y - oy) + Math.abs(g.position.z - oz) > 0.002 || this.amp > 0.02 || this.tuck > 0.02) {
                     shadowManager.markMotion(g.position.x, g.position.y + 0.9, g.position.z, 1.0, ox, oy + 0.9, oz);
                 }
+            }
+        };
+
+        // V2.2 Enhanced Animations: your body's legs while that setting is on. The stride follows
+        // the way you move relative to where you look (forwards, backwards, side steps that spread
+        // and close the legs), keeps time with your speed (not the distance, which at your running
+        // speed would step faster than the frame rate), shortens and quickens when crouched, tucks
+        // up in the air, and squashes on landing by how hard you land.
+        const eaBody = {
+            used: false, fwd: 0, side: 0, air: 0, land: 0, fall: 0, wasAir: false,
+            update: function (pb, dt, dx, dz, yaw, s) {
+                this.used = true;
+                const cc = characterController;
+                const walkTop = Math.max(0.5, cc.terminalSpeed(cc.walkSpeed * (cc.speedMultiplier || 1)) * 60);
+                let vf = 0, vs = 0;
+                if (dt > 0 && Math.hypot(dx, dz) < 3) {
+                    vf = (dx * -Math.sin(yaw) + dz * -Math.cos(yaw)) / dt / walkTop;   // along where you look
+                    vs = (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / dt / walkTop;     // to your right
+                }
+                const air = cc.grounded === false;
+                const k = Math.min(1, dt * 10);
+                this.fwd += (vf - this.fwd) * k;
+                this.side += (vs - this.side) * k;
+                const sp = Math.min(1.6, Math.hypot(this.fwd, this.side));
+                pb.amp += ((air ? 0 : Math.min(1, sp)) - pb.amp) * k;
+                if (pb.amp < 0.002) pb.amp = 0;
+                const crouch = cc.crouchBlend || 0;
+                if (!air) pb.phase = (pb.phase + dt * EA_TAU * 1.5 * sp * (1 + 0.35 * crouch)) % EA_TAU;
+                if (air) {
+                    this.air = Math.min(1, this.air + dt * 5);
+                    this.fall = Math.min(this.fall, cc.velocity.y);
+                } else {
+                    if (this.wasAir) this.land = Math.min(1, 0.4 + Math.max(0, -this.fall) / 0.45);
+                    this.air = Math.max(0, this.air - dt * 8);
+                    this.fall = 0;
+                }
+                this.wasAir = air;
+                this.land *= Math.exp(-dt * 7);
+                if (this.land < 0.002) this.land = 0;
+                const n = Math.max(1e-3, Math.hypot(this.fwd, this.side));
+                const df = this.fwd / n, ds = this.side / n;
+                const swing = Math.sin(pb.phase) * (0.55 - 0.15 * crouch) * pb.amp * df;
+                const spread = (0.5 - 0.5 * Math.cos(pb.phase)) * 0.3 * Math.abs(ds) * pb.amp;
+                const tuck = 0.5 * this.air, bend = 0.12 * crouch + 0.3 * this.land;
+                pb.legs[0].rotation.x = swing + tuck + bend;
+                pb.legs[1].rotation.x = -swing + tuck * 0.7 + bend;
+                pb.legs[0].rotation.z = -spread - 0.06 * crouch;
+                pb.legs[1].rotation.z = spread + 0.06 * crouch;
+                pb.group.scale.y = s * (1 - 0.08 * this.land);
+                pb.tuck = 0;
+            },
+            // Back to the classic legs (it never turns them sideways)
+            clear: function (pb) {
+                this.used = false;
+                pb.legs[0].rotation.z = 0;
+                pb.legs[1].rotation.z = 0;
+                this.fwd = this.side = this.air = this.land = this.fall = 0;
             }
         };
 
