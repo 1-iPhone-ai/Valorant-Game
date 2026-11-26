@@ -99,14 +99,30 @@ test('game time: moves only with the game steps, never goes back, and a timer la
     // between steps it includes what waits to be simulated (under one step)
     assert.ok(Math.abs(r.gameMs - r.stepMs) < 1000 / 60, `game time ${r.gameMs.toFixed(1)} ms vs steps ${r.stepMs.toFixed(1)} ms`);
 
-    // A smoke lasts its length in game time, whatever the frame rate here (a short one, 2 s)
+    // A smoke lasts its length in game time, whatever the frame rate here (a short one, 2 s). Smokes are
+    // checked once a frame, against that frame's game time, so it ends in the first frame whose game time
+    // has passed its end, and the frames before were not past it. (Counting steps to that frame gives up
+    // to three more than its length on a slow machine, where one frame runs up to four steps: 123 on CI.)
+    // A frame exactly at the end may still show it: game time adds 1000/60 ms a step and 120 of them can
+    // come to a hair under 2000 ms, so the check allows a microsecond either way.
     await evaluate(() => {
-        agentSystem.spawnSmokeSphere(0, 1, 18, 0x6d28d9, 4.6, 2000, gameNow());
-        window.__sm = agentSystem.smokes.find((s) => s.inUse);
-        window.__smStart = __steps;
+        const t = gameNow();
+        agentSystem.spawnSmokeSphere(0, 1, 18, 0x6d28d9, 4.6, 2000, t);
+        const sm = agentSystem.smokes.find((s) => s.inUse && s.expireAt === t + 2000);
+        window.__sm = { t: t, prev: null, end: null };
+        const orig = agentSystem.updateRender;
+        let last = t;
+        agentSystem.updateRender = function (time, now, delta) {
+            const was = sm.inUse;
+            const r = orig.call(this, time, now, delta);
+            if (was && !sm.inUse && __sm.end === null) { __sm.prev = last; __sm.end = now; }
+            last = now;
+            return r;
+        };
     });
-    await page.waitForFunction(() => !__sm.inUse, null, { timeout: 240000, polling: 'raf' });
-    const lived = await evaluate(() => (__steps - __smStart) * 1000 / 60);
-    assert.ok(Math.abs(lived - 2000) <= 2 * 1000 / 60, `the smoke lived ${lived.toFixed(0)} ms of game time (2000 ms)`);
+    await page.waitForFunction(() => __sm.end !== null, null, { timeout: 240000, polling: 'raf' });
+    const sm = await evaluate(() => __sm);
+    assert.ok(sm.prev - sm.t <= 2000 + 1e-3 && sm.end - sm.t >= 2000 - 1e-3,
+        `the smoke ended in the frame at ${(sm.end - sm.t).toFixed(1)} ms of game time, the frame before was at ${(sm.prev - sm.t).toFixed(1)} ms (2000 ms)`);
     assert.deepEqual(errors, []);
 });
