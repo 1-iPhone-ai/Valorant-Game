@@ -514,8 +514,13 @@ test('kill cam with Enhanced Animations on plays back the recorded values (a rel
         if (!e.eaV) enhancedAnim._initState(e, e.mesh, e.slot);
         enhancedAnim._oneShot(e, 1, 2.5);
     });
-    await page.waitForFunction(() => __k.eaGCode === 1 && replayRec.count > 6, null, { timeout: 60000 });
-    const rec = await evaluate(() => ({ t: performance.now(), code: __k.eaGCode }));
+    // The moment to play back: a recorder capture well inside the reload, so the captures either side of
+    // it both hold the reload and the new values. (Taken just as the reload starts, the capture before
+    // it can be one from before Enhanced Animations went on, and a replay frame between a capture
+    // without the new values and one with them draws the classic pose: CI caught that on a fast runner.)
+    await page.waitForFunction(() => __k.eaGCode === 1 && __k.eaGT > 0.6 && replayRec.count > 6, null, { timeout: 60000 });
+    const rec = await evaluate(() => { const R = replayRec, i = (R.head - 1 + R.N) % R.N; return { t: R.t[i], on: R.eaOn[i], code: __k.eaGCode }; });
+    assert.equal(rec.on, 1, 'the capture played back holds the new values');
     await page.waitForFunction(() => __k.eaGCode === 0, null, { timeout: 60000 });
     await frames(5);
     const death = await evaluate(() => {
