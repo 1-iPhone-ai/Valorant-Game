@@ -28279,7 +28279,9 @@
                 db.group.rotation.y = db.yaw;
                 db.group.visible = true;
                 soundFX.deadlockBarrier();
+                abilityLook.tag = 'deadlock.e';   // V2.2: Barrier Mesh's placement ring (High Fidelity)
                 this.spawnWindRing(hit.x, hit.y + 0.1, hit.z, 0x38bdf8, 5.8, now);
+                abilityLook.tag = null;
                 showNotification("BARRIER MESH DEPLOYED — 5.8m X-Forcefield Repels & Shocks Enemies while Bullets Pass Through!", 2000);
             },
 
@@ -28312,7 +28314,9 @@
 
                 if (!bestEnemy) {
                     const hit = this.getAimGroundPoint(30.0);
+                    abilityLook.tag = 'deadlock.x';   // V2.2: Annihilation's miss (High Fidelity)
                     this.spawnFlashBurst(hit.x, hit.y + 1.0, hit.z, 0x38bdf8, 6.0, 420, now);
+                    abilityLook.tag = null;
                     return;
                 }
 
@@ -28327,7 +28331,9 @@
                 dc.executeAt = now + AGENT_TUNING.deadlock.x.reelMs;
                 dc.cocoonMesh.position.set(dc.position.x, 1.15, dc.position.z);
                 dc.group.visible = true;
+                abilityLook.tag = 'deadlock.x';   // V2.2: Annihilation's capture (High Fidelity)
                 this.spawnFlashBurst(dc.capturePos.x, 1.15, dc.capturePos.z, 0x38bdf8, 4.2, 340, now);
+                abilityLook.tag = null;
             },
 
             // --- Harbor Relic Hydro-Controller Abilities (Cascade [C], Cove [Q], High Tide [E], Reckoning [X]) ---
@@ -28606,7 +28612,9 @@
                 vs.group.rotation.y = yaw;
                 vs.group.visible = true;
                 soundFX.vyseShear();
+                abilityLook.tag = 'vyse.c';   // V2.2: Shear's placement ring (High Fidelity)
                 this.spawnWindRing(hit.x, hit.y + 0.1, hit.z, 0xc084fc, 5.5, now);
+                abilityLook.tag = null;
                 showNotification("SHEAR TRAP ARMED — Erupts Indestructible 9m Liquid-Metal Wall Behind Crossing Hostiles!", 1900);
             },
 
@@ -28632,7 +28640,9 @@
                 vr.group.position.copy(vr.position);
                 vr.group.visible = true;
                 soundFX.vyseRose();
+                abilityLook.tag = 'vyse.q';   // V2.2: Arc Rose's placement ring (High Fidelity)
                 this.spawnWindRing(hit.x, hit.y + 0.15, hit.z, 0xe879f9, 3.8, now);
+                abilityLook.tag = null;
                 showNotification("ARC ROSE PLANTED — Press [Q] again to Detonate 22m Metallic Flash ( or Auto-Triggers on Approach)!", 1950);
                 this.syncHud(now, true);
             },
@@ -28654,8 +28664,10 @@
                 const rx = targetRose.position.x;
                 const ry = targetRose.position.y;
                 const rz = targetRose.position.z;
+                abilityLook.tag = 'vyse.q';   // V2.2: Arc Rose's flash (High Fidelity)
                 this.spawnFlashBurst(rx, ry + 0.5, rz, 0xe879f9, 7.2, 420, now);
                 this.spawnWindRing(rx, Math.max(0.1, ry - 0.35), rz, 0xc084fc, 9.5, now);
+                abilityLook.tag = null;
 
                 let blindedCount = 0;
                 for (let i = 0; i < enemyObjects.length; i++) {
@@ -28734,7 +28746,9 @@
                 sg.ringMesh.scale.set(sg.radius, 1, sg.radius);
                 sg.group.position.copy(sg.position);
                 sg.group.visible = true;
+                abilityLook.tag = 'vyse.x';   // V2.2: Steel Garden's cast ring (High Fidelity)
                 this.spawnWindRing(px, 0.25, pz, 0xc084fc, 16.0, now);
+                abilityLook.tag = null;
             },
 
             // --- Tejo Ballistic Initiator Abilities (Stealth Drone [C], Special Delivery [Q], Guided Salvo [E], Armageddon [X]) ---
@@ -29146,7 +29160,9 @@
                 vc.group.position.copy(vc.position);
                 vc.group.visible = true;
                 soundFX.vetoCrosscut();
+                abilityLook.tag = 'veto.c';   // V2.2: Crosscut's placement ring (High Fidelity)
                 this.spawnWindRing(hit.x, floorY + 0.15, hit.z, 0x10b981, 4.8, now);
+                abilityLook.tag = null;
                 showNotification("CROSSCUT VORTEX ANCHOR PLACED (22s) — Press [C] Again to Teleport & Trigger Bio-Shockwave!", 2100);
                 this.syncHud(now, true);
             },
@@ -29165,7 +29181,9 @@
                 vc.active = false;
                 vc.group.visible = false;
 
+                abilityLook.tag = 'veto.c';   // V2.2: the teleport's rings and burst (High Fidelity)
                 this.spawnWindRing(oldX, oldY + 0.15, oldZ, 0x10b981, 5.0, now);
+                abilityLook.tag = null;
                 characterController.position.set(targetX, targetY, targetZ);
                 characterController.velocity.set(0, 0, 0);
                 camera.position.set(targetX, targetY + characterController.height, targetZ);
@@ -29176,8 +29194,10 @@
                 updateHealthHUD();
 
                 soundFX.vetoCrosscut();
+                abilityLook.tag = 'veto.c';   // V2.2 (as above)
                 this.spawnFlashBurst(targetX, targetY + 0.8, targetZ, 0x10b981, 5.5, 380, now);
                 this.spawnWindRing(targetX, targetY + 0.15, targetZ, 0x34d399, 5.8, now);
+                abilityLook.tag = null;
 
                 const nowMs = Date.now();
                 const rSq = AGENT_TUNING.veto.c.radiusM * AGENT_TUNING.veto.c.radiusM;
@@ -29282,7 +29302,9 @@
                 vi.group.visible = true;
                 this.playerBlindUntil = 0;
                 soundFX.vetoInterceptor();
+                abilityLook.tag = 'veto.e';   // V2.2: Interceptor's placement ring (High Fidelity)
                 this.spawnWindRing(hit.x, floorY + 0.2, hit.z, 0x10b981, 8.5, now);
+                abilityLook.tag = null;
                 showNotification("INTERCEPTOR DRONE DEPLOYED (12s) — Zaps Hostiles in 12.5m & Cleanses Blinds!", 2000);
             },
 
@@ -29296,7 +29318,9 @@
                 ve.nextPulseAt = now + AGENT_TUNING.veto.x.firstTickMs;
                 ve.group.position.set(characterController.position.x, 0.04, characterController.position.z);
                 ve.group.visible = true;
+                abilityLook.tag = 'veto.x';   // V2.2: Evolution's cast ring (High Fidelity)
                 this.spawnWindRing(characterController.position.x, 0.25, characterController.position.z, 0x10b981, 10.0, now);
+                abilityLook.tag = null;
             },
 
             // --- Miks Sonic Controller Abilities (M-Pulse [C], Harmonize [Q], Waveform [E], Bassquake [X]) ---
@@ -30451,7 +30475,9 @@
                 tm.group.position.copy(tm.position);
                 tm.group.visible = true;
 
+                abilityLook.tag = 'chamber.c';   // V2.2: Trademark's placement ring (High Fidelity)
                 this.spawnWindRing(tx, floorY + 0.08, tz, 0xf59e0b, 3.0, now);
+                abilityLook.tag = null;
                 soundFX.chamberSnap();
                 showNotification("TRADEMARK TRAP DEPLOYED! Scans 11m & Detonates a 6.5m Slow + Vulnerable Field!", 1700);
             },
@@ -30567,7 +30593,9 @@
                     this.chamberAnchor.group.position.copy(this.chamberAnchor.position);
                     this.chamberAnchor.group.visible = true;
                 }
+                abilityLook.tag = 'chamber.e';   // V2.2: Rendezvous's placement ring (High Fidelity)
                 this.spawnWindRing(ax, floorY + 0.08, az, 0xf59e0b, 3.6, now);
+                abilityLook.tag = null;
                 soundFX.chamberSnap();
                 showNotification("RENDEZVOUS ANCHOR PLACED! Press [E] Again Anytime Within 28s to Snap Teleport!", 2200);
                 this.syncHud(now, true);
@@ -30584,9 +30612,11 @@
                 const destY = this.chamberAnchor.position.y;
                 const destZ = this.chamberAnchor.position.z;
 
+                abilityLook.tag = 'chamber.e';   // V2.2: the teleport's portals and burst (High Fidelity)
                 this.spawnShadowPortal(originX, originY, originZ, now);
                 this.spawnShadowPortal(destX, destY, destZ, now);
                 this.spawnFlashBurst(destX, destY + 0.9, destZ, 0xf59e0b, 3.8, 320, now);
+                abilityLook.tag = null;
 
                 characterController.position.set(destX, destY + characterController.height, destZ);
                 characterController.prevSimPosition.copy(characterController.position);
@@ -30681,7 +30711,9 @@
                     createHitEffect(hitPoint || hitEnemy.mesh.position, false);
                     // Tour De Force deals 185 base damage (1-shot kill anywhere on the body!) and spawns a Trademark Slow Field at the victim's position!
                     damageEnemyActor(hitEnemy, AGENT_TUNING.chamber.x.damage, now, nowMs, "Tour De Force", hitZone, AGENT_TUNING.chamber.x.headMult, AGENT_TUNING.chamber.x.legMult);
+                    abilityLook.tag = 'chamber.x';   // V2.2: a kill's slow field (High Fidelity)
                     this.spawnSlowZone(ex, this.findSupportFloorY(ex, ey + 0.5, ez), ez, now);
+                    abilityLook.tag = null;
                 } else if (hitTarget) {
                     createHitEffect(hitPoint || hitTarget.mesh.position, false);
                     damageTargetActor(hitTarget, AGENT_TUNING.chamber.x.damage, now, nowMs, "Tour De Force", hitLeaf || hitTarget.leaves[0]);
@@ -30931,7 +30963,9 @@
                 cam.group.lookAt(characterController.position.x, cy - 0.8, characterController.position.z);
                 cam.group.visible = true;
 
+                abilityLook.tag = 'cypher.e';   // V2.2: Spycam's placement burst (High Fidelity)
                 this.spawnFlashBurst(cx, cy, cz, 0x38bdf8, 2.6, 280, now);
+                abilityLook.tag = null;
                 soundFX.spycamDart();
                 showNotification("SPYCAM MOUNTED! Scanning 32m & Firing Tracking Recon Darts (+20% DMG)!", 1800);
             },
@@ -31838,7 +31872,9 @@
                         st.q.charges = st.q.maxCharges; st.q.rechargeEnd = 0;
                         st.e.charges = st.e.maxCharges; st.e.rechargeEnd = 0;
                     }
+                    abilityLook.tag = 'cypher.x';   // V2.2: Neural Theft's cast ring (High Fidelity: its scan spheres draw it)
                     this.spawnWindRing(characterController.position.x, characterController.position.y - 1.2, characterController.position.z, 0x38bdf8, 8.5, now);
+                    abilityLook.tag = null;
                     soundFX.spycamDart();
                     showNotification("WHERE IS EVERYONE HIDING?! NEURAL THEFT ACTIVE (All Enemies Revealed + 2nd Neural Shock Pulse)!", 3500);
                 } else if (agentId === 'brimstone') {
@@ -31943,7 +31979,9 @@
                 } else if (agentId === 'chamber') {
                     // Tour De Force: Summon Golden Anti-Materiel Sniper Rifle with 5 One-Shot-Kill Golden Rounds!
                     game.ultChargesLeft = AGENT_TUNING.chamber.x.roundCount;
+                    abilityLook.tag = 'chamber.x';   // V2.2: Tour De Force's activation burst (High Fidelity)
                     this.spawnFlashBurst(characterController.position.x, characterController.position.y - 0.4, characterController.position.z, 0xf59e0b, 4.8, 380, now);
+                    abilityLook.tag = null;
                     soundFX.chamberSnap();
                     showNotification("THEY ARE SO DEAD! TOUR DE FORCE READY (5 One-Shot Golden Sniper Rounds — Press Left-Click or [X])!", 3600);
                 } else if (agentId === 'kayo') {
@@ -33613,7 +33651,9 @@
                         wire.inUse = false;
                         wire.group.visible = false;
                         soundFX.shock();
+                        abilityLook.tag = 'cypher.c';   // V2.2: Trapwire's concussion (High Fidelity)
                         this.spawnFlashBurst(wire.position.x, wire.position.y + 0.9, wire.position.z, 0x38bdf8, 4.8, 360, now);
+                        abilityLook.tag = null;
                         const blastRSq = (wire.radius + AGENT_TUNING.cypher.c.blastPadM) * (wire.radius + AGENT_TUNING.cypher.c.blastPadM);
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -34045,8 +34085,10 @@
                     } else if (now >= tm.detonateAt) {
                         tm.inUse = false;
                         tm.group.visible = false;
+                        abilityLook.tag = 'chamber.c';   // V2.2: Trademark's slow field and burst (High Fidelity)
                         this.spawnSlowZone(tm.position.x, tm.position.y, tm.position.z, now);
                         this.spawnFlashBurst(tm.position.x, tm.position.y + 0.5, tm.position.z, 0xf59e0b, 6.5, 420, now);
+                        abilityLook.tag = null;
                         let slowedCount = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
                             const e = enemyObjects[j];
@@ -35012,8 +35054,10 @@
                         ds.inUse = false;
                         ds.group.visible = false;
                         soundFX.deadlockSensor();
+                        abilityLook.tag = 'deadlock.q';   // V2.2: Sonic Sensor's concussion (High Fidelity)
                         this.spawnFlashBurst(ds.position.x, 0.9, ds.position.z, 0x38bdf8, 6.8, 340, now);
                         this.spawnWindRing(ds.position.x, 0.3, ds.position.z, 0x38bdf8, 6.8, 320, now);
+                        abilityLook.tag = null;
                         const blastRSq = AGENT_TUNING.deadlock.q.blastRadiusM * AGENT_TUNING.deadlock.q.blastRadiusM;
                         let stunned = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -35087,8 +35131,10 @@
                         dc.active = false;
                         dc.group.visible = false;
                         soundFX.deadlockCocoon();
+                        abilityLook.tag = 'deadlock.x';   // V2.2: Annihilation's execution (High Fidelity)
                         this.spawnFlashBurst(dc.position.x, 1.15, dc.position.z, 0x38bdf8, 5.5, 380, now);
                         this.spawnWindRing(dc.position.x, 0.35, dc.position.z, 0x38bdf8, 5.8, 360, now);
+                        abilityLook.tag = null;
                         if (tEnemy && tEnemy.isActive && !tEnemy.hit) {
                             damageEnemyActor(tEnemy, AGENT_TUNING.deadlock.x.damage, now, nowMs, "Annihilation Execution", false);
                         }
@@ -35407,7 +35453,9 @@
                                 vs.crestMesh.visible = true;
                                 vs.coreMesh.visible = false;
                                 soundFX.vyseShear();
+                                abilityLook.tag = 'vyse.c';   // V2.2: Shear's wall going up (High Fidelity)
                                 this.spawnWindRing(vs.position.x, vs.position.y + 0.15, vs.position.z, 0xc084fc, 4.8, now);
+                                abilityLook.tag = null;
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.vyse.c.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.vyse.c.revealMs);
                                 damageEnemyActor(e, AGENT_TUNING.vyse.c.damage, now, nowMs, "Shear Metallic Trap", false);
@@ -35501,8 +35549,10 @@
                     } else if (!sg.erupted && now >= sg.eruptAt) {
                         sg.erupted = true;
                         soundFX.vyseGarden();
+                        abilityLook.tag = 'vyse.x';   // V2.2: Steel Garden's eruption (High Fidelity)
                         this.spawnFlashBurst(sg.position.x, 1.4, sg.position.z, 0xc084fc, 9.5, 450, now);
                         this.spawnWindRing(sg.position.x, 0.3, sg.position.z, 0xe879f9, sg.radius * 0.65, now);
+                        abilityLook.tag = null;
                         const rSq = sg.radius * sg.radius;
                         let jammed = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -35767,12 +35817,16 @@
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.veto.e.revealMs);
                                 this.applyEnemyBlind(e, now, AGENT_TUNING.veto.e.blindMs);
                                 damageEnemyActor(e, AGENT_TUNING.veto.e.damage, now, nowMs, "Interceptor Zap", false);
+                                abilityLook.tag = 'veto.e';   // V2.2: a zap (High Fidelity)
                                 this.spawnFlashBurst(e.mesh.position.x, e.mesh.position.y + 1.1, e.mesh.position.z, 0x10b981, 2.2, 220, now);
+                                abilityLook.tag = null;
                             }
                         }
                         if (zapped > 0) {
                             soundFX.vetoInterceptor();
+                            abilityLook.tag = 'veto.e';   // V2.2 (as above)
                             this.spawnWindRing(vi.position.x, vi.position.y, vi.position.z, 0x34d399, 4.2, now);
+                            abilityLook.tag = null;
                         }
                     }
                 }
@@ -50753,6 +50807,764 @@
                     halo: 0xfef9c3, light: 0xfacc15, scorch: { scale: 0.4, hex: 0x1b1c22 } }
             }
         });
+        // V2.2: the rest of the Sentinels (stage 2). Each look reads its Classic items only (adapters fill the
+        // renderers' parameters in place); the tags are in each ability's own spawn code
+        (function () {
+            const L = abilityLook;
+            const tmp = new THREE.Vector3();
+            // the last ms of a life, as a 1 -> 0 fade
+            const fadeOut = function (rem, ms) { return rem < ms ? Math.max(0, rem / ms) : 1; };
+            // a model part's rot (XYZ Euler) for a turn about x by t, then about y by a (made once, as the models are defined)
+            const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _eu = new THREE.Euler(), _ax = new THREE.Vector3(1, 0, 0), _ay = new THREE.Vector3(0, 1, 0);
+            const tilt = function (a, t) {
+                _qa.setFromAxisAngle(_ay, a); _qb.setFromAxisAngle(_ax, t); _qa.multiply(_qb);
+                _eu.setFromQuaternion(_qa, 'XYZ');
+                return [_eu.x, _eu.y, _eu.z];
+            };
+            // a model group that is also carried by another (built once per instance: a spinning ring on a bobbing body)
+            const nest = function (parent, child) { return function (kit) { kit.group(parent).add(kit.group(child)); }; };
+            // the player's feet (into a parameter set's x, y, z)
+            const feet = function (P) { const c = characterController; P.x = c.position.x; P.y = c.position.y - c.height; P.z = c.position.z; };
+
+            // ---------------------------------------------------------------- SAGE
+            // Healing Orb: the heal session on you: jade light on the off-hand as you cast, sparks rising round you
+            // while it mends (an aura when seen from outside). No screen edge: the Classic heal glow is on screen,
+            // and a short buff's edge would take Resurrection's (the edge is the latest buff's)
+            L.defineLook('sage.e', {
+                routes: { sageHealSession: { renderer: 'self', adapt: 'session' } },
+                styles: { self: { hand: { mode: 2, color: 0x6ee7b7, scale: 0.7 },
+                    aura: { colA: 0x10b981, colB: 0x34d399, w: 1.0, h: 2.0 },
+                    motes: { every: 110, spec: { kind: 'spark', hex: 0x6ee7b7, n: 2, life: 0.9, s0: 0.06, s1: 0.015, a0: 1, drag: 1.4, up: 1.1, jitter: 0.35 } } } }
+            });
+            // Resurrection: while the ultimate stands (a timer), a jade aura and a faint shimmer at the screen edge;
+            // the revive itself (tryPhoenixRebirth's burst, tagged 'sage.x' there) a jade bloom
+            L.addTimer('sageResurrection', { until: function () { return game.ultAgent === 'sage' ? game.ultActiveUntil : 0; }, key: 'sage.x' });
+            L.defineLook('sage.x', {
+                routes: { sageResurrection: { renderer: 'self', adapt: 'timer' }, flash: 'flash' },
+                styles: {
+                    self: { edge: { colA: 0x047857, colB: 0x34d399, shimmer: true, k: 0.25 }, aura: { colA: 0x10b981, colB: 0x6ee7b7, w: 1.1, h: 2.1 },
+                        motes: { every: 170, spec: { kind: 'spark', hex: 0xa7f3d0, n: 2, life: 1.0, s0: 0.05, s1: 0.015, a0: 1, drag: 1.2, up: 0.7, jitter: 0.5 } } },
+                    flash: { core: 0x10b981, glow: 'theme:sage', coreSize: 1.3, streaks: 1.2, halo: { hex: 0x6ee7b7, size: 8 }, light: { hex: 0x34d399, radius: 16 }, embers: { n: 28, hex: 0x6ee7b7 } }
+                }
+            });
+
+            // ---------------------------------------------------------------- KILLJOY
+            // Nanoswarm: a hexagonal grenade with a lit band, then a nanite field (the shared molly pool: isNanoswarm)
+            L.defineModel('killjoy.nanoswarm', {
+                count: 2,
+                mats: { shell: { color: 'theme:killjoy', rough: 0.38, metal: 0.25 }, dark: { color: 0x1c2128, rough: 0.5, metal: 0.55 }, glow: { glow: 0xfef08a } },
+                parts: [
+                    { shape: 'cyl', size: [0.1, 0.1, 0.18], seg: 6, rot: [Math.PI / 2, 0, 0], mat: 'shell' },
+                    { shape: 'cyl', size: [0.078, 0.105, 0.052], seg: 6, at: [0, 0, 0.114], rot: [Math.PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'cyl', size: [0.105, 0.078, 0.052], seg: 6, at: [0, 0, -0.114], rot: [Math.PI / 2, 0, 0], mat: 'dark' },
+                    { shape: 'torus', size: [0.104, 0.016], seg: [4, 6], mat: 'glow' },
+                    { shape: 'sphere', size: [0.033], seg: [8, 6], at: [0, 0, 0.144], mat: 'glow' }
+                ]
+            });
+            L.defineLook('killjoy.c', {
+                routes: { projectile: 'projectile', molly: 'groundZone' },
+                styles: {
+                    projectile: { model: 'killjoy.nanoswarm', spin: { axis: 'z', rate: 11 },
+                        trail: [{ kind: 'spark', hex: 0xfde047, life: 0.25, s0: 0.04, s1: 0.012, a0: 1, drag: 2, grav: 2, jx: 1, jy: 1, jz: 1 },
+                            { kind: 'glow', at: 'pos', hex: 0xfacc15, life: 0.16, s0: 0.2, s1: 0.04, a0: 0.5, drag: 0, grav: 0 }] },
+                    groundZone: { preset: 'field', colA: 0xa16207, colB: 0xfde047,
+                        emit: { every: 80, spec: { kind: 'spark', hex: 0xfde047, n: 3, life: 0.55, s0: 0.05, s1: 0.012, a0: 1, drag: 1.4, up: 0.9, jitter: 1.6 } } }
+                }
+            });
+            // Lockdown: a tripod device with a turning crown round a lit core, the detain field on the floor and
+            // the dome over it (one Classic object, three renderers; the dome a scan sphere that forms, then holds)
+            (function () {
+                const parts = [];
+                for (let k = 0; k < 3; k++) {
+                    const a = k * Math.PI * 2 / 3;
+                    parts.push({ shape: 'rbox', size: [0.07, 0.6, 0.07], radius: 0.025, seg: 2, at: [Math.sin(a) * 0.25, 0.24, Math.cos(a) * 0.25], rot: [Math.cos(a) * 0.6, 0, -Math.sin(a) * 0.6], mat: 'body' });
+                    parts.push({ shape: 'rbox', size: [0.13, 0.04, 0.18], radius: 0.015, seg: 2, at: [Math.sin(a) * 0.43, 0.02, Math.cos(a) * 0.43], rot: [0, a, 0], mat: 'body' });
+                }
+                parts.push({ shape: 'cyl', size: [0.2, 0.25, 0.2], seg: 16, at: [0, 0.5, 0], mat: 'body' });
+                parts.push({ shape: 'cyl', size: [0.09, 0.11, 0.52], seg: 12, at: [0, 0.84, 0], mat: 'body' });
+                parts.push({ shape: 'torus', size: [0.23, 0.03], seg: [6, 24], at: [0, 0.61, 0], rot: [Math.PI / 2, 0, 0], mat: 'accent' });
+                parts.push({ group: 'crown', shape: 'torus', size: [0.34, 0.035], seg: [6, 28], rot: [Math.PI / 2, 0, 0], mat: 'accent' });
+                for (let k = 0; k < 4; k++) {
+                    const a = k * Math.PI / 2;
+                    parts.push({ group: 'crown', shape: 'rbox', size: [0.05, 0.24, 0.2], radius: 0.02, seg: 2, at: [Math.sin(a) * 0.34, 0.02, Math.cos(a) * 0.34], rot: [0, a, 0], mat: 'accent' });
+                }
+                parts.push({ group: 'crown', shape: 'oct', size: [0.19], at: [0, 0.06, 0], mat: 'core' });
+                L.defineModel('killjoy.lockdown', {
+                    count: 1,
+                    mats: { body: { color: 0xd4d8de, rough: 0.38, metal: 0.55 }, accent: { color: 'theme:killjoy', rough: 0.34, metal: 0.2 }, core: { light: 0xfacc15 } },
+                    groups: { crown: { at: [0, 1.22, 0], role: 'spin', axis: 'y', rate: 1.6 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('killjoy.x', {
+                routes: {
+                    kjLockdown: [
+                        { renderer: 'deployable', adapt: function (P, ld, now) {
+                            P.x = ld.position.x; P.y = ld.position.y; P.z = ld.position.z; P.yaw = 0; P.headYaw = NaN;
+                            P.start = ld.startAt; P.remain = ld.expireAt - now; P.alert = true; P.fade = 1;
+                        } },
+                        { renderer: 'groundZone', adapt: function (P, ld, now) {
+                            P.x = ld.position.x; P.y = ld.position.y; P.z = ld.position.z; P.r = ld.radius; P.rect = 0; P.yaw = 0;
+                            P.start = ld.startAt; P.end = ld.expireAt; P.age = (now - ld.startAt) * 0.001;
+                            P.fade = fadeOut(ld.expireAt - now, 500) * Math.min(1, P.age * 1.2);
+                        } },
+                        { renderer: 'pulse', adapt: function (P, ld, now) {
+                            const age = now - ld.startAt;
+                            P.shape = 1; P.x = ld.position.x; P.y = ld.position.y; P.z = ld.position.z; P.R = ld.radius;
+                            P.front = Math.min(1, age / 900); P.after = age * 0.001; P.charge = 0;
+                            P.fade = fadeOut(ld.expireAt - now, 500); P.wave = ld.startAt;
+                        } }
+                    ]
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'killjoy.lockdown', lights: [0xfacc15, 0xfacc15, 0xff5a4d], lightY: 1.3, lightRadius: 3.5, lightK: 0.6, unfoldMs: 450, dust: { hex: 0x8d8579, n: 10 } },
+                    groundZone: { preset: 'field', colA: 0xa16207, colB: 0xf0abfc },
+                    pulse: { preset: 'sonar', colA: 0xfacc15, colB: 0xfef9c3, shellA: 0xe879f9, shellB: 0xfacc15, ring: 0xfde047, eruptLight: 0xfacc15, shake: 0.35 }
+                }
+            });
+
+            // ---------------------------------------------------------------- CYPHER
+            // Trapwire: two anchor posts with lenses (the model, turned with the Classic group) and the laser
+            // between them (a beam); it flickers and widens, the lenses turn amber, once someone trips it; the
+            // concussion (step 2H's burst, tagged) a cyan pop
+            (function () {
+                const parts = [];
+                for (const s of [-1, 1]) {
+                    const x = s * 2.6;
+                    parts.push({ shape: 'cyl', size: [0.11, 0.15, 0.05], seg: 12, at: [x, 0.025, 0], mat: 'body' });
+                    parts.push({ shape: 'cyl', size: [0.04, 0.055, 0.4], seg: 10, at: [x, 0.25, 0], mat: 'body' });
+                    parts.push({ shape: 'rbox', size: [0.15, 0.12, 0.12], radius: 0.03, seg: 2, at: [x, 0.48, 0], mat: 'trim' });
+                    parts.push({ shape: 'cyl', size: [0.04, 0.04, 0.04], seg: 12, at: [x - s * 0.085, 0.48, 0], rot: [0, 0, Math.PI / 2], mat: 'eye' });
+                    parts.push({ shape: 'sphere', size: [0.03], seg: [10, 8], at: [x, 0.56, 0], mat: 'eye' });   // a status light on top (amber when tripped)
+                }
+                L.defineModel('cypher.trapwire', {
+                    count: 3,
+                    mats: { body: { color: 0xe2e8f0, rough: 0.32, metal: 0.6 }, trim: { color: 0x1e293b, rough: 0.4, metal: 0.5, emissive: 0x062a40 }, eye: { light: 0x38bdf8 } },
+                    parts: parts
+                });
+            })();
+            L.defineLook('cypher.c', {
+                routes: {
+                    trapwires: [
+                        { renderer: 'deployable', keep: ['ringMesh'], adapt: function (P, w, now) {   // V2.2: keeps its 3.6 m trigger disc (Classic's range marker) drawn
+                            P.x = w.position.x; P.y = w.position.y; P.z = w.position.z; P.yaw = w.group.rotation.y; P.headYaw = NaN;
+                            P.start = w.startAt; P.remain = w.expireAt - now; P.alert = !!w.triggered; P.fade = 1;
+                        } },
+                        { renderer: 'beam', adapt: function (P, w, now) {
+                            // the Classic laser: along the group's x, 0.48 m up, between the lenses
+                            const yaw = w.group.rotation.y, cx = Math.cos(yaw) * 2.5, cz = -Math.sin(yaw) * 2.5, y = w.position.y + 0.48;
+                            L.between(P, w.position.x - cx, y, w.position.z - cz, w.position.x + cx, y, w.position.z + cz);
+                            P.width = w.triggered ? 1.7 + 0.5 * Math.sin(now * 0.05) : 1;
+                            P.fade = w.triggered ? 0.75 + 0.25 * Math.sin(now * 0.04) : 0.8 + 0.2 * Math.sin(now * 0.012);
+                        } }
+                    ],
+                    flash: 'flash'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'cypher.trapwire', lights: [0x38bdf8, 0xfacc15, 0xfacc15], lightY: 0.48, lightRadius: 1.6, lightK: 0.3, unfoldMs: 250, dust: { hex: 0x8d8579, n: 6 } },
+                    beam: { core: 0xe0f7ff, glow: 'theme:cypher', width: 0.09, jag: 0, origin: null, impact: null },
+                    flash: { core: 0x38bdf8, glow: 'theme:cypher', coreSize: 0.9, streaks: 1, halo: { hex: 0x7dd3fc, size: 5 }, light: { hex: 0x38bdf8, radius: 12 }, embers: { n: 16, hex: 0x7dd3fc } }
+                }
+            });
+            // Cyber Cage: an electric canister, then a holographic cage (a smoke shell with a grid; its colour names it)
+            L.defineLook('cypher.q', {
+                routes: { projectile: 'projectile', smoke: 'smoke' },
+                styles: {
+                    projectile: { orb: { style: 2, a: 0xe0f7ff, b: 'theme:cypher', size: 0.6 },
+                        trail: [{ kind: 'glow', hex: 0x38bdf8, life: 0.28, s0: 0.28, s1: 0.05, a0: 0.75, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0xbae6fd, life: 0.22, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 1, jx: 1.2, jy: 1.2, jz: 1.2 }] },
+                    smoke: { preset: 'cage', body: 0x0b3a52, wisp: 0x38bdf8, glow: 0x0ea5e9, glowK: 0.5, opacity: 0.75, grid: 7 }
+                }
+            });
+            // Spycam: a camera on a ball mount, its head turning as the Classic one does (toward what it sees),
+            // the lens flashing at each dart; the placement burst a small cyan pop
+            L.defineModel('cypher.spycam', {
+                count: 2,
+                mats: { body: { color: 0xe8edf3, rough: 0.3, metal: 0.45 }, dark: { color: 0x111827, rough: 0.45, metal: 0.6 }, trim: { color: 'theme:cypher', rough: 0.4, metal: 0.2, emissive: 0x0c4a6e }, lens: { light: 0x38bdf8 } },
+                groups: { head: { at: [0, 0, 0], role: 'head' } },
+                parts: [
+                    { shape: 'sphere', size: [0.065], seg: [10, 8], at: [0, 0.17, -0.04], mat: 'dark' },
+                    { shape: 'cyl', size: [0.022, 0.022, 0.22], seg: 8, at: [0, 0.3, -0.04], mat: 'dark' },
+                    { shape: 'cyl', size: [0.09, 0.09, 0.03], seg: 14, at: [0, 0.42, -0.04], mat: 'dark' },
+                    { group: 'head', shape: 'rbox', size: [0.3, 0.22, 0.38], radius: 0.06, seg: 3, mat: 'body' },
+                    { group: 'head', shape: 'cyl', size: [0.1, 0.12, 0.12], seg: 16, at: [0, 0, 0.23], rot: [Math.PI / 2, 0, 0], mat: 'trim' },
+                    { group: 'head', shape: 'box', size: [0.2, 0.025, 0.2], at: [0, 0.122, -0.03], mat: 'trim' },
+                    { group: 'head', shape: 'sphere', size: [0.075], seg: [12, 10], at: [0, 0, 0.27], mat: 'lens' }
+                ]
+            });
+            L.defineLook('cypher.e', {
+                routes: {
+                    spycams: { renderer: 'deployable', adapt: function (P, cam, now) {
+                        P.x = cam.position.x; P.y = cam.position.y; P.z = cam.position.z; P.yaw = 0;
+                        tmp.set(0, 0, 1).applyQuaternion(cam.group.quaternion);   // where the Classic camera faces
+                        P.headYaw = Math.atan2(tmp.x, tmp.z);
+                        P.shotAt = cam.lastDartAt || 0;
+                        P.start = cam.startAt; P.remain = cam.expireAt - now; P.alert = !!cam.lastDartAt && now - cam.lastDartAt < 1800; P.fade = 1;
+                    } },
+                    flash: 'flash'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'cypher.spycam', unfoldMs: 200, scan: 0.7, trackRate: 10, idleRate: 2, recoil: 0.025, muzzle: [0, 0, 0.3],
+                        lights: [0x38bdf8, 0x7dd3fc, 0xffffff], lightY: 0, lightRadius: 2, lightK: 0.45, dust: null,
+                        muzzleFx: { halo: 0xe0f7ff, light: 0x38bdf8, spark: 0x7dd3fc } },
+                    flash: { core: 0x38bdf8, glow: 'theme:cypher', coreSize: 0.5, streaks: 0.5, halo: { hex: 0x7dd3fc, size: 2.5 }, light: { hex: 0x38bdf8, radius: 6 }, embers: { n: 8, hex: 0x7dd3fc } }
+                }
+            });
+            // Neural Theft: two scan spheres sweep out from you (at the cast and 3.2 s later, step 2J's shock),
+            // on a timer for the ultimate; its Classic cast ring is drawn by the first sweep
+            L.addTimer('cypherNeuralTheft', { until: function () { return game.ultAgent === 'cypher' ? game.ultActiveUntil : 0; }, key: 'cypher.x' });
+            L.defineLook('cypher.x', {
+                routes: {
+                    cypherNeuralTheft: { renderer: 'pulse', adapt: function (P, it, now) {
+                        const age = now - it.startAt, second = AGENT_TUNING.cypher.x.secondPulseMs, t0 = age < second ? 0 : second;
+                        feet(P);
+                        P.shape = 1; P.R = 30;
+                        const f = (age - t0) / 1100;
+                        P.front = f <= 1 ? f : -1; P.after = (age - t0) * 0.001; P.charge = 0; P.fade = 1; P.wave = t0;
+                    } },
+                    ring: 'absorb'
+                },
+                styles: { pulse: { preset: 'sonar', colA: 'theme:cypher', colB: 0xe0f7ff, shellA: 0x38bdf8, shellB: 0x0e7490, ring: 0x7dd3fc, eruptLight: 0x38bdf8 } }
+            });
+
+            // ---------------------------------------------------------------- CHAMBER
+            // the Classic tracer (neonBeam, shared with Neon: its lookKey says whose shot it is): its group's spot
+            // and turn, its length, the Classic fade
+            const tracer = function (P, nb, now) {
+                const o = nb.group.position;
+                P.ox = o.x; P.oy = o.y; P.oz = o.z;
+                P.q.copy(nb.group.quaternion);
+                P.len = Math.max(0.5, nb.outerMesh.scale.z);
+                const frac = Math.min(1, Math.max(0, (now - nb.startAt) / Math.max(1, nb.expireAt - nb.startAt)));
+                P.fade = 1 - frac; P.width = 1 - frac * 0.5;
+            };
+            const goldZone = { preset: 'field', colA: 0xb45309, colB: 0xfde68a, tongues: 'mote',
+                emit: { every: 140, spec: { kind: 'glow', hex: 0xfcd34d, n: 1, life: 1.0, s0: 0.12, s1: 0.03, a0: 0.8, drag: 1, up: 0.5, jitter: 0.3 } } };
+            // Trademark: a dark disc trap with a gold rim and a turning gem (red once it locks on); its trigger's
+            // spawns (step 2S, tagged): a gold pop and the slow field (the shared slow zone pool), gold here
+            L.defineModel('chamber.trademark', {
+                count: 2,
+                mats: { dark: { color: 0x1f1a14, rough: 0.45, metal: 0.6 }, gold: { color: 0xe0a530, rough: 0.3, metal: 0.6, emissive: 0x2a1a00 }, gem: { light: 0xf59e0b } },
+                groups: { rotor: { at: [0, 0.33, 0], role: 'spin', axis: 'y', rate: 1.4 } },
+                parts: [
+                    { shape: 'cyl', size: [0.36, 0.44, 0.08], seg: 24, at: [0, 0.04, 0], mat: 'dark' },
+                    { shape: 'torus', size: [0.4, 0.025], seg: [6, 32], at: [0, 0.08, 0], rot: [Math.PI / 2, 0, 0], mat: 'gold' },
+                    { shape: 'cyl', size: [0.05, 0.09, 0.2], seg: 12, at: [0, 0.17, 0], mat: 'gold' },
+                    { group: 'rotor', shape: 'oct', size: [0.12], scale: [1, 1.6, 1], mat: 'gem' },
+                    { group: 'rotor', shape: 'torus', size: [0.17, 0.014], seg: [4, 24], rot: [Math.PI / 2, 0, 0], mat: 'gem' }
+                ]
+            });
+            L.defineLook('chamber.c', {
+                routes: {
+                    trademarks: { renderer: 'deployable', keep: ['ringMesh'], adapt: function (P, tm, now) {   // V2.2: keeps its detection ring (Classic's range marker) drawn
+                        P.x = tm.position.x; P.y = tm.position.y; P.z = tm.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = tm.startAt; P.remain = tm.expireAt - now; P.alert = !!tm.triggered; P.fade = 1;
+                    } },
+                    slowZones: 'groundZone', flash: 'flash', ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'chamber.trademark', lights: [0xf59e0b, 0xef4444, 0xef4444], lightY: 0.35, lightRadius: 1.8, lightK: 0.4, unfoldMs: 250 },
+                    groundZone: goldZone,
+                    flash: { core: 0xf59e0b, glow: 'theme:chamber', coreSize: 1, streaks: 1, halo: { hex: 0xfcd34d, size: 6 }, light: { hex: 0xf59e0b, radius: 14 }, embers: { n: 18, hex: 0xfbbf24 } }
+                }
+            });
+            // Headhunter: a heavy pistol tracer, a muzzle flash and sparks where it lands
+            L.defineLook('chamber.q', {
+                routes: { neonBeam: { renderer: 'beam', adapt: tracer } },
+                styles: { beam: { core: 0xfff7d6, glow: 'theme:chamber', width: 0.16, jag: 0, origin: { halo: 0xfff1c1, light: 0xf59e0b },
+                    impact: { halo: 0xfff1c1, light: 0xf59e0b, sparks: 0xfde68a, glow: 0xfbbf24, smoke: 0x5b5146 } } }
+            });
+            // Rendezvous: a gold card turning over a slim post; the teleport (tagged): a gold pop where you land,
+            // a dash from where you left, and the two shared portals as gold whirls on the floor
+            L.defineModel('chamber.anchor', {
+                count: 1,
+                mats: { dark: { color: 0x2b2118, rough: 0.45, metal: 0.55 }, gold: { color: 0xe0a530, rough: 0.28, metal: 0.65, emissive: 0x2a1a00 }, gem: { light: 0xfbbf24 } },
+                groups: { card: { at: [0, 1.15, 0], role: 'spin', axis: 'y', rate: 1.0 } },
+                parts: [
+                    { shape: 'cyl', size: [0.2, 0.28, 0.06], seg: 16, at: [0, 0.03, 0], mat: 'gold' },
+                    { shape: 'cyl', size: [0.06, 0.11, 0.8], seg: 12, at: [0, 0.46, 0], mat: 'dark' },
+                    { shape: 'torus', size: [0.085, 0.02], seg: [6, 18], at: [0, 0.86, 0], rot: [Math.PI / 2, 0, 0], mat: 'gold' },
+                    { group: 'card', shape: 'rbox', size: [0.36, 0.54, 0.03], radius: 0.025, seg: 2, mat: 'gold' },
+                    { group: 'card', shape: 'oct', size: [0.085], scale: [1, 1.5, 0.45], mat: 'gem' }
+                ]
+            });
+            L.defineLook('chamber.e', {
+                routes: {
+                    chamberAnchor: { renderer: 'deployable', keep: ['ringMesh'], adapt: function (P, ca, now) {   // V2.2: keeps its teleport-range ring (Classic's range marker) drawn
+                        P.x = ca.position.x; P.y = ca.position.y; P.z = ca.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = ca.startAt; P.remain = ca.expireAt - now; P.alert = false; P.fade = 1;
+                    } },
+                    shadowPortals: { renderer: 'groundZone', adapt: function (P, pt, now) {
+                        const t = Math.min(1, Math.max(0, (now - pt.startAt) / Math.max(1, pt.expireAt - pt.startAt)));
+                        P.x = pt.position.x; P.y = pt.position.y; P.z = pt.position.z; P.r = 1.3 * (1 + t * 0.7); P.rect = 0; P.yaw = 0;
+                        P.start = pt.startAt; P.end = pt.expireAt; P.age = (now - pt.startAt) * 0.001; P.fade = (1 - t) * Math.min(1, P.age * 12);
+                    } },
+                    flash: ['flash', 'self'], ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'chamber.anchor', lights: [0xfbbf24, 0xfbbf24, 0xfbbf24], lightY: 1.15, lightRadius: 1.8, lightK: 0.35, unfoldMs: 300 },
+                    groundZone: { preset: 'vortex', colA: 0xf59e0b, colB: 0xfff1c1, blend: 'add' },
+                    self: { dash: true, color: 'theme:chamber' },
+                    flash: { core: 0xf59e0b, glow: 'theme:chamber', coreSize: 0.8, streaks: 0.9, halo: { hex: 0xfcd34d, size: 4 }, light: { hex: 0xf59e0b, radius: 10 }, embers: { n: 14, hex: 0xfbbf24 } }
+                }
+            });
+            // Tour De Force: a thick gold sniper tracer; the activation burst a gold bloom; a kill's slow field gold
+            L.defineLook('chamber.x', {
+                routes: { neonBeam: { renderer: 'beam', adapt: tracer }, slowZones: 'groundZone', flash: 'flash' },
+                styles: {
+                    beam: { core: 0xfffbeb, glow: 'theme:chamber', width: 0.4, jag: 0, origin: { halo: 0xfff1c1, light: 0xf59e0b },
+                        impact: { halo: 0xfff1c1, light: 0xf59e0b, sparks: 0xfde68a, glow: 0xfbbf24, smoke: 0x5b5146 } },
+                    groundZone: goldZone,
+                    flash: { core: 0xf59e0b, glow: 'theme:chamber', coreSize: 1, streaks: 1.1, halo: { hex: 0xfcd34d, size: 6 }, light: { hex: 0xf59e0b, radius: 12 }, embers: { n: 20, hex: 0xfbbf24 } }
+                }
+            });
+
+            // ---------------------------------------------------------------- DEADLOCK
+            const nanowire = { colA: 0x0369a1, colB: 0xbae6fd };
+            // GravNet: a banded grenade, then the net: a cell field that draws in nanite sparks, and a low dome of
+            // nanowire (the Classic dome's shape: the pool's radius, 0.42 of it high) that rises as it lands
+            L.defineModel('deadlock.grenade', {
+                count: 1,
+                mats: { body: { color: 0x3b4452, rough: 0.4, metal: 0.7 }, plate: { color: 0xcbd5e1, rough: 0.35, metal: 0.6 }, wire: { glow: 0x7dd3fc } },
+                parts: [
+                    { shape: 'sphere', size: [0.11], seg: [12, 10], mat: 'body' },
+                    { shape: 'cyl', size: [0.068, 0.075, 0.075], seg: 10, at: [0, 0, 0.11], rot: [Math.PI / 2, 0, 0], mat: 'plate' },
+                    { shape: 'torus', size: [0.115, 0.012], seg: [4, 16], mat: 'wire' },
+                    { shape: 'torus', size: [0.115, 0.012], seg: [4, 16], rot: [0, Math.PI / 2, 0], mat: 'wire' }
+                ]
+            });
+            (function () {
+                const R = AGENT_TUNING.deadlock.c.radiusM, H = R * 0.42, parts = [];
+                for (const e of [0, 0.5, 0.95, 1.3]) parts.push({ group: 'net', shape: 'torus', size: [R * Math.cos(e), 0.03], seg: [4, 56], at: [0, H * Math.sin(e), 0], rot: [Math.PI / 2, 0, 0], mat: 'wire' });
+                for (let k = 0; k < 6; k++) parts.push({ group: 'net', shape: 'torus', size: [R, 0.03], seg: [4, 44], arc: Math.PI, rot: [0, k * Math.PI / 6, 0], scale: [1, H / R, 1], mat: 'wire' });
+                parts.push({ group: 'net', shape: 'sphere', size: [0.14], seg: [8, 6], at: [0, H, 0], mat: 'wire' });
+                L.defineModel('deadlock.net', {
+                    count: 2,
+                    mats: { wire: { glow: 0x7dd3fc } },
+                    groups: { net: { at: [0, 0, 0], role: 'spin', axis: 'y', rate: 0.3 } },
+                    parts: parts,
+                    custom: nest('base', 'net')   // it rises as the base unfolds, and turns
+                });
+            })();
+            L.defineLook('deadlock.c', {
+                routes: {
+                    projectile: 'projectile',
+                    deadlockGravNets: [
+                        { renderer: 'groundZone', adapt: function (P, gn, now) {
+                            P.x = gn.position.x; P.y = gn.position.y; P.z = gn.position.z; P.r = gn.radius; P.rect = 0; P.yaw = 0;
+                            P.start = gn.startAt; P.end = gn.expireAt; P.age = (now - gn.startAt) * 0.001;
+                            P.fade = fadeOut(gn.expireAt - now, 450) * Math.min(1, P.age * 5);
+                        } },
+                        { renderer: 'deployable', adapt: function (P, gn, now) {
+                            P.x = gn.position.x; P.y = gn.position.y; P.z = gn.position.z; P.yaw = 0; P.headYaw = NaN;
+                            P.start = gn.startAt; P.remain = gn.expireAt - now; P.alert = false; P.fade = fadeOut(gn.expireAt - now, 450);
+                        } }
+                    ],
+                    ring: 'absorb'
+                },
+                styles: {
+                    projectile: { model: 'deadlock.grenade', spin: { axis: 'x', rate: 13 },
+                        trail: [{ kind: 'spark', hex: 0x7dd3fc, life: 0.25, s0: 0.04, s1: 0.012, a0: 1, drag: 2, grav: 2, jx: 1, jy: 1, jz: 1 }] },
+                    groundZone: { preset: 'field', colA: nanowire.colA, colB: nanowire.colB,
+                        emit: { every: 90, spec: { kind: 'spark', hex: 0x7dd3fc, n: 3, life: 0.6, s0: 0.05, s1: 0.012, a0: 1, drag: 0.5, out: -3.5, up: 0.3, jitter: 0.6 } } },
+                    deployable: { preset: 'device', model: 'deadlock.net', unfoldMs: 380, lightK: 0, dust: null }
+                }
+            });
+            // Sonic Sensor: a small tripod with a listening dish that turns; when it trips (step 2SS, tagged) a
+            // concussive shockwave
+            L.defineModel('deadlock.sensor', {
+                count: 2,
+                mats: { body: { color: 0xcbd5e1, rough: 0.35, metal: 0.6 }, dark: { color: 0x1e293b, rough: 0.45, metal: 0.55 }, eye: { light: 0x38bdf8 } },
+                groups: { dish: { at: [0, 0.5, 0], role: 'spin', axis: 'y', rate: 1.2 } },
+                parts: (function () {
+                    const p = [];
+                    for (let k = 0; k < 3; k++) {
+                        const a = k * Math.PI * 2 / 3;
+                        p.push({ shape: 'rbox', size: [0.04, 0.3, 0.04], radius: 0.015, seg: 1, at: [Math.sin(a) * 0.1, 0.12, Math.cos(a) * 0.1], rot: [Math.cos(a) * 0.5, 0, -Math.sin(a) * 0.5], mat: 'body' });
+                    }
+                    p.push({ shape: 'cyl', size: [0.035, 0.045, 0.3], seg: 8, at: [0, 0.32, 0], mat: 'body' });
+                    p.push({ group: 'dish', shape: 'cyl', size: [0.16, 0.06, 0.07], seg: 16, at: [0, 0.03, 0.02], rot: [0.45, 0, 0], mat: 'dark' });
+                    p.push({ group: 'dish', shape: 'torus', size: [0.155, 0.014], seg: [4, 24], at: [0, 0.065, 0.035], rot: [Math.PI / 2 + 0.45, 0, 0], mat: 'body' });
+                    p.push({ group: 'dish', shape: 'sphere', size: [0.04], seg: [8, 6], at: [0, 0.075, 0.04], mat: 'eye' });
+                    return p;
+                })()
+            });
+            L.defineLook('deadlock.q', {
+                routes: {
+                    deadlockSensors: { renderer: 'deployable', keep: ['ringMesh'], adapt: function (P, ds, now) {   // V2.2: keeps its detection ring (Classic's range marker) drawn
+                        P.x = ds.position.x; P.y = ds.position.y; P.z = ds.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = ds.startAt; P.remain = ds.expireAt - now; P.alert = !!ds.triggered; P.fade = 1;
+                    } },
+                    flash: 'blast', ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'deadlock.sensor', lights: [0x38bdf8, 0xffffff, 0xffffff], lightY: 0.55, lightRadius: 1.6, lightK: 0.35, unfoldMs: 250 },
+                    blast: { preset: 'concussive', rScale: 1, shellA: 0xe0f2fe, shellB: 0x38bdf8, coreA: 0xffffff, coreB: 0x38bdf8, ringB: 0x7dd3fc,
+                        sparks: { n: 14, hex: 0xbae6fd }, smoke: null, halo: 0xe0f2fe, light: 0x38bdf8 }
+                }
+            });
+            // Barrier Mesh: the X of walls as nanowire mesh (two panels: the Classic walls at yaw and yaw + 90 deg)
+            // round a mast with a turning core
+            L.defineModel('deadlock.core', {
+                count: 2,
+                mats: { body: { color: 0xcbd5e1, rough: 0.35, metal: 0.6 }, dark: { color: 0x1e293b, rough: 0.45, metal: 0.55 }, eye: { light: 0x7dd3fc } },
+                groups: { core: { at: [0, 1.25, 0], role: 'spin', axis: 'y', rate: 1.2 } },
+                parts: [
+                    { shape: 'cyl', size: [0.2, 0.26, 0.1], seg: 6, at: [0, 0.05, 0], mat: 'body' },
+                    { shape: 'cyl', size: [0.06, 0.06, 2.5], seg: 6, at: [0, 1.25, 0], mat: 'dark' },
+                    { shape: 'cyl', size: [0.1, 0.13, 0.08], seg: 6, at: [0, 2.5, 0], mat: 'body' },
+                    { group: 'core', shape: 'oct', size: [0.24], mat: 'eye' },
+                    { group: 'core', shape: 'torus', size: [0.34, 0.02], seg: [4, 24], rot: [Math.PI / 2, 0, 0], mat: 'eye' }
+                ]
+            });
+            L.defineLook('deadlock.e', {
+                routes: {
+                    deadlockBarriers: [
+                        { renderer: 'wall', adapt: function (P, db, now) {
+                            const a = P.panels[0], b = P.panels[1], y = db.position.y + 1.25;
+                            P.n = 2;
+                            a.x = b.x = db.position.x; a.y = b.y = y; a.z = b.z = db.position.z;
+                            a.sx = b.sx = 11.6; a.sy = b.sy = 2.5; a.sz = b.sz = 0.16;
+                            a.yaw = db.yaw; b.yaw = db.yaw + Math.PI / 2; a.shape = b.shape = 'box';
+                            P.start = db.startAt; P.maxHealth = 0; P.fade = fadeOut(db.expireAt - now, 500);
+                        } },
+                        { renderer: 'deployable', adapt: function (P, db, now) {
+                            P.x = db.position.x; P.y = db.position.y; P.z = db.position.z; P.yaw = db.yaw; P.headYaw = NaN;
+                            P.start = db.startAt; P.remain = db.expireAt - now; P.alert = false; P.fade = 1;
+                        } }
+                    ],
+                    ring: 'absorb'
+                },
+                styles: {
+                    wall: { preset: 'mesh', colA: nanowire.colA, colB: 0x7dd3fc, floor: -1,
+                        emit: { every: 110, spec: { kind: 'spark', hex: 0xbae6fd, n: 1, life: 0.3, s0: 0.05, s1: 0.012, a0: 1, drag: 1, jitter: 3 } },
+                        end: { kind: 'glow', hex: 0x7dd3fc, n: 10, life: 0.45, s0: 0.25, s1: 0.04, a0: 0.8, drag: 1, jitter: 1 } },
+                    deployable: { preset: 'device', model: 'deadlock.core', lights: [0x7dd3fc, 0x7dd3fc, 0xffffff], lightY: 1.25, lightRadius: 2.2, lightK: 0.4, unfoldMs: 300 }
+                }
+            });
+            // Annihilation: a cocoon of nanowire bands round the captive, a tether reeling it in (a beam from
+            // the pull point to the cocoon); the capture and the execution (tagged) concussive blasts
+            (function () {
+                const parts = [];
+                const bands = [[0.15, 0.6, 0, 0], [0.5, 0.82, 0.3, 0], [0.92, 0.9, -0.35, 0.25], [1.34, 0.88, 0.25, -0.3], [1.74, 0.72, -0.2, 0.2], [2.1, 0.42, 0, 0]];
+                for (let k = 0; k < bands.length; k++) {
+                    const b = bands[k];
+                    parts.push({ group: 'wrap', shape: 'torus', size: [b[1], 0.045], seg: [6, 36], at: [0, b[0] - 1.15, 0], rot: [Math.PI / 2 + b[2], b[3], 0], mat: k % 2 ? 'glow' : 'wire' });
+                }
+                L.defineModel('deadlock.cocoon', {
+                    count: 1,
+                    mats: { wire: { color: 0xb6c2d1, rough: 0.3, metal: 0.8 }, glow: { glow: 0x7dd3fc } },
+                    groups: { wrap: { at: [0, 1.15, 0], role: 'spin', axis: 'y', rate: 1.1 } },
+                    parts: parts,
+                    custom: nest('base', 'wrap')   // it wraps up as the base unfolds, and turns
+                });
+            })();
+            L.defineLook('deadlock.x', {
+                routes: {
+                    deadlockCocoon: [
+                        { renderer: 'deployable', adapt: function (P, dc, now) {
+                            const frac = Math.min(1, Math.max(0, (now - dc.startAt) / Math.max(1, dc.executeAt - dc.startAt)));
+                            P.x = dc.position.x; P.y = 0; P.z = dc.position.z; P.yaw = 0; P.headYaw = NaN;   // the Classic captive stands at y 0
+                            P.start = dc.startAt; P.remain = Math.max(0, dc.executeAt - now); P.alert = true; P.fade = 1 - 0.15 * frac;
+                        } },
+                        { renderer: 'beam', adapt: function (P, dc, now) {
+                            L.between(P, dc.pullTargetPos.x, 1.1, dc.pullTargetPos.z, dc.position.x, 1.1, dc.position.z);
+                            P.width = 0.8 + 0.3 * Math.sin(now * 0.03); P.fade = 1;
+                        } }
+                    ],
+                    flash: 'blast', ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'deadlock.cocoon', unfoldMs: 300, lightK: 0, dust: null },
+                    beam: { core: 0xe0f7ff, glow: 0x38bdf8, width: 0.16, jag: 0.05, origin: null, impact: null },
+                    blast: { preset: 'concussive', rScale: 1, shellA: 0xe0f2fe, shellB: 0x0ea5e9, coreA: 0xffffff, coreB: 0x38bdf8, ringB: 0x7dd3fc,
+                        sparks: { n: 18, hex: 0xbae6fd }, dust: { n: 12, hex: 0x8a8279, s1: 1.8 }, smoke: null, halo: 0xe0f2fe, light: 0x38bdf8 }
+                }
+            });
+
+            // ---------------------------------------------------------------- VYSE
+            const chrome = { color: 0x9a9aa8, rough: 0.22, metal: 0.85 };
+            // Shear: a liquid-metal disc trap with a lilac core; when someone steps near (popped) the Classic wall
+            // rises (one panel from startPos to endPos, growing as the Classic one does) in liquid metal
+            L.defineModel('vyse.trap', {
+                count: 2,
+                mats: { metal: chrome, core: { light: 0xe879f9 } },
+                groups: { blades: { at: [0, 0.06, 0], role: 'spin', axis: 'y', rate: 0.9 } },
+                parts: (function () {
+                    const p = [{ shape: 'cyl', size: [0.3, 0.34, 0.05], seg: 20, at: [0, 0.025, 0], mat: 'metal' },
+                        { shape: 'oct', size: [0.11], at: [0, 0.16, 0], scale: [1, 1.4, 1], mat: 'core' }];
+                    for (let k = 0; k < 6; k++) p.push({ group: 'blades', shape: 'box', size: [0.05, 0.02, 0.3], at: [Math.sin(k * Math.PI / 3) * 0.28, 0, Math.cos(k * Math.PI / 3) * 0.28], rot: tilt(k * Math.PI / 3, -0.25), mat: 'metal' });
+                    return p;
+                })()
+            });
+            L.defineLook('vyse.c', {
+                routes: {
+                    vyseShears: [
+                        { renderer: 'deployable', adapt: function (P, vs, now) {
+                            P.x = vs.position.x; P.y = vs.position.y; P.z = vs.position.z; P.yaw = vs.group.rotation.y; P.headYaw = NaN;
+                            P.start = vs.startAt; P.remain = vs.expireAt - now; P.alert = !!vs.popped;
+                            P.fade = vs.popped ? Math.max(0, 1 - (now - vs.poppedAt) / 160) : 1;   // it goes into the wall
+                        } },
+                        { renderer: 'wall', adapt: function (P, vs, now) {
+                            if (!vs.popped) { P.n = 0; P.fade = 0; P.start = vs.startAt; P.maxHealth = 0; return; }   // nothing drawn until it pops
+                            const a = P.panels[0], rise = Math.min(1, (now - vs.poppedAt) / 180);
+                            P.n = 1;
+                            a.x = (vs.startPos.x + vs.endPos.x) * 0.5; a.z = (vs.startPos.z + vs.endPos.z) * 0.5; a.y = vs.position.y + 1.6 * rise;
+                            a.sx = Math.max(0.1, Math.hypot(vs.endPos.x - vs.startPos.x, vs.endPos.z - vs.startPos.z)); a.sy = Math.max(0.05, 3.2 * rise); a.sz = 0.42;
+                            a.yaw = vs.group.rotation.y; a.shape = 'box';
+                            P.start = vs.startAt; P.maxHealth = 0; P.fade = fadeOut(vs.expireAt - now, 400);
+                        } }
+                    ],
+                    ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'vyse.trap', lights: [0xe879f9, 0xf5d0fe, 0xf5d0fe], lightY: 0.2, lightRadius: 1.4, lightK: 0.3, unfoldMs: 250 },
+                    // liquid metal: the flowing, reflective sheet (the curtain's water mode) in dark chrome, a bright crest
+                    wall: { preset: 'water', colA: 0x4c4a5c, colB: 0xe879f9, floor: -1,
+                        emit: { every: 120, spec: { kind: 'spark', hex: 0xe9d5ff, n: 2, life: 0.6, s0: 0.05, s1: 0.02, a0: 1, drag: 0.6, up: 2, jitter: 1.2, grav: 9.8 } },
+                        end: { kind: 'spark', hex: 0xe9d5ff, n: 18, life: 0.5, s0: 0.06, s1: 0.015, a0: 1, drag: 1, jitter: 3 } }
+                }
+            });
+            // Arc Rose: a metal flower on a stem, its petals turning slowly round a lit heart; its flash (Q again or
+            // an enemy near: detonateVyseArcRose, tagged) a lilac pop
+            L.defineModel('vyse.rose', {
+                count: 2,
+                mats: { metal: chrome, petal: { color: 0xc9b8e8, rough: 0.25, metal: 0.75, emissive: 0x1a0a2a }, heart: { light: 0xe879f9 } },
+                groups: { bloom: { at: [0, 0.55, 0], role: 'spin', axis: 'y', rate: 0.6 } },
+                parts: (function () {
+                    const p = [{ shape: 'cyl', size: [0.016, 0.024, 0.56], seg: 8, at: [0, 0.28, 0], mat: 'metal' },
+                        { shape: 'cyl', size: [0.09, 0.12, 0.03], seg: 12, at: [0, 0.015, 0], mat: 'metal' },
+                        { shape: 'box', size: [0.15, 0.008, 0.05], at: [0.07, 0.22, 0], rot: [0, 0, 0.45], mat: 'metal' },
+                        { shape: 'box', size: [0.13, 0.008, 0.045], at: [-0.06, 0.33, 0.01], rot: [0, 0.3, -0.5], mat: 'metal' }];
+                    for (let k = 0; k < 6; k++) {
+                        const a = k * Math.PI / 3, t = 0.75, h = 0.2;
+                        p.push({ group: 'bloom', shape: 'box', size: [0.1, h, 0.012], at: [Math.sin(a) * (0.04 + Math.sin(t) * h * 0.5), Math.cos(t) * h * 0.5, Math.cos(a) * (0.04 + Math.sin(t) * h * 0.5)], rot: tilt(a, t), mat: 'petal' });
+                    }
+                    for (let k = 0; k < 5; k++) {
+                        const a = k * Math.PI * 2 / 5 + 0.3, t = 0.35, h = 0.15;
+                        p.push({ group: 'bloom', shape: 'box', size: [0.07, h, 0.01], at: [Math.sin(a) * (0.02 + Math.sin(t) * h * 0.5), Math.cos(t) * h * 0.5, Math.cos(a) * (0.02 + Math.sin(t) * h * 0.5)], rot: tilt(a, t), mat: 'petal' });
+                    }
+                    p.push({ group: 'bloom', shape: 'sphere', size: [0.045], seg: [10, 8], at: [0, 0.04, 0], mat: 'heart' });
+                    return p;
+                })()
+            });
+            L.defineLook('vyse.q', {
+                routes: {
+                    vyseArcRoses: { renderer: 'deployable', adapt: function (P, vr, now) {
+                        P.x = vr.position.x; P.y = vr.position.y - AGENT_TUNING.vyse.q.heightM; P.z = vr.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = vr.startAt; P.remain = vr.expireAt - now; P.alert = false; P.fade = fadeOut(vr.expireAt - now, 450);
+                    } },
+                    flash: 'flash', ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'vyse.rose', lights: [0xe879f9, 0xe879f9, 0xe879f9], lightY: 0.6, lightRadius: 1.4, lightK: 0.35, unfoldMs: 350 },
+                    flash: { core: 0xa855f7, glow: 0xe879f9, coreSize: 1.2, streaks: 1.15, halo: { hex: 0xf0abfc, size: 7 }, light: { hex: 0xe879f9, radius: 15 }, embers: { n: 20, hex: 0xf0abfc } }
+                }
+            });
+            // Razorvine: a dark metal seed, then a nest of thorns: metal vines over the floor and a thorny knot
+            // turning in the middle (one Classic item, two renderers)
+            L.defineModel('vyse.thorns', {
+                count: 2,
+                mats: { metal: { color: 0x7c6f94, rough: 0.25, metal: 0.8, emissive: 0x140a22 } },
+                groups: { knot: { at: [0, 0.3, 0], role: 'spin', axis: 'y', rate: 0.45 } },
+                parts: (function () {
+                    const p = [{ group: 'knot', geometry: function () { return new THREE.TorusKnotGeometry(0.95, 0.085, 72, 6, 2, 3); }, rot: [Math.PI / 2, 0, 0], scale: [1, 1, 0.3], mat: 'metal' }];
+                    for (let k = 0; k < 10; k++) {
+                        const a = k * 2.39996, r = 0.55 + (k % 3) * 0.18;
+                        p.push({ group: 'knot', shape: 'cone', size: [0.025, 0.32 + (k % 4) * 0.06], seg: 5, at: [Math.sin(a) * r, 0.1, Math.cos(a) * r], rot: tilt(a, 0.5 + (k % 3) * 0.2), mat: 'metal' });
+                    }
+                    return p;
+                })()
+            });
+            L.defineLook('vyse.e', {
+                routes: {
+                    projectile: 'projectile',
+                    vyseRazorvines: [
+                        { renderer: 'groundZone', adapt: function (P, rv, now) {
+                            P.x = rv.position.x; P.y = rv.position.y; P.z = rv.position.z; P.r = rv.radius; P.rect = 0; P.yaw = 0;
+                            P.start = rv.startAt; P.end = rv.expireAt; P.age = (now - rv.startAt) * 0.001;
+                            P.fade = fadeOut(rv.expireAt - now, 450) * Math.min(1, P.age * 4);
+                        } },
+                        { renderer: 'deployable', adapt: function (P, rv, now) {
+                            P.x = rv.position.x; P.y = rv.position.y; P.z = rv.position.z; P.yaw = 0; P.headYaw = NaN;
+                            P.start = rv.startAt; P.remain = rv.expireAt - now; P.alert = false; P.fade = fadeOut(rv.expireAt - now, 450);
+                        } }
+                    ],
+                    ring: 'absorb'
+                },
+                styles: {
+                    projectile: { orb: { style: 1, a: 0x1e1b2e, b: 'theme:vyse', size: 0.5, blend: 'normal' },
+                        trail: [{ kind: 'glow', hex: 0xc084fc, life: 0.28, s0: 0.25, s1: 0.05, a0: 0.6, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0xe9d5ff, life: 0.22, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 3, jx: 1, jy: 1, jz: 1 }] },
+                    groundZone: { preset: 'thorns', colA: 0x6d5f8a, colB: 0xc084fc },
+                    deployable: { preset: 'device', model: 'vyse.thorns', unfoldMs: 300, lightK: 0, dust: { hex: 0x8d8579, n: 8 } }
+                }
+            });
+            // Steel Garden: a field of metal thorns 24 m across round a coiled crown of thorns (the Classic crown),
+            // faint and low while it winds up, then erupting (step 2EEE, tagged): the crown rises and a ring of
+            // shards races out over the whole garden
+            (function () {
+                const p = [{ group: 'crown', geometry: function () { return new THREE.TorusKnotGeometry(4.5, 0.16, 180, 6, 3, 5); }, rot: [Math.PI / 2, 0, 0], scale: [1, 1, 0.18], mat: 'metal' }];
+                for (let k = 0; k < 18; k++) {
+                    const a = k * Math.PI * 2 / 18, r = 4.5 + (k % 2 ? 0.45 : -0.45);
+                    p.push({ group: 'crown', shape: 'cone', size: [0.07, 0.9 + (k % 3) * 0.35], seg: 5, at: [Math.sin(a) * r, 0.35, Math.cos(a) * r], rot: tilt(a, (k % 2 ? 0.35 : -0.2)), mat: 'metal' });
+                }
+                L.defineModel('vyse.crown', {
+                    count: 1,
+                    mats: { metal: { color: 0x7c6a9c, rough: 0.22, metal: 0.8, emissive: 0x1a0d2e } },
+                    groups: { crown: { at: [0, 0.4, 0], role: 'spin', axis: 'y', rate: 0.25 } },
+                    parts: p
+                });
+            })();
+            const gardenGrow = function (sg, now) {
+                return sg.erupted ? 0.35 + 0.65 * Math.min(1, (now - sg.eruptAt) / 300) : 0.35 * Math.min(1, (now - sg.startAt) * 0.003);
+            };
+            L.defineLook('vyse.x', {
+                routes: {
+                    vyseSteelGarden: [
+                        { renderer: 'groundZone', adapt: function (P, sg, now) {
+                            P.x = sg.position.x; P.y = sg.position.y; P.z = sg.position.z; P.r = sg.radius; P.rect = 0; P.yaw = 0;
+                            P.start = sg.startAt; P.end = sg.expireAt; P.age = (now - sg.startAt) * 0.001;
+                            P.fade = fadeOut(sg.expireAt - now, 500) * gardenGrow(sg, now);
+                        } },
+                        { renderer: 'deployable', adapt: function (P, sg, now) {
+                            P.x = sg.position.x; P.y = sg.position.y; P.z = sg.position.z; P.yaw = 0; P.headYaw = NaN;
+                            P.start = sg.startAt; P.remain = sg.expireAt - now; P.alert = false;
+                            P.fade = (0.25 + 0.75 * gardenGrow(sg, now)) * fadeOut(sg.expireAt - now, 500);   // coiled low, then risen
+                        } }
+                    ],
+                    flash: 'blast', ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'vyse.crown', unfoldMs: 0, lightK: 0, dust: null },
+                    groundZone: { preset: 'thorns', colA: 0x7c6a9c, colB: 0xe879f9 },
+                    blast: { preset: 'concussive', rScale: 2.2, shellA: 0xf5d0fe, shellB: 0xa855f7, coreA: 0xffffff, coreB: 0xc084fc, ringB: 0xe879f9,
+                        sparks: { n: 46, hex: 0xf5f3ff, up: 5, upRand: 7 }, dust: { n: 16, hex: 0x8a8279, s1: 2.2 }, smoke: null, halo: 0xf5d0fe, light: 0xc084fc, shake: 1.2 }
+                }
+            });
+
+            // ---------------------------------------------------------------- VETO
+            // Crosscut: a twisted bio-knot over a ring on the floor, its heart glowing; the teleport (tagged): a green
+            // pop where you land and green sparks rising round you as you arrive (at the burst's spot: the Classic
+            // teleport moves you first; no screen edge, which would take Evolution's)
+            L.defineModel('veto.anchor', {
+                count: 1,
+                mats: { chitin: { color: 0x1f5c40, rough: 0.42, metal: 0.35, emissive: 0x04251a }, core: { light: 0x34d399 } },
+                groups: { knot: { at: [0, 0.75, 0], role: 'spin', axis: 'y', rate: 1.2 } },
+                parts: (function () {
+                    const p = [{ shape: 'torus', size: [0.5, 0.04], seg: [6, 32], at: [0, 0.04, 0], rot: [Math.PI / 2, 0, 0], mat: 'chitin' }];
+                    for (let k = 0; k < 3; k++) {
+                        const a = k * Math.PI * 2 / 3;
+                        p.push({ shape: 'cone', size: [0.05, 0.5], seg: 6, at: [Math.sin(a) * 0.36, 0.24, Math.cos(a) * 0.36], rot: tilt(a, -0.55), mat: 'chitin' });
+                    }
+                    p.push({ group: 'knot', geometry: function () { return new THREE.TorusKnotGeometry(0.28, 0.065, 64, 8, 2, 3); }, mat: 'chitin' });
+                    p.push({ group: 'knot', shape: 'sphere', size: [0.12], seg: [12, 10], mat: 'core' });
+                    return p;
+                })()
+            });
+            L.defineLook('veto.c', {
+                routes: {
+                    vetoCrosscutAnchor: { renderer: 'deployable', adapt: function (P, vc, now) {
+                        P.x = vc.position.x; P.y = vc.position.y; P.z = vc.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = vc.startAt; P.remain = vc.expireAt - now; P.alert = false; P.fade = fadeOut(vc.expireAt - now, 500);
+                    } },
+                    flash: ['flash', { renderer: 'self', adapt: function (P, f, now) {
+                        P.subject = null; P.x = f.position.x; P.y = f.position.y - 0.8; P.z = f.position.z; P.speed = 0;
+                        P.fade = Math.max(0, 1 - (now - f.startAt) / Math.max(1, f.expireAt - f.startAt));
+                    } }],
+                    ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'veto.anchor', lights: [0x34d399, 0x34d399, 0x34d399], lightY: 0.75, lightRadius: 1.8, lightK: 0.4, unfoldMs: 300 },
+                    flash: { core: 0x10b981, glow: 'theme:veto', coreSize: 0.9, streaks: 1, halo: { hex: 0x6ee7b7, size: 5 }, light: { hex: 0x10b981, radius: 12 }, embers: { n: 18, hex: 0x6ee7b7 } },
+                    self: { aura: { colA: 0x10b981, colB: 0xa7f3d0, w: 1.1, h: 2.0 },
+                        motes: { every: 60, spec: { kind: 'spark', hex: 0x6ee7b7, n: 4, life: 0.5, s0: 0.06, s1: 0.015, a0: 1, drag: 1.2, up: 1.6, jitter: 1.2 } } }
+                }
+            });
+            // Chokehold: a dark glob with a green rim, then a pool of bio-goo; its splat (the detonation's burst) a
+            // green splash
+            L.defineLook('veto.q', {
+                routes: { projectile: 'projectile', vetoChokeholds: { renderer: 'groundZone', adapt: function (P, ch, now) {
+                    P.x = ch.position.x; P.y = ch.position.y; P.z = ch.position.z; P.r = ch.radius; P.rect = 0; P.yaw = 0;
+                    P.start = ch.startAt; P.end = ch.expireAt; P.age = (now - ch.startAt) * 0.001;
+                    P.fade = fadeOut(ch.expireAt - now, 400) * Math.min(1, P.age * 5);
+                } }, flash: 'blast', ring: 'absorb' },
+                styles: {
+                    projectile: { orb: { style: 1, a: 0x022c22, b: 0x34d399, size: 0.55, blend: 'normal' },
+                        trail: [{ kind: 'glow', hex: 0x10b981, life: 0.3, s0: 0.25, s1: 0.06, a0: 0.6, drag: 0, grav: 0 },
+                            { kind: 'spark', hex: 0x6ee7b7, life: 0.25, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 4, jx: 1, jy: 1, jz: 1 }] },
+                    groundZone: { preset: 'toxic', colA: 0x065f46, colB: 0x6ee7b7, scorch: { hex: 0x0f2a1e, scale: 0.85, holdMs: 5000 } },
+                    blast: { preset: 'splash', rScale: 1, shellA: 0xd1fae5, shellB: 0x10b981, coreA: 0xffffff, coreB: 0x10b981, ringB: 0x34d399,
+                        sparks: { n: 26, hex: 0x6ee7b7, up: 4, upRand: 6 }, dust: null, halo: 0xd1fae5, light: 0x10b981 }
+                }
+            });
+            // Interceptor: a hovering bio-drone, its core bobbing inside a turning ring; each zap (step 2NNN, tagged)
+            // a short green bolt from the drone to the enemy and a small pop
+            L.defineModel('veto.interceptor', {
+                count: 2,
+                mats: { shell: { color: 0x1f2a24, rough: 0.4, metal: 0.6 }, trim: { color: 'theme:veto', rough: 0.35, metal: 0.3, emissive: 0x064e3b }, core: { light: 0x34d399 } },
+                groups: { body: { at: [0, AGENT_TUNING.veto.e.heightM, 0], role: 'bob', amp: 0.1, rate: 0.6 }, ring: { at: [0, 0, 0], role: 'spin', axis: 'y', rate: 2.4 } },
+                parts: [
+                    { group: 'body', shape: 'oct', size: [0.15], scale: [1, 1.35, 1], mat: 'core' },
+                    { group: 'body', shape: 'torus', size: [0.2, 0.03], seg: [6, 24], rot: [Math.PI / 2, 0, 0], mat: 'shell' },
+                    { group: 'body', shape: 'torus', size: [0.2, 0.03], seg: [6, 24], mat: 'shell' },
+                    { group: 'body', shape: 'cone', size: [0.07, 0.16], seg: 6, at: [0, -0.27, 0], rot: [Math.PI, 0, 0], mat: 'shell' },
+                    { group: 'ring', shape: 'torus', size: [0.46, 0.025], seg: [6, 32], rot: [Math.PI / 2, 0, 0], mat: 'trim' },
+                    { group: 'ring', shape: 'box', size: [0.05, 0.05, 0.14], at: [0, 0, 0.46], mat: 'trim' },
+                    { group: 'ring', shape: 'box', size: [0.05, 0.05, 0.14], at: [0.4, 0, -0.23], rot: [0, 2.094, 0], mat: 'trim' },
+                    { group: 'ring', shape: 'box', size: [0.05, 0.05, 0.14], at: [-0.4, 0, -0.23], rot: [0, -2.094, 0], mat: 'trim' }
+                ],
+                custom: nest('body', 'ring')   // the ring turns round the bobbing body
+            });
+            L.defineLook('veto.e', {
+                routes: {
+                    vetoInterceptors: { renderer: 'deployable', keep: ['ringMesh'], adapt: function (P, vi, now) {   // V2.2: keeps its zap-range ring (Classic's range marker) drawn
+                        P.x = vi.position.x; P.y = vi.position.y - AGENT_TUNING.veto.e.heightM; P.z = vi.position.z; P.yaw = 0; P.headYaw = NaN;
+                        P.start = vi.startAt; P.remain = vi.expireAt - now; P.alert = false; P.fade = fadeOut(vi.expireAt - now, 450);
+                    } },
+                    flash: ['flash', { renderer: 'beam', adapt: function (P, f, now) {
+                        // the zap: from the nearest drone to the burst on the enemy
+                        const list = agentSystem.vetoInterceptors;
+                        let best = null, bd = 1e9;
+                        for (let i = 0; i < list.length; i++) { const v = list[i]; if (!v.inUse) continue; const d = v.position.distanceToSquared(f.position); if (d < bd) { bd = d; best = v; } }
+                        const o = best ? best.position : f.position;
+                        L.between(P, o.x, o.y, o.z, f.position.x, f.position.y, f.position.z);
+                        P.width = 1; P.fade = Math.max(0, 1 - (now - f.startAt) / Math.max(1, f.expireAt - f.startAt));
+                    } }],
+                    ring: 'absorb'
+                },
+                styles: {
+                    deployable: { preset: 'device', model: 'veto.interceptor', lights: [0x34d399, 0xa7f3d0, 0xecfdf5], lightY: AGENT_TUNING.veto.e.heightM, lightRadius: 2.2, lightK: 0.45, unfoldMs: 300, dust: null },
+                    flash: { core: 0x10b981, glow: 'theme:veto', coreSize: 0.45, streaks: 0.4, halo: { hex: 0x6ee7b7, size: 2.4 }, light: { hex: 0x10b981, radius: 6 }, embers: { n: 8, hex: 0x6ee7b7 } },
+                    beam: { core: 0xecfdf5, glow: 'theme:veto', width: 0.12, jag: 0.18, origin: null, impact: null }
+                }
+            });
+            // Evolution: on you for the ultimate: a green aura and edge, sparks rising; its pulses (every tick of
+            // step 2OOO: nextPulseAt) green scan spheres the size of the aura's reach
+            L.defineLook('veto.x', {
+                routes: {
+                    vetoEvolutionAura: [
+                        { renderer: 'self', adapt: function (P, ea, now) {
+                            feet(P); P.subject = null; P.speed = 0;
+                            P.fade = Math.min(1, (now - ea.startAt) / 200) * fadeOut(ea.expireAt - now, 500);
+                        } },
+                        { renderer: 'pulse', adapt: function (P, ea, now) {
+                            const last = ea.nextPulseAt - AGENT_TUNING.veto.x.tickMs, f = (now - last) / 420;
+                            feet(P);
+                            P.shape = 1; P.R = AGENT_TUNING.veto.x.radiusM;
+                            P.front = f >= 0 && f <= 1 ? f : -1; P.after = Math.max(0, now - last) * 0.001; P.charge = 0;
+                            P.fade = 0.45 * fadeOut(ea.expireAt - now, 500); P.wave = ea.nextPulseAt;   // a quiet shell: you stand inside it
+                        } }
+                    ],
+                    ring: 'absorb'
+                },
+                styles: {
+                    self: { edge: { colA: 0x10b981, colB: 0x6ee7b7, shimmer: true, k: 0.3 }, aura: { colA: 0x10b981, colB: 0xa7f3d0, w: 1.3, h: 2.2 },
+                        motes: { every: 120, spec: { kind: 'spark', hex: 0x6ee7b7, n: 2, life: 0.8, s0: 0.05, s1: 0.015, a0: 1, drag: 1.2, up: 1.2, jitter: 0.6 } } },
+                    pulse: { preset: 'sonar', colA: 0x10b981, colB: 0xd1fae5, shellA: 0x10b981, shellB: 0x022c22, ring: 0x6ee7b7, eruptLight: 0x0b6b4a }
+                }
+            });
+        })();
         // V2.2: end of the Sentinels' block
 
         // Initialize the optimized game
