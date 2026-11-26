@@ -50809,12 +50809,13 @@
                     self: { dash: true, color: 0xff9d2e, hand: { mode: 2, color: 0xff9d2e, scale: 0.6 } }
                 }
             });
-            // PHOENIX Run It Back: the anchor is a stone brazier burning where you will come back (a column of light
-            // over it, a ring of runes turning on the floor); the rebirth burst (tagged) a big fire flash
+            // PHOENIX Run It Back: the anchor is a bronze brazier burning where you will come back (a column of light
+            // over it, a ring of runes turning on the floor); the rebirth burst (tagged) a big fire flash. V2.2: its
+            // stand and bowl are one dark bronze (one draw less than a stone stand under a bronze bowl)
             (function () {
                 const parts = [
-                    { shape: 'cyl', size: [0.3, 0.38, 0.14], seg: 10, at: [0, 0.07, 0], mat: 'stone' },
-                    { shape: 'cyl', size: [0.11, 0.15, 0.52], seg: 10, at: [0, 0.4, 0], mat: 'stone' },
+                    { shape: 'cyl', size: [0.3, 0.38, 0.14], seg: 10, at: [0, 0.07, 0], mat: 'bronze' },
+                    { shape: 'cyl', size: [0.11, 0.15, 0.52], seg: 10, at: [0, 0.4, 0], mat: 'bronze' },
                     { shape: 'cyl', size: [0.34, 0.15, 0.22], seg: 14, at: [0, 0.77, 0], mat: 'bronze' },
                     { shape: 'torus', size: [0.335, 0.03], seg: [6, 24], at: [0, 0.88, 0], rot: [PI / 2, 0, 0], mat: 'bronze' },
                     { shape: 'sphere', size: [0.27], seg: [14, 8], at: [0, 0.86, 0], scale: [1, 0.32, 1], mat: 'coal' },
@@ -50828,7 +50829,7 @@
                 for (let k = 0; k < 5; k++) { const a = k * 2.513; flames.push(Math.cos(a) * 0.1, 0.84, Math.sin(a) * 0.1, 0.34 + (k % 2) * 0.08, 0.62 + (k % 3) * 0.12, k * 0.21, (k * 0.37) % 1, 0, 0); }
                 L.defineModel('phoenix.anchor', {
                     count: 1,
-                    mats: { stone: { color: 0x2a2421, rough: 0.85, metal: 0.05 }, bronze: { color: 0x7c4a1e, rough: 0.38, metal: 0.8 }, coal: { light: 0xff7a1a }, rune: { glow: 0xffb347 } },
+                    mats: { bronze: { color: 0x5e3a1a, rough: 0.45, metal: 0.75 }, coal: { light: 0xff7a1a }, rune: { glow: 0xffb347 } },
                     groups: { runes: { at: [0, 0.04, 0], role: 'spin', axis: 'y', rate: 0.5 } },
                     parts: parts,
                     custom: function (kit) {
@@ -50980,7 +50981,7 @@
             L.defineLook('raze.q', {
                 routes: { flash: [{ renderer: 'blast' }, { renderer: 'self' }], ring: 'absorb' },
                 styles: {
-                    blast: { preset: 'fire', aoe: true, coreA: 0xffa64d, coreB: 0xe0501a, smoke: { n: 6, hex: 0x3b3633, k: 0.5 }, scorch: { scale: 0.5, hex: 'theme:raze' }, shake: 0.8 },
+                    blast: { preset: 'fire', aoe: true, coreA: 0xffa64d, coreB: 0xe0501a, smoke: { n: 6, hex: 0x3b3633, k: 0.5 }, scorch: null, shake: 0.8 },   // V2.2: no scorch (a scorch stands as a draw for seconds; the jump's satchel needs none)
                     self: { dash: true, color: 0xfb923c, hand: { mode: 2, color: 0xfb923c, scale: 0.55 } }
                 }
             });
@@ -51127,7 +51128,7 @@
                         trail: [{ kind: 'glow', hex: 0x2ee8cf, life: 0.25, s0: 0.3, s1: 0.05, a0: 0.75, drag: 0, grav: 0 },
                             { kind: 'spark', hex: 0x99fff0, life: 0.2, s0: 0.04, s1: 0.012, a0: 1, drag: 1.5, grav: 2, jx: 1.6, jy: 1.6, jz: 1.6 }] },
                     blast: { preset: 'electric', aoe: true, rScale: 1, coreA: 0x9ffff0, coreB: 'theme:neon', ringB: 0x38bdf8, arcHex: 0x99fff0, sparks: { n: 24, hex: 0x99fff0 },
-                        halo: 0xccfff6, light: 0x00f5d4, shake: 0.7, scorch: { scale: 0.4, hex: 0x14201f } }
+                        halo: 0xccfff6, light: 0x00f5d4, shake: 0.7, scorch: null }   // V2.2: a shock leaves no scorch (two a cast, each a draw for seconds)
                 }
             });
             // NEON Overdrive: the lightning beam (neonBeam, stamped where it fires: its group's turn and length), the
@@ -51224,22 +51225,23 @@
             });
 
             // WAYLAY's crystal: a prism of light turning over a cyan halo (Refract's beacon; scaled down, Saturate's
-            // zones), and the big mirage crystal over Convergent Paths
+            // zones), and the big mirage crystal over Convergent Paths. V2.2: kept lean (several stand at once): the
+            // prism's shards and floor halo are one cyan glow turning together, the mirage's shards are its own light
             L.defineModel('waylay.prism', {
                 count: 3,   // Refract's beacon and Saturate's two zones
-                mats: { prism: { light: 0xfde047 }, shard: { glow: 0xfffbe6 }, halo: { glow: 0x38bdf8 } },
-                groups: { crystal: { at: [0, 1.0, 0], role: 'spin', axis: 'y', rate: 1.6 }, orbit: { at: [0, 1.0, 0], role: 'spin', axis: 'y', rate: -1.1 }, halo: { at: [0, 0.06, 0], role: 'spin', axis: 'y', rate: -0.7 } },
+                mats: { prism: { light: 0xfde047 }, shard: { glow: 0x7dd3fc } },
+                groups: { crystal: { at: [0, 1.0, 0], role: 'spin', axis: 'y', rate: 1.6 }, orbit: { at: [0, 1.0, 0], role: 'spin', axis: 'y', rate: -1.1 } },
                 parts: shards([
                     { group: 'crystal', shape: 'oct', size: [0.4], scale: [0.8, 1.35, 0.8], mat: 'prism' },
-                    { group: 'halo', shape: 'torus', size: [0.95, 0.028], seg: [6, 48], rot: [PI / 2, 0, 0], mat: 'halo' }
+                    { group: 'orbit', shape: 'torus', size: [0.95, 0.028], seg: [6, 48], at: [0, -0.94, 0], rot: [PI / 2, 0, 0], mat: 'shard' }   // the halo on the floor
                 ], 'orbit', 'shard', 4, 0.6, 0, 0.06, 1.6),
                 custom: function (kit) { glowQuads(kit, 'crystal', 0, 0, 0xfffbe6, 0xfde047, 0.6, [0, 0, 0, 1.7, 1.7, 0.4, 0.2, 0, 0]); }
             });
             L.defineModel('waylay.mirage', {
                 count: 1,
-                mats: { prism: { light: 0xfde047 }, shard: { glow: 0x7dd3fc } },
-                groups: { crystal: { at: [0, 1.35, 0], role: 'spin', axis: 'y', rate: 1.2 }, orbit: { at: [0, 1.35, 0], role: 'spin', axis: 'y', rate: -0.8 } },
-                parts: shards([{ group: 'crystal', shape: 'oct', size: [0.85], detail: 1, scale: [0.75, 1.25, 0.75], mat: 'prism' }], 'orbit', 'shard', 6, 1.35, 0, 0.1, 1.7),
+                mats: { prism: { light: 0xfde047 } },
+                groups: { crystal: { at: [0, 1.35, 0], role: 'spin', axis: 'y', rate: 1.2 } },
+                parts: shards([{ group: 'crystal', shape: 'oct', size: [0.85], detail: 1, scale: [0.75, 1.25, 0.75], mat: 'prism' }], 'crystal', 'prism', 6, 1.35, 0, 0.1, 1.7),
                 custom: function (kit) { glowQuads(kit, 'crystal', 0, 0, 0xfffbe6, 0xfde047, 0.5, [0, 0, 0, 3.4, 3.4, 0.6, 0.3, 0, 0]); }
             });
             const prismStyle = { preset: 'device', model: 'waylay.prism', unfoldMs: 0, lights: [0xfde047, 0xfffbe6, 0xffffff], lightY: 0.8, lightRadius: 3, lightK: 0.5, blinkMs: 2000, dust: null };
