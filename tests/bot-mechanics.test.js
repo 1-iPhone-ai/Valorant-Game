@@ -16,6 +16,20 @@ const HELPERS = () => {
     // (t0: where the clock starts, the same in two builds compared against each other; it never runs
     // backwards from one run to the next)
     window.__det = (fn, t0) => {
+        // The sound buffers made on first use (the reverb's impulse response: 176,400 Math.random()
+        // calls; the shared noise: one second's worth) are made here, before the seeded numbers. Made
+        // by a sound playing for the first time inside a run, they took its numbers in one build and
+        // not in the other whenever a bot happened to fire before the run (a loaded machine), and the
+        // runs went apart from their first respawn.
+        const ctx = soundFX.ensureContext && soundFX.ensureContext();
+        if (ctx) {
+            soundFX._ensureReverb(ctx);
+            if (!soundFX._noiseBuffer || soundFX._noiseBuffer.sampleRate !== ctx.sampleRate) {
+                const b = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = b.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                soundFX._noiseBuffer = b;
+            }
+        }
         const realPerf = performance.now.bind(performance), realDate = Date.now, realRandom = Math.random;
         const T0 = Math.max(t0 !== undefined ? t0 : realPerf(), window.__simT || 0) + 1000;
         let el = 0, seed = 20221;
