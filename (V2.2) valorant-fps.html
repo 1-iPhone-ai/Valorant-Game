@@ -23072,7 +23072,8 @@
         //    sounds (birds, bells, drips, metal creaks, neon buzz) placed around the
         //    player through the 3D audio panner.
         //    V2.2: each one-shot comes from one of the map's own landmarks (its sound
-        //    points, MAP_SOUND_POINTS below).
+        //    points, MAP_SOUND_POINTS below), and Haven, a monastery at night, has
+        //    crickets, an owl and a night bird instead of birds.
         // A 250 ms scheduler looks ahead and books notes on the audio clock, so
         // frame drops never make the music stutter. Volumes follow Master Volume.
         const MAP_AUDIO = {
@@ -23080,8 +23081,9 @@
                       bed: { type: 'lowpass', freq: 520, q: 0.4, gain: 0.5 }, hum: 0, events: ['bird', 'bell', 'bird'] },
             bind:   { root: 50, scale: [0, 1, 4, 5, 7, 8, 10], prog: [0, 1, 0, 6], tempo: 66, wave: 'sawtooth', cutoff: 900,
                       bed: { type: 'lowpass', freq: 380, q: 0.5, gain: 0.6 }, hum: 0, events: ['chime', 'bird'] },
+            // V2.2: Haven is a night monastery: bells (still a third of the sounds), crickets, an owl now and then, a night bird
             haven:  { root: 52, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 3, 5, 4], tempo: 64, wave: 'triangle', cutoff: 1200,
-                      bed: { type: 'lowpass', freq: 450, q: 0.4, gain: 0.45 }, hum: 0, events: ['bell', 'bird', 'bird'] },
+                      bed: { type: 'lowpass', freq: 450, q: 0.4, gain: 0.45 }, hum: 0, events: ['bell', 'cricket', 'owl', 'cricket', 'bell', 'cricket', 'nightbird', 'cricket', 'bell'] },
             icebox: { root: 49, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 6, 4], tempo: 70, wave: 'sine', cutoff: 2400,
                       bed: { type: 'bandpass', freq: 1100, q: 0.7, gain: 0.55 }, hum: 55, events: ['creak', 'chime'] },
             lotus:  { root: 55, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 5, 4, 0], tempo: 62, wave: 'triangle', cutoff: 1100,
@@ -23108,13 +23110,17 @@
                 chime: K.M.landmarks.lanterns.map((l) => [l[0], l[2] - 0.7, l[1]]),
                 bird: K.M.landmarks.palms.map((p) => [p[0], p[2] + 0.6, p[1]]).concat(K.tops(0.5), K.roofs(0.5))
             }),
-            // The monastery: bells from the temple tower, the Bell Tower (A's heaven, found by its callout)
-            // and the stupas' brass spires; birds over the roofs and the bigger open areas
+            // The monastery at night: bells from the temple tower, the Bell Tower (A's heaven, found by its
+            // callout) and the stupas' brass spires; crickets in the corners of the Prayer Court, the three
+            // sites and the two long walks; owls on the temple tower, the Bell Tower and the roofs; a night
+            // bird over the bigger open areas
             haven: (K) => {
                 const bt = K.zone('BELL TOWER', 'aSite', 4.2), tower = bt ? [K.above(bt, 2.6)] : [];
                 return {
                     bell: K.tops(0.5).concat(tower, K.spires(5.5, 11, 0.3)),
-                    bird: K.roofs(0.5).concat(K.open(10))
+                    cricket: K.corners(['court', 'aSite', 'bSite', 'cSite', 'longN', 'longCS'], 0.35, 0.25),
+                    owl: K.tops(0.5).concat(tower, K.roofs(0.4)),
+                    nightbird: K.open(10)
                 };
             },
             // The container port: creaks from the gantry crane (its girders, end beams and cab) and the fuel
@@ -23401,7 +23407,7 @@
             },
 
             // The one-shot sounds (played inside soundFX.at, so placed in 3D). V2.2: moved out of
-            // _scheduleAmbience unchanged
+            // _scheduleAmbience unchanged, plus Haven's night sounds: crickets, an owl and a night bird
             _play: function (kind, v) {
                 if (kind === 'bird') {
                     const f = 2400 + Math.random() * 1600;
@@ -23422,7 +23428,70 @@
                 } else if (kind === 'neon') {
                     soundFX.playTone(120, 120, 0.7, 'square', 0.02 * v, 0);
                     soundFX.playTone(240, 240, 0.5, 'square', 0.012 * v, 0.1);
+                } else if (kind === 'cricket') {
+                    // A rapid train of high chirps: 4-6 chirps of 3-4 quick pulses, about three chirps a second
+                    this._chirps(4200 + Math.random() * 700, 4 + Math.floor(Math.random() * 3), 3 + Math.floor(Math.random() * 2), 0.03 * v);
+                } else if (kind === 'owl') {
+                    // A soft hooted pair: a short hoot, then a longer one that falls away
+                    const f = 330 + Math.random() * 90;
+                    this._voice('sine', f, f * 1.03, f * 0.93, 0.36, 0.08, 0.05 * v, 0);
+                    this._voice('sine', f * 0.97, f, f * 0.85, 0.7, 0.12, 0.05 * v, 0.55 + Math.random() * 0.15);
+                } else if (kind === 'nightbird') {
+                    // A night bird's single call: a plaintive whistle that rises, then slides away
+                    const f = 1500 + Math.random() * 500;
+                    this._voice('sine', f, f * 1.4, f * 1.05, 0.55, 0.05, 0.035 * v, 0);
                 }
+            },
+
+            // V2.2: the night sounds' voices, routed like soundFX.playTone (through the 3D panner inside
+            // soundFX.at, under Master Volume, into the echo); the gain as playTone scales it
+            _scaled: function (gainVal) {
+                const cfg = game.userSettings;
+                return Math.min(0.45, Math.max(0, gainVal * ((cfg && typeof cfg.masterVolume === 'number') ? cfg.masterVolume / 100 : 1)));
+            },
+            // One oscillator gliding f0 -> f1 (at 30%) -> f2, with a soft attack (a hoot, a whistle)
+            _voice: function (type, f0, f1, f2, dur, attack, gainVal, delay) {
+                const ctx = soundFX.ensureContext(), peak = this._scaled(gainVal);
+                if (!ctx || peak <= 0.0002) return;
+                try {
+                    const t0 = ctx.currentTime + delay;
+                    const osc = ctx.createOscillator(), g = ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(f0, t0);
+                    osc.frequency.exponentialRampToValueAtTime(f1, t0 + dur * 0.3);
+                    osc.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+                    g.gain.setValueAtTime(0.0001, t0);
+                    g.gain.linearRampToValueAtTime(peak, t0 + attack);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+                    osc.connect(g);
+                    soundFX._route(ctx, g);
+                    osc.start(t0);
+                    osc.stop(t0 + dur + 0.02);
+                } catch (e) {}
+            },
+            // A cricket: chirps of a few 13 ms pulses on one high oscillator (one voice for the whole train)
+            _chirps: function (f, chirps, pulses, gainVal) {
+                const ctx = soundFX.ensureContext(), peak = this._scaled(gainVal);
+                if (!ctx || peak <= 0.0002) return;
+                try {
+                    const t0 = ctx.currentTime + 0.02, gap = 0.3 + Math.random() * 0.08;
+                    const osc = ctx.createOscillator(), g = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(f, t0);
+                    g.gain.setValueAtTime(0, t0);
+                    for (let c = 0; c < chirps; c++) {
+                        for (let k = 0; k < pulses; k++) {
+                            const a = t0 + c * gap + k * 0.022;
+                            g.gain.setValueAtTime(0, a);
+                            g.gain.linearRampToValueAtTime(peak, a + 0.004);
+                            g.gain.linearRampToValueAtTime(0, a + 0.013);
+                        }
+                    }
+                    osc.connect(g);
+                    soundFX._route(ctx, g);
+                    osc.start(t0);
+                    osc.stop(t0 + chirps * gap + 0.05);
+                } catch (e) {}
             },
 
             // V2.2: a point of this kind in earshot (12-45 m from p), at random, into _pt; false if there is
