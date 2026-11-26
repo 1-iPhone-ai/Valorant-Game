@@ -4262,6 +4262,18 @@
                                 </div>
                             </div>
 
+                            <!-- V2.2: Enhanced Animations -->
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Enhanced Animations</strong>
+                                    <small>Bots and wingmen step, aim, reload, cast, plant, climb and react by where they are hit; your gun and body move with your real speed, jumps and landings. Looks only: hitboxes and timings are unchanged</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-anim-detail-pills">
+                                    <button class="settings-pill-opt active" data-animdetail="off">OFF</button>
+                                    <button class="settings-pill-opt" data-animdetail="on">ON</button>
+                                </div>
+                            </div>
+
                             <div class="settings-control-row">
                                 <div class="settings-control-label">
                                     <strong>Glow Halos</strong>
@@ -6267,6 +6279,7 @@
                 surfaceDetail: 'auto', // V1.7: 'auto' (quality profile) | 'on' | 'off'
                 mapDetail: 'off',      // V1.7: High Detail Maps, 'off' (default) | 'on'
                 charDetail: 'off',     // V1.7: High Detail Characters & Guns, 'off' (default) | 'on'
+                animDetail: 'off',     // V2.2: Enhanced Animations, 'off' (default) | 'on' (no quality tier turns it on)
                 gpLookSens: 1.0,       // V1.7 controller: right-stick look sensitivity (0.3-3.0x)
                 gpDeadzone: 12,        // V1.7 controller: stick deadzone % (5-30)
                 gpInvertY: false,
@@ -12115,6 +12128,9 @@
             const normals = new Float32Array(vertexCount * 3);
             const uvs = new Float32Array(vertexCount * 2);
             const indices = vertexCount > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
+            // V2.2: parts tagged with a bone (eaTag) are remembered as [vertex count, bone], so the
+            // Enhanced Animations bone attribute can be made if and when that setting is turned on
+            const eaParts = parts.some((p) => p.bone !== undefined) ? baked.map((g, i) => [g.attributes.position.count, parts[i].bone || 0]) : null;
             let vOffset = 0;
             let iOffset = 0;
             for (const g of baked) {
@@ -12140,9 +12156,15 @@
             merged.setIndex(new THREE.BufferAttribute(indices, 1));
             merged.computeBoundingBox();
             merged.computeBoundingSphere();
+            if (eaParts) merged.userData.eaParts = eaParts;   // V2.2
             return merged;
         }
-        
+        // V2.2 Enhanced Animations: tag figure parts with their bones (EA_SHADER_POSE), in order
+        function eaTag(parts, bones) {
+            for (let i = 0; i < parts.length && i < bones.length; i++) parts[i].bone = bones[i];
+            return parts;
+        }
+
         function partMatrix(x, y, z, rx, ry, rz) {
             const m = new THREE.Matrix4();
             const e = new THREE.Euler(rx || 0, ry || 0, rz || 0);
@@ -13300,9 +13322,130 @@
         // bobs with each step and leans back on a hit, and the rifle kicks back on a
         // shot. Only the drawn shape moves: hit proxies (the actor leaves) are untouched.
         // uSplitLegs/uArmSwing switch limbs off for shapes where they are not separate.
+        // V2.2 Enhanced Animations: the skeleton the bot shader poses when the setting is on.
+        // aBone tags each vertex with its bone (EA_BONE: 0 pelvis, 1 spine, 2 head, 3/4 right
+        // upper arm/forearm, 5/6 left, 7 rifle, 8 magazine, 9/10 right thigh/shin, 11/12 left).
+        // Per instance, as well as instanceAnim (stride phase, walk 0..1 + run 0..1, flinch,
+        // recoil): instanceAnim2 = (direction moved relative to the facing, aim pitch, aim yaw
+        // (+ = to its left), hit reaction (+ head snap, - legs buckle)); instanceAnim3 =
+        // (gesture code + weight, gesture phase, lean (+ = to its right), idle phase).
+        // Joints are rigid rotations about pivots in the figure's own space (front -Z, right +X).
+        const EA_SHADER_POSE = `
+            attribute float aBone;
+            attribute vec4 instanceAnim2;
+            attribute vec4 instanceAnim3;
+            uniform float uAnimDetail;
+            mat3 eaRX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
+            mat3 eaRY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
+            mat3 eaRZ(float a) { float c = cos(a), s = sin(a); return mat3(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0); }
+            // child transform = parent then a rotation Q about the rest-pose pivot P
+            void eaJoint(inout mat3 R, inout vec3 T, mat3 Q, vec3 P) { T += R * (P - Q * P); R = R * Q; }
+            float eaIs(float g, float c) { return 1.0 - step(0.5, abs(g - c)); }
+            float eaBump(float x, float c, float w) { return 0.5 + 0.5 * cos(3.14159265 * clamp(abs(x - c) / w, 0.0, 1.0)); }
+            void eaPose(out mat3 R, out vec3 T) {
+                float bone = aBone;
+                float ph = instanceAnim.x;
+                float walk = min(instanceAnim.y, 1.0);
+                float run = clamp(instanceAnim.y - 1.0, 0.0, 1.0);
+                float mf = cos(instanceAnim2.x), ms = sin(instanceAnim2.x);
+                float snap = max(instanceAnim2.w, 0.0), buckle = max(-instanceAnim2.w, 0.0);
+                float gc = floor(instanceAnim3.x + 0.005);
+                float gw = clamp((instanceAnim3.x - gc) / 0.99, 0.0, 1.0);
+                float gp = instanceAnim3.y;
+                float idle = instanceAnim3.w;
+                float wReload = gw * eaIs(gc, 1.0), wCast = gw * eaIs(gc, 2.0);
+                float wPlant = gw * eaIs(gc, 3.0), wDefuse = gw * eaIs(gc, 4.0), wWork = wPlant + wDefuse;
+                float wClimb = gw * eaIs(gc, 5.0), wPush = gw * eaIs(gc, 6.0);
+                float still = (1.0 - walk) * (1.0 - gw);
+                float sway = 0.03 * sin(idle / 3.0) * still;
+                // Legs: hip swing h, knee bend k and hip roll r. The swing runs along the way it
+                // moves (forwards, backwards, or side steps that spread and close the feet); a
+                // shallow bend for planting and defusing, a buckle on a leg hit, hanging legs on a
+                // rope, a lunge against a door
+                float dl = atan(ms, abs(mf) + 0.0001);
+                float stride = (0.5 + 0.2 * run) * walk;
+                float kneeAmt = (0.85 + 0.45 * run) * walk * (abs(mf) + 0.55 * abs(ms));
+                float spread = (0.5 - 0.5 * cos(ph)) * 0.26 * abs(ms) * walk;
+                float bend = 0.3 * wWork + 0.3 * buckle;
+                float cl = sin(gp) * wClimb;
+                float pR = ph - dl, pL = ph + 3.14159265 - dl;
+                float hR = sin(pR) * stride * mf + bend + 0.45 * wClimb + 0.25 * cl + 0.3 * wPush;
+                float hL = sin(pL) * stride * mf + bend + 0.45 * wClimb - 0.25 * cl - 0.22 * wPush;
+                float kR = max(0.0, cos(pR)) * kneeAmt + 1.84 * bend + 0.8 * wClimb + 0.3 * cl + 0.42 * wPush;
+                float kL = max(0.0, cos(pL)) * kneeAmt + 1.84 * bend + 0.8 * wClimb - 0.3 * cl + 0.08 * wPush;
+                float rR = spread - sway / 0.92, rL = -spread - sway / 0.92;
+                // The pelvis sits so the lower foot stays on the floor (not while hanging on a rope)
+                float footR = (0.42 * cos(hR) + 0.5 * cos(hR - kR)) * cos(rR);
+                float footL = (0.42 * cos(hL) + 0.5 * cos(hL - kL)) * cos(rL);
+                R = mat3(1.0);
+                T = vec3(sway, (max(footR, footL) - 0.92) * (1.0 - wClimb), 0.0);
+                if (bone > 8.5) {
+                    bool right = bone < 10.5;
+                    float sd = right ? 1.0 : -1.0;
+                    eaJoint(R, T, eaRZ(right ? rR : rL) * eaRX(right ? hR : hL), vec3(sd * 0.12, 0.92, 0.0));
+                    if ((bone > 9.5 && bone < 10.5) || bone > 11.5) eaJoint(R, T, eaRX(-(right ? kR : kL)), vec3(sd * 0.17, 0.5, 0.0));
+                    return;
+                }
+                if (bone < 0.5) return;
+                // Spine: flinch, aim, run lean, idle breathing and weight shift, peek lean, gestures
+                float aimP = instanceAnim2.y, aimY = instanceAnim2.z;
+                float breath = (0.5 + 0.5 * sin(idle)) * still;
+                float sYaw = clamp(aimY * 0.45, -0.5, 0.5) * (1.0 - gw);
+                float sPitch = instanceAnim.z * 0.26 + 0.1 * snap - 0.12 * buckle - 0.1 * run + 0.12 * aimP * (1.0 - gw)
+                    + 0.015 * breath - 0.2 * wWork - 0.2 * wPush - 0.05 * wReload - 0.06 * wCast + 0.06 * wClimb;
+                float sRoll = -instanceAnim3.z + 0.5 * sway;
+                eaJoint(R, T, eaRY(sYaw) * eaRZ(sRoll) * eaRX(sPitch), vec3(0.0, 1.0, 0.0));
+                if (bone < 1.5) return;
+                if (bone < 2.5) {
+                    float hYaw = clamp(aimY - sYaw, -1.1, 1.1) * (1.0 - wClimb) * (1.0 - wWork);
+                    float hPitch = 0.55 * aimP + 0.6 * snap - 0.3 * wWork + 0.45 * wClimb - 0.12 * wReload;
+                    eaJoint(R, T, eaRY(hYaw) * eaRX(hPitch), vec3(0.0, 1.68, 0.0));
+                    return;
+                }
+                // Arms and rifle aim together about the shoulder line; the rifle kicks on a shot
+                float recoil = instanceAnim.w;
+                float aimEff = (0.85 * aimP + 0.09 * recoil) * (1.0 - gw) - 0.35 * wCast - 0.95 * wWork - 0.12 * wReload;
+                T += R * vec3(0.0, 0.012 * breath, 0.06 * recoil);
+                eaJoint(R, T, eaRX(aimEff), vec3(0.0, 1.46, -0.05));
+                // Reload: rifle rolled to the side, left hand to the magazine, down to the belt
+                // with it, back up, a slap, back to the handguard
+                float tilt = smoothstep(0.0, 0.16, gp) * (1.0 - smoothstep(0.84, 1.0, gp)) * wReload;
+                float reach = smoothstep(0.06, 0.2, gp) * (1.0 - smoothstep(0.86, 0.98, gp)) * wReload;
+                float down = eaBump(gp, 0.46, 0.14) * wReload;
+                float slap = eaBump(gp, 0.77, 0.04) * wReload;
+                if (bone > 4.5 && bone < 6.5) {
+                    float lp = -0.3 * reach - 0.45 * down + 0.1 * slap, ly = 0.0, ef = -0.35 * reach - 0.2 * down, ey = -0.5 * reach;
+                    // Cast: the hand comes up in front, then throws forward
+                    float up = smoothstep(0.0, 0.3, gp) * (1.0 - smoothstep(0.72, 1.0, gp)) * wCast;
+                    float thr = eaBump(gp, 0.56, 0.12) * wCast;
+                    lp += 1.2 * up + 0.5 * thr; ef += -0.9 * up + 0.8 * thr; ly += 0.3 * up;
+                    // Planting taps, defusing works the device
+                    lp += 0.15 * wWork + 0.1 * sin(gp) * wPlant; ef += 0.18 * sin(gp * 2.0) * wPlant + 0.12 * sin(gp * 1.6) * wDefuse;
+                    ey += 0.22 * sin(gp * 0.8) * wDefuse;
+                    // Climb: hands over hands up the rope (in over the head); push: palms on the door
+                    lp += (2.3 + 0.45 * sin(gp)) * wClimb + 0.55 * wPush;
+                    ef += (-0.75 - 0.35 * sin(gp)) * wClimb + 0.45 * wPush;
+                    ly += 0.15 * wPush;
+                    eaJoint(R, T, eaRZ(-0.35 * wClimb) * eaRY(ly) * eaRX(lp), vec3(-0.41, 1.52, 0.0));
+                    if (bone > 5.5) eaJoint(R, T, eaRY(ey) * eaRX(ef), vec3(-0.31, 1.22, -0.25));
+                    return;
+                }
+                // Right arm: on a rope it climbs too, the rifle held upright in that hand; on a door
+                // the rifle hangs from it
+                float rp = (2.3 - 0.45 * sin(gp)) * wClimb + 0.5 * wPush;
+                float re = (-0.75 + 0.35 * sin(gp)) * wClimb + 0.4 * wPush;
+                float wpi = -0.15 * tilt + (0.02 + 0.1 * sin(gp)) * wClimb - 1.3 * wPush;
+                eaJoint(R, T, eaRZ(0.35 * wClimb) * eaRX(rp), vec3(0.41, 1.52, 0.0));
+                if (bone < 3.5) return;
+                eaJoint(R, T, eaRX(re), vec3(0.35, 1.21, -0.13));
+                if (bone < 4.5) return;
+                eaJoint(R, T, eaRZ(0.55 * tilt) * eaRX(wpi), vec3(0.24, 1.17, -0.38));
+                if (bone > 7.5) T += R * vec3(0.0, -(0.22 * (smoothstep(0.2, 0.32, gp) - smoothstep(0.62, 0.72, gp)) * wReload + 0.3 * down), 0.0);
+            }`;
         const enemyAnimUniforms = {
             uSplitLegs: { value: 0 },
-            uArmSwing: { value: 0 }
+            uArmSwing: { value: 0 },
+            uAnimDetail: { value: 0 }   // V2.2: Enhanced Animations (0: the math above, exactly)
         };
         function syncEnemyAnimUniforms() {
             const detailed = typeof characterDetail !== 'undefined' && characterDetail.enabled;
@@ -13313,10 +13456,14 @@
             const uPart = { value: partIndex };
             material.onBeforeCompile = (shader) => {
                 shader.uniforms.uPart = uPart;
+                shader.uniforms.uAnimDetail = enemyAnimUniforms.uAnimDetail;   // V2.2
                 // Humanoid soldier animation. instanceAnim: x walk phase, y stride amount,
                 // z flinch, w recoil. Each leg swings from the hip and bends at the knee
                 // on its forward swing (the boots follow the shins); the upper body bobs
                 // with the stride and leans back on a hit; the rifle and forearms kick.
+                // V2.2: with Enhanced Animations on (uAnimDetail 1) the second branch poses a
+                // small skeleton instead (EA_SHADER_POSE); off, the first branch is the V1.7 math
+                // exactly. One program either way, compiled in the warm-up.
                 shader.vertexShader = shader.vertexShader
                     .replace('#include <common>', `#include <common>
                         attribute vec4 instanceAnim;
@@ -13334,10 +13481,16 @@
                         bool isLegVertex(vec3 p) {
                             float isLegs = step(1.5, uPart) * step(uPart, 2.5);
                             return isLegs > 0.5 || (p.y < 0.2 && abs(p.x) < 0.42);
-                        }`)
+                        }
+                        ${EA_SHADER_POSE}`)
                     .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
                         float eUpper = smoothstep(0.9, 1.1, position.y);
-                        if (isLegVertex(position)) {
+                        mat3 eaR = mat3(1.0);
+                        vec3 eaT = vec3(0.0);
+                        if (uAnimDetail > 0.5) {
+                            eaPose(eaR, eaT);
+                            objectNormal = eaR * objectNormal;
+                        } else if (isLegVertex(position)) {
                             vec2 lp = legPose(position.x >= 0.0 ? 1.0 : -1.0);
                             if (position.y < 0.5) objectNormal = animRotX(objectNormal, -lp.y, 0.0, 0.0);
                             objectNormal = animRotX(objectNormal, lp.x, 0.0, 0.0);
@@ -13345,7 +13498,9 @@
                             objectNormal = animRotX(objectNormal, instanceAnim.z * 0.26 * eUpper, 0.0, 0.0);
                         }`)
                     .replace('#include <begin_vertex>', `#include <begin_vertex>
-                        if (isLegVertex(position)) {
+                        if (uAnimDetail > 0.5) {
+                            transformed = eaR * transformed + eaT;
+                        } else if (isLegVertex(position)) {
                             vec2 lp = legPose(position.x >= 0.0 ? 1.0 : -1.0);
                             if (position.y < 0.5) transformed = animRotX(transformed, -lp.y, 0.5, 0.0);
                             transformed = animRotX(transformed, lp.x, 0.92, 0.0);
@@ -13374,6 +13529,488 @@
             }
             return g;
         }
+
+        // =============================================
+        // V2.2 Enhanced Animations (Settings > Video & Quality, off by default)
+        // =============================================
+        // Off: nothing here is built or run, and bots, wingmen, the viewmodel and your body
+        // animate exactly as before. On, looks only (hit proxies, movement, aim, timings, damage
+        // and AI never read anything here):
+        //  - Bots: the bot shader's second branch (EA_SHADER_POSE) poses a small skeleton from
+        //    a bone tag per vertex and two more per-instance vec4s, so bots stay one draw per
+        //    part per page and use the one program compiled in the warm-up. They are drawn
+        //    facing where the AI faces them (the group's +Z; the figure is built facing -Z, so
+        //    the classic look shows their backs). Legs follow the direction moved (side steps,
+        //    backwards, walk to run); turning on the spot shuffles the feet; the rifle and arms
+        //    aim up and down at you and the head turns to you; gestures for reloading, casting,
+        //    planting, defusing and the climb and push the map-mechanics setting starts; a lean
+        //    out on a peek; hit reactions by zone; deaths that fall away from the shot;
+        //    breathing and shifting weight at rest. Values are worked out each 60 Hz step
+        //    (stepBots), a dozen numbers per bot, and written by packEnemyBatches (packSlot).
+        //  - Wingmen: drawn through the same program, as one-instance InstancedMeshes in place
+        //    of their figure, with the same values.
+        //  - First person and your body: the eaFP / eaBody blocks hooked into vmAnim, castFX,
+        //    applyWeaponBobbingBase and playerBody.
+        // The shared fields enemy.animAction / animActionAt: this sets and clears 'reload',
+        // 'cast', 'plant' and 'defuse'; the map-mechanics code sets 'climb' and 'push'.
+        const EA_GESTURES = [null, 'reload', 'cast', 'plant', 'defuse', 'climb', 'push'];
+        const EA_TAU = Math.PI * 2;
+        const _eaUp = new THREE.Vector3(0, 1, 0), _eaAxis = new THREE.Vector3(), _eaQ = new THREE.Quaternion();
+        const _eaWhite = new THREE.Color(1, 1, 1);
+        const enhancedAnim = {
+            on: false,         // drawn with Enhanced Animations now
+            wanted: false,     // the setting (applied once the game is built: ready)
+            ready: false,
+            built: false,      // bone tags, page attributes and wingman rigs exist (first switch on)
+            wingRigs: [],
+            stepMs: 0,         // CPU time of the last stepBots (telemetry)
+
+            set: function (on) {
+                on = !!on;
+                this.wanted = on;
+                if (!this.ready) return;
+                if (on) this.build();
+                if (on === this.on) return;
+                this.on = on;
+                enemyAnimUniforms.uAnimDetail.value = on ? 1 : 0;
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    e.poseDirty = true;
+                    if (!on && this._mine(e.animAction)) e.animAction = null;
+                }
+                for (const r of this.wingRigs) {
+                    r.rig.visible = on;
+                    for (let p = 0; p < r.fig.children.length; p++) if (p !== 1) r.fig.children[p].visible = !on;
+                    // Their head stays their own mesh: posed here while on, back to rest when off
+                    const head = r.fig.children[1];
+                    head.matrixAutoUpdate = !on;
+                    if (!on) head.updateMatrix();
+                    head.matrixWorldNeedsUpdate = true;
+                }
+                if (typeof eaFP !== 'undefined') eaFP.reset();
+                if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
+            },
+
+            // First switch on: bone tags on the figures in use, the two extra per-instance
+            // attributes on every page, the wingman rigs. Nothing new is compiled.
+            build: function () {
+                if (this.built) return;
+                this.built = true;
+                for (const chunk of enemyChunks.values()) for (const page of chunk.pages) this.pageAttrs(page);
+                for (const page of enemyPageFree) this.pageAttrs(page);
+                const te = typeof tacticalEnhancements !== 'undefined' ? tacticalEnhancements : null;
+                if (te && te.wingmanBots) for (const bot of te.wingmanBots) this._buildWingRig(bot);
+            },
+            pageAttrs: function (page) {
+                for (let p = 0; p < page.meshes.length; p++) this.geomAttrs(page.meshes[p].geometry, enemyPartSpecs[p].geometry);
+                page.structureDirty = true;
+            },
+            // A page geometry drawing src: its bones, and its own two extra instance buffers
+            geomAttrs: function (geom, src) {
+                if (src) geom.setAttribute('aBone', this.bones(src));
+                for (const name of ['instanceAnim2', 'instanceAnim3']) {
+                    if (geom.attributes[name]) continue;
+                    const a = new THREE.InstancedBufferAttribute(new Float32Array(ENEMY_PAGE_CAP * 4), 4);
+                    a.setUsage(THREE.DynamicDrawUsage);
+                    geom.setAttribute(name, a);
+                }
+            },
+            // The per-vertex bone attribute of a figure geometry (made once, from its tagged parts)
+            bones: function (geo) {
+                if (geo.attributes.aBone) return geo.attributes.aBone;
+                const n = geo.attributes.position.count;
+                const arr = new Float32Array(n);
+                const parts = geo.userData && geo.userData.eaParts;
+                if (parts) {
+                    let o = 0;
+                    for (const part of parts) { arr.fill(part[1], o, Math.min(n, o + part[0])); o += part[0]; }
+                } else {
+                    // A figure without tags: bones by where each vertex is
+                    const pos = geo.attributes.position;
+                    for (let i = 0; i < n; i++) arr[i] = this._boneAt(pos.getX(i), pos.getY(i), pos.getZ(i));
+                }
+                const attr = new THREE.BufferAttribute(arr, 1);
+                geo.setAttribute('aBone', attr);
+                return attr;
+            },
+            _boneAt: function (x, y, z) {
+                if (y < 0.9 && Math.abs(x) < 0.45) return x >= 0 ? (y < 0.5 ? 10 : 9) : (y < 0.5 ? 12 : 11);
+                if (y > 1.66 && Math.abs(x) < 0.33) return 2;
+                if (z < -0.3 && y > 0.95 && y < 1.45 && x > 0.05) return 7;
+                if (y > 1.0 && y < 1.56 && x > 0.3) return y > 1.3 ? 3 : 4;
+                if (y > 1.0 && y < 1.56 && x < -0.3) return y > 1.3 ? 5 : 6;
+                return y < 1.04 ? 0 : 1;
+            },
+
+            // One bot in one page slot: the drawn transform turned half round (Ry(pi) puts the
+            // figure's front on the group's +Z, where the AI faces), and the animation values
+            packSlot: function (mesh, s, e, mw) {
+                const a = mesh.instanceMatrix.array, o = s * 16, m = mw.elements;
+                for (let i = 0; i < 16; i++) a[o + i] = m[i];
+                a[o] = -m[0]; a[o + 1] = -m[1]; a[o + 2] = -m[2];
+                a[o + 8] = -m[8]; a[o + 9] = -m[9]; a[o + 10] = -m[10];
+                if (!e.eaV) this._initState(e, e.mesh, e.slot);
+                const rep = e.eaRepOn === true;
+                const v = rep ? e.eaRep : e.eaV;
+                const g = mesh.geometry.attributes;
+                g.instanceAnim.setXYZW(s, v[0], v[1], rep ? v[10] : (e.animFlinch || 0), rep ? v[11] : (e.animRecoil || 0));
+                if (g.instanceAnim2) {
+                    g.instanceAnim2.setXYZW(s, v[2], v[3], v[4], v[5]);
+                    g.instanceAnim3.setXYZW(s, v[6], v[7], v[8], v[9]);
+                }
+            },
+
+            _initState: function (st, mesh, seed) {
+                const p = mesh.position;
+                st.eaPX = p.x; st.eaPY = p.y; st.eaPZ = p.z; st.eaYaw = mesh.rotation.y;
+                st.eaVX = 0; st.eaVZ = 0; st.eaWalk = 0; st.eaRun = 0; st.eaMove = 0; st.eaPhase = 0;
+                st.eaAimP = 0; st.eaAimY = 0; st.eaSnap = 0; st.eaBuckle = 0; st.eaLean = 0;
+                st.eaIdle = ((seed || 0) * 2.1) % (3 * EA_TAU);
+                st.eaGCode = 0; st.eaGW = 0; st.eaGT = 0; st.eaGDur = 0; st.eaGPh = 0; st.eaGY0 = p.y;
+                st.eaAbil = 0; st.eaRec = 0; st.eaShots = 0; st.eaReloadDue = false;
+                st.eaHitX = 0; st.eaHitZ = 0; st.eaFall = null;
+                if (!st.eaV) st.eaV = new Float32Array(12);
+                st.eaV.fill(0);
+                st.eaV[9] = st.eaIdle;
+            },
+
+            // Walk, run, direction and turning steps from how the body moved this step. The
+            // figure's front in the world is (fx, fz), its right (rx, rz).
+            _locomote: function (st, mesh, dt, fx, fz, rx, rz, dead, climbing) {
+                const pos = mesh.position, th = mesh.rotation.y;
+                let dx = pos.x - st.eaPX, dz = pos.z - st.eaPZ;
+                st.eaPX = pos.x; st.eaPY = pos.y; st.eaPZ = pos.z;
+                let d = Math.hypot(dx, dz);
+                if (dead || d > 2) { dx = 0; dz = 0; d = 0; }   // teleports, respawns and the dead are not steps
+                const kv = 1 - Math.exp(-dt * 10);
+                st.eaVX += (dx / dt - st.eaVX) * kv;
+                st.eaVZ += (dz / dt - st.eaVZ) * kv;
+                const speed = Math.hypot(st.eaVX, st.eaVZ);
+                let dyaw = th - st.eaYaw;
+                dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+                st.eaYaw = th;
+                if (dead || Math.abs(dyaw) > 1.2) dyaw = 0;
+                // Turning on the spot: small side steps the way it turns
+                const turn = Math.abs(dyaw) / dt;
+                const walkMove = Math.min(1, speed / 3.2);
+                const shuffle = (!climbing && speed < 0.8 && turn > 0.6) ? Math.min(0.4, turn * 0.22) : 0;
+                const shuffling = shuffle > walkMove;
+                st.eaWalk += ((climbing ? 0 : Math.max(walkMove, shuffle)) - st.eaWalk) * Math.min(1, dt * 10);
+                if (st.eaWalk < 0.002) st.eaWalk = 0;
+                const r = Math.min(1, Math.max(0, (speed - 2.8) / 2));
+                st.eaRun += (r * r * (3 - 2 * r) - st.eaRun) * Math.min(1, dt * 6);
+                // +Y yaw turns the front toward the figure's left
+                if (shuffling) st.eaMove = dyaw > 0 ? -Math.PI / 2 : Math.PI / 2;
+                else if (speed > 0.05) st.eaMove = Math.atan2(st.eaVX * rx + st.eaVZ * rz, st.eaVX * fx + st.eaVZ * fz);
+                st.eaPhase = (st.eaPhase + (d + (shuffling ? Math.abs(dyaw) * 0.3 : 0)) / (1.7 + 0.7 * st.eaRun) * EA_TAU) % EA_TAU;
+            },
+            // Aim pitch and yaw (+ = to the figure's left) toward a point, smoothed
+            _aim: function (st, dt, mesh, tx, ty, tz, fx, fz, rx, rz, aiming) {
+                let pt = 0, yt = 0;
+                if (aiming) {
+                    const p = mesh.position, dx = tx - p.x, dz = tz - p.z;
+                    const hd = Math.hypot(dx, dz) || 0.001;
+                    pt = Math.max(-0.9, Math.min(0.9, Math.atan2(ty - (p.y + 1.46 * (mesh.scale.y || 1)), hd)));
+                    yt = Math.max(-1.3, Math.min(1.3, Math.atan2(-(dx * rx + dz * rz), dx * fx + dz * fz)));
+                }
+                const k = Math.min(1, dt * 8);
+                st.eaAimP += (pt - st.eaAimP) * k;
+                st.eaAimY += (yt - st.eaAimY) * k;
+            },
+            _values: function (st, flinch, recoil) {
+                const v = st.eaV;
+                v[0] = st.eaPhase;
+                v[1] = Math.min(1, st.eaWalk) * (1 + st.eaRun);
+                v[2] = st.eaMove; v[3] = st.eaAimP; v[4] = st.eaAimY;
+                v[5] = st.eaSnap >= st.eaBuckle ? st.eaSnap : -st.eaBuckle;
+                v[6] = st.eaGCode ? st.eaGCode + Math.min(0.99, st.eaGW * 0.99) : 0;
+                v[7] = st.eaGPh; v[8] = st.eaLean; v[9] = st.eaIdle;
+                v[10] = flinch; v[11] = recoil;
+            },
+
+            // Every 60 Hz step (from updateEnemyAnimation), for the bots on screen
+            stepBots: function (dt) {
+                const t0 = performance.now();
+                const P = characterController.position;
+                const planter = this._planter(), defuser = this._defuser(), gNow = gameNow();
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    if (!e.renderActive || !e.mesh.visible) continue;
+                    const m = e.mesh;
+                    if (!e.eaV) this._initState(e, m, e.slot);
+                    const th = m.rotation.y;
+                    const fx = Math.sin(th), fz = Math.cos(th), rx = -fz, rz = fx;
+                    const dead = !!e.hit;
+                    this._locomote(e, m, dt, fx, fz, rx, rz, dead, e.animAction === 'climb');
+                    // Aim at you while it can see you (a falling body throws its arms up instead)
+                    this._aim(e, dt, m, P.x, P.y - 0.25, P.z, fx, fz, rx, rz, !dead && e.hasSight);
+                    if (dead && e.eaFall) e.eaAimP = 1.25 * e.eaFall.fwd * Math.min(1, e.eaFall.anim.angle / 1.42 || 0);
+                    // Hit reactions settle
+                    e.eaSnap *= Math.exp(-dt * 5); if (e.eaSnap < 0.003) e.eaSnap = 0;
+                    e.eaBuckle *= Math.exp(-dt * 3.5); if (e.eaBuckle < 0.003) e.eaBuckle = 0;
+                    // A lean out on a peek, toward the side it steps out to
+                    const leanT = (!dead && e.aiState === 'peek') ? this._peekSide(e, rx, rz) * 0.13 : 0;
+                    e.eaLean += (leanT - e.eaLean) * Math.min(1, dt * 6);
+                    e.eaIdle = (e.eaIdle + dt * EA_TAU / 4.2) % (3 * EA_TAU);
+                    this._gesture(e, dt, planter, defuser, gNow, dead);
+                    this._values(e, e.animFlinch || 0, e.animRecoil || 0);
+                    e.poseDirty = true;
+                }
+                this.stepMs = performance.now() - t0;
+            },
+            _peekSide: function (e, rx, rz) {
+                const c = enemyTactics.covers[e.coverIdx];
+                if (!c || e.peekX === undefined) return 0;
+                const side = (e.peekX - c.x) * rx + (e.peekZ - c.z) * rz;
+                return Math.abs(side) < 0.05 ? 0 : Math.sign(side);
+            },
+            // Which bot is planting (a Match, attacking bots) or defusing (your planted spike):
+            // the same bot the spike code picks (the first one in range)
+            _botNear: function (p, r) {
+                const g = gameNow();
+                for (let i = 0; i < enemyObjects.length; i++) {
+                    const e = enemyObjects[i];
+                    if (!e.isActive || e.hit || e.blindedUntil > g) continue;
+                    if (Math.hypot(e.mesh.position.x - p.x, e.mesh.position.z - p.z) <= r) return e;
+                }
+                return null;
+            },
+            _planter: function () {
+                if (typeof matchMode === 'undefined' || !matchMode.active || matchMode.phase !== 'live' || matchMode.side !== 'defend') return null;
+                const td = tacticalDirector;
+                if (td.spikeState === 'planted' || !(matchMode.botPlantProgress > 0)) return null;
+                const site = td.spikeSites[matchMode.plantSiteKey];
+                return site ? this._botNear(site.pos, 2.8) : null;
+            },
+            _defuser: function () {
+                const td = typeof tacticalDirector !== 'undefined' ? tacticalDirector : null;
+                if (!td || td.spikeState !== 'planted') return null;
+                if (game.gameMode === 'retake' || (game.gameMode === 'match' && matchMode.playerDefuses())) return null;
+                return this._botNear(td.activeSpikeSitePos, 4.2);
+            },
+            _mine: function (a) { return a === 'reload' || a === 'cast' || a === 'plant' || a === 'defuse'; },
+            _mag: function (e) { return { rusher: 8, sniper: 3, armored: 10 }[e.archetype] || 6; },
+            _reloadSec: function (e) {
+                const d = (game.userSettings && game.userSettings.botDifficulty) || 'gold';
+                const mult = d === 'iron' ? 1.45 : (d === 'immortal' ? 0.78 : (d === 'radiant' ? 0.58 : 1.0));
+                return Math.max(0.8, Math.min(1.7, 0.7 * (e.shotDelay || 2200) * mult / 1000));
+            },
+            _oneShot: function (e, code, dur) {
+                if (e.eaGCode >= 3 && e.eaGDur === 0 && e.eaGW > 0) return;   // climbing, pushing, planting, defusing go on
+                e.eaGCode = code; e.eaGDur = dur; e.eaGT = 0; e.eaGW = 0;
+            },
+            // Gestures. Continuous: climb and push (animAction, from the map-mechanics code),
+            // planting and defusing (the spike code's bot). One-shots: a cast (the bot's ability
+            // timer moved on) and a reload after a magazine's worth of shots (looks only: when
+            // it fires is unchanged; a shot cuts a reload short).
+            _gesture: function (e, dt, planter, defuser, gNow, dead) {
+                const act = e.animAction;
+                let want = 0;
+                if (!dead) {
+                    if (act === 'climb') want = 5;
+                    else if (act === 'push') want = 6;
+                    else if (e === planter) want = 3;
+                    else if (e === defuser) want = 4;
+                }
+                const abil = e.nextAbilityAt || 0;
+                if (abil !== e.eaAbil) {
+                    if (e.eaAbil && !dead) this._oneShot(e, 2, 0.75);
+                    e.eaAbil = abil;
+                }
+                const rec = e.animRecoil || 0;
+                if (rec > e.eaRec + 1e-6) {
+                    if (e.eaGCode === 1 && e.eaGDur > 0) e.eaGT = Math.max(e.eaGT, e.eaGDur * 0.88);
+                    if (++e.eaShots >= this._mag(e)) { e.eaShots = 0; e.eaReloadDue = true; }
+                }
+                e.eaRec = rec;
+                if (e.eaReloadDue && rec < 0.25 && !dead) { e.eaReloadDue = false; this._oneShot(e, 1, this._reloadSec(e)); }
+                if (e.reloading && !dead && !(e.eaGCode === 1 && e.eaGDur > 0)) this._oneShot(e, 1, 1.6);
+                if (want) {
+                    if (e.eaGCode !== want || e.eaGDur > 0) { e.eaGCode = want; e.eaGDur = 0; e.eaGT = 0; e.eaGW = 0; e.eaGY0 = e.mesh.position.y; }
+                    e.eaGT += dt;
+                    e.eaGW = Math.min(1, e.eaGW + dt * 5);
+                } else if (e.eaGCode && e.eaGDur > 0) {
+                    e.eaGT += dt;
+                    const p = e.eaGT / e.eaGDur;
+                    if (p >= 1 || dead) { e.eaGCode = 0; e.eaGW = 0; }
+                    else {
+                        const a = Math.min(1, p / 0.1), b = Math.max(0, (p - 0.9) / 0.1);
+                        e.eaGW = a * a * (3 - 2 * a) * (1 - b * b * (3 - 2 * b));
+                    }
+                } else if (e.eaGCode) {
+                    e.eaGT += dt;
+                    e.eaGW -= dt * 5;
+                    if (e.eaGW <= 0) { e.eaGW = 0; e.eaGCode = 0; }
+                }
+                const c = e.eaGCode;
+                if (c === 1 || c === 2) e.eaGPh = Math.min(1, e.eaGT / e.eaGDur);
+                else if (c === 5) e.eaGPh = (e.mesh.position.y - e.eaGY0) / 2.6 * EA_TAU;   // a hand-over-hand cycle per 2.6 m climbed
+                else if (c) e.eaGPh = e.eaGT * EA_TAU * (c === 6 ? 0.7 : 1.4);
+                else e.eaGPh = 0;
+                // The shared field: ours while reloading, casting, planting or defusing
+                const name = (c >= 1 && c <= 4) ? EA_GESTURES[c] : null;
+                if (name) {
+                    if (e.animAction !== name && (e.animAction == null || this._mine(e.animAction))) { e.animAction = name; e.animActionAt = gNow; }
+                } else if (this._mine(e.animAction)) e.animAction = null;
+            },
+
+            // From damageEnemyActor: head snaps back, legs buckle (the body flinch is the classic
+            // one), and the shot's direction for the fall (from a wingman by name, else from you)
+            onHit: function (e, zone, label) {
+                if (!e.eaV) this._initState(e, e.mesh, e.slot);
+                if (zone === 'head') e.eaSnap = 1;
+                else if (zone === 'legs') e.eaBuckle = 1;
+                const P = characterController.position;
+                let sx = P.x, sz = P.z;
+                const te = typeof tacticalEnhancements !== 'undefined' ? tacticalEnhancements : null;
+                if (te && te.wingmanBots) for (const b of te.wingmanBots) if (b.name === label) { sx = b.group.position.x; sz = b.group.position.z; }
+                const dx = e.mesh.position.x - sx, dz = e.mesh.position.z - sz, d = Math.hypot(dx, dz);
+                if (d > 0.01) { e.eaHitX = dx / d; e.eaHitZ = dz / d; }
+            },
+            // From animateEnemyDeath: the classic topple's fall and timing, tipping away from the
+            // last shot (turned by the classic random spin, so the same random numbers are used)
+            startDeath: function (e, spin) {
+                if (!e.eaV) this._initState(e, e.mesh, e.slot);
+                const th = e.mesh.rotation.y;
+                let hx = e.eaHitX, hz = e.eaHitZ;
+                if (!hx && !hz) { hx = -Math.sin(th); hz = -Math.cos(th); }   // no shot seen: backwards
+                const a = Math.atan2(hx, hz) + spin;
+                const wx = Math.sin(a), wz = Math.cos(a);
+                const c = Math.cos(th), s = Math.sin(th);
+                const lx = wx * c - wz * s, lz = wx * s + wz * c;   // in the group's frame (+Z is the drawn front)
+                const fwd = Math.max(0, lz), back = Math.max(0, -lz);
+                const anim = { actor: e, generation: e.generation, kind: 'topple', fallSpeed: 0, rotationSpeed: spin, done: false,
+                    eaAX: lz, eaAZ: -lx, eaYaw: th, eaLift: 0.31 * back * back + 0.3 * fwd * fwd + 0.5 * lx * lx };
+                e.eaFall = { fwd: fwd, anim: anim };
+                stepActorAnimation(anim);
+                if (!anim.done) actorAnimations.push(anim);
+            },
+
+            // The head bone's transform (figure space) for the values v: the same chain as
+            // EA_SHADER_POSE (pelvis, spine joint, neck joint), for a head drawn as a plain mesh
+            _headMatrix: function (v, out) {
+                const walk = Math.min(v[1], 1), run = Math.min(1, Math.max(0, v[1] - 1)), ph = v[0];
+                const mf = Math.cos(v[2]), ms = Math.sin(v[2]);
+                const snap = Math.max(v[5], 0), buckle = Math.max(-v[5], 0);
+                const gc = Math.floor(v[6] + 0.005), gw = Math.min(1, Math.max(0, (v[6] - gc) / 0.99)), gp = v[7], idle = v[9];
+                const is = (c) => (Math.abs(gc - c) < 0.5 ? 1 : 0);
+                const wReload = gw * is(1), wCast = gw * is(2), wWork = gw * (is(3) + is(4)), wClimb = gw * is(5), wPush = gw * is(6);
+                const still = (1 - walk) * (1 - gw);
+                const sway = 0.03 * Math.sin(idle / 3) * still;
+                const dl = Math.atan2(ms, Math.abs(mf) + 0.0001);
+                const stride = (0.5 + 0.2 * run) * walk;
+                const kneeAmt = (0.85 + 0.45 * run) * walk * (Math.abs(mf) + 0.55 * Math.abs(ms));
+                const spread = (0.5 - 0.5 * Math.cos(ph)) * 0.26 * Math.abs(ms) * walk;
+                const bend = 0.3 * wWork + 0.3 * buckle, cl = Math.sin(gp) * wClimb;
+                const pR = ph - dl, pL = ph + Math.PI - dl;
+                const hR = Math.sin(pR) * stride * mf + bend + 0.45 * wClimb + 0.25 * cl + 0.3 * wPush;
+                const hL = Math.sin(pL) * stride * mf + bend + 0.45 * wClimb - 0.25 * cl - 0.22 * wPush;
+                const kR = Math.max(0, Math.cos(pR)) * kneeAmt + 1.84 * bend + 0.8 * wClimb + 0.3 * cl + 0.42 * wPush;
+                const kL = Math.max(0, Math.cos(pL)) * kneeAmt + 1.84 * bend + 0.8 * wClimb - 0.3 * cl + 0.08 * wPush;
+                const rR = spread - sway / 0.92, rL = -spread - sway / 0.92;
+                const footR = (0.42 * Math.cos(hR) + 0.5 * Math.cos(hR - kR)) * Math.cos(rR);
+                const footL = (0.42 * Math.cos(hL) + 0.5 * Math.cos(hL - kL)) * Math.cos(rL);
+                const aimP = v[3], aimY = v[4];
+                const breath = (0.5 + 0.5 * Math.sin(idle)) * still;
+                const sYaw = Math.max(-0.5, Math.min(0.5, aimY * 0.45)) * (1 - gw);
+                const sPitch = v[10] * 0.26 + 0.1 * snap - 0.12 * buckle - 0.1 * run + 0.12 * aimP * (1 - gw)
+                    + 0.015 * breath - 0.2 * wWork - 0.2 * wPush - 0.05 * wReload - 0.06 * wCast + 0.06 * wClimb;
+                const sRoll = -v[8] + 0.5 * sway;
+                const hYaw = Math.max(-1.1, Math.min(1.1, aimY - sYaw)) * (1 - wClimb) * (1 - wWork);
+                const hPitch = 0.55 * aimP + 0.6 * snap - 0.3 * wWork + 0.45 * wClimb - 0.12 * wReload;
+                const m = this._hm, q = this._hq;
+                out.makeTranslation(sway, (Math.max(footR, footL) - 0.92) * (1 - wClimb), 0);
+                // joint about pivot P: translate(P) * Q * translate(-P)
+                q.makeRotationY(sYaw).multiply(m.makeRotationZ(sRoll)).multiply(m.makeRotationX(sPitch));
+                out.multiply(m.makeTranslation(0, 1.0, 0)).multiply(q).multiply(m.makeTranslation(0, -1.0, 0));
+                q.makeRotationY(hYaw).multiply(m.makeRotationX(hPitch));
+                out.multiply(m.makeTranslation(0, 1.68, 0)).multiply(q).multiply(m.makeTranslation(0, -1.68, 0));
+                return out;
+            },
+            _hm: new THREE.Matrix4(), _hq: new THREE.Matrix4(),
+
+            // ---- Wingmen: their figure's torso, legs and gear as one-instance InstancedMeshes of
+            // the bot program (same geometry, their own materials' colours), shown while on. The
+            // head keeps its own mesh and program (its bright material skips tone mapping, a bot
+            // program variant nobody else needs), posed by _headMatrix.
+            _buildWingRig: function (bot) {
+                const g = bot.group;
+                const fig = g.children.find((c) => c.isGroup && c.children.length >= 4 && c.children[0].isMesh);
+                if (!fig) return;
+                fig.updateMatrix();
+                const rig = new THREE.Group();
+                rig.visible = false;
+                const meshes = [];
+                for (let p = 0; p < 4; p++) {
+                    if (p === 1) continue;
+                    const src = fig.children[p], sg = src.geometry;
+                    const geo = new THREE.BufferGeometry();
+                    geo.setIndex(sg.index);
+                    for (const name of ['position', 'normal', 'uv']) if (sg.attributes[name]) geo.setAttribute(name, sg.attributes[name]);
+                    const anim = new THREE.InstancedBufferAttribute(new Float32Array(4), 4);
+                    anim.setUsage(THREE.DynamicDrawUsage);
+                    geo.setAttribute('instanceAnim', anim);
+                    this.geomAttrs(geo, sg);
+                    if (!sg.boundingSphere) sg.computeBoundingSphere();
+                    geo.boundingSphere = sg.boundingSphere.clone();
+                    geo.boundingSphere.radius += 0.8;   // raised arms and legs
+                    const mat = src.material.clone();
+                    installEnemyAnimation(mat, p);
+                    const im = new THREE.InstancedMesh(geo, mat, 1);
+                    im.setMatrixAt(0, fig.matrix);
+                    im.setColorAt(0, _eaWhite);
+                    im.castShadow = true;
+                    im.receiveShadow = true;
+                    rig.add(im);
+                    meshes.push(im);
+                }
+                g.add(rig);
+                const st = { slot: this.wingRigs.length + 3 };
+                this._initState(st, g, st.slot * 5);
+                this.wingRigs.push({ bot: bot, fig: fig, rig: rig, meshes: meshes, st: st, fire: bot.lastFireAt || 0, recoil: 0 });
+            },
+            // Every frame while on (wingmen move on the frame clock); still while the game is paused
+            stepWingmen: function (delta, now) {
+                const te = typeof tacticalEnhancements !== 'undefined' ? tacticalEnhancements : null;
+                if (!te || !te.wingmanGroup || !te.wingmanGroup.visible || !this.wingRigs.length) return;
+                if (mainMenu.paused() || photoMode.active) return;
+                const dt = Math.max(1e-3, Math.min(0.05, delta));
+                for (const r of this.wingRigs) {
+                    const g = r.bot.group, st = r.st, th = g.rotation.y;
+                    // Their figure faces the group's -Z (they turn with + pi)
+                    const fx = -Math.sin(th), fz = -Math.cos(th), rx = Math.cos(th), rz = -Math.sin(th);
+                    this._locomote(st, g, dt, fx, fz, rx, rz, false, false);
+                    // Aim at the nearest bot in its 28 m range (where it shoots)
+                    let best = null, bd = 28 * 28;
+                    for (let i = 0; i < enemyObjects.length; i++) {
+                        const e = enemyObjects[i];
+                        if (!e.isActive || e.hit) continue;
+                        const dx = e.mesh.position.x - g.position.x, dz = e.mesh.position.z - g.position.z, d = dx * dx + dz * dz;
+                        if (d < bd) { bd = d; best = e; }
+                    }
+                    if (best) this._aim(st, dt, g, best.mesh.position.x, best.mesh.position.y + 1.2, best.mesh.position.z, fx, fz, rx, rz, true);
+                    else this._aim(st, dt, g, 0, 0, 0, fx, fz, rx, rz, false);
+                    if (r.bot.lastFireAt !== r.fire) {
+                        if (r.bot.lastFireAt >= now - 1) r.recoil = 1;   // a burst (a wall check moves it back instead)
+                        r.fire = r.bot.lastFireAt;
+                    }
+                    r.recoil *= Math.exp(-dt * 16);
+                    if (r.recoil < 0.002) r.recoil = 0;
+                    st.eaIdle = (st.eaIdle + dt * EA_TAU / 4.2) % (3 * EA_TAU);
+                    this._values(st, 0, r.recoil);
+                    const v = st.eaV;
+                    for (const im of r.meshes) {
+                        const a = im.geometry.attributes;
+                        a.instanceAnim.setXYZW(0, v[0], v[1], v[10], v[11]); a.instanceAnim.needsUpdate = true;
+                        a.instanceAnim2.setXYZW(0, v[2], v[3], v[4], v[5]); a.instanceAnim2.needsUpdate = true;
+                        a.instanceAnim3.setXYZW(0, v[6], v[7], v[8], v[9]); a.instanceAnim3.needsUpdate = true;
+                    }
+                    const head = r.fig.children[1];
+                    this._headMatrix(v, head.matrix);
+                    head.matrixWorldNeedsUpdate = true;
+                }
+            }
+        };
         function initEnemyBatches() {
             const T = actorTemplates;
             syncEnemyAnimUniforms();
@@ -13427,6 +14064,7 @@
                 const anim = new THREE.InstancedBufferAttribute(new Float32Array(ENEMY_PAGE_CAP * 4), 4);
                 anim.setUsage(THREE.DynamicDrawUsage);
                 geometry.setAttribute('instanceAnim', anim);
+                if (enhancedAnim.built) enhancedAnim.geomAttrs(geometry, spec.geometry);   // V2.2: Enhanced Animations has been on
                 const mesh = new THREE.InstancedMesh(geometry, enemyPartMaterials[p], ENEMY_PAGE_CAP);
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
@@ -13453,7 +14091,8 @@
                 const geom = mesh.geometry;
                 const keep = [];
                 for (const name in geom.attributes) {
-                    if (name !== 'instanceMatrix' && name !== 'instanceColor' && name !== 'instanceAnim') keep.push(name);
+                    // V2.2: instanceAnim2/3 (Enhanced Animations) are the page's own too
+                    if (name !== 'instanceMatrix' && name !== 'instanceColor' && name !== 'instanceAnim' && name !== 'instanceAnim2' && name !== 'instanceAnim3') keep.push(name);
                 }
                 for (let i = 0; i < keep.length; i++) geom.deleteAttribute(keep[i]);
                 geom.setIndex(null);
@@ -13567,7 +14206,8 @@
             perfTelemetry.enemyPacked = packed;
             perfTelemetry.enemyPagesLive = enemyPagesLive;
             perfTelemetry.enemyPageCap = ENEMY_PAGE_CAP;
-            
+            const eaOn = enhancedAnim.on;   // V2.2: Enhanced Animations
+
             for (const chunk of enemyChunks.values()) {
                 const pages = chunk.pages;
                 for (let pi = 0; pi < pages.length; pi++) {
@@ -13587,8 +14227,12 @@
                         const parts = Math.min(leaves.length, meshes.length);
                         for (let p = 0; p < parts; p++) {
                             if (writeMatrix) {
-                                meshes[p].setMatrixAt(s, leaves[p].matrixWorld);
-                                meshes[p].geometry.attributes.instanceAnim.setXYZW(s, enemy.animPhase || 0, enemy.animAmt || 0, enemy.animFlinch || 0, enemy.animRecoil || 0);
+                                // V2.2: Enhanced Animations writes its turned transform and values
+                                if (eaOn) enhancedAnim.packSlot(meshes[p], s, enemy, leaves[p].matrixWorld);
+                                else {
+                                    meshes[p].setMatrixAt(s, leaves[p].matrixWorld);
+                                    meshes[p].geometry.attributes.instanceAnim.setXYZW(s, enemy.animPhase || 0, enemy.animAmt || 0, enemy.animFlinch || 0, enemy.animRecoil || 0);
+                                }
                                 perfTelemetry.enemyMatrixWrites++;
                             }
                             if (writeColor) {
@@ -13609,6 +14253,10 @@
                         if (matrixHi >= matrixLo) {
                             perfTelemetry.requestUpload(mesh.instanceMatrix, matrixLo * 16, (matrixHi - matrixLo + 1) * 16);
                             perfTelemetry.requestUpload(mesh.geometry.attributes.instanceAnim, matrixLo * 4, (matrixHi - matrixLo + 1) * 4);
+                            if (eaOn && mesh.geometry.attributes.instanceAnim2) {   // V2.2
+                                perfTelemetry.requestUpload(mesh.geometry.attributes.instanceAnim2, matrixLo * 4, (matrixHi - matrixLo + 1) * 4);
+                                perfTelemetry.requestUpload(mesh.geometry.attributes.instanceAnim3, matrixLo * 4, (matrixHi - matrixLo + 1) * 4);
+                            }
                         }
                         if (mesh.instanceColor && colorHi >= colorLo) {
                             perfTelemetry.requestUpload(mesh.instanceColor, colorLo * 3, (colorHi - colorLo + 1) * 3);
@@ -15192,7 +15840,12 @@
                 blindedUntil: 0,
                 burningUntil: 0,
                 revealedUntil: 0,
-                slowedUntil: 0
+                slowedUntil: 0,
+                // V2.2: what the bot is doing, for its animation: null or 'reload', 'cast', 'plant',
+                // 'defuse' (Enhanced Animations sets these), 'climb', 'push' (the map-mechanics bots);
+                // animActionAt is the gameNow() it started
+                animAction: null,
+                animActionAt: 0
             };
             for (let i = 0; i < leaves.length; i++) {
                 leaves[i].updateMatrix();
@@ -15304,6 +15957,14 @@
             const gearHead = [box(0.44, 0.12, 0.06, 0, 1.93, -0.27)];   // visor
             const gearLegs = [];
             for (const s of [-1, 1]) gearLegs.push(box(0.24, 0.14, 0.38, s * 0.17, 0.07, -0.05));   // boots
+            // V2.2: bones for Enhanced Animations (pelvis 0, spine 1, head 2, right arm 3/4, left
+            // arm 5/6, rifle 7, magazine 8, right leg 9/10, left leg 11/12)
+            eaTag(torso, [0, 1, 1, 1, 1, 1, 1, 3, 4, 5, 6]);
+            eaTag(head, [2, 2, 2, 2]);
+            eaTag(legs, [11, 11, 12, 9, 9, 10]);
+            eaTag(gearUpper, [0, 1, 1, 1, 7, 7, 7, 8, 7, 4, 6]);
+            eaTag(gearHead, [2]);
+            eaTag(gearLegs, [12, 10]);
             const merge = (parts) => {
                 const m = mergeGeometryParts(parts);
                 for (const p of parts) p.geometry.dispose();
@@ -15588,6 +16249,7 @@
                         const geom = mesh.geometry;
                         geom.setIndex(src.index);
                         for (const name of ['position', 'normal', 'uv']) geom.setAttribute(name, src.attributes[name]);
+                        if (enhancedAnim.built) geom.setAttribute('aBone', enhancedAnim.bones(src));   // V2.2: its bones
                     };
                     const p = enemyPartSpecs.indexOf(spec);
                     for (const chunk of enemyChunks.values()) for (const page of chunk.pages) if (page.meshes[p]) swap(page.meshes[p]);
@@ -15683,6 +16345,10 @@
             actor.animAmt = 0;
             actor.animFlinch = 0;
             actor.animRecoil = 0;
+            // V2.2: a new life starts with no action, and Enhanced Animations starts its pose afresh
+            actor.animAction = null;
+            actor.animActionAt = 0;
+            if (actor.eaV) enhancedAnim._initState(actor, group, actor.slot);
             enemyTactics.reset(actor);
             botMechanics.reset(actor);   // V2.2: no move left over from a past life (animAction null)
             restoreRestAppearance(actor);
@@ -20454,6 +21120,7 @@
 
             const isHeadshot = (hitZone === 'head');
             const isLegshot = (hitZone === 'legs');
+            if (enhancedAnim.on) enhancedAnim.onHit(enemy, hitZone, sourceLabel);   // V2.2: a reaction by zone (looks only)
             const zoneMult = isHeadshot ? headMult : (isLegshot ? legMult : 1.0);
             const vulnMult = (enemy.revealedUntil > gNow) ? 1.2 : 1.0;
             const finalDamage = Math.max(1, Math.round(amount * zoneMult * vulnMult));
@@ -40778,13 +41445,20 @@
                         anim.vel = -anim.vel * 0.22;
                         if (Math.abs(anim.vel) < 0.35) anim.lieT = anim.t;
                     }
-                    mesh.rotation.z = anim.rotationSpeed * Math.min(1, anim.angle / LIE);
+                    if (anim.eaAX === undefined) mesh.rotation.z = anim.rotationSpeed * Math.min(1, anim.angle / LIE);
                 } else if (anim.t - anim.lieT > 0.9) {
                     anim.baseY -= 1.4 * dt;
                 }
-                mesh.rotation.x = anim.angle;
-                // Lift by the torso's half-depth so the back rests on the floor
-                mesh.position.y = anim.baseY + 0.3 * Math.sin(anim.angle);
+                if (anim.eaAX !== undefined) {
+                    // V2.2 Enhanced Animations: the same fall, tipping away from the shot
+                    // (enhancedAnim.startDeath), lifted by the body's depth that way
+                    mesh.quaternion.setFromAxisAngle(_eaUp, anim.eaYaw).multiply(_eaQ.setFromAxisAngle(_eaAxis.set(anim.eaAX, 0, anim.eaAZ), anim.angle));
+                    mesh.position.y = anim.baseY + anim.eaLift * Math.sin(anim.angle);
+                } else {
+                    mesh.rotation.x = anim.angle;
+                    // Lift by the torso's half-depth so the back rests on the floor
+                    mesh.position.y = anim.baseY + 0.3 * Math.sin(anim.angle);
+                }
                 anim.done = anim.baseY < -1.2 || anim.t > 4;
                 anim.actor.poseDirty = true;
                 shadowManager.markMotion(mesh.position.x, mesh.position.y, mesh.position.z, anim.actor.boundRadius, mesh.position.x, oldY, mesh.position.z);
@@ -40854,6 +41528,8 @@
         function animateEnemyDeath(enemy) {
             // V1.7: topple backwards onto the floor, lie there, then sink away
             // (used to drop straight through the floor in under a second)
+            // V2.2: with Enhanced Animations on, the same fall goes away from the last shot
+            if (enhancedAnim.on) { enhancedAnim.startDeath(enemy, (Math.random() - 0.5) * 0.5); return; }
             startActorAnimation(enemy, 'topple', (Math.random() - 0.5) * 0.5);
         }
         
@@ -40870,7 +41546,15 @@
                 const d = Math.hypot(pos.x - e.animX, pos.z - e.animZ);
                 e.animX = pos.x;
                 e.animZ = pos.z;
-                const step = (e.hit || d > 2) ? 0 : d;
+                let step = (e.hit || d > 2) ? 0 : d;
+                // V2.2: a bot climbing a rope or pushing a door (Bots Use Map Mechanics) in the classic
+                // look: its legs walk with the height climbed, or slowly in place while it pushes
+                if (e.animAction === 'climb' || e.animAction === 'push') {
+                    if (e.animYAt !== e.animActionAt) { e.animYAt = e.animActionAt; e.animY = pos.y; }
+                    const dy = Math.abs(pos.y - e.animY);
+                    e.animY = pos.y;
+                    step = e.hit ? 0 : (e.animAction === 'climb' ? (dy < 2 ? dy * 0.6 : 0) : dt * 0.9);
+                }
                 const p0 = e.animPhase || 0, a0 = e.animAmt || 0, f0 = e.animFlinch || 0, r0 = e.animRecoil || 0;
                 const target = Math.min(1, (step / Math.max(dt, 1e-4)) / 3.2);
                 let amt = a0 + (target - a0) * Math.min(1, dt * 10);
@@ -40885,6 +41569,7 @@
                 e.animRecoil = recoil;
                 if (e.animPhase !== p0 || amt !== a0 || flinch !== f0 || recoil !== r0) e.poseDirty = true;
             }
+            if (enhancedAnim.on) enhancedAnim.stepBots(dt);   // V2.2: Enhanced Animations' values
         }
         
         // Restore hit-flash colors once their 100 ms have passed
@@ -45429,6 +46114,13 @@
             const gearHead = [rb(0.44, 0.12, 0.06, 0.028, 0, 1.93, -0.27)];   // visor
             const gearLegs = [];
             for (const s of [-1, 1]) gearLegs.push(rb(0.22, 0.13, 0.36, 0.05, s * 0.17, 0.065, -0.05));   // boots
+            // V2.2: bones for Enhanced Animations (as buildHumanoidEnemyGeometry; joint balls go with the limb below)
+            eaTag(torso, [0, 1, 1, 1, 1, 1, 1, 1, 3, 3, 4, 4, 5, 5, 6, 6]);
+            eaTag(head, [2, 2, 2, 2]);
+            eaTag(legs, [11, 11, 12, 11, 12, 9, 9, 10, 9, 10]);
+            eaTag(gearUpper, [0, 1, 1, 1, 7, 7, 7, 8, 7, 4, 6]);
+            eaTag(gearHead, [2]);
+            eaTag(gearLegs, [12, 10]);
             const merge = (parts) => mergeGeometryParts(parts);
             const out = hasGearPart
                 ? { torso: merge(torso), head: merge(head), legs: merge(legs), weapon: merge(gearUpper.concat(gearHead, gearLegs)) }
@@ -45470,6 +46162,7 @@
                         const geom = mesh.geometry;
                         geom.setIndex(src.index);
                         for (const n of ['position', 'normal', 'uv']) geom.setAttribute(n, src.attributes[n]);
+                        if (enhancedAnim.built) geom.setAttribute('aBone', enhancedAnim.bones(src));   // V2.2: its bones
                     };
                     for (const chunk of enemyChunks.values()) for (const page of chunk.pages) if (page.meshes[p]) swap(page.meshes[p]);
                     for (const page of enemyPageFree) if (page.meshes[p]) swap(page.meshes[p]);
@@ -47757,6 +48450,7 @@
             surfaceDetail: 'auto',
             mapDetail: 'off',
             charDetail: 'off',
+            animDetail: 'off',        // V2.2: Enhanced Animations (older saves get it off from here)
             glowHalos: 'auto',
             abilityEffects: 'auto',   // V2.0: older saves get Auto from here
             brightness: 100,
@@ -48859,14 +49553,22 @@
             t: null, pl: null, en: null,
             shots: [], kills: [], recording: true,
             ES: 9, // x y z rx ry rz shown animPhase animAmt
+            // V2.2: Enhanced Animations' 12 values per bot (enhancedAnim.eaV), recorded only while
+            // that setting is on (ea is made the first time it is); eaOn marks the frames that have them
+            EA: 12, ea: null, eaOn: null,
 
             init: function () {
                 this.E = enemyObjects.length;
                 this.t = new Float64Array(this.N);
                 this.pl = new Float32Array(this.N * 5);
                 this.en = new Float32Array(this.N * Math.max(1, this.E) * this.ES);
+                if (this.ea) this._eaAlloc();   // V2.2
                 this.head = 0; this.count = 0;
                 this.shots.length = 0; this.kills.length = 0;
+            },
+            _eaAlloc: function () {
+                this.ea = new Float32Array(this.N * Math.max(1, this.E) * this.EA);
+                this.eaOn = new Uint8Array(this.N);
             },
 
             capture: function (now) {
@@ -48886,6 +49588,16 @@
                     this.en[o + 6] = e.renderActive ? 1 : 0;
                     this.en[o + 7] = e.animPhase || 0; this.en[o + 8] = e.animAmt || 0;
                 }
+                // V2.2: Enhanced Animations' values, while it is on
+                if (enhancedAnim.on) {
+                    if (!this.ea) this._eaAlloc();
+                    const A = this.EA, eb = i * this.E * A;
+                    for (let k = 0; k < this.E; k++) {
+                        const v = enemyObjects[k].eaV;
+                        if (v) this.ea.set(v, eb + k * A); else this.ea.fill(0, eb + k * A, eb + (k + 1) * A);
+                    }
+                    this.eaOn[i] = 1;
+                } else if (this.eaOn) this.eaOn[i] = 0;
                 this.head = (i + 1) % this.N;
                 this.count = Math.min(this.N, this.count + 1);
             },
@@ -49099,6 +49811,7 @@
                     e.animPhase = R.en[ob + 7];
                     e.animAmt = R.en[oa + 8] + (R.en[ob + 8] - R.en[oa + 8]) * f;
                     e.poseDirty = true;
+                    if (enhancedAnim.on) this._eaPose(e, k, br.a, br.b, f);   // V2.2: Enhanced Animations' recorded values
                 }
                 packEnemyBatches();
                 // Camera
@@ -49162,6 +49875,25 @@
                 this.overlay.classList.toggle('slowmo', slow);
             },
 
+            // V2.2: a bot's Enhanced Animations values for this replay frame (frames a, b, blend f),
+            // drawn instead of its live ones (eaRep) until endFrame; a frame recorded with the
+            // setting off gives the walk it recorded and no more
+            _eaPose: function (e, k, a, b, f) {
+                const R = replayRec, A = R.EA;
+                if (!e.eaRep) e.eaRep = new Float32Array(A);
+                const v = e.eaRep;
+                if (R.ea && R.eaOn[a] && R.eaOn[b]) {
+                    const oa = (a * R.E + k) * A, ob = (b * R.E + k) * A, x = R.ea;
+                    for (let j = 0; j < A; j++) v[j] = x[oa + j] + (x[ob + j] - x[oa + j]) * f;
+                    v[0] = x[ob]; v[6] = x[ob + 6]; v[7] = x[ob + 7]; v[9] = x[ob + 9];   // phases and the gesture: the later frame
+                    v[2] = _lerpAng(x[oa + 2], x[ob + 2], f);
+                } else {
+                    v.fill(0);
+                    v[0] = e.animPhase; v[1] = e.animAmt;
+                }
+                e.eaRepOn = true;
+            },
+
             // After the render: put the live world back
             endFrame: function () {
                 if (!this.clip || !this.saved || !this.saved.length) return;
@@ -49174,6 +49906,7 @@
                     m.visible = s[o + 7] > 0.5;
                     e.animPhase = s[o + 8];
                     e.animAmt = s[o + 9];
+                    if (e.eaRepOn) e.eaRepOn = false;   // V2.2
                     e.poseDirty = true;
                 }
                 s.length = 0;
@@ -51624,6 +52357,13 @@
                     this.saveToStorage();
                 });
 
+                // V2.2: Enhanced Animations, applied at once (nothing compiles)
+                this.bindPillGroup('setting-anim-detail-pills', 'data-animdetail', (val) => {
+                    game.userSettings.animDetail = val === 'on' ? 'on' : 'off';
+                    enhancedAnim.set(game.userSettings.animDetail === 'on');
+                    this.saveToStorage();
+                });
+
                 this.bindPillGroup('setting-glow-halos-pills', 'data-halos', (val) => {
                     game.userSettings.glowHalos = val || 'auto';
                     applyVisualOverrides();
@@ -52735,6 +53475,7 @@
                 qualityController.setEnemyFlashLights(cfg.flashLights !== false);
                 qualityController.setFrameTarget(cfg.autoTargetHz || 55);
                 applyVisualOverrides();
+                enhancedAnim.set(cfg.animDetail === 'on');   // V2.2: Enhanced Animations (waits for the game to be built)
 
                 mouseLookController.sensitivity = cfg.sensitivity || 0.002;
                 mouseLookController.smoothing = typeof cfg.smoothing === 'number' ? cfg.smoothing : 0.5;
@@ -52843,6 +53584,7 @@
                 setActivePill('setting-slide-pills', 'data-slide', cfg.slide === false ? 'off' : 'on');
                 setActivePill('setting-mantle-pills', 'data-mantle', cfg.mantle === false ? 'off' : 'on');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
+                setActivePill('setting-anim-detail-pills', 'data-animdetail', cfg.animDetail === 'on' ? 'on' : 'off');   // V2.2
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
                 setActivePill('setting-audio-steps-pills', 'data-audiosteps', cfg.enemyFootsteps === false ? 'off' : 'on');
@@ -54734,6 +55476,9 @@
             // V1.7 High Detail Characters & Guns: everything it swaps now exists
             characterDetail.ready = true;
             characterDetail.set(characterDetail.wanted);
+            // V2.2 Enhanced Animations: likewise (its one bot program was compiled above either way)
+            enhancedAnim.ready = true;
+            enhancedAnim.set(enhancedAnim.wanted);
             
             // Show welcome message
             if (deviceInfo.touchEnabled) {
@@ -54901,6 +55646,7 @@
             agentSystem.updateRender(time, gameNow(), delta);   // V2.2: ability visuals follow game time
             tacticalDirector.update(delta, now);
             tacticalEnhancements.update(delta, now);
+            if (enhancedAnim.on) enhancedAnim.stepWingmen(delta, now);   // V2.2: Enhanced Animations' wingmen
             abilityLook.update(gameNow(), delta);   // V2.0: High Fidelity ability visuals (does nothing in Classic)
             tacticalRadar.update(now);
             packEnemyBatches();
