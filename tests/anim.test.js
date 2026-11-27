@@ -9,9 +9,12 @@ const { boot, closeBrowser, programState } = require('./harness');
 after(closeBrowser);
 
 const onPill = (evaluate, on) => evaluate((on) => document.querySelector(`#setting-anim-detail-pills [data-animdetail="${on ? 'on' : 'off'}"]`).click(), on);
+// V2.3: a save with Agent Identity off (design 17.2: these assertions are pinned to the V2.2 picture)
+const IDENTITY_OFF = () => { try { const k = 'valorant_v16_user_settings'; const o = JSON.parse(localStorage.getItem(k) || '{}'); o.agentIdentity = 'off'; localStorage.setItem(k, JSON.stringify(o)); } catch (e) {} };
 
 test('Enhanced Animations is off by default: nothing of it is built and no shader program is added', { timeout: 240000 }, async () => {
-    const { page, errors, frames, evaluate } = await boot();
+    // V2.3: pinned to Agent Identity off at boot (nothing of V2.3 is built either); identity on is checked below
+    const { page, errors, frames, evaluate } = await boot({ initScript: IDENTITY_OFF });
     await frames(5);
     const s = await evaluate(() => {
         const pages = [];
@@ -34,6 +37,27 @@ test('Enhanced Animations is off by default: nothing of it is built and no shade
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(programs, watermark, 'no shader programs after the warm-up');
     assert.equal(stalls, 0);
+    // V2.3: identity off at boot builds no kit and leaves uIdentity 0
+    const id0 = await evaluate(() => ({ identity: game.userSettings.agentIdentity, uIdentity: enemyAnimUniforms.uIdentity.value, kits: V23.bots._state.sets.length, built: V23.bots._state.built }));
+    assert.deepEqual(id0, { identity: 'off', uIdentity: 0, kits: 0, built: false });
+    // V2.3: switching identity on builds only V2.3 attributes: each page gains instanceKit and a kit, nothing of Enhanced
+    // Animations (instanceAnim2/3, aBone) appears, the part geometries are untouched, and nothing compiles
+    await evaluate(() => document.querySelector('#setting-agent-identity-pills [data-agentidentity="on"]').click());
+    await frames(5);
+    const id1 = await evaluate(() => {
+        const pages = [];
+        for (const c of enemyChunks.values()) for (const pg of c.pages) pages.push(pg);
+        return {
+            identity: game.userSettings.agentIdentity, uIdentity: enemyAnimUniforms.uIdentity.value, ea: enhancedAnim.built,
+            kitted: pages.length > 0 && pages.every((pg) => pg.kit && pg.meshes.every((m) => m.geometry.attributes.instanceKit === pg.kit.geometry.attributes.instanceKit)),
+            eaExtras: pages.some((pg) => pg.meshes.some((m) => m.geometry.attributes.instanceAnim2 || m.geometry.attributes.aBone)),
+            names: [...new Set([].concat(...pages.map((pg) => pg.meshes.map((m) => Object.keys(m.geometry.attributes).sort().join(',')))))],
+            bones: enemyPartSpecs.some((spec) => !!spec.geometry.attributes.aBone || !!spec.geometry.attributes.instanceKit)
+        };
+    });
+    assert.deepEqual(id1, { identity: 'on', uIdentity: 1, ea: false, kitted: true, eaExtras: false, names: id1.names, bones: false });
+    for (const n of id1.names) assert.equal(n, 'instanceAnim,instanceKit,normal,position,uv', `page attributes: ${n}`);
+    assert.deepEqual(await programState(page), [watermark, watermark, 0], 'switching identity on compiles nothing');
     assert.deepEqual(errors, []);
 });
 
@@ -44,8 +68,11 @@ test('Enhanced Animations is off by default: nothing of it is built and no shade
 // V2.2 final check: V2.1 drew each bot with its back to where the AI turns it (the figure is built facing -Z,
 // the AI turns a bot's +Z to its target); this build draws it half a turn round, facing its target. So the
 // V2.1 boot's bots are turned half a turn (turn: π) to draw what this build draws.
-const SHOOT = ({ v21Src, turn }) => {
+const SHOOT = ({ v21Src, turn, identityOn }) => {
     window.updateEnemies = () => {};
+    // V2.3: pinned to Agent Identity off (its V2.2 picture); the V2.1 boot has no V23
+    const setIdentity = (v) => { if (typeof V23 === 'undefined') return; game.userSettings.agentIdentity = v; V23.core.applySettings(game.userSettings, 'agentIdentity'); };
+    setIdentity('off');
     if (tacticalEnhancements.wingmanEnabled) tacticalEnhancements.toggleWingmanAI(false);
     while (enemyObjects.length < 5) createEnemyActor('standard');
     // phase, stride, flinch, recoil
@@ -104,6 +131,17 @@ const SHOOT = ({ v21Src, turn }) => {
     game.userSettings.charDetail = 'on'; applyVisualOverrides();
     out.detailed = look();
     out.uniform = typeof enemyAnimUniforms.uAnimDetail === 'undefined' ? null : enemyAnimUniforms.uAnimDetail.value;
+    out.identity = typeof enemyAnimUniforms.uIdentity === 'undefined' ? null : enemyAnimUniforms.uIdentity.value;
+    // V2.3: the same posed bots with Agent Identity on: drawn with their kits (other pixels), uIdentity 1
+    if (identityOn) {
+        setIdentity('on');
+        const on = look();
+        out.on = { bot: on.bot, identity: enemyAnimUniforms.uIdentity.value, kits: [...enemyChunks.values()].reduce((n, c) => n + c.pages.filter((pg) => pg.kit && pg.kit.visible && pg.kit.count > 0).length, 0) };
+        const x = atob(on.px), y = atob(out.detailed.px);
+        let diff = 0;
+        for (let i = 0; i < x.length; i++) if (x.charCodeAt(i) !== y.charCodeAt(i)) diff++;
+        out.on.diff = diff;
+    }
     return out;
 };
 
@@ -114,8 +152,12 @@ test('off, bots draw exactly as V2.1 drew them turned to face their target (same
     assert.ok(a > 0 && b > a, 'V2.1 bot animation found');
     const v21Install = src.slice(a, b) + "material.customProgramCacheKey = () => 'enemyAnimV21';\n}";
     const mine = await boot({ quality: 'high' });
-    const r = await mine.evaluate(SHOOT, { v21Src: v21Install, turn: 0 });
+    const r = await mine.evaluate(SHOOT, { v21Src: v21Install, turn: 0, identityOn: true });
     assert.deepEqual(mine.errors, []);
+    // V2.3: Agent Identity was off for the comparison below (uIdentity 0); on, the same bots draw with their kits
+    assert.equal(r.identity, 0, 'identity off: uIdentity 0');
+    assert.equal(r.on.identity, 1, 'identity on: uIdentity 1');
+    assert.ok(r.on.kits > 0 && r.on.diff > 500 && r.on.bot >= r.detailed.bot, `identity on: kits drawn (${JSON.stringify(r.on)})`);
     const v21 = await boot({ quality: 'high', file: '(V2.1) valorant-fps.html' });
     const old = await v21.evaluate(SHOOT, { v21Src: null, turn: Math.PI });
     assert.deepEqual(v21.errors, []);

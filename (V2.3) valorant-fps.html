@@ -13562,7 +13562,12 @@
         const enemyAnimUniforms = {
             uSplitLegs: { value: 0 },
             uArmSwing: { value: 0 },
-            uAnimDetail: { value: 0 }   // V2.2: Enhanced Animations (0: the math above, exactly)
+            uAnimDetail: { value: 0 },   // V2.2: Enhanced Animations (0: the math above, exactly)
+            // V2.3: Agent Identity (BOTKIT sets them): uIdentity 1 runs the kit, zone colour, rim and dissolve code below
+            // (0: none of it runs and the output is V2.2's); uRim the highlight accent (linear), uRimBase the rim weight
+            uIdentity: { value: 0 },
+            uRim: { value: new THREE.Color(0xff4655).convertSRGBToLinear() },
+            uRimBase: { value: 0.18 }
         };
         function syncEnemyAnimUniforms() {
             const detailed = typeof characterDetail !== 'undefined' && characterDetail.enabled;
@@ -13572,10 +13577,81 @@
         // V2.3 REGION R6.installEnemyAnimation [WP6]: single owner (H23). Kit branch, zone colours, rim and dissolve, all
         // behind uIdentity with identical text for every material (one 'enemyAnim' program)
         function installEnemyAnimation(material, partIndex) {
+            // V2.3: what the identity code does (every statement sits inside `if (uIdentity > 0.5)` after the existing math, and
+            // the text is the same for every material, so there is still one 'enemyAnim' program; uPart tells the parts apart):
+            //  - instanceKit (vec4 per instance): x the 24-bit module mask, y the primary colour and z the trim colour (RGB24,
+            //    sRGB bytes), w integer flags (1 kit on, 2 flat flash, 4 ally: no highlight rim) plus the dissolve fraction;
+            //  - the kit part (uPart 4: the kit superset, uv.x = 2 + module id, uv.y = zone): a module whose mask bit is clear,
+            //    or every module while the kit is off, collapses to one point (degenerate triangles); the classic rifle kick
+            //    is taken back off kit vertices;
+            //  - colour, after color_vertex: kit zone 0 the primary, 1 (accent) the highlight accent uRim (the windup orb,
+            //    module 23, and an ally's accents take the trim), 2 dark (the primary x 0.3); a flat flash keeps the kit at
+            //    instanceColor (the flash or blind colour of the torso, like the body);
+            //  - one varying (vV23): x the rim weight (uRimBase, more on a flash), y the dissolve band; at emissivemap_fragment
+            //    the emissive gains uRim x (x * (1 - |N.V|)^3 + y): a fresnel rim plus the band rising from the feet;
+            //  - the dissolve shrinks the drawn body 15% toward its spine (x and z in figure space); no discard (early-Z kept).
+            // The GLSL below is a constant: identical text in every program that shares the key.
+            const V23_EA_VERT_PARS = `
+                            // V2.3: Agent Identity (all of it behind uIdentity)
+                            attribute vec4 instanceKit;
+                            uniform float uIdentity;
+                            uniform vec3 uRim;
+                            uniform float uRimBase;
+                            varying vec2 vV23;
+                            vec3 v23Rgb(float v) {
+                                float r = floor(v / 65536.0);
+                                float g = floor((v - r * 65536.0) / 256.0);
+                                vec3 c = vec3(r, g, v - r * 65536.0 - g * 256.0) / 255.0;
+                                return mix(c * 0.0773993808, pow(c * 0.9478672986 + 0.0521327014, vec3(2.4)), step(vec3(0.04045), c));
+                            }`;
+            const V23_EA_COLOR = `
+                            if (uIdentity > 0.5) {
+                                float v23F = floor(instanceKit.w + 0.0001);
+                                float v23Flash = step(0.5, mod(floor(v23F / 2.0), 2.0));
+                                float v23Ally = step(3.5, v23F);
+                                float v23D = clamp(instanceKit.w - v23F, 0.0, 1.0);
+                                float v23Band = 0.0;
+                                if (v23D > 0.001) v23Band = (1.0 - smoothstep(0.0, 0.3, abs(position.y - (v23D * 2.5 - 0.15)))) * (1.0 - smoothstep(0.82, 1.0, v23D)) * 2.4;
+                                vV23 = vec2((uRimBase + 0.9 * v23Flash) * (1.0 - v23Ally), v23Band);
+                                if (uPart > 3.5 && v23Flash < 0.5) {
+                                    float v23Z = floor(uv.y + 0.5);
+                                    vec3 v23C = v23Rgb(instanceKit.y);
+                                    if (v23Z > 1.5) v23C *= 0.3;
+                                    else if (v23Z > 0.5) v23C = (uv.x > 24.5 || v23Ally > 0.5) ? v23Rgb(instanceKit.z) : uRim;
+                                    vColor.rgb = v23C;
+                                }
+                            }`;
+            const V23_EA_BEGIN = `
+                            if (uIdentity > 0.5) {
+                                if (uPart > 3.5) {
+                                    float v23Bit = mod(floor(instanceKit.x / exp2(floor(uv.x - 1.5))), 2.0);
+                                    if (v23Bit < 0.5 || mod(floor(instanceKit.w + 0.0001), 2.0) < 0.5) transformed = vec3(0.0);
+                                    else if (uAnimDetail < 0.5 && position.z < -0.18 && position.y > 1.0 && position.y < 1.5) {
+                                        float v23A = instanceAnim.z * 0.26 * eUpper;
+                                        transformed -= instanceAnim.w * 0.09 * vec3(0.0, -sin(v23A), cos(v23A));
+                                    }
+                                }
+                                float v23Dis = clamp(instanceKit.w - floor(instanceKit.w + 0.0001), 0.0, 1.0);
+                                if (v23Dis > 0.001) transformed.xz *= 1.0 - 0.15 * v23Dis;
+                            }`;
+            const V23_EA_FRAG_PARS = `
+                            // V2.3: Agent Identity (all of it behind uIdentity)
+                            uniform float uIdentity;
+                            uniform vec3 uRim;
+                            varying vec2 vV23;`;
+            const V23_EA_EMISSIVE = `
+                            if (uIdentity > 0.5) {
+                                float v23Fr = 1.0 - abs(dot(normal, normalize(vViewPosition)));
+                                totalEmissiveRadiance += uRim * (vV23.x * v23Fr * v23Fr * v23Fr + vV23.y);
+                            }`;
             const uPart = { value: partIndex };
             material.onBeforeCompile = (shader) => {
                 shader.uniforms.uPart = uPart;
                 shader.uniforms.uAnimDetail = enemyAnimUniforms.uAnimDetail;   // V2.2
+                // V2.3: the identity uniforms, shared by every material that draws a bot (pages, the kit, wingman rigs)
+                shader.uniforms.uIdentity = enemyAnimUniforms.uIdentity;
+                shader.uniforms.uRim = enemyAnimUniforms.uRim;
+                shader.uniforms.uRimBase = enemyAnimUniforms.uRimBase;
                 // Humanoid soldier animation. instanceAnim: x walk phase, y stride amount,
                 // z flinch, w recoil. Each leg swings from the hip and bends at the knee
                 // on its forward swing (the boots follow the shins); the upper body bobs
@@ -13601,7 +13677,8 @@
                             float isLegs = step(1.5, uPart) * step(uPart, 2.5);
                             return isLegs > 0.5 || (p.y < 0.2 && abs(p.x) < 0.42);
                         }
-                        ${EA_SHADER_POSE}`)
+                        ${EA_SHADER_POSE}${V23_EA_VERT_PARS}`)
+                    .replace('#include <color_vertex>', `#include <color_vertex>${V23_EA_COLOR}`)   // V2.3: kit zone colours (uIdentity)
                     .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
                         float eUpper = smoothstep(0.9, 1.1, position.y);
                         mat3 eaR = mat3(1.0);
@@ -13629,7 +13706,11 @@
                             // The body rises and dips with each step
                             transformed.y += abs(sin(instanceAnim.x)) * 0.04 * instanceAnim.y * eUpper;
                             transformed = animRotX(transformed, instanceAnim.z * 0.26 * eUpper, 0.95, 0.0);
-                        }`);
+                        }${V23_EA_BEGIN}`);
+                // V2.3: the rim and the dissolve band (uIdentity), at the emissive step of the lit fragment
+                shader.fragmentShader = shader.fragmentShader
+                    .replace('#include <common>', `#include <common>${V23_EA_FRAG_PARS}`)
+                    .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>${V23_EA_EMISSIVE}`);
             };
             material.customProgramCacheKey = () => 'enemyAnim';
         }
@@ -16515,25 +16596,579 @@
         //   installEnemyAnimation / enemyAnimUniforms region).
         // Purpose: deterministic agent assignment (actor.agentId, actor.lookIdx only), the kit superset geometry, page.kit and
         //   instanceKit, packPose / packColor / flush, tier swaps, rim colours, wingman kits and the replay override API.
-        //   Stubs only in WP1 (no kit exists: zero extra draws).
-        // Clocks: assignment is pure (no clock); instanceKit is written on the colorDirty path and on death ticks (60 Hz sim).
-        V23.bots = {
-            assign: function (actor) { return null; },                       // H21.1
-            onPage: function (page) { return null; },                        // H22.1
-            releasePage: function (page) { return null; },                   // H22.2
-            packPose: function (page, k, enemy) { return null; },            // H22.3
-            packColor: function (page, k, enemy) { return null; },           // H22.4
-            flush: function (page, n, colorLo, colorHi) { return null; },    // H22.5
-            geomAttrs: function (geom, src) { return null; },                // H22.6
-            wingRig: function (bot, rig, meshes) { return null; },           // H22.7
-            onTier: function () { return null; },                            // H22.8 / H22.9
-            setRim: function (mode) { return null; },                        // H27.1
-            previewColors: function (mode) { return null; },                 // H27.2: { stroke, fill } for the crosshair preview's bot (null: V2.2's)
-            wingKit: function (bot, agentId) { return null; },               // H28
-            onKilled: function (enemy, hitZone, source) { return null; },    // H25.2
-            kitRep: function (enemy, rec) { return false; },
-            archOverride: function (enemy, archIndex) { return false; }
-        };
+        // Clocks: assignment is pure (no clock); instanceKit is written on the colorDirty path and on death ticks (60 Hz sim:
+        //   the dissolve reads the topple's own anim.t and anim.lieT); everything else follows the hooks that call it.
+        //
+        // V2.3: how bots carry their agent (design 9; contract v0 instanceKit layout):
+        //  - assign (H21.1): WP2's pure assignLook gives the pool index (Match, Ranked and Spike Rush pass this block's match
+        //    counter, one per match matchMode starts; other modes the slot, generation and map), then a deterministic step
+        //    forward skips an agent a live bot of the same archetype already shows, and the player's own agent, where the
+        //    pool allows. It writes actor.agentId and actor.lookIdx and nothing else, with Agent Identity on or off.
+        //  - The identity build runs once, the first time a hook finds Agent Identity on after CORE built its boot set (at
+        //    boot: the warm-up's first packEnemyBatches; later: the next hook after the setting is switched on). Every THREE
+        //    object it makes is made inside V23.core._quiet (no draw from the game's Math.random stream). It gives every page
+        //    (live and free) a kit: page.kit, a fifth InstancedMesh (castShadow false, a child of the torso mesh, so it is
+        //    shown, hidden, added and removed with the page) drawing the content tier's kit superset (V23.parts.kitSuperset)
+        //    with V23.mat.kitPage(); it shares the torso's instanceMatrix and instanceAnim/2/3 attribute objects (the leaves'
+        //    local matrices are identity, so the torso's matrix is the group's: the kit pose costs no write and no upload)
+        //    and owns instanceColor (leaves[0]'s colour, flash and blind included). instanceKit is one attribute per page,
+        //    shared by its meshes and its kit; geometries made later get a shared neutral one (zeros) until their page or rig
+        //    binds its own, so no bot draw ever reads a missing attribute while uIdentity is 1.
+        //  - Writes: packColor (the colorDirty path) writes the kit colour and the slot's instanceKit; packPose writes only
+        //    on death ticks (a dying bot whose dissolve moved); flush sets the kit's count and asks for the colour-range and
+        //    death-range uploads. A steady frame writes nothing.
+        //  - The warm reserve: when the build runs before the warm-up ends, two more pages are made (inside _quiet), packed
+        //    with one kit instance in front of the camera and tagged for the warm-up (CORE's warmPre / warmPost show and
+        //    restore them), so every buffer they hold is on the GPU before the first frame. They are held here, not put in
+        //    enemyPageFree: a free page there would stand in for a createEnemyPage call V2.2 makes, and its uuids are 32 of
+        //    the game's Math.random draws, so the stream would shift. Instead, when V2.2's createEnemyPage has made a page
+        //    (its draws exactly as V2.2), onPage gives it a reserve page's meshes and kit in place of the ones it just made
+        //    (never drawn: they hold no GPU state), so a bot entering a new chunk creates no buffer.
+        //  - Identity off: uIdentity 0 (the shader's identity code does not run), every kit hidden (0 kit draws), wingman
+        //    kits drawn with no triangles; the V2.2 picture exactly. The kits stay built for the next switch-on.
+        //  - Highlight accents (setRim): red 0xff4655, yellow 0xffd166, purple 0xe879f9, cyan 0x67e8f9 for uRim (the kit's
+        //    accent zones, the fresnel rim, the dissolve band); uRimBase 0.18, 0.12 on the Low content tier or Low quality.
+        //  - Wingmen: wingKit records the agent (from the wingman's name); the build adds a plain Mesh of that agent's kit
+        //    modules (V23.mat.world, its palette base) as the 5th child of the figure Group (children 0-3 unchanged), drawn
+        //    with Enhanced Animations off; wingRig adds a one-instance kit to the EA rig (it shares the rig torso's instance
+        //    attributes; the rig's instanceKit carries the ally flag, so no highlight rim). 5 draws per wingman either way.
+        //  - Protocols for other blocks (they write these on the enemy and mark enemy.colorDirty): enemy.v23Orb === true
+        //    shows kit module 23 (the windup orb in the right hand) in the trim colour (BOTMOTION's windup). The dissolve
+        //    follows the actor's 'topple' record (anim.t, anim.lieT on the 60 Hz sim), so a death style that keeps those
+        //    fields (BOTMOTION's deathStep) gets it: it starts 0.6 s into the lie and rises over 0.9 s.
+        //  - Replays (SCREENS, WP9): kitRep(enemy, { agentId } | { lookIdx } | null) draws the bot as the recorded agent until
+        //    called with null; archOverride(enemy, archIndex) draws it with that archetype's (ENEMY_ARCHETYPE_ORDER index)
+        //    rest colours and scale, and archOverride(enemy, -1) puts the live values back bit-exact. Both return false (and
+        //    change nothing) while Agent Identity is off.
+        (function () {
+            // V2.3: the highlight accent table (design 9.5) and the crosshair preview's practice bot colours (H27.2): V2.2's
+            // strings for red, yellow and purple, and the cyan branch V2.2 lacked (it drew cyan as red)
+            const ACCENT = Object.freeze({ red: 0xff4655, yellow: 0xffd166, purple: 0xe879f9, cyan: 0x67e8f9 });
+            const PREVIEW = Object.freeze({
+                red: Object.freeze({ stroke: 'rgba(255, 70, 85, 0.65)', fill: 'rgba(255, 70, 85, 0.22)' }),
+                yellow: Object.freeze({ stroke: 'rgba(255, 209, 102, 0.75)', fill: 'rgba(255, 209, 102, 0.24)' }),
+                purple: Object.freeze({ stroke: 'rgba(217, 70, 239, 0.75)', fill: 'rgba(217, 70, 239, 0.24)' }),
+                cyan: Object.freeze({ stroke: 'rgba(103, 232, 249, 0.75)', fill: 'rgba(103, 232, 249, 0.24)' })
+            });
+            // V2.3: the map order assignLook's mapIndex counts in (tacticalDirector.cycleMapPreset's)
+            const MAPS = ['ascent', 'bind', 'haven', 'icebox', 'lotus', 'split', 'skyline'];
+            const RESERVE = 2;                  // warm pages held for the first new chunks
+            const ORB_BIT = 8388608;            // 2^23: kit module 23, the windup orb
+            const FULL_MASK = 16777215;         // all 24 modules (the warm draw)
+            const SHARED = ['instanceAnim', 'instanceAnim2', 'instanceAnim3'];
+            const B = {
+                built: false, on: false, making: false, tier: null, geom: null, mat: null, zero: null,
+                sets: [], pool: [], reserve: [], wing: [], rigs: [], slots: [], kits: [],
+                matchSeed: 0, lastStats: null, mode: 'red'
+            };
+            const _white = new THREE.Color(1, 1, 1), _col = new THREE.Color(), _hsl = { h: 0, s: 0, l: 0 };
+            const _m4 = new THREE.Matrix4(), _v3 = new THREE.Vector3();
+            // data for the tests (never read by the game)
+            const stats = { built: 0, sets: 0, reserveMade: 0, reserveUsed: 0, kitWrites: 0, deathWrites: 0, uploadBytes: 0, tierSwaps: 0, wingKits: 0, rigKits: 0 };
+
+            // V2.3: Agent Identity as the game shows it: the setting on (V23.core.enabled) and CORE's boot set built
+            const wanted = () => !!(V23.core && V23.core.enabled() && V23.core.stats && V23.core.stats.identityBuilt);
+            // V2.3: the content tier the bodies are drawn in (as CORE's contentTier): Ultra, High Detail, Medium, Low
+            const tierNow = () => ((typeof ultraChars !== 'undefined' && ultraChars.on) ? 'ultra' : (characterDetail.enabled ? 'high' : (CONTENT.detailedModels ? 'medium' : 'low')));
+            const quiet = (fn) => V23.core._quiet(fn);
+            const slotOf = (enemy) => {
+                const i = enemy.slot | 0;
+                return B.slots[i] || (B.slots[i] = { rep: -1, anim: null, d: 0, arch: -1, save: new Float64Array(15) });
+            };
+
+            // V2.3: an agent's kit data, cached by its resolved look (a redefined look resolves to a new object): the module
+            // mask, the primary (the palette base desaturated by half and at most 40% lightness, sRGB RGB24), the trim (the
+            // look's bot.accent slot, default glow) and the plain base colour (allies)
+            function kitOf(li) {
+                const id = AGENT_ORDER[li] || AGENT_ORDER[0];
+                const look = V23.core.resolve(id);
+                let K = B.kits[li];
+                if (K && K.look === look) return K;
+                K = B.kits[li] || (B.kits[li] = { look: null, mask: 0, prim: 0, trim: 0, base: 0, spec: null });
+                K.look = look;
+                let mask = 0;
+                const kit = (look && look.bot && look.bot.kit) || [];
+                for (let i = 0; i < kit.length; i++) { const k = kit[i]; if (k >= 0 && k <= 22 && Math.floor(mask / Math.pow(2, k)) % 2 === 0) mask += Math.pow(2, k); }
+                K.mask = mask;
+                const pal = (look && look.palette) || {};
+                const base = pal.base || { c: 0x39414f, r: 0.6, m: 0.1 };
+                _col.setHex(base.c).getHSL(_hsl);
+                _col.setHSL(_hsl.h, _hsl.s * 0.5, Math.min(_hsl.l, 0.4));
+                K.prim = _col.getHex();
+                const acc = pal[(look && look.bot && look.bot.accent) || 'glow'] || pal.glow || pal.trim || base;
+                K.trim = acc.c;
+                K.base = base.c;
+                K.spec = { c: base.c, r: base.r === undefined ? 0.6 : base.r, m: base.m === undefined ? 0.1 : base.m };
+                return K;
+            }
+            // V2.3: the dissolve fraction (0 until 0.6 s into the lie, then up over 0.9 s), from the actor's topple record
+            function dissolveOf(enemy, st) {
+                if (!enemy.hit) return 0;
+                let a = st.anim;
+                if (!a || a.actor !== enemy || a.generation !== enemy.generation) {
+                    a = (enemy.eaFall && enemy.eaFall.anim && enemy.eaFall.anim.generation === enemy.generation) ? enemy.eaFall.anim : null;
+                    if (!a) for (let i = 0; i < actorAnimations.length; i++) { const x = actorAnimations[i]; if (x.actor === enemy && x.kind === 'topple' && x.generation === enemy.generation) { a = x; break; } }
+                    st.anim = a;
+                }
+                if (!a || typeof a.t !== 'number' || !(a.lieT >= 0)) return 0;
+                const v = (a.t - a.lieT - 0.6) / 0.9;
+                return v <= 0 ? 0 : Math.min(0.999, v);
+            }
+            // V2.3: one slot's instanceKit: mask (+ the orb while a windup shows it), primary, trim, flags (1 kit on, 2 flat
+            // flash while the torso shows a hit flash or a blind) plus the dissolve
+            function kitWrite(attr, k, enemy, st) {
+                const K = kitOf(st.rep >= 0 ? st.rep : (enemy.lookIdx >= 0 ? enemy.lookIdx : 0));
+                const d = dissolveOf(enemy, st);
+                st.d = d;
+                const flags = 1 + (enemy.flashUntil && enemy.flashUntil[0] ? 2 : 0);
+                attr.setXYZW(k, K.mask + (enemy.v23Orb === true ? ORB_BIT : 0), K.prim, K.trim, flags + d);
+                stats.kitWrites++;
+            }
+
+            // ---- kit sets (an InstancedMesh, its geometry and the page's instanceKit), pooled ----------------------------
+            // V2.3: the kit superset's own attributes on a kit geometry (the tier swaps call it again)
+            function bindSuperset(g) {
+                const src = B.geom;
+                g.setIndex(src.index);
+                for (const n of ['position', 'normal', 'uv', 'aBone']) g.setAttribute(n, src.attributes[n]);
+            }
+            // V2.3: the torso's instance attributes and chunk bounds, shared by reference (re-checked by flush: Enhanced
+            // Animations adds instanceAnim2/3 later, acquireEnemyPage sets the bounds)
+            function shareTorso(kg, torso) {
+                const tg = torso.geometry;
+                for (let i = 0; i < SHARED.length; i++) {
+                    const a = tg.attributes[SHARED[i]];
+                    if (a) { if (kg.attributes[SHARED[i]] !== a) kg.setAttribute(SHARED[i], a); }
+                    else if (kg.attributes[SHARED[i]]) kg.deleteAttribute(SHARED[i]);
+                }
+                if (tg.boundingSphere && kg.boundingSphere !== tg.boundingSphere) { kg.boundingSphere = tg.boundingSphere; kg.boundingBox = tg.boundingBox; }
+            }
+            function newSet() {
+                return quiet(() => {   // V2.3: no draw from the game's Math.random stream
+                    const geom = new THREE.BufferGeometry();
+                    const attr = new THREE.InstancedBufferAttribute(new Float32Array(ENEMY_PAGE_CAP * 4), 4);
+                    attr.setUsage(THREE.DynamicDrawUsage);
+                    bindSuperset(geom);
+                    geom.setAttribute('instanceKit', attr);
+                    const mesh = new THREE.InstancedMesh(geom, B.mat, ENEMY_PAGE_CAP);
+                    for (let s = 0; s < ENEMY_PAGE_CAP; s++) mesh.setColorAt(s, _white);
+                    mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+                    mesh.castShadow = false;   // V2.3: 0 draws in the shadow pass
+                    mesh.receiveShadow = true;
+                    mesh.frustumCulled = true;
+                    mesh.count = 0;
+                    mesh.visible = B.on;
+                    mesh.name = 'v23:kit';
+                    freezeStaticTransform(mesh);
+                    const st = { mesh: mesh, geom: geom, attr: attr, page: null, dLo: Infinity, dHi: -1 };
+                    mesh.userData.v23 = st;
+                    B.sets.push(st);
+                    stats.sets++;
+                    return st;
+                });
+            }
+            // V2.3: a page gets a kit set: shared torso attributes, the page's instanceKit on every mesh, the kit under the
+            // torso mesh (shown and hidden with it), a full repack next frame
+            function attach(page) {
+                if (page.kit || !page.meshes.length) return;
+                const st = B.pool.pop() || newSet();
+                const torso = page.meshes[0];
+                st.page = page;
+                st.dLo = Infinity; st.dHi = -1;
+                st.mesh.instanceMatrix = torso.instanceMatrix;
+                shareTorso(st.geom, torso);
+                for (let p = 0; p < page.meshes.length; p++) page.meshes[p].geometry.setAttribute('instanceKit', st.attr);
+                torso.add(st.mesh);
+                st.mesh.count = 0;
+                st.mesh.visible = B.on;
+                page.kit = st.mesh;
+                page.structureDirty = true;
+            }
+            // V2.3: the warm reserve (see the header): two pages made inside _quiet, one instance each at 3 m in front of the
+            // camera (as warmShaderVariants' warm point), the kit with every module, tagged 'pre' for CORE's warm registry
+            function makeReserve() {
+                camera.updateMatrixWorld();
+                _v3.set(0, 0, -1).transformDirection(camera.matrixWorld);
+                _m4.makeTranslation(camera.position.x + _v3.x * 3, camera.position.y + _v3.y * 3 - 1.2, camera.position.z + _v3.z * 3);
+                for (let i = 0; i < RESERVE; i++) {
+                    const page = createEnemyPage();   // inside _build's _quiet; onPage skips it (B.making)
+                    attach(page);
+                    for (const m of page.meshes) {
+                        m.setMatrixAt(0, _m4);
+                        m.count = 1;
+                        m.visible = false;
+                        m.frustumCulled = false;
+                        m.userData.v23Warm = 'pre';
+                        scene.add(m);
+                    }
+                    const st = page.kit.userData.v23;
+                    st.attr.setXYZW(0, FULL_MASK, 0x404448, 0x9aa0a8, 1);
+                    st.mesh.count = 1;
+                    st.mesh.visible = false;
+                    st.mesh.frustumCulled = false;
+                    st.mesh.userData.v23Warm = 'pre';
+                    B.reserve.push(page);
+                    stats.reserveMade++;
+                }
+            }
+            // V2.3: a page V2.2 just made takes a reserve page's meshes and kit (uploaded in the warm-up) in place of its own
+            function fromReserve(page) {
+                const r = B.reserve.pop();
+                if (r.meshes.length !== page.meshes.length || r.meshes.some((m, p) => m.material !== page.meshes[p].material)) return false;
+                for (let p = 0; p < r.meshes.length; p++) {
+                    const m = r.meshes[p];
+                    delete m.userData.v23Warm;
+                    m.count = 0;
+                    m.visible = false;
+                    m.frustumCulled = true;
+                    if (m.parent) m.parent.remove(m);
+                    page.meshes[p] = m;
+                }
+                const kit = r.kit;
+                delete kit.userData.v23Warm;
+                kit.frustumCulled = true;
+                kit.count = 0;
+                kit.visible = B.on;
+                kit.userData.v23.page = page;
+                page.kit = kit;
+                r.kit = null;
+                // V2.3: Enhanced Animations' attributes when it was built after the warm-up (its build skips the reserve)
+                if (enhancedAnim.built && !page.meshes[0].geometry.attributes.instanceAnim2) enhancedAnim.pageAttrs(page);
+                stats.reserveUsed++;
+                return true;
+            }
+
+            // ---- wingmen ---------------------------------------------------------------------------------------------------
+            const figOf = (bot) => bot && bot.group && bot.group.children.find((c) => c.isGroup && c.children.length >= 4 && c.children[0].isMesh);
+            // V2.3: a wingman's plain kit geometry for a tier: only its agent's modules (no orb) cut from the kit superset
+            function wingGeom(rec, tier) {
+                if (rec.geoms[tier]) return rec.geoms[tier];
+                const src = V23.parts.kitSuperset(tier), K = kitOf(AGENT_ORDER.indexOf(rec.agentId));
+                const P = src.attributes.position.array, N = src.attributes.normal.array, U = src.attributes.uv.array, I = src.index.array;
+                const keep = new Int32Array(P.length / 3).fill(-1), pos = [], nor = [], idx = [];
+                const inKit = (v) => { const m = Math.round(U[v * 2]) - 2; return m < 23 && Math.floor(K.mask / Math.pow(2, m)) % 2 === 1; };
+                for (let t = 0; t < I.length; t += 3) {
+                    if (!inKit(I[t])) continue;
+                    for (let j = 0; j < 3; j++) {
+                        const v = I[t + j];
+                        if (keep[v] < 0) { keep[v] = pos.length / 3; pos.push(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]); nor.push(N[v * 3], N[v * 3 + 1], N[v * 3 + 2]); }
+                        idx.push(keep[v]);
+                    }
+                }
+                const g = quiet(() => new THREE.BufferGeometry());
+                g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+                g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nor), 3));
+                g.setIndex(idx);
+                g.computeBoundingSphere();
+                rec.geoms[tier] = g;
+                return g;
+            }
+            // V2.3: identity off draws no triangle of a wingman kit (Enhanced Animations' switch shows every figure child
+            // but the head again), and Enhanced Animations on hides it (the rig kit draws)
+            function wingShow(rec) {
+                if (!rec.mesh) return;
+                rec.mesh.geometry.setDrawRange(0, B.on ? Infinity : 0);
+                rec.mesh.visible = B.on && !enhancedAnim.on;
+            }
+            function wingMake(rec) {
+                const fig = figOf(rec.bot);
+                if (rec.mesh || !rec.agentId || !fig) return;
+                const K = kitOf(AGENT_ORDER.indexOf(rec.agentId));
+                const geom = wingGeom(rec, B.tier);
+                const mesh = quiet(() => new THREE.Mesh(geom, V23.mat.world(K.spec)));
+                mesh.castShadow = false;
+                mesh.receiveShadow = true;
+                mesh.name = 'v23:wingKit';
+                fig.add(mesh);   // V2.3: the figure's 5th child (children 0-3 and the single Group child unchanged)
+                rec.mesh = mesh;
+                wingShow(rec);
+                stats.wingKits++;
+            }
+            // V2.3: the EA rig's kit: one instance, sharing the rig torso's instance attributes; the rig's own instanceKit
+            // (ally flag 4: no highlight rim, accents in the trim) on its three meshes and the kit
+            function rigWrite(rec) {
+                if (!rec.attr) return;
+                const w = B.wing.find((x) => x.bot === rec.bot);
+                const li = w && w.agentId ? AGENT_ORDER.indexOf(w.agentId) : -1;
+                if (li < 0) { rec.attr.setXYZW(0, 0, 0, 0, 4); rec.attr.needsUpdate = true; return; }
+                const K = kitOf(li);
+                rec.attr.setXYZW(0, K.mask, K.base, K.trim, 1 + 4);
+                rec.attr.needsUpdate = true;
+            }
+            function rigMake(rec) {
+                if (rec.kit || !rec.meshes.length) return;
+                const t = rec.meshes[0];
+                quiet(() => {
+                    rec.attr = new THREE.InstancedBufferAttribute(new Float32Array(4), 4);
+                    const geom = new THREE.BufferGeometry();
+                    bindSuperset(geom);
+                    shareTorso(geom, t);
+                    geom.setAttribute('instanceKit', rec.attr);
+                    geom.boundingSphere = t.geometry.boundingSphere;
+                    const kit = new THREE.InstancedMesh(geom, B.mat, 1);
+                    kit.instanceMatrix = t.instanceMatrix;
+                    kit.setColorAt(0, _white);
+                    kit.castShadow = false;
+                    kit.receiveShadow = true;
+                    kit.frustumCulled = true;
+                    kit.name = 'v23:rigKit';
+                    rec.kit = kit;
+                });
+                for (const m of rec.meshes) m.geometry.setAttribute('instanceKit', rec.attr);
+                rec.rig.add(rec.kit);
+                rec.kit.visible = B.on;
+                rigWrite(rec);
+                stats.rigKits++;
+            }
+
+            // ---- the identity build and the on / off switch -----------------------------------------------------------------
+            function build() {
+                if (B.built || B.making) return;
+                B.making = true;
+                try {
+                    quiet(() => {   // V2.3: every object below takes its uuid from a V23.rand stream
+                        B.tier = tierNow();
+                        B.geom = V23.parts.kitSuperset(B.tier);
+                        B.mat = V23.mat.kitPage();
+                        B.zero = new THREE.InstancedBufferAttribute(new Float32Array(ENEMY_PAGE_CAP * 4), 4);
+                        for (const chunk of enemyChunks.values()) for (const page of chunk.pages) attach(page);
+                        for (const page of enemyPageFree) attach(page);
+                        if (perfTelemetry.programWatermark === 0 && enemyPartSpecs.length) makeReserve();
+                    });
+                    B.built = true;
+                    stats.built++;
+                    for (const w of B.wing) wingMake(w);
+                    for (const r of B.rigs) rigMake(r);
+                } finally {
+                    B.making = false;
+                }
+            }
+            function setOn(on) {
+                B.on = on;
+                enemyAnimUniforms.uIdentity.value = on ? 1 : 0;
+                for (const st of B.sets) st.mesh.visible = on;
+                for (const r of B.rigs) if (r.kit) r.kit.visible = on;
+                for (const w of B.wing) wingShow(w);
+                // V2.3: every live page repacks (instanceKit and the kit colours are not written while identity is off)
+                for (const chunk of enemyChunks.values()) for (const page of chunk.pages) page.structureDirty = true;
+            }
+            // V2.3: every hook starts here: the build on the first identity-on, the switch, the rim weight
+            function sync() {
+                const want = wanted();
+                if (want && !B.built) build();
+                const on = want && B.built;
+                if (on !== B.on) setOn(on);
+                const rb = (B.tier === 'low' || adaptiveSettings.currentQuality === 'low') ? 0.12 : 0.18;
+                if (enemyAnimUniforms.uRimBase.value !== rb) enemyAnimUniforms.uRimBase.value = rb;
+                return on;
+            }
+
+            V23.bots = {
+                // V2.3 (H21.1): the bot's agent and look index (see the header); nothing else on the actor is written
+                assign: function (actor) {
+                    const arch = actor.archetype;
+                    const mi = Math.max(0, MAPS.indexOf(game.mapPreset || 'ascent'));
+                    let seed = null;
+                    if (typeof matchMode !== 'undefined' && matchMode.active) {
+                        // V2.3: Match, Ranked and Spike Rush: one counter step per match (its stats record is new per start)
+                        if (matchMode.stats !== B.lastStats) { B.lastStats = matchMode.stats; B.matchSeed++; }
+                        seed = B.matchSeed;
+                    }
+                    const r = V23.core.assignLook(actor.slot | 0, actor.generation | 0, mi, seed, arch);
+                    const n = r.size, m = r.members, mine = game.activeAgent;
+                    let pick = r.index;
+                    for (let s = 0; s < n; s++) {
+                        const i = (r.index + s) % n, id = m[i];
+                        if (n > 1 && id === mine) continue;
+                        let dup = false;
+                        for (let j = 0; j < enemyObjects.length; j++) {
+                            const e = enemyObjects[j];
+                            if (e !== actor && e.isActive && !e.hit && e.archetype === arch && e.agentId === id) { dup = true; break; }
+                        }
+                        if (!dup) { pick = i; break; }
+                    }
+                    actor.agentId = m[pick];
+                    actor.lookIdx = AGENT_ORDER.indexOf(m[pick]);
+                    return null;
+                },
+                // V2.3 (H22.1): a page V2.2 just made: a reserve page's meshes and kit when one is left, else a kit of its own
+                onPage: function (page) {
+                    if (B.making) return null;
+                    sync();
+                    if (!B.built) return null;
+                    if (perfTelemetry.programWatermark > 0 && B.reserve.length && fromReserve(page)) return null;
+                    attach(page);
+                    return null;
+                },
+                // V2.3 (H22.2): the kit leaves the page first and goes back to the pool (its own buffers are reused);
+                // V2.2's release then drops instanceKit from the page's geometries with the other shared attributes
+                releasePage: function (page) {
+                    const kit = page.kit;
+                    if (!kit) return null;
+                    const st = kit.userData.v23;
+                    if (kit.parent) kit.parent.remove(kit);
+                    for (let i = 0; i < SHARED.length; i++) if (st.geom.attributes[SHARED[i]]) st.geom.deleteAttribute(SHARED[i]);
+                    st.geom.boundingSphere = null;
+                    st.geom.boundingBox = null;
+                    st.page = null;
+                    kit.count = 0;
+                    page.kit = null;
+                    B.pool.push(st);
+                    return null;
+                },
+                // V2.3 (H22.3): pose writes share the torso's buffers; only a dying bot's dissolve is written here
+                packPose: function (page, k, enemy) {
+                    if (!B.on || !enemy.hit || !page.kit) return null;
+                    const st = slotOf(enemy), set = page.kit.userData.v23;
+                    const d = dissolveOf(enemy, st);
+                    if (Math.fround(1 + (enemy.flashUntil && enemy.flashUntil[0] ? 2 : 0) + d) === set.attr.getW(k)) return null;
+                    kitWrite(set.attr, k, enemy, st);
+                    if (k < set.dLo) set.dLo = k;
+                    if (k > set.dHi) set.dHi = k;
+                    stats.deathWrites++;
+                    return null;
+                },
+                // V2.3 (H22.4): the colour path: the kit colour (leaves[0]'s: rest, flash or blind) and the slot's instanceKit
+                packColor: function (page, k, enemy) {
+                    if (!B.on || !page.kit) return null;
+                    const set = page.kit.userData.v23;
+                    page.kit.setColorAt(k, enemy.leaves[0].material.color);
+                    kitWrite(set.attr, k, enemy, slotOf(enemy));
+                    return null;
+                },
+                // V2.3 (H22.5): the kit's count, its shared attributes and bounds, and the colour and death range uploads
+                flush: function (page, n, colorLo, colorHi) {
+                    sync();
+                    const kit = page.kit;
+                    if (!kit) return null;
+                    const set = kit.userData.v23, torso = page.meshes[0];
+                    kit.count = n;
+                    if (kit.instanceMatrix !== torso.instanceMatrix) kit.instanceMatrix = torso.instanceMatrix;
+                    shareTorso(set.geom, torso);
+                    if (!B.on || n === 0) { set.dLo = Infinity; set.dHi = -1; return null; }
+                    if (colorHi >= colorLo) {
+                        perfTelemetry.requestUpload(kit.instanceColor, colorLo * 3, (colorHi - colorLo + 1) * 3);
+                        stats.uploadBytes += (colorHi - colorLo + 1) * 12;
+                    }
+                    const lo = Math.min(colorLo, set.dLo), hi = Math.min(n - 1, Math.max(colorHi, set.dHi));
+                    if (hi >= lo) {
+                        perfTelemetry.requestUpload(set.attr, lo * 4, (hi - lo + 1) * 4);
+                        stats.uploadBytes += (hi - lo + 1) * 16;
+                    }
+                    set.dLo = Infinity; set.dHi = -1;
+                    return null;
+                },
+                // V2.3 (H22.6): a bot geometry made after the build reads a shared neutral instanceKit until its page or
+                // rig binds its own
+                geomAttrs: function (geom, src) {
+                    if (B.built && !geom.attributes.instanceKit) geom.setAttribute('instanceKit', B.zero);
+                    return null;
+                },
+                // V2.3 (H22.7): the wingman EA rig's one-instance kit
+                wingRig: function (bot, rig, meshes) {
+                    const rec = { bot: bot, rig: rig, meshes: meshes, kit: null, attr: null };
+                    B.rigs.push(rec);
+                    sync();
+                    if (B.built) rigMake(rec);
+                    return null;
+                },
+                // V2.3 (H22.8, H22.9): the kit geometry follows the body tier (the superset of the new content tier, by
+                // reference: nothing compiles), and the reserve pages get V2.2's swap that its loops skip
+                onTier: function () {
+                    sync();
+                    if (!B.built) return null;
+                    for (const page of B.reserve) for (let p = 0; p < page.meshes.length && p < enemyPartSpecs.length; p++) {
+                        const geom = page.meshes[p].geometry, src = enemyPartSpecs[p].geometry;
+                        if (geom.attributes.position === src.attributes.position) continue;
+                        geom.setIndex(src.index);
+                        for (const name of ['position', 'normal', 'uv']) geom.setAttribute(name, src.attributes[name]);
+                        if (enhancedAnim.built) geom.setAttribute('aBone', enhancedAnim.bones(src));
+                    }
+                    const t = tierNow();
+                    if (t === B.tier) return null;
+                    B.tier = t;
+                    B.geom = quiet(() => V23.parts.kitSuperset(t));
+                    for (const st of B.sets) bindSuperset(st.geom);
+                    for (const r of B.rigs) if (r.kit) bindSuperset(r.kit.geometry);
+                    for (const w of B.wing) if (w.mesh) { w.mesh.geometry = wingGeom(w, t); wingShow(w); }
+                    stats.tierSwaps++;
+                    sync();
+                    return null;
+                },
+                // V2.3 (H27.1): the highlight accent for the kit accents, the rim and the dissolve band
+                setRim: function (mode) {
+                    sync();
+                    B.mode = ACCENT[mode] ? mode : 'red';
+                    enemyAnimUniforms.uRim.value.setHex(ACCENT[B.mode]).convertSRGBToLinear();
+                    return null;
+                },
+                // V2.3 (H27.2): the crosshair preview's practice bot, cyan included (V2.2's strings for the others)
+                previewColors: function (mode) {
+                    return PREVIEW[mode] || PREVIEW.red;
+                },
+                // V2.3 (H28): the wingman's agent (its kit is made by the build, or now when identity is built)
+                wingKit: function (bot, agentId) {
+                    const rec = { bot: bot, agentId: AGENT_DEFS[agentId] ? agentId : null, mesh: null, geoms: {} };
+                    B.wing.push(rec);
+                    sync();
+                    if (B.built) wingMake(rec);
+                    for (const r of B.rigs) if (r.bot === bot) rigWrite(r);
+                    return null;
+                },
+                // V2.3 (H25.2): a kill starts the dissolve's clock afresh (the topple record is found on the next death tick)
+                onKilled: function (enemy, hitZone, source) {
+                    const st = slotOf(enemy);
+                    st.anim = null;
+                    st.d = 0;
+                    return null;
+                },
+                // V2.3 (replays, WP9): draw this bot as a recorded agent ({ agentId } or { lookIdx }); null ends it
+                kitRep: function (enemy, rec) {
+                    sync();
+                    if (!B.on || !enemy) return false;
+                    let li = -1;
+                    if (rec) li = typeof rec.lookIdx === 'number' ? rec.lookIdx : AGENT_ORDER.indexOf(rec.agentId);
+                    if (rec && !(li >= 0 && li < AGENT_ORDER.length)) return false;
+                    const st = slotOf(enemy);
+                    if (st.rep !== li) { st.rep = li; enemy.colorDirty = true; }
+                    return true;
+                },
+                // V2.3 (replays, WP9): draw this bot with a recorded archetype's rest colours (with the highlight override)
+                // and scale; -1 puts the live scale and leaf colours back bit-exact
+                archOverride: function (enemy, archIndex) {
+                    sync();
+                    if (!B.on || !enemy) return false;
+                    const st = slotOf(enemy), sv = st.save, g = enemy.mesh, L = enemy.leaves;
+                    const id = (typeof archIndex === 'number' && archIndex >= 0) ? ENEMY_ARCHETYPE_ORDER[archIndex] : null;
+                    if (!id) {
+                        if (st.arch < 0) return false;
+                        g.scale.set(sv[0], sv[1], sv[2]);
+                        for (let p = 0; p < L.length && p < 4; p++) L[p].material.color.setRGB(sv[3 + p * 3], sv[4 + p * 3], sv[5 + p * 3]);
+                        st.arch = -1;
+                        enemy.poseDirty = true;
+                        enemy.colorDirty = true;
+                        return true;
+                    }
+                    if (st.arch < 0) {
+                        sv[0] = g.scale.x; sv[1] = g.scale.y; sv[2] = g.scale.z;
+                        for (let p = 0; p < L.length && p < 4; p++) { const c = L[p].material.color; sv[3 + p * 3] = c.r; sv[4 + p * 3] = c.g; sv[5 + p * 3] = c.b; }
+                    }
+                    const a = ENEMY_ARCHETYPES[id], c = a.colors, mode = B.mode;
+                    // V2.3: enemyPartPalette's colours, without its array (called every replay frame)
+                    const torso = mode === 'yellow' ? 0xd97706 : mode === 'purple' ? 0x7e22ce : mode === 'cyan' ? 0x0891b2 : c.torso;
+                    const head = mode === 'yellow' ? 0xffd166 : mode === 'purple' ? 0xe879f9 : mode === 'cyan' ? 0x67e8f9 : c.head;
+                    g.scale.set(a.scale.x, a.scale.y, a.scale.z);
+                    for (let p = 0; p < L.length && p < 4; p++) L[p].material.color.setHex(p === 0 ? torso : p === 1 ? head : p === 2 ? c.legs : c.weapon).convertSRGBToLinear();
+                    st.arch = archIndex;
+                    enemy.poseDirty = true;
+                    enemy.colorDirty = true;
+                    return true;
+                },
+                // data for the tests (never read by the game): counters and the build's state
+                _stats: stats,
+                _state: B
+            };
+        })();
         // ===== END V2.3 BLOCK BOTKIT =====
 
         // ===== V2.3 BLOCK BOTMOTION [WP7] =====
