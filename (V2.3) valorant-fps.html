@@ -3561,6 +3561,21 @@
         /* ===== V2.3 CSS FP [WP4] ===== */
         /* Owner: WP4. The ultimate's edge vignette: never takes the pointer, hidden until the FP block uses it. */
         #ult-cue { display: none; pointer-events: none; }
+        /* V2.3: shown by V23.fp.ultCue for 700 ms when an ultimate starts (design 7.5): the centre 55% of the short side
+           stays fully clear (transparent to 55% of the closest-side radius), at most 0.35 opacity, above the screen effects
+           (z-index 5) and below the crosshair (10); half as strong in Competitive, a thin dim edge under Reduce Flashes */
+        #ult-cue.v23-on {
+            display: block; position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 6; opacity: 0;
+            background: radial-gradient(circle closest-side at 50% 50%, transparent 55%, var(--v23-ult, #ffffff) 125%);
+            animation: v23UltCue 700ms ease-out forwards;
+        }
+        #ult-cue.v23-on.v23-comp { animation-name: v23UltCueComp; }
+        #ult-cue.v23-on.v23-rf { background: radial-gradient(circle closest-side at 50% 50%, transparent 84%, var(--v23-ult, #ffffff) 150%); animation-name: v23UltCueRf; }
+        #ult-cue.v23-on.v23-rf.v23-comp { animation-name: v23UltCueRfComp; }
+        @keyframes v23UltCue { 0% { opacity: 0; } 20% { opacity: 0.35; } 100% { opacity: 0; } }
+        @keyframes v23UltCueComp { 0% { opacity: 0; } 20% { opacity: 0.175; } 100% { opacity: 0; } }
+        @keyframes v23UltCueRf { 0% { opacity: 0; } 20% { opacity: 0.12; } 100% { opacity: 0; } }
+        @keyframes v23UltCueRfComp { 0% { opacity: 0; } 20% { opacity: 0.06; } 100% { opacity: 0; } }
         /* ===== END V2.3 CSS FP ===== */
         /* ===== V2.3 CSS SCREENS [WP9] ===== */
         /* Owner: WP9. The MVP pose cell, hidden until the SCREENS block uses it. */
@@ -19797,16 +19812,719 @@
         //   hand2, the gesture dispatch for castFX._pose and eaFP.castPose, second-stage fire feedback, the ultimate cue and
         //   the off-hand drawRange API that VMANIM uses. Stubs only in WP1 (pose returns null: V2.2's pose runs).
         // Clocks: castFX / vmAnim real clock (performance.now) for gestures and the ultimate vignette.
-        V23.fp = {
-            attach: function (model, slot, handZ) { return null; },            // H13 (createWeapons, after each createHandsMesh)
-            reapply: function () { return null; },                             // H15 (after the hands geometry swaps)
-            initCast: function (castFX) { return null; },                      // H16.1
-            onStart: function (castFX, kind, abilityKey) { return null; },     // H16.2
-            pose: function (castFX, kind, p, now, variant) { return null; },   // H16.3 / H16.4: null keeps V2.2's pose
-            onSecondaryFire: function (abilityKey) { return null; },           // H19.1-4
-            offHand: function (model, hidden) { return false; },
-            ultCue: function (agentId) { return null; }
-        };
+        //
+        // V2.3 (WP4): how first person carries the agent (design 7). Everything here is built once, the first time Agent
+        //   Identity is applied (the first V23.fp.reapply with identity on: at boot that is the shader warm-up's
+        //   ultraRealism.warm, through ultraGuns.apply's H15.2 line), inside V23.core._quiet, so the uuids of the THREE
+        //   objects made here take no draw from the game's Math.random stream. After that, an agent change, a tier swap or a
+        //   setting change only swaps geometry and material references and writes material values (no allocation, no
+        //   compile: every material is a V23.mat.vm, the gun and hands program).
+        //  - Hands (H13, H15): each of the 4 gun models' hands mesh draws a grouped variant of the V2.2 geometry it would
+        //    draw (simple, or Low's two-finger simple, High Detail, Ultra with its cuff): the same parts at the same places,
+        //    with the fingertips (and thumb tips) as their own parts, in 4 groups: [hand A glove, hand A tips, hand B glove,
+        //    hand B tips]. Hand A (gun-local x +0.08, the one V2.2's builders call the left hand) is exactly the first half of
+        //    the index buffer, as in V2.2. A full-glove agent's hands take one glove material (three ignores the groups: one
+        //    draw); a fingerless or wrapped agent's take [glove, tip] (4 draws). The variant follows the tier from the game's
+        //    own state (ultraGuns, characterDetail), not from the mesh, so Ultra turning off (whose apply compares against
+        //    its own geometry) still lands on the right variant.
+        //  - Arms (H13, H14): one Group (userData.isAgentArm) is put right after each model's hands (index 9 on the rifle
+        //    and the pistol), holding a sleeve mesh and a detail mesh with the agent's V23.parts.fpArms geometry pair (one
+        //    pair per agent, shared by the 4 models), at (0, 0, handZ). Skins, the workshop clone, characterDetail and
+        //    ultraGuns skip it (H14). Left-handed mode only translates the gun model, so the arms follow and are not mirrored.
+        //  - castFX (H16-H18): the cast hand draws one of 6 grouped pose geometries (open, cup, fist, point, snap, flat:
+        //    V23.motion.CAST_POSES) with the agent's glove materials; hand2, a child of castFX.group, is the exact mirror
+        //    image of the hand about the screen's centre line (its matrix is T^-1 x mirror x T) for two-hand gestures;
+        //    castFX.sleeve and a detail mesh take the agent's forearm (the right-hand half of its fpArms pair, re-indexed,
+        //    sharing the pair's vertex buffers). V23.fp.pose drives castFX._pose (Enhanced Animations off) and
+        //    eaFP.castPose (on) from the look's gesture (V23.motion.gesture: its first-person keys), with the look's tempo,
+        //    snap, sway and asym. Every gesture is wound up at once and reaches its release key at p 0.10-0.16 (the effect
+        //    spawned at t 0); the core flare and the palette layer (V23.audio.motif) fire there. castFX.core is placed at the
+        //    energy point (the palm, kept out of the screen centre), because High Fidelity's self renderer reads it.
+        //  - Ultimates (H18): the look's own gesture; at t0 #ult-cue (an edge vignette: the centre 55% of the short side
+        //    clear, at most 0.35 opacity over 700 ms, half in Competitive, thin and dim under Reduce Flashes, below the
+        //    crosshair, no pointer) and V23.audio.ultSting; the hands keep 0.3 NDC off the vertical centre line after p 0.2,
+        //    every energy card keeps 0.3 NDC off the centre and the halo stays small enough to leave the centre clear; the
+        //    V2.2 release at p 0.68 (shake, light) is kept, the light in the palette's glow colour.
+        //  - Second-stage fires (H19): a visual kick on vmAnim's spring (written here: vmAnim.fire draws Math.random) and
+        //    the ability's tap gesture.
+        //  - Off-hand drawRange API (for VMANIM, WP5): V23.fp.offHand(model, hidden) -> bool. hidden true draws only the
+        //    second half of that model's hands index buffer (setDrawRange(half, half): hand A, gun-local +x, is gone);
+        //    false draws both again. It works with Agent Identity on or off (V2.2's merged hands keep hand A first too),
+        //    returns false for a model V23.fp.attach never saw, and the state is kept per model: every hands geometry
+        //    swap (tier changes, identity on or off) re-applies it on the new geometry and resets the old one.
+        //  - Identity off: nothing here runs, so the V2.2 hands, castFX and gestures are untouched; after identity was on,
+        //    switching it off puts back the V2.2 geometry the tier wants, the V2.2 skin materials (0xffdbac), V2.2's cast
+        //    hand and sleeve, and hides the arms, hand2 and the cast detail.
+        //  - Data for the tests (read only): V23.fp.state; private helpers start with '_'.
+        V23.fp = (function () {
+            const S = {
+                models: [],        // per gun model: { model, slot, handZ, hands, v22Mat, simple, arm, sleeve, detail, offHidden }
+                cast: null,        // castFX (initCast)
+                v22: null,         // castFX's V2.2 hand and sleeve (geometry, material, transform)
+                built: false, applied: false, everApplied: false, buildMs: 0, builds: 0,
+                mats: null, handArr: null, sleeveArr: null, detailArr: null,
+                grouped: new Map(),   // V2.2 hands geometry -> its grouped variant
+                arms: {},             // agentId -> { res, castSleeve, castDetail }
+                poses: {},            // cast-hand pose name -> geometry
+                hand2: null, hand2Sleeve: null, hand2Detail: null, castDetail: null, cloneStub: null,
+                castXf: null,         // { p, q, s }: the forearm's place under the cast hand (fpArms hand space -> cast space)
+                agent: null, two: false,
+                cur: { active: null, kind: null, key: null, agent: null, slot: null, name: null, g: null, pr: 0.12, h2: 0.7, two: false,
+                    released: false, releasedAt: -1, motion: null, energy: new THREE.Vector3(), lastP: -1 },
+                castN: 0, rng: null, cue: null   // rng: made at first use (CORE, which defines V23.rand, loads after this block)
+            };
+            // ---- scratch (no allocation while a gesture plays) -------------------------------------------------------------
+            const _k = new Float32Array(7), _k2 = new Float32Array(7);
+            const _T = new THREE.Matrix4(), _T2 = new THREE.Matrix4(), _Ti = new THREE.Matrix4(), _M = new THREE.Matrix4().makeScale(-1, 1, 1);
+            const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+            const _m3 = new THREE.Matrix3();
+            const _ENERGY = new THREE.Vector3(0.009, 0.05, -0.04);   // the energy point in front of the palm (cast-hand space)
+            const _enabled = () => !!(V23.core && V23.core.enabled());
+            const _clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+            const _sm = (a, b, x) => { const u = _clamp01((x - a) / (b - a)); return u * u * (3 - 2 * u); };
+            // V2.3: the gesture easing (PARTS' _EASE): smoothstep, sharpened toward an ease-out by motion.snap
+            const _ease = (u, snap) => { u = _clamp01(u); const sm = u * u * (3 - 2 * u); const pw = 1 - Math.pow(1 - u, 1 + 3 * snap); return sm + (pw - sm) * snap; };
+
+            // ---- hand geometry -----------------------------------------------------------------------------------------------
+            // V2.3: bake parts [spec, matrix, group, hand] (V23.parts.prim raw arrays) into one BufferGeometry, hand 0 first,
+            // each hand's glove parts then its tips, so hand 0 is exactly the first half of the index buffer
+            function _bake(list, name) {
+                let nv = 0, ni = 0;
+                for (const e of list) { const d = V23.parts.prim(e[0]); nv += d.v; ni += d.i.length; }
+                const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+                const groups = [];
+                let o = 0, io = 0, half = 0;
+                for (let hand = 0; hand < 2; hand++) {
+                    for (let grp = 0; grp < 2; grp++) {
+                        const start = io;
+                        for (const e of list) {
+                            if (e[3] !== hand || e[2] !== grp) continue;
+                            const d = V23.parts.prim(e[0]), m = e[1].elements;
+                            _m3.getNormalMatrix(e[1]);
+                            const n3 = _m3.elements;
+                            for (let k = 0; k < d.v; k++) {
+                                const x = d.p[k * 3], y = d.p[k * 3 + 1], z = d.p[k * 3 + 2], t = (o + k) * 3;
+                                P[t] = m[0] * x + m[4] * y + m[8] * z + m[12];
+                                P[t + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+                                P[t + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+                                const a = d.n[k * 3], b = d.n[k * 3 + 1], c = d.n[k * 3 + 2];
+                                const nx = n3[0] * a + n3[3] * b + n3[6] * c, ny = n3[1] * a + n3[4] * b + n3[7] * c, nz = n3[2] * a + n3[5] * b + n3[8] * c;
+                                const l = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+                                N[t] = nx / l; N[t + 1] = ny / l; N[t + 2] = nz / l;
+                            }
+                            for (let k = 0; k < d.i.length; k++) I[io + k] = d.i[k] + o;
+                            o += d.v; io += d.i.length;
+                        }
+                        if (io > start) groups.push([start, io - start, grp]);
+                    }
+                    if (hand === 0) half = io;
+                }
+                const g = V23.core._quiet(() => new THREE.BufferGeometry());   // V2.3: its uuid takes no draw from the game's stream
+                g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+                g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+                g.setIndex(new THREE.BufferAttribute(I, 1));
+                for (const [s0, c, mi] of groups) g.addGroup(s0, c, mi);
+                g.computeBoundingBox();
+                g.computeBoundingSphere();
+                g.name = name;
+                g.userData.v23Half = half;
+                return g;
+            }
+            const _rb = (w, h, d, r, seg) => ({ prim: 'rbox', size: [w, h, d], r: r, seg: seg || 2 });
+            const _bx = (w, h, d) => ({ prim: 'box', size: [w, h, d] });
+            const _T0 = (x, y, z, rx, ry, rz) => partMatrix(x, y, z, rx, ry, rz);
+            // V2.3: the parts of V2.2's hands geometries (createHandsGeometry simple and High Detail, createUltraHandsGeometry),
+            // at the same places, with each fingertip and thumb tip split off as a 'tips' part (group 1): simple fingers and
+            // thumbs become a glove segment and a tip segment of the same overall size; High Detail keeps its tip parts and
+            // splits the thumb; Ultra's distal segments and the joints before them are the tips
+            function _gunHandParts(kind, handZ, fingers) {
+                const out = [];
+                const H = [_T0(0.08, -0.05, handZ, 0, 0, 0), _T0(-0.08, -0.05, handZ, 0, Math.PI, 0)];
+                H.forEach((hm, h) => {
+                    const add = (spec, m, grp) => out.push([spec, m, grp, h]);
+                    if (kind === 'detailed') {
+                        add(_rb(0.042, 0.08, 0.062, 0.012), hm.clone(), 0);
+                        for (let i = 0; i < 4; i++) {
+                            const base = hm.clone().multiply(_T0((i - 1.5) * 0.022, 0.054, -0.026, -0.3, 0, 0));
+                            add(_rb(0.018, 0.03, 0.019, 0.007), base.clone(), 0);
+                            add(_rb(0.016, 0.026, 0.017, 0.007), base.clone().multiply(_T0(0, 0.026, -0.006, -0.5, 0, 0)), 1);
+                        }
+                        const tm = hm.clone().multiply(_T0(0.03, 0.02, 0, 0, 0, Math.PI / 4));
+                        add(_rb(0.021, 0.026, 0.021, 0.008), tm.clone().multiply(_T0(0, -0.008, 0)), 0);
+                        add(_rb(0.019, 0.018, 0.019, 0.007), tm.clone().multiply(_T0(0, 0.012, 0)), 1);
+                    } else if (kind === 'ultra') {
+                        const joint = { prim: 'sph', size: [0.0098, 0.0098, 0.0098], seg: [10, 8] };
+                        const seg = [_rb(0.019, 0.03, 0.02, 0.0085), _rb(0.0175, 0.024, 0.0185, 0.008), _rb(0.016, 0.02, 0.017, 0.0075)];
+                        const sc = (s) => new THREE.Matrix4().makeScale(s, s, s);
+                        add(_rb(0.044, 0.082, 0.064, 0.016, 3), hm.clone(), 0);
+                        add({ prim: 'cyl', size: [0.034, 0.032, 0.045], seg: 18 }, hm.clone().multiply(_T0(0, -0.058, 0.004, 0, 0, 0)), 0);
+                        for (let i = 0; i < 4; i++) {
+                            const len = [0.96, 1.0, 0.97, 0.86][i];
+                            let m = hm.clone().multiply(_T0((i - 1.5) * 0.0215, 0.043, -0.024, -0.35, 0, 0));
+                            add(joint, m.clone(), 0);
+                            for (let k = 0; k < 3; k++) {
+                                const hh = [0.03, 0.024, 0.02][k] * len;
+                                add(seg[k], m.clone().multiply(_T0(0, hh / 2, 0, 0, 0, 0)).multiply(new THREE.Matrix4().makeScale(1, len, 1)), k === 2 ? 1 : 0);
+                                m = m.clone().multiply(_T0(0, hh, 0, k < 2 ? -0.55 : 0, 0, 0));
+                                if (k < 2) add(joint, m.clone().multiply(sc(0.92 - k * 0.06)), k === 1 ? 1 : 0);
+                            }
+                        }
+                        let t = hm.clone().multiply(_T0(0.026, 0.012, -0.012, -0.2, 0, Math.PI / 4));
+                        add(joint, t.clone().multiply(sc(1.1)), 0);
+                        for (let k = 0; k < 2; k++) {
+                            const hh = [0.03, 0.026][k];
+                            add(k === 0 ? _rb(0.022, 0.03, 0.022, 0.009) : _rb(0.02, 0.026, 0.02, 0.0085), t.clone().multiply(_T0(0, hh / 2, 0, 0, 0, 0)), k);
+                            t = t.clone().multiply(_T0(0, hh, 0, -0.3, 0, 0));
+                            if (k === 0) add(joint, t.clone(), 1);
+                        }
+                    } else {
+                        add(_bx(0.04, 0.08, 0.06), hm.clone(), 0);
+                        for (let i = 0; i < fingers; i++) {
+                            const f = hm.clone().multiply(_T0((i - 1.5) * 0.022, 0.065, -0.03, -0.3, 0, 0));
+                            add(_bx(0.018, 0.032, 0.018), f.clone().multiply(_T0(0, -0.009, 0)), 0);
+                            add(_bx(0.018, 0.018, 0.018), f.clone().multiply(_T0(0, 0.016, 0)), 1);
+                        }
+                        const tm = hm.clone().multiply(_T0(0.03, 0.02, 0, 0, 0, Math.PI / 4));
+                        add(_bx(0.02, 0.026, 0.02), tm.clone().multiply(_T0(0, -0.007, 0)), 0);
+                        add(_bx(0.02, 0.014, 0.02), tm.clone().multiply(_T0(0, 0.013, 0)), 1);
+                    }
+                });
+                return out;
+            }
+            // V2.3: the cast hand's six pose shapes (design 7.1): per finger the proximal curl toward the palm (rad), the
+            // distal joint as a multiple of it (dI: the index's own), the spread, and the thumb's swing across the palm
+            const _CAST_SHAPE = {
+                open: { c: [0.10, 0.12, 0.14, 0.17], d: 1.0, sp: 1.15, th: 0.0 },
+                cup: { c: [0.50, 0.55, 0.60, 0.66], d: 1.3, sp: 0.95, th: 0.55 },
+                fist: { c: [1.45, 1.50, 1.50, 1.45], d: 1.25, sp: 0.9, th: 1.15 },
+                point: { c: [0.0, 1.45, 1.50, 1.45], d: 1.25, dI: 0, sp: 0.92, th: 0.95 },
+                snap: { c: [0.35, 1.05, 1.40, 1.45], d: 1.1, sp: 0.92, th: 0.85 },
+                flat: { c: [-0.04, -0.04, -0.04, -0.04], d: 0, sp: 1.0, th: -0.1 }
+            };
+            // V2.3: one cast-hand pose (V2.2's open left hand: palm forward, fingers up, thumb toward the middle), fingers and
+            // thumb in two segments (glove, tips)
+            function _castHandParts(pose) {
+                const H = _CAST_SHAPE[pose] || _CAST_SHAPE.open, out = [];
+                const add = (spec, m, grp) => out.push([spec, m, grp, 0]);
+                add(_rb(0.07, 0.075, 0.026, 0.01), _T0(0, 0, 0, 0, 0, 0), 0);
+                for (let i = 0; i < 4; i++) {
+                    const len = i === 0 || i === 3 ? 0.92 : 1, cu = H.c[i], cd = cu * (i === 0 && H.dI !== undefined ? H.dI : H.d);
+                    const L1 = 0.031 * len, L2 = 0.026 * len;
+                    const b = _T0((i - 1.5) * 0.0175 * H.sp, 0.034, -0.004, -(0.06 + cu), 0, (i - 1.5) * -0.07 * H.sp);
+                    add(_rb(0.016, L1, 0.017, 0.007), b.clone().multiply(_T0(0, L1 / 2, 0)), 0);
+                    const j = b.clone().multiply(_T0(0, L1, 0, -cd, 0, 0));
+                    add(_rb(0.015, L2, 0.016, 0.0065), j.clone().multiply(_T0(0, L2 / 2, 0)), 1);
+                }
+                const th = H.th, t = _T0(0.028, -0.012, -0.006, -0.2 - 0.75 * th, 0.2 * th, -0.75 + 1.25 * th);
+                add(_rb(0.018, 0.026, 0.019, 0.008), t.clone().multiply(_T0(0, 0.013, 0)), 0);
+                const tj = t.clone().multiply(_T0(0, 0.026, 0, -0.35 * Math.max(0, th), 0, 0));
+                add(_rb(0.017, 0.02, 0.018, 0.0075), tj.clone().multiply(_T0(0, 0.01, 0)), 1);
+                return out;
+            }
+            // V2.3: which V2.2 hands geometry a model's hands want now (the game's own tier state), and its kind
+            function _v22Hands(E) {
+                if (typeof ultraGuns !== 'undefined' && ultraGuns.on && ultraGuns.built) for (const h of ultraGuns.hands) if (h.mesh === E.hands) return ['ultra', h.ultra];
+                if (typeof characterDetail !== 'undefined' && characterDetail.enabled) for (const s of characterDetail.gunSwaps) if (s.mesh === E.hands) return ['detailed', s.detailed];
+                return ['simple', E.simple];
+            }
+            // V2.3: the grouped variant of a V2.2 hands geometry, built the first time a tier needs it (a tier swap or the
+            // identity build, never per frame) and kept, so a tier round trip returns the same geometry (ultra.test)
+            function _groupedOf(E, kind, src) {
+                let g = S.grouped.get(src);
+                if (g) return g;
+                g = _bake(_gunHandParts(kind, E.handZ, CONTENT.fingers), 'v23:hands:' + kind + ':' + E.slot);
+                g.userData.v23Src = src;
+                g.userData.v23Kind = kind;
+                S.grouped.set(src, g);
+                return g;
+            }
+            // V2.3: the off-hand drawRange: hidden draws the second half (hand B) only
+            function _range(g, hidden) {
+                if (!g) return;
+                const n = g.index ? g.index.count : g.attributes.position.count, half = (g.userData && g.userData.v23Half) || n / 2;
+                if (hidden) g.setDrawRange(half, n - half); else g.setDrawRange(0, Infinity);
+            }
+
+            // ---- arms ----------------------------------------------------------------------------------------------------
+            // V2.3: the right-hand half of an fpArms geometry (triangles whose centre is at x > 0 in its hand space), as a
+            // geometry of its own that shares the pair's vertex buffers (a new index only), groups kept in order
+            function _rightHalf(src, name) {
+                const pos = src.attributes.position.array, idx = src.index.array, out = [], groups = [];
+                const list = src.groups.length ? src.groups : [{ start: 0, count: idx.length, materialIndex: 0 }];
+                for (const gr of list) {
+                    const st = out.length;
+                    for (let t = gr.start; t < gr.start + gr.count; t += 3) {
+                        const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+                        if (pos[a * 3] + pos[b * 3] + pos[c * 3] > 0) out.push(a, b, c);
+                    }
+                    if (out.length > st) groups.push([st, out.length - st, gr.materialIndex]);
+                }
+                const g = V23.core._quiet(() => new THREE.BufferGeometry());   // V2.3: no draw from the game's stream
+                g.setAttribute('position', src.attributes.position);
+                g.setAttribute('normal', src.attributes.normal);
+                g.setIndex(new THREE.BufferAttribute(src.attributes.position.count > 65535 ? new Uint32Array(out) : new Uint16Array(out), 1));
+                for (const [s0, c, mi] of groups) g.addGroup(s0, c, mi);
+                g.computeBoundingSphere();
+                g.name = name;
+                return g;
+            }
+            // V2.3: an agent's arm set: its fpArms pair (cached per look by PARTS) and the cast forearm made from it; a
+            // redefined look (a new pair) is re-indexed once, when it is first used
+            function _armOf(id) {
+                const look = V23.core.resolve(id);
+                if (!look) return null;
+                const res = V23.parts.fpArms(look);
+                let A = S.arms[id];
+                if (A && A.res === res) return A;
+                A = { id: id, look: look, res: res, castSleeve: _rightHalf(res.sleeve, 'v23:fp:castSleeve:' + id), castDetail: _rightHalf(res.detail, 'v23:fp:castDetail:' + id) };
+                S.arms[id] = A;
+                return A;
+            }
+            // V2.3: the cast forearm's place under the cast hand: fpArms hand space (right wrist (0.08, -0.09, 0), forearm toward
+            // (0, -0.75, 0.66), back of the hand outward +x) to cast-hand space (wrist under the palm, forearm down -y, back of
+            // the hand toward the camera +z): C = T(wrist) R_cast R_fp^T T(-W)
+            function _castTransform() {
+                const a = new THREE.Vector3(0, -0.75, 0.66).normalize(), pz = new THREE.Vector3(1, 0, 0), ex = new THREE.Vector3().crossVectors(a, pz).normalize();
+                const Rfp = new THREE.Matrix4().makeBasis(ex, a, pz);
+                const a2 = new THREE.Vector3(0, -1, 0), pz2 = new THREE.Vector3(0, 0, 1), ex2 = new THREE.Vector3().crossVectors(a2, pz2).normalize();
+                const Rc = new THREE.Matrix4().makeBasis(ex2, a2, pz2);
+                const C = new THREE.Matrix4().makeTranslation(0, -0.036, 0).multiply(Rc).multiply(Rfp.clone().transpose()).multiply(new THREE.Matrix4().makeTranslation(-0.08, 0.09, 0));
+                const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+                C.decompose(p, q, s);
+                return { p: p, q: q, s: s };
+            }
+            const _place = (o, X) => { o.position.copy(X.p); o.quaternion.copy(X.q); o.scale.copy(X.s); };
+
+            // ---- materials ---------------------------------------------------------------------------------------------------
+            // V2.3: a palette entry {c, r, m, e?, ei?} written into a V23.mat.vm material (runtime colours: setHex then
+            // convertSRGBToLinear; the defaults are V23.mat.vm's)
+            function _paint(mat, spec) {
+                const s = spec || { c: 0x808080 };
+                mat.color.setHex(s.c).convertSRGBToLinear();
+                mat.roughness = s.r === undefined ? 0.6 : s.r;
+                mat.metalness = s.m === undefined ? 0 : s.m;
+                mat.emissive.setHex(s.e === undefined ? 0 : s.e).convertSRGBToLinear();
+                mat.emissiveIntensity = s.ei === undefined ? (s.e === undefined ? 0 : 1) : s.ei;
+            }
+            const _slot = (look, name) => (look.palette[name] || (name === 'visor' ? look.palette.glow : null) || look.palette.base);
+            // V2.3: the agent's glove (and tips) colours, and whether the tips draw apart: fingerless and wrapped gloves, or
+            // tips 'skin', show the skin palette on the tip parts; a bare hand is skin all over (one material, one draw)
+            function _gloveOf(look) {
+                const G = look.gloves || {}, type = G.type || 'full';
+                const glove = type === 'bare' ? look.palette.skin : _slot(look, (look.fp && look.fp.glove) || G.slot || 'glove');
+                const tipsSkin = type !== 'bare' && (G.tips === 'skin' || type === 'fingerless' || type === 'wrap');
+                return { glove: glove, tip: look.palette.skin, two: tipsSkin && look.palette.skin.c !== glove.c };
+            }
+
+            // ---- the build (the first identity application) ------------------------------------------------------------------
+            function _build() {
+                const t0 = performance.now();
+                V23.core._quiet(() => {   // V2.3: every THREE object below takes its uuid from a V23.rand stream
+                    const vm = (c) => V23.mat.vm({ c: c, r: 0.6 });
+                    S.mats = { glove: vm(0x808080), tip: vm(0x808080), sl0: vm(0x808080), sl1: vm(0x808080), dt0: vm(0x808080), dt1: vm(0x808080) };
+                    S.handArr = [S.mats.glove, S.mats.tip];
+                    S.sleeveArr = [S.mats.sl0, S.mats.sl1];
+                    S.detailArr = [S.mats.dt0, S.mats.dt1];
+                    for (const id of AGENT_ORDER) _armOf(id);
+                    const A = _armOf(game.activeAgent) || _armOf('jett');
+                    // V2.3: the workshop clones a whole gun model before H14.2 removes the arms; the arm Group clones as this
+                    // one inert stand-in (no new objects, so no uuid draws from the game's stream), which H14.2 then removes
+                    S.cloneStub = new THREE.Group();
+                    S.cloneStub.userData.isAgentArm = true;
+                    S.cloneStub.visible = false;
+                    for (const E of S.models) {
+                        const arm = new THREE.Group();
+                        arm.name = 'v23FpArm';
+                        arm.userData.isAgentArm = true;
+                        E.sleeve = new THREE.Mesh(A.res.sleeve, S.sleeveArr);
+                        E.detail = new THREE.Mesh(A.res.detail, S.detailArr);
+                        for (const m of [E.sleeve, E.detail]) { m.userData.isAgentArm = true; m.updateMatrix(); m.matrixAutoUpdate = false; }
+                        arm.add(E.sleeve, E.detail);
+                        arm.position.set(0, 0, E.handZ);
+                        arm.updateMatrix();
+                        arm.matrixAutoUpdate = false;
+                        arm.visible = false;
+                        arm.clone = function () { return S.cloneStub; };
+                        // V2.3: right after the hands (index 9 on the rifle and the pistol); indices 0-8 keep their order
+                        const at = E.model.children.indexOf(E.hands);
+                        E.model.children.splice(at + 1, 0, arm);
+                        arm.parent = E.model;
+                        E.arm = arm;
+                    }
+                    for (const pose of V23.motion.CAST_POSES) S.poses[pose] = _bake(_castHandParts(pose), 'v23:castHand:' + pose);
+                    S.castXf = _castTransform();
+                });
+                S.built = true;
+                _buildCast();
+                S.builds++;
+                S.buildMs = performance.now() - t0;
+            }
+            // V2.3: castFX's extras (once castFX exists): the cast detail and hand2 with its forearm, children of castFX.group
+            function _buildCast() {
+                const fx = S.cast;
+                if (!S.built || S.hand2 || !fx || !fx.group) return;
+                const A = _armOf(game.activeAgent) || _armOf('jett');
+                V23.core._quiet(() => {   // V2.3: no draw from the game's stream
+                    S.castDetail = new THREE.Mesh(A.castDetail, S.detailArr);
+                    _place(S.castDetail, S.castXf);
+                    S.castDetail.visible = false;
+                    S.hand2 = new THREE.Mesh(S.poses.open, S.mats.glove);
+                    S.hand2.matrixAutoUpdate = false;
+                    S.hand2.visible = false;
+                    S.hand2Sleeve = new THREE.Mesh(A.castSleeve, S.sleeveArr);
+                    S.hand2Detail = new THREE.Mesh(A.castDetail, S.detailArr);
+                    _place(S.hand2Sleeve, S.castXf);
+                    _place(S.hand2Detail, S.castXf);
+                    S.hand2.add(S.hand2Sleeve, S.hand2Detail);
+                    fx.group.add(S.castDetail, S.hand2);
+                });
+            }
+
+            // ---- applying identity -------------------------------------------------------------------------------------------
+            // V2.3: the agent's materials and geometry references (H6 through V23.core.onAgentChanged, and every reapply)
+            function _applyAgent(id) {
+                const A = _armOf(id) || _armOf('jett');
+                const look = A.look, G = _gloveOf(look), sl = A.res.slots.sleeve, dt = A.res.slots.detail;
+                _paint(S.mats.glove, G.glove);
+                _paint(S.mats.tip, G.tip);
+                _paint(S.mats.sl0, _slot(look, sl[0]));
+                _paint(S.mats.sl1, _slot(look, sl[1] || sl[0]));
+                _paint(S.mats.dt0, _slot(look, dt[0]));
+                _paint(S.mats.dt1, _slot(look, dt[1] || dt[0]));
+                S.agent = A.id;
+                S.two = G.two;
+                return A;
+            }
+            function _applyModel(E, on, A) {
+                const [kind, src] = _v22Hands(E);
+                let g;
+                if (on) {
+                    g = _groupedOf(E, kind, src);
+                    E.hands.material = S.two ? S.handArr : S.mats.glove;
+                    if (E.arm) {
+                        E.arm.visible = true;
+                        if (E.sleeve.geometry !== A.res.sleeve) E.sleeve.geometry = A.res.sleeve;
+                        if (E.detail.geometry !== A.res.detail) E.detail.geometry = A.res.detail;
+                    }
+                } else {
+                    g = src;
+                    E.hands.material = E.v22Mat;
+                    if (E.arm) E.arm.visible = false;
+                }
+                if (E.hands.geometry !== g) { _range(E.hands.geometry, false); E.hands.geometry = g; }
+                _range(g, E.offHidden);
+            }
+            function _applyCast(on, A) {
+                const fx = S.cast;
+                if (!fx || !fx.hand || !S.v22) return;
+                if (on && !S.hand2) _buildCast();
+                if (on) {
+                    fx.hand.geometry = S.poses.open;
+                    fx.hand.material = S.two ? S.handArr : S.mats.glove;
+                    fx.sleeve.geometry = A.castSleeve;
+                    fx.sleeve.material = S.sleeveArr;
+                    _place(fx.sleeve, S.castXf);
+                    if (S.castDetail) { S.castDetail.geometry = A.castDetail; S.castDetail.visible = true; }
+                    if (S.hand2) {
+                        S.hand2.material = fx.hand.material;
+                        S.hand2.visible = false;
+                        S.hand2Sleeve.geometry = A.castSleeve;
+                        S.hand2Detail.geometry = A.castDetail;
+                    }
+                } else {
+                    const V = S.v22;
+                    fx.hand.geometry = V.handGeom;
+                    fx.hand.material = V.handMat;
+                    fx.sleeve.geometry = V.sleeveGeom;
+                    fx.sleeve.material = V.sleeveMat;
+                    fx.sleeve.position.copy(V.p); fx.sleeve.quaternion.copy(V.q); fx.sleeve.scale.copy(V.s);
+                    if (S.castDetail) S.castDetail.visible = false;
+                    if (S.hand2) S.hand2.visible = false;
+                }
+            }
+
+            // ---- gestures ------------------------------------------------------------------------------------------------------
+            // V2.3: the gesture a cast plays: the ultimate's gestures.x, a second press's gestures[slot + '2'] (else a wrist
+            // tap), a cast's gestures[slot]; with no key, the kind's default
+            function _gestureName(look, kind, slot) {
+                const G = look.gestures || {};
+                if (kind === 'ult') return G.x || 'twoHandChannel';
+                if (kind === 'tap') return (slot && G[slot + '2']) || 'wristTap';
+                return (slot && G[slot]) || 'overhandThrow';
+            }
+            // V2.3: set up the current gesture (onStart, or the first pose of a cast started without it)
+            function _begin(fx, kind, key) {
+                const C = S.cur, a = fx.active;
+                let agent = game.activeAgent, slot = null;
+                if (key) { const q = String(key).split('.'); if (AGENT_DEFS[q[0]]) agent = q[0]; slot = q[1] || null; }
+                if (kind === 'ult' && !slot) slot = 'x';
+                const look = V23.core.resolve(agent) || V23.core.resolve('jett');
+                let name = _gestureName(look, kind, slot), g = V23.motion.gesture(name);
+                if (!g) { name = kind === 'tap' ? 'wristTap' : kind === 'ult' ? 'twoHandChannel' : 'overhandThrow'; g = V23.motion.gesture(name); }
+                const M = look.motion, K = g.fp;
+                // V2.3: tempo inside the fixed clip (design 7.3/7.4): the release key lands at p 0.10-0.16 for every gesture
+                // (a fast agent sooner, a deliberate one later), the hold ends at h2 and the recovery takes the rest
+                const pr = Math.min(0.16, Math.max(0.10, g.release / Math.sqrt(M.tempo || 1)));
+                const h = K[K.length - 1][0];
+                C.active = a; C.kind = kind; C.key = key || null; C.agent = agent; C.slot = slot; C.name = name; C.g = g; C.motion = M;
+                C.pr = pr; C.h2 = Math.min(0.9, Math.max(pr + 0.1, 1 - (1 - h) / (M.tempo || 1)));
+                C.two = g.hands > 1; C.released = false; C.releasedAt = -1; C.lastP = -1;
+                C.energy.set(0, 0, 0);
+                if (fx.hand && S.poses.open && fx.hand.geometry !== S.poses.open) fx.hand.geometry = S.poses.open;
+                if (S.hand2) S.hand2.visible = false;
+                return C;
+            }
+            // V2.3: the first-person key at gesture progress q into out [x, y, z, rx, ry, rz, aside]; returns the key's hand pose
+            function _keyAt(K, q, snap, out) {
+                let i = 0;
+                while (i < K.length - 2 && q > K[i + 1][0]) i++;
+                const a = K[i], b = K[i + 1];
+                const u = _ease((q - a[0]) / Math.max(1e-6, b[0] - a[0]), i === 0 ? snap : snap * 0.5);
+                for (let d = 0; d < 6; d++) out[d] = a[d + 1] + (b[d + 1] - a[d + 1]) * u;
+                out[6] = a[9] + (b[9] - a[9]) * u;
+                return q >= b[0] - 1e-9 ? b[7] : a[7];
+            }
+            // V2.3: keep a card's centre at least minR (NDC) off the screen centre, at its depth (weaponGroup space is the
+            // viewmodel camera's view space)
+            function _push(pos, minR) {
+                const P = viewmodelCamera.projectionMatrix.elements, z = -pos.z;
+                if (z < 0.02) return;
+                const xn = P[0] * pos.x / z, yn = P[5] * pos.y / z, d = Math.sqrt(xn * xn + yn * yn);
+                if (d >= minR) return;
+                const nx = d > 1e-6 ? xn / d * minR : 0, ny = d > 1e-6 ? yn / d * minR : -minR;
+                pos.x = nx * z / P[0];
+                pos.y = ny * z / P[5];
+            }
+            // V2.3: the largest card (world size) whose visible disc (0.65 of its half-size) stays out of the central 0.18 NDC
+            function _cap(pos) {
+                const P = viewmodelCamera.projectionMatrix.elements, z = -pos.z;
+                if (z < 0.02) return 0;
+                const xn = P[0] * pos.x / z, yn = P[5] * pos.y / z, d = Math.sqrt(xn * xn + yn * yn);
+                return Math.max(0.02, (d - 0.18) * 2 * z / (0.65 * P[5]));
+            }
+
+            return {
+                // V2.3 (hook H13) (createWeapons, after each createHandsMesh): record the model and its hands mesh. Nothing is built
+                // here (the saved settings are not loaded yet): the first identity application builds and places the arms
+                attach: function (model, slot, handZ) {
+                    if (!model || S.models.some((m) => m.model === model)) return null;
+                    let hands = null;
+                    for (let i = model.children.length - 1; i >= 0; i--) {
+                        const c = model.children[i];
+                        if (c.userData && c.userData.isHands && c.userData.handZ === handZ) { hands = c; break; }
+                    }
+                    if (!hands) return null;
+                    S.models.push({ model: model, slot: slot, handZ: handZ, hands: hands, v22Mat: hands.material, simple: hands.geometry, arm: null, sleeve: null, detail: null, offHidden: false });
+                    return null;
+                },
+                // V2.3 (hook H15) (after characterDetail's and ultraGuns' hands swaps), H6 (V23.core.onAgentChanged) and the identity
+                // setting: the tier's grouped hands, the agent's arms, gloves and cast forearm, the off-hand drawRange; with
+                // identity off (after it was on) the V2.2 hands and castFX come back. Builds only the first time it applies.
+                reapply: function () {
+                    const on = _enabled();
+                    if (!on && !S.everApplied) return null;   // V2.3: identity off from the start: V2.2 owns everything
+                    if (on && !S.built) _build();
+                    const A = on ? _applyAgent(game.activeAgent) : null;
+                    for (const E of S.models) _applyModel(E, on, A);
+                    _applyCast(on, A);
+                    S.applied = on;
+                    if (on) S.everApplied = true;
+                    return null;
+                },
+                // V2.3 (hook H16.1) (castFX.init end): record castFX and its V2.2 hand and sleeve (nothing is built here)
+                initCast: function (castFX) {
+                    if (!castFX || !castFX.hand || !castFX.sleeve) return null;
+                    S.cast = castFX;
+                    const sv = castFX.sleeve;
+                    S.v22 = { handGeom: castFX.hand.geometry, handMat: castFX.hand.material, sleeveGeom: sv.geometry, sleeveMat: sv.material,
+                        p: sv.position.clone(), q: sv.quaternion.clone(), s: sv.scale.clone() };
+                    return null;
+                },
+                // V2.3 (hook H16.2) (castFX.start end): the agent's gesture for this cast; an ultimate also starts its cue and turns
+                // its release light to the palette's glow
+                onStart: function (castFX, kind, abilityKey) {
+                    const on = _enabled();
+                    // V2.3: the setting changed by a path that did not reapply (V23.core.applySettings(cfg, null) after boot,
+                    // or a boot whose warm-up never reapplied): the first cast after it puts the set right, either way
+                    if (on !== S.applied && (on || S.everApplied)) this.reapply();
+                    if (!on || !castFX || !castFX.active || !S.built) return null;
+                    const C = _begin(castFX, kind, abilityKey);
+                    S.castN++;
+                    if (kind === 'ult') {
+                        const look = V23.core.resolve(C.agent);
+                        if (look && look.palette.glow) castFX.active.hex = look.palette.glow.c;
+                        this.ultCue(C.agent);
+                    }
+                    return null;
+                },
+                // V2.3 (hook H16.3) / H16.4: the hand, hand2, the energy and how far the gun is moved aside, for clip progress p; null
+                // keeps V2.2's pose (identity off)
+                pose: function (castFX, kind, p, now, variant) {
+                    if (!S.applied || !S.built || !castFX || !castFX.group || !_enabled()) return null;
+                    let C = S.cur;
+                    if (C.active !== castFX.active || !C.g) C = _begin(castFX, kind, null);
+                    const g = C.g, K = g.fp, n = K.length, M = C.motion, fx = castFX;
+                    const hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                    const pr = C.pr, h2 = C.h2, r = K[1][0], h = K[n - 1][0];
+                    // V2.3: the gesture's progress q: wound up at once, the release key at pr, the hold to h2, then the
+                    // recovery holds the last key while the envelope takes the hand down to rest
+                    const q = p <= pr ? p / pr * r : p < h2 ? r + (p - pr) / (h2 - pr) * (h - r) : h;
+                    const up = _sm(0, 0.035, p) * (1 - _sm(h2, h2 + 0.8 * (1 - h2), p));
+                    const recov = p >= h2;
+                    const pose = _keyAt(K, q, M.snap, _k);
+                    // V2.3: body language: sway is the follow-through after the release, asym the working hand's lateral
+                    // offset (and hand2's lag), snap the easing above; an ultimate trembles while it gathers
+                    const fol = M.sway * _bump(p, pr + 0.07, 0.07);
+                    _k[2] -= 0.022 * fol; _k[3] -= 0.12 * fol; _k[1] -= 0.006 * fol;
+                    _k[0] -= 0.018 * M.asym;
+                    let charge, flare, hold = 0, tremble = 0;
+                    if (kind === 'ult') {
+                        charge = _seg(p, 0.05, 0.62);
+                        flare = _bump(p, 0.7, 0.1) * 1.4 + 0.5 * _bump(p, pr, 0.06);
+                        tremble = charge * (1 - _seg(p, 0.64, 0.68));
+                    } else {
+                        charge = _seg(p, 0, pr) * (1 - _seg(p, pr + 0.05, pr + 0.3));
+                        flare = _bump(p, pr, 0.07) * 1.2;
+                        if (g.code === 8 || g.code === 10) hold = 0.45 * _seg(p, pr, pr + 0.05) * (1 - _seg(p, h2 - 0.12, h2));
+                    }
+                    const R = fx.REST;
+                    let X = (R.x + (_k[0] - R.x) * up) * hand + Math.sin(now * 0.09) * 0.0035 * tremble;
+                    const Y = R.y + (_k[1] - R.y) * up + Math.cos(now * 0.11) * 0.0035 * tremble, Z = R.z + (_k[2] - R.z) * up;
+                    const Pm = viewmodelCamera.projectionMatrix.elements;
+                    if (kind === 'ult') {
+                        // V2.3: an ultimate keeps both hands 0.3 NDC off the vertical centre line after p 0.2 (the crosshair)
+                        const w = _sm(0.18, 0.25, p), zz = Math.max(0.05, -Z), xn = Pm[0] * X / zz;
+                        if (w > 0 && Math.abs(xn) < 0.3) X += ((X < 0 || (X === 0 && hand > 0) ? -1 : 1) * 0.3 * zz / Pm[0] - X) * w;
+                    }
+                    const grp = fx.group;
+                    grp.visible = up > 0.01;
+                    grp.position.set(X, Y, Z);
+                    grp.scale.set(1.3 * hand, 1.3, 1.3);
+                    grp.rotation.set(-0.55 + (_k[3] + 0.55) * up, (0.25 + (_k[4] - 0.25) * up) * hand, (0.15 + (_k[5] - 0.15) * up) * hand);
+                    const geo = S.poses[recov ? 'open' : pose] || S.poses.open;
+                    if (fx.hand.geometry !== geo) fx.hand.geometry = geo;
+                    _T.compose(grp.position, grp.quaternion, grp.scale);
+                    // V2.3: hand2 (two-hand gestures): the mirror image of the hand about the screen's centre line, a little
+                    // behind it by asym; hidden before the clip ends
+                    const two = C.two && up > 0.01 && p < h2 + 0.5 * (1 - h2);
+                    if (S.hand2) {
+                        S.hand2.visible = two;
+                        if (two) {
+                            const q2 = Math.max(0, q - 0.04 * M.asym);
+                            const pose2 = _keyAt(K, q2, M.snap, _k2);
+                            _k2[2] -= 0.022 * fol; _k2[3] -= 0.12 * fol; _k2[1] -= 0.006 * fol + 0.012 * M.asym;
+                            _k2[0] -= 0.018 * M.asym;
+                            let X2 = (R.x + (_k2[0] - R.x) * up) * hand;
+                            const Y2 = R.y + (_k2[1] - R.y) * up, Z2 = R.z + (_k2[2] - R.z) * up;
+                            if (kind === 'ult') {
+                                const w = _sm(0.18, 0.25, p), zz = Math.max(0.05, -Z2), xn = Pm[0] * X2 / zz;
+                                if (w > 0 && Math.abs(xn) < 0.3) X2 += ((X2 < 0 || (X2 === 0 && hand > 0) ? -1 : 1) * 0.3 * zz / Pm[0] - X2) * w;
+                            }
+                            _p.set(X2, Y2, Z2);
+                            _e.set(-0.55 + (_k2[3] + 0.55) * up, (0.25 + (_k2[4] - 0.25) * up) * hand, (0.15 + (_k2[5] - 0.15) * up) * hand);
+                            _q.setFromEuler(_e);
+                            _T2.compose(_p, _q, grp.scale);
+                            _Ti.copy(_T).invert();
+                            S.hand2.matrix.copy(_Ti).multiply(_M).multiply(_T2);
+                            S.hand2.matrixWorldNeedsUpdate = true;
+                            const geo2 = S.poses[recov ? 'open' : pose2] || S.poses.open;
+                            if (S.hand2.geometry !== geo2) S.hand2.geometry = geo2;
+                        }
+                    }
+                    // V2.3: the energy point (in front of the palm, kept 0.3 NDC off the centre); castFX.core sits on it
+                    C.energy.copy(_ENERGY).applyMatrix4(_T);
+                    _push(C.energy, 0.3);
+                    const fade = 1 - _seg(p, kind === 'ult' ? 0.78 : 0.7, kind === 'ult' ? 0.92 : 0.84);
+                    const e = Math.min(1, charge + flare + hold) * fade * (up > 0.01 ? 1 : 0);
+                    const pulse = 1 + 0.08 * Math.sin(now * 0.025);
+                    let haloS = (0.08 + 0.17 * Math.max(charge, hold) + 0.2 * flare) * pulse * (kind === 'ult' ? 1.45 : 1);
+                    if (kind === 'ult') haloS = Math.min(haloS, _cap(C.energy));
+                    fx.halo.visible = fx.core.visible = e > 0.01;
+                    fx.halo.position.copy(C.energy);
+                    fx.halo.scale.setScalar(haloS);
+                    fx.halo.rotation.z = now * 0.002;
+                    fx.core.position.copy(C.energy);
+                    fx.core.scale.setScalar(haloS * 0.4);
+                    fx.haloMat.opacity = Math.min(1, 1.1 * e);
+                    fx.coreMat.opacity = Math.min(1, 1.1 * e);
+                    // V2.3: an ultimate's wisps spiral in around the energy point (each kept off the centre)
+                    const wispOn = kind === 'ult' ? charge * (1 - _seg(p, 0.66, 0.72)) : 0;
+                    for (let i = 0; i < fx.wisps.length; i++) {
+                        const wsp = fx.wisps[i];
+                        wsp.visible = wispOn > 0.02;
+                        if (!wsp.visible) continue;
+                        const an = now * 0.006 + i * Math.PI * 2 / fx.wisps.length, rr = 0.16 * (1 - 0.55 * wispOn);
+                        wsp.position.set(C.energy.x + Math.cos(an) * rr, C.energy.y + Math.sin(an * 1.3) * rr * 0.6, C.energy.z + Math.sin(an) * rr * 0.4);
+                        _push(wsp.position, 0.3);
+                        wsp.scale.setScalar(0.05 + 0.04 * wispOn);
+                    }
+                    // V2.3: the release key: the palette layer plays there (the ability's own sound played at t 0)
+                    if (!C.released && p >= pr - 1e-9) {   // (p is a time ratio: a hair under the key still counts)
+                        C.released = true;
+                        C.releasedAt = p;
+                        if (V23.audio && C.slot && kind !== 'ult') V23.audio.motif(C.agent, C.slot);
+                    }
+                    C.lastP = p;
+                    return up * _k[6];
+                },
+                // V2.3 (hook H19) (shoot's second-stage and ultimate fire branches): a visual kick on the viewmodel spring and the
+                // ability's tap gesture. vmAnim.fire draws Math.random for its roll, so the kick is written here, its roll
+                // from a V2.3 stream; nothing here touches gameplay state.
+                onSecondaryFire: function (abilityKey) {
+                    if (!_enabled() || typeof vmAnim === 'undefined' || !vmAnim.sp) return null;
+                    const s = vmAnim.sp, amt = 0.035;
+                    s.vp += amt * 80;
+                    s.vz += amt * 34;
+                    s.vy -= amt * 40;
+                    if (!S.rng) S.rng = V23.rand(0x46503421);   // V2.3: the kick's roll: a V2.3 stream, never Math.random
+                    s.vr += (S.rng() - 0.5) * amt * 24;
+                    const agent = String(abilityKey || '').split('.')[0], def = AGENT_DEFS[agent] || AGENT_DEFS[game.activeAgent];
+                    if (S.cast && def) S.cast.start('tap', def.themeColor, abilityKey);
+                    return null;
+                },
+                // V2.3: the off-hand drawRange API (see the block header): hidden true draws only hand B of the model's hands
+                offHand: function (model, hidden) {
+                    let E = null;
+                    for (const m of S.models) if (m.model === model) { E = m; break; }
+                    if (!E) return false;
+                    E.offHidden = !!hidden;
+                    _range(E.hands.geometry, E.offHidden);
+                    return true;
+                },
+                // V2.3: the ultimate's activation cue at t0: #ult-cue (CSS FP block) in the palette's glow colour, half in
+                // Competitive, thin and dim under Reduce Flashes; and the palette sting (V23.audio)
+                ultCue: function (agentId) {
+                    if (!_enabled()) return null;
+                    const el = S.cue || (S.cue = document.getElementById('ult-cue'));
+                    if (!el) return null;
+                    if (!el.__v23End) { el.__v23End = true; el.addEventListener('animationend', () => el.classList.remove('v23-on')); }
+                    const look = V23.core.resolve(agentId) || V23.core.resolve(game.activeAgent);
+                    const c = look && look.palette.glow ? look.palette.glow.c : 0xffffff;
+                    el.style.setProperty('--v23-ult', 'rgb(' + ((c >> 16) & 255) + ',' + ((c >> 8) & 255) + ',' + (c & 255) + ')');
+                    const u = game.userSettings || {};
+                    el.classList.remove('v23-on');
+                    void el.offsetWidth;   // V2.3: restarts the 700 ms animation (one layout, at an ultimate's activation only)
+                    el.classList.toggle('v23-comp', u.atmosphereMode === 'competitive');
+                    el.classList.toggle('v23-rf', !!u.reduceFlashes);
+                    el.classList.add('v23-on');
+                    if (V23.audio) V23.audio.ultSting(agentId);
+                    return null;
+                },
+                // data for the tests (read only)
+                state: {
+                    get applied() { return S.applied; }, get built() { return S.built; }, get buildMs() { return S.buildMs; }, get builds() { return S.builds; },
+                    get agent() { return S.agent; }, get two() { return S.two; }, get casts() { return S.castN; },
+                    get cur() { return S.cur.active && S.cast && S.cur.active === S.cast.active ? S.cur : null; },
+                    get models() { return S.models.map((E) => ({ slot: E.slot, arm: E.arm, offHidden: E.offHidden, handsIndex: E.model.children.indexOf(E.hands), armIndex: E.arm ? E.model.children.indexOf(E.arm) : -1 })); },
+                    get mats() { return S.mats; }, get hand2() { return S.hand2; }, get castDetail() { return S.castDetail; }, get poses() { return S.poses; },
+                    get grouped() { return S.grouped.size; }
+                },
+                // V2.3 (private, the tests): a grouped hands geometry built apart (kind 'simple' | 'detailed' | 'ultra'), an
+                // agent's arm set
+                _handsGeometry: function (kind, handZ, fingers) { return _bake(_gunHandParts(kind, handZ, fingers), 'v23:hands:test'); },
+                _arm: function (agentId) { return S.built ? _armOf(agentId) : null; }
+            };
+        })();
         // ===== END V2.3 BLOCK FP =====
 
         // ===== V2.3 BLOCK VMANIM [WP5] =====
