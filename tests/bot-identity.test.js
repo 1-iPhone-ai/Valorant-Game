@@ -1,8 +1,14 @@
 'use strict';
 // V2.3 bot identity in the instanced pipeline (design 9, 17.1; WP6). One boot of the V2.3 build (Agent Identity on, the
-// default), at most 4 minutes. Checks:
+// default), at most 4 minutes, on the machine's content tier (Low on 4 or fewer hardware threads, Medium or High above);
+// BOT_IDENTITY_TIER=low|medium|high forces one through the saved contentTierMode (bot-identity-medium.test.js runs it on
+// Medium, the design's budget tier). Checks:
+//  - Math.random: every draw is counted from the first check to the last; none is taken while BOTKIT code is on the stack
+//    (any V23.bots entry, the kits' render callbacks, the build), across assignment, new pages and the reserve swap,
+//    deaths and the dissolve, tier swaps, Enhanced Animations, wingmen, highlight colours and the identity switch;
 //  - the warm reserve: two warmed pages exist after the warm-up, and a bot entering a new chunk takes one (V2.2's
-//    createEnemyPage still runs, so its Math.random draws are V2.2's) and creates no GPU buffer (glBufferData calls 0);
+//    createEnemyPage still runs and takes exactly its own 8 draws per part, V2.2's count) and creates no GPU buffer
+//    (glBufferData calls 0), with Enhanced Animations off and, for the second reserve page, switched on after the warm-up;
 //  - assignment: deterministic, inside the archetype's pool, no duplicate among live bots of an archetype (respawns and
 //    generations included), the player's agent skipped where the pool allows, fixed per slot within a Match and moved
 //    by the next Match; only actor.agentId and actor.lookIdx are written;
@@ -14,10 +20,13 @@
 //    cyan; a hit flash makes the kit one flat colour (the flash flag in instanceKit, one hue in the kit's pixels);
 //  - the dissolve (onKilled, death ticks): 0 until 0.6 s into the lie, then rising, written only on death ticks;
 //  - identity off (the pill): every kit hidden (0 kit draws), uIdentity 0; on again restores them;
-//  - wingmen: one Group child, the kit as the figure's 5th child, draws equal with Enhanced Animations off and on;
-//  - tier swaps (High Detail, Ultra bodies) swap the kit superset by reference and compile nothing;
-//  - kitRep and archOverride (the replay override API) apply and restore bit-exact;
-//  - steady frames upload no kit bytes; programs == watermark, 0 stalls, no page errors.
+//  - wingmen: one Group child, the kit as the figure's 5th child, draws equal with Enhanced Animations off and on, and
+//    one draw per wingman more than with identity off (the shadow pass unchanged);
+//  - tier swaps (High Detail, Ultra bodies) swap the kit superset by reference and compile nothing; every agent's kit
+//    draws on every tier (a module the Low superset lacks takes its stand-in);
+//  - kitRep and archOverride (the replay override API) apply and restore bit-exact, the restore also with identity off,
+//    and a save from an earlier life is dropped after a respawn;
+//  - steady frames (bots moved inside their chunks) upload no kit bytes; programs == watermark, 0 stalls, no page errors.
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -53,26 +62,65 @@ const hueDist = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 36
 const hexHue = (h) => hueOf((h >> 16) & 255, (h >> 8) & 255, h & 255);
 
 // No pointer lock in headless runs (it leaks renderer memory when play resumes many times)
-const INIT = () => { Element.prototype.requestPointerLock = function () {}; document.exitPointerLock = function () {}; };
+// and the forced content tier, if any, saved before the game reads it
+const TIER = process.env.BOT_IDENTITY_TIER || null;
+const INIT = (tier) => {
+    Element.prototype.requestPointerLock = function () {}; document.exitPointerLock = function () {};
+    if (tier) try { const k = 'valorant_v16_user_settings'; const o = JSON.parse(localStorage.getItem(k) || '{}'); o.contentTierMode = tier; localStorage.setItem(k, JSON.stringify(o)); } catch (e) {}
+};
+// The BOTKIT block's line range in the game file (stack frames of the inline script carry the document's line numbers)
+function botkitLines() {
+    const lines = fs.readFileSync(GAME_FILE, 'utf8').split('\n');
+    const lo = lines.findIndex((l) => l.includes('// ===== V2.3 BLOCK BOTKIT [WP6] =====')) + 1;
+    const hi = lines.findIndex((l) => l.includes('// ===== END V2.3 BLOCK BOTKIT =====')) + 1;
+    return [lo, hi];
+}
 
-test('bot identity: assignment, kits on pages, draws, leaves, colours, hit volume, rim, flash, dissolve, identity off, wingmen, tiers, reserve', { timeout: 240000 }, async () => {
-    const { page, errors, frames, evaluate } = await boot({ initScript: INIT });
+test(`bot identity (${TIER ? TIER + ' content tier' : 'the machine\'s content tier'}): Math.random, reserve, assignment, kits on pages, draws, leaves, colours, hit volume, rim, flash, dissolve, identity off, wingmen, tiers, replays`, { timeout: 240000 }, async () => {
+    const { page, errors, frames, evaluate } = await boot({ initScript: INIT, initArg: TIER });
     const [, watermark0] = await programState(page);
 
-    // ---- the warm reserve and a bot entering a new chunk ------------------------------------------------------------
+    // ---- Math.random: count every draw; a draw with BOTKIT code on the stack (a V23.bots entry, or a frame inside the
+    // block's lines: render callbacks, the build) is one too many. The game's stream itself is untouched (one real draw
+    // per call); V23.core._quiet still swaps it for its own stream and restores this counter.
+    const [lo, hi] = botkitLines();
+    assert.ok(lo > 0 && hi > lo, 'the BOTKIT block is found');
+    const rand0 = await evaluate(([lo, hi]) => {
+        const R = window.__v23rand = { total: 0, inside: 0, sites: {}, calls: {}, depth: 0 };
+        const real = Math.random, re = /\.html:(\d+):\d+/g;
+        const inBlock = (st) => { re.lastIndex = 0; let m; while ((m = re.exec(st))) { const n = +m[1]; if (n >= lo && n <= hi) return true; } return false; };
+        const stack = () => { const lim = Error.stackTraceLimit; Error.stackTraceLimit = 100; const st = new Error().stack; Error.stackTraceLimit = lim; return st; };
+        Math.random = function () {
+            R.total++;
+            const st = stack();
+            if (R.depth > 0 || inBlock(st)) { R.inside++; const k = (st.split('\n')[2] || '').trim(); R.sites[k] = (R.sites[k] || 0) + 1; }
+            return real();
+        };
+        for (const k of Object.keys(V23.bots)) {
+            const f = V23.bots[k];
+            if (typeof f !== 'function' || k[0] === '_') continue;
+            V23.bots[k] = function () { R.depth++; R.calls[k] = (R.calls[k] || 0) + 1; try { return f.apply(this, arguments); } finally { R.depth--; } };
+        }
+        // the attribution works: a frame inside assign reports a line inside the block (a getter BOTKIT reads)
+        let seen = null;
+        const desc = Object.getOwnPropertyDescriptor(game, 'activeAgent'), v = game.activeAgent, a = enemyObjects[0], keep = [a.agentId, a.lookIdx];
+        Object.defineProperty(game, 'activeAgent', { configurable: true, enumerable: true, get() { if (seen === null) seen = stack(); return v; } });
+        try { V23.bots.assign(a); } finally { Object.defineProperty(game, 'activeAgent', desc || { value: v, writable: true, configurable: true, enumerable: true }); a.agentId = keep[0]; a.lookIdx = keep[1]; }
+        return { attributed: !!seen && inBlock(seen), site: seen && seen.split('\n').find((l) => /\.html:/.test(l)) };
+    }, [lo, hi]);
+    assert.ok(rand0.attributed, `a stack frame inside BOTKIT is recognised (${JSON.stringify(rand0)}; block lines ${lo}-${hi})`);
+
+    // ---- the warm reserve: a bot entering a new chunk, with Enhanced Animations off and then switched on -------------
     const reserve = await evaluate(() => {
-        const S = V23.bots._state, st = V23.bots._stats;
-        const out = { made: st.reserveMade, held: S.reserve.length, used: st.reserveUsed, warmTag: S.reserve.every((pg) => pg.meshes.every((m) => m.userData.v23Warm === 'pre') && pg.kit.userData.v23Warm === 'pre') };
-        // the chunks with a page, and a bot moved into one without
-        const used = new Set([...enemyChunks.keys()]);
-        let target = null;
-        for (const cx of [-1, 0]) for (const cz of [-1, 0]) if (!used.has(cx + ',' + cz) && !target) target = [cx, cz];
-        out.target = target;
-        out.free = enemyPageFree.length;
+        const S = V23.bots._state, st = V23.bots._stats, R = window.__v23rand;
+        const out = { made: st.reserveMade, held: S.reserve.length, used: st.reserveUsed, parts: enemyPartSpecs.length, moves: [],
+            warmTag: S.reserve.every((pg) => pg.meshes.every((m) => m.userData.v23Warm === 'pre') && pg.kit.userData.v23Warm === 'pre'),
+            eaBuffers: S.reserve.every((pg) => pg.meshes.every((m) => !!m.geometry.attributes.instanceAnim2 && !!m.geometry.attributes.instanceAnim3)) };
         const live = enemyObjects.filter((x) => x.isActive && !x.hit && x.renderActive);
-        const e = live[0];
-        if (!target || live.length < 2 || out.free) return out;
-        // only the bot pages drawn, from over the map (every chunk in view)
+        out.live = live.length;
+        if (live.length < 2) return out;
+        const e = live[0], buddy = live[1];
+        // only the bot pages drawn, from over the map (chunks -2..1 in view)
         const cam = new THREE.PerspectiveCamera(100, 480 / 270, 0.5, 400);
         cam.position.set(0, 120, 0.01); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
         const draw = () => {
@@ -84,29 +132,56 @@ test('bot identity: assignment, kits on pages, draws, leaves, colours, hit volum
             for (const o of hidden) o.visible = true;
             return calls;
         };
-        // two bots on one page first (a bot alone on its page would take that page back from the free list), and the
-        // free list set aside, so the move below makes V2.2 create a page
-        e.mesh.position.copy(live[1].mesh.position); e.mesh.position.x += 0.8; e.poseDirty = true;
+        const move = (ea) => {
+            // a chunk with no page (the map's own first, then the ring round it)
+            const used = new Set([...enemyChunks.keys()]);
+            let target = null;
+            for (const ring of [[-1, 0], [-2, -1, 0, 1]]) for (const cx of ring) for (const cz of ring) if (!target && !used.has(cx + ',' + cz)) target = [cx, cz];
+            const r = { ea: ea, target: target };
+            if (!target) return r;
+            // e joins its buddy's page first (alone on its page, e would take that page back from the free list), and the
+            // free list is set aside, so the move below makes V2.2 create a page
+            e.mesh.position.copy(buddy.mesh.position); e.mesh.position.x += 0.8; e.poseDirty = true;
+            packEnemyBatches();
+            draw();
+            const stash = enemyPageFree.splice(0);
+            const used0 = st.reserveUsed, warmMeshes = new Set([].concat(...S.reserve.map((pg) => pg.meshes)));
+            const gl0 = [perfTelemetry.glBufferDataCalls, perfTelemetry.glBufferDataBytes], r0 = [R.total, R.inside];
+            e.mesh.position.set(target[0] * 50 + 25, 0, target[1] * 50 + 25); e.poseDirty = true;
+            packEnemyBatches();
+            r.draws = R.total - r0[0];
+            r.drawsInside = R.inside - r0[1];
+            const calls = draw();
+            enemyPageFree.push(...stash);
+            Object.assign(r, { reserveUsed: st.reserveUsed - used0, bufferDataCalls: perfTelemetry.glBufferDataCalls - gl0[0], bufferDataBytes: perfTelemetry.glBufferDataBytes - gl0[1],
+                fromReserve: !!e.page && warmMeshes.has(e.page.meshes[0]) && !!e.page.kit && e.page.meshes[0].count === 1 && e.page.kit.count === 1, heldAfter: S.reserve.length,
+                chunk: e.pageCx + ',' + e.pageCz, calls: calls, eaAttrs: !!e.page && e.page.meshes.every((m) => !ea || (!!m.geometry.attributes.aBone && !!m.geometry.attributes.instanceAnim2)) });
+            return r;
+        };
+        out.moves.push(move(false));
+        // Enhanced Animations switched on after the warm-up (its build gives the live and free pages their buffers; a
+        // frame draws them), then the second reserve page
+        enhancedAnim.set(true);
         packEnemyBatches();
         draw();
-        const stash = enemyPageFree.splice(0);
-        const used0 = st.reserveUsed, warmMeshes = new Set([].concat(...S.reserve.map((pg) => pg.meshes)));
-        const gl0 = [perfTelemetry.glBufferDataCalls, perfTelemetry.glBufferDataBytes];
-        e.mesh.position.set(target[0] * 50 + 25, 0, target[1] * 50 + 25); e.poseDirty = true;
+        out.moves.push(move(true));
+        enhancedAnim.set(false);
         packEnemyBatches();
-        const calls = draw();
-        enemyPageFree.push(...stash);
-        out.newPage = { reserveUsed: st.reserveUsed - used0, bufferDataCalls: perfTelemetry.glBufferDataCalls - gl0[0], bufferDataBytes: perfTelemetry.glBufferDataBytes - gl0[1],
-            fromReserve: !!e.page && warmMeshes.has(e.page.meshes[0]) && !!e.page.kit && e.page.meshes[0].count === 1 && e.page.kit.count === 1, heldAfter: S.reserve.length,
-            chunk: e.pageCx + ',' + e.pageCz, calls: calls };
         return out;
     });
     assert.equal(reserve.made, 2, 'two warm pages made at boot');
     assert.equal(reserve.used + reserve.held, 2, 'held in the reserve until a new page takes one');
-    assert.ok(reserve.target && reserve.free === 0 && reserve.newPage, `a free chunk, an empty free list and two live bots (${JSON.stringify(reserve)})`);
-    assert.equal(reserve.newPage.reserveUsed, 1, 'the new page took a reserve page');
-    assert.ok(reserve.newPage.fromReserve && reserve.newPage.calls > 0, `the bot draws from the reserve page's meshes (${JSON.stringify(reserve.newPage)})`);
-    assert.equal(reserve.newPage.bufferDataCalls, 0, `a bot entering a new chunk creates no GPU buffer (${JSON.stringify(reserve.newPage)})`);
+    assert.ok(reserve.warmTag && reserve.eaBuffers, `tagged for the warm-up, with their own EA buffers (${JSON.stringify(reserve)})`);
+    assert.ok(reserve.live >= 2 && reserve.moves.length === 2, `two live bots (${JSON.stringify(reserve)})`);
+    for (const mv of reserve.moves) {
+        const tag = mv.ea ? 'Enhanced Animations on' : 'Enhanced Animations off';
+        assert.ok(mv.target, `${tag}: a chunk without a page (${JSON.stringify(mv)})`);
+        assert.equal(mv.reserveUsed, 1, `${tag}: the new page took a reserve page`);
+        assert.ok(mv.fromReserve && mv.calls > 0 && mv.eaAttrs, `${tag}: the bot draws from the reserve page's meshes (${JSON.stringify(mv)})`);
+        assert.equal(mv.bufferDataCalls, 0, `${tag}: a bot entering a new chunk creates no GPU buffer (${JSON.stringify(mv)})`);
+        assert.equal(mv.draws, 8 * reserve.parts, `${tag}: the new page's Math.random draws are V2.2's createEnemyPage's (8 per part)`);
+        assert.equal(mv.drawsInside, 0, `${tag}: none of them inside BOTKIT`);
+    }
     console.log('# reserve', JSON.stringify(reserve));
 
     // ---- assignment -------------------------------------------------------------------------------------------------
@@ -296,6 +371,21 @@ test('bot identity: assignment, kits on pages, draws, leaves, colours, hit volum
     }
     assert.deepEqual(Object.keys(outside).map((k) => k + ' ' + JSON.stringify(outside[k].slice(0, 2))), [], 'every kit point inside the union hit volume + 0.03 m at every archetype scale');
     console.log('# kit superset vertices:', kitData.map((k) => k.tier + ' ' + k.p.length / 3).join(', '));
+    // every agent's kit draws on every tier: the mask names only modules that tier's superset holds, at least one, and
+    // where the superset holds all of the kit's modules the mask is the kit itself
+    const masks = await evaluate(() => AGENT_ORDER.map((id) => {
+        const L = V23.core.resolve(id), kit = ((L && L.bot && L.bot.kit) || []).filter((k) => k >= 0 && k <= 22);
+        return { id: id, kit: kit, tiers: ['low', 'medium', 'high', 'ultra'].map((t) => {
+            const mods = V23.parts.kitSuperset(t).userData.kit.modules, has = (k) => mods.some((m) => m.id === k && m.vertices > 0);
+            const mask = V23.bots._kitMask(id, t), bits = [];
+            for (let k = 0; k < 24; k++) if (Math.floor(mask / Math.pow(2, k)) % 2 === 1) bits.push(k);
+            return { tier: t, bits: bits, held: bits.every(has), exact: !kit.every(has) || (bits.length === kit.length && kit.every((k) => bits.indexOf(k) >= 0)) };
+        }) };
+    }));
+    const badMask = [];
+    for (const m of masks) for (const t of m.tiers) if (m.kit.length && (!t.bits.length || !t.held || !t.exact)) badMask.push(m.id + '/' + t.tier + ' kit ' + m.kit + ' bits ' + t.bits);
+    assert.deepEqual(badMask, [], 'every agent kit draws on every tier, only modules the tier holds, the kit itself where it can');
+    console.log('# Low kits with stand-ins:', masks.filter((m) => m.kit.join() !== m.tiers[0].bits.join() && m.kit.slice().sort((a, b) => a - b).join() !== m.tiers[0].bits.join()).map((m) => m.id + ' ' + m.kit + '>' + m.tiers[0].bits).join('; '));
 
     // ---- rendered crops: the rim hue per highlight colour; a hit flash is one flat colour ------------------------------
     const crops = await evaluate(() => {
@@ -460,7 +550,9 @@ test('bot identity: assignment, kits on pages, draws, leaves, colours, hit volum
         if (!te.wingmanEnabled) te.toggleWingmanAI(true);
         te.wingmanGroup.visible = true;
         te.wingmanBots.forEach((b, i) => b.group.position.set(-13 + i * 4, 0, 8));
-        const out = { plain: te.wingmanBots.map((b) => { const figs = b.group.children.filter((c) => c.isGroup); return [figs.length, figs[0] ? figs[0].children.length : 0, figs[0] && figs[0].children[4] ? figs[0].children[4].name : null]; }) };
+        // (the Group Enhanced Animations adds for its rig, V2.2's, is not the figure: EA was first switched on above)
+        const rigs = new Set(enhancedAnim.wingRigs.map((r) => r.rig));
+        const out = { plain: te.wingmanBots.map((b) => { const figs = b.group.children.filter((c) => c.isGroup && !rigs.has(c)); return [figs.length, figs[0] ? figs[0].children.length : 0, figs[0] && figs[0].children[4] ? figs[0].children[4].name : null]; }) };
         const cam = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
         cam.position.set(-11, 6, 20); cam.lookAt(-11, 0, 8); cam.updateMatrixWorld();
         const sm = renderer.shadowMap, smRender = sm.render;
@@ -476,12 +568,19 @@ test('bot identity: assignment, kits on pages, draws, leaves, colours, hit volum
             for (const o of hidden) o.visible = true;
             return n;
         };
+        const identity = (v) => { game.userSettings.agentIdentity = v; V23.core.applySettings(game.userSettings, 'agentIdentity'); packEnemyBatches(); };
         try {
             out.off = count(false);
             out.on = count(true);
             out.rigKits = enhancedAnim.wingRigs.map((r) => r.rig.children.filter((c) => c.name === 'v23:rigKit').length);
             out.off2 = count(false);
-        } finally { sm.render = smRender; }
+            // identity off: the plain kits and the rig kits draw nothing (V2.2's wingman draws)
+            identity('off');
+            out.idOff = [count(false), count(true)];
+            identity('on');
+            out.idOn = [count(false), count(true)];
+            enhancedAnim.set(false);
+        } finally { sm.render = smRender; if (game.userSettings.agentIdentity !== 'on') identity('on'); }
         out.n = te.wingmanBots.length;
         return out;
     });
@@ -494,7 +593,13 @@ test('bot identity: assignment, kits on pages, draws, leaves, colours, hit volum
     assert.equal(wing.on[1], wing.off[1], 'and in the shadow pass');
     assert.equal(wing.off2[0], wing.off[0], 'and off again');
     assert.deepEqual(wing.rigKits, wing.rigKits.map(() => 1), 'each EA rig carries a one-instance kit');
-    console.log('# wingman draws (main, shadow) EA off / on:', JSON.stringify([wing.off, wing.on]), 'for', wing.n, 'wingmen');
+    assert.ok(wing.n > 0, 'some wingmen');
+    for (const ea of [0, 1]) {
+        const tag = ea ? 'Enhanced Animations on' : 'Enhanced Animations off';
+        assert.equal(wing.idOn[ea][0] - wing.idOff[ea][0], wing.n, `${tag}: one kit draw per wingman more than with identity off (${JSON.stringify(wing)})`);
+        assert.equal(wing.idOn[ea][1], wing.idOff[ea][1], `${tag}: the shadow pass unchanged by the kits`);
+    }
+    console.log('# wingman draws (main, shadow) EA off / on:', JSON.stringify([wing.off, wing.on]), 'identity off (EA off, on):', JSON.stringify(wing.idOff), 'for', wing.n, 'wingmen');
 
     // ---- tier swaps compile nothing; kitRep and archOverride restore bit-exact; steady frames upload no kit bytes -----
     const tiers = await evaluate(() => {
@@ -517,11 +622,43 @@ test('bot identity: assignment, kits on pages, draws, leaves, colours, hit volum
         const other = ENEMY_ARCHETYPE_ORDER.indexOf(arch === 'armored' ? 'rusher' : 'armored');
         out.arch = [V23.bots.archOverride(e, other), snap() !== live, Math.abs(e.mesh.scale.x - ENEMY_ARCHETYPES[ENEMY_ARCHETYPE_ORDER[other]].scale.x) < 1e-12, V23.bots.archOverride(e, -1), snap() === live];
         out.rep = [V23.bots.kitRep(e, { agentId: 'sage' }), V23.bots.kitRep(e, { agentId: 'nobody' }), V23.bots.kitRep(e, null)];
-        // steady state: frames with nothing to recolour upload no kit bytes
+        // the restore also works with identity off (only starting an override needs it on)
+        const identity = (v) => { game.userSettings.agentIdentity = v; V23.core.applySettings(game.userSettings, 'agentIdentity'); packEnemyBatches(); };
+        const slot = () => V23.bots._state.slots[e.slot | 0];
+        const a1 = V23.bots.archOverride(e, other), r1 = V23.bots.kitRep(e, { agentId: 'sage' });
+        identity('off');
+        out.offRestore = [a1, r1, V23.bots.archOverride(e, other), V23.bots.kitRep(e, { agentId: 'omen' }), V23.bots.archOverride(e, -1), snap() === live, V23.bots.kitRep(e, null), slot().rep, slot().arch];
+        identity('on');
+        // a save from an earlier life: dropped after a respawn (the new life's own scale and colours stay)
+        V23.bots.archOverride(e, other);
+        respawnEnemy(e);
+        packEnemyBatches();
+        const life = snap();
+        out.stale = [V23.bots.archOverride(e, -1), snap() === life, Math.abs(e.mesh.scale.x - ENEMY_ARCHETYPES[e.archetype].scale.x) < 1e-12];
+        // steady state: frames with nothing to recolour upload no kit bytes. Each bot moves 0.01 m a frame toward the centre
+        // of its own chunk, so no page changes (a bot crossing into another page is a structure repack, which rewrites
+        // its kit slots as V2.2 rewrites its colours)
         packEnemyBatches();
         const b0 = V23.bots._stats.uploadBytes, w0 = V23.bots._stats.kitWrites;
-        for (let i = 0; i < 30; i++) { for (const x of enemyObjects) if (x.isActive) { x.mesh.position.x += 0.01; x.poseDirty = true; } packEnemyBatches(); }
+        const where = () => enemyObjects.map((x) => [x.page, x.pageCx, x.pageCz]);
+        const p0 = where();
+        for (let i = 0; i < 30; i++) {
+            for (const x of enemyObjects) if (x.isActive) {
+                const c = (x.pageCx + 0.5) * 50;
+                x.mesh.position.x += Math.abs(c - x.mesh.position.x) > 0.02 ? Math.sign(c - x.mesh.position.x) * 0.01 : 0;
+                x.mesh.rotation.y += 0.01;
+                x.poseDirty = true;
+            }
+            packEnemyBatches();
+        }
         out.steady = { bytes: V23.bots._stats.uploadBytes - b0, writes: V23.bots._stats.kitWrites - w0 };
+        out.samePages = where().every((w, i) => w[0] === p0[i][0] && w[1] === p0[i][1] && w[2] === p0[i][2]);
+        // a page V2.2 releases (its free list full): the kit set goes back to the pool first, and the next page takes it
+        const pool0 = V23.bots._state.pool.length, spare = createEnemyPage(), had = !!spare.kit;
+        releaseEnemyPageGPU(spare);
+        const pool1 = V23.bots._state.pool.length, next = createEnemyPage(), reused = V23.bots._state.pool.length === pool1 - 1 && !!next.kit;
+        releaseEnemyPageGPU(next);
+        out.release = [had, spare.kit === null, pool1 === pool0 + 1, reused];
         out.stats = V23.bots._stats;
         return out;
     });
@@ -530,10 +667,20 @@ test('bot identity: assignment, kits on pages, draws, leaves, colours, hit volum
     assert.ok(tiers.reserveTier, 'the reserve pages follow the body tier');
     assert.deepEqual(tiers.arch, [true, true, true, true, true], 'archOverride applies and restores bit-exact');
     assert.deepEqual(tiers.rep, [true, false, true], 'kitRep takes a known agent and null');
+    assert.deepEqual(tiers.offRestore, [true, true, false, false, true, true, true, -1, -1], `identity off: no new override, and both restore bit-exact (${JSON.stringify(tiers.offRestore)})`);
+    assert.deepEqual(tiers.stale, [false, true, true], 'a save from the last life is dropped: the new life keeps its own scale and colours');
+    assert.ok(tiers.samePages, 'the steady frames keep every bot on its page');
+    assert.deepEqual(tiers.release, [true, true, true, true], 'a released page returns its kit set to the pool, and the next page reuses it');
     assert.deepEqual(tiers.steady, { bytes: 0, writes: 0 }, 'steady frames write and upload no kit data');
     console.log('# stats', JSON.stringify(tiers.stats));
 
     await frames(5);
+    const rand = await evaluate(() => window.__v23rand);
+    console.log('# Math.random draws', rand.total, 'inside BOTKIT', rand.inside, JSON.stringify(rand.sites), 'V23.bots calls', JSON.stringify(rand.calls));
+    // (wingKit runs when the wingmen are built, at boot: the boot probe covers it)
+    for (const k of ['assign', 'onPage', 'releasePage', 'packPose', 'packColor', 'flush', 'geomAttrs', 'wingRig', 'onTier', 'setRim', 'onKilled', 'kitRep', 'archOverride'])
+        assert.ok(rand.calls[k] > 0, `V23.bots.${k} was driven`);
+    assert.equal(rand.inside, 0, `no Math.random draw inside BOTKIT (${JSON.stringify(rand.sites)})`);
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(watermark, watermark0, 'the watermark never moved');
     assert.equal(programs, watermark, 'programs == watermark');

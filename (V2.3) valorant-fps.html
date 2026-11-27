@@ -13577,18 +13577,23 @@
         // V2.3 REGION R6.installEnemyAnimation [WP6]: single owner (H23). Kit branch, zone colours, rim and dissolve, all
         // behind uIdentity with identical text for every material (one 'enemyAnim' program)
         function installEnemyAnimation(material, partIndex) {
-            // V2.3: what the identity code does (every statement sits inside `if (uIdentity > 0.5)` after the existing math, and
-            // the text is the same for every material, so there is still one 'enemyAnim' program; uPart tells the parts apart):
+            // V2.3: what the identity code does (every statement sits inside `if (uIdentity > 0.5)`, after the existing math but
+            // for the kit cut, which comes after color_vertex and ahead of the pose (design 9.4 amended by the risk table's
+            // mitigation: the mask exits before the pose math); the text is the same for every material, so there is still
+            // one 'enemyAnim' program; uPart tells the parts apart):
             //  - instanceKit (vec4 per instance): x the 24-bit module mask, y the primary colour and z the trim colour (RGB24,
             //    sRGB bytes), w integer flags (1 kit on, 2 flat flash, 4 ally: no highlight rim) plus the dissolve fraction;
-            //  - the kit part (uPart 4: the kit superset, uv.x = 2 + module id, uv.y = zone): a module whose mask bit is clear,
-            //    or every module while the kit is off, collapses to one point (degenerate triangles); the classic rifle kick
-            //    is taken back off kit vertices;
+            //  - the kit part (uPart 4: the kit superset, uv.x = 2 + module id, uv.y = zone): a vertex of a module whose mask
+            //    bit is clear, or of any module while the kit is off, leaves main right after color_vertex with gl_Position
+            //    outside the clip volume (its triangles are rejected whole: a module's three vertices share the module and
+            //    the instance), so the masked modules (about 1,000 of the 1,026 Medium superset vertices per bot) run no pose
+            //    math and no lighting; the classic rifle kick is taken back off kit vertices;
             //  - colour, after color_vertex: kit zone 0 the primary, 1 (accent) the highlight accent uRim (the windup orb,
             //    module 23, and an ally's accents take the trim), 2 dark (the primary x 0.3); a flat flash keeps the kit at
             //    instanceColor (the flash or blind colour of the torso, like the body);
             //  - one varying (vV23): x the rim weight (uRimBase, more on a flash), y the dissolve band; at emissivemap_fragment
-            //    the emissive gains uRim x (x * (1 - |N.V|)^3 + y): a fresnel rim plus the band rising from the feet;
+            //    the emissive gains uRim x (x * (1 - |N.V|)^3 + y): a fresnel rim plus the band rising from the feet (design
+            //    9.4 puts the band inside the fresnel term; outside it, the band shows across the body, not only at its edges);
             //  - the dissolve shrinks the drawn body 15% toward its spine (x and z in figure space); no discard (early-Z kept).
             // The GLSL below is a constant: identical text in every program that shares the key.
             const V23_EA_VERT_PARS = `
@@ -13606,6 +13611,10 @@
                             }`;
             const V23_EA_COLOR = `
                             if (uIdentity > 0.5) {
+                                if (uPart > 3.5 && (mod(floor(instanceKit.x / exp2(floor(uv.x - 1.5))), 2.0) < 0.5 || mod(floor(instanceKit.w + 0.0001), 2.0) < 0.5)) {
+                                    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+                                    return;
+                                }
                                 float v23F = floor(instanceKit.w + 0.0001);
                                 float v23Flash = step(0.5, mod(floor(v23F / 2.0), 2.0));
                                 float v23Ally = step(3.5, v23F);
@@ -13623,13 +13632,9 @@
                             }`;
             const V23_EA_BEGIN = `
                             if (uIdentity > 0.5) {
-                                if (uPart > 3.5) {
-                                    float v23Bit = mod(floor(instanceKit.x / exp2(floor(uv.x - 1.5))), 2.0);
-                                    if (v23Bit < 0.5 || mod(floor(instanceKit.w + 0.0001), 2.0) < 0.5) transformed = vec3(0.0);
-                                    else if (uAnimDetail < 0.5 && position.z < -0.18 && position.y > 1.0 && position.y < 1.5) {
-                                        float v23A = instanceAnim.z * 0.26 * eUpper;
-                                        transformed -= instanceAnim.w * 0.09 * vec3(0.0, -sin(v23A), cos(v23A));
-                                    }
+                                if (uPart > 3.5 && uAnimDetail < 0.5 && position.z < -0.18 && position.y > 1.0 && position.y < 1.5) {
+                                    float v23A = instanceAnim.z * 0.26 * eUpper;
+                                    transformed -= instanceAnim.w * 0.09 * vec3(0.0, -sin(v23A), cos(v23A));
                                 }
                                 float v23Dis = clamp(instanceKit.w - floor(instanceKit.w + 0.0001), 0.0, 1.0);
                                 if (v23Dis > 0.001) transformed.xz *= 1.0 - 0.15 * v23Dis;
@@ -16623,7 +16628,8 @@
         //    enemyPageFree: a free page there would stand in for a createEnemyPage call V2.2 makes, and its uuids are 32 of
         //    the game's Math.random draws, so the stream would shift. Instead, when V2.2's createEnemyPage has made a page
         //    (its draws exactly as V2.2), onPage gives it a reserve page's meshes and kit in place of the ones it just made
-        //    (never drawn: they hold no GPU state), so a bot entering a new chunk creates no buffer.
+        //    (never drawn: they hold no GPU state), so a bot entering a new chunk creates no buffer. The reserve pages carry
+        //    their own Enhanced Animations buffers (instanceAnim2/3) from the start, so this holds with EA switched on later.
         //  - Identity off: uIdentity 0 (the shader's identity code does not run), every kit at count 0 (0 kit draws), wingman
         //    kits drawn with no triangles; the V2.2 picture exactly. The kits stay built for the next switch-on. A kit stays
         //    in the render list while it is off (count 0 draws nothing), so its onBeforeRender notices a switch made while no
@@ -16644,8 +16650,12 @@
         //    fields (BOTMOTION's deathStep) gets it: it starts 0.6 s into the lie and rises over 0.9 s.
         //  - Replays (SCREENS, WP9): kitRep(enemy, { agentId } | { lookIdx } | null) draws the bot as the recorded agent until
         //    called with null; archOverride(enemy, archIndex) draws it with that archetype's (ENEMY_ARCHETYPE_ORDER index)
-        //    rest colours and scale, and archOverride(enemy, -1) puts the live values back bit-exact. Both return false (and
-        //    change nothing) while Agent Identity is off.
+        //    rest colours and scale, and archOverride(enemy, -1) puts the live values back bit-exact. Starting an override
+        //    returns false (and changes nothing) while Agent Identity is off; ending one (null, -1) works on or off. The
+        //    saved live values belong to the life they were taken from (enemy.generation): after a respawn they are dropped.
+        //  - Kit masks per tier (maskFor): a kit module the content tier's superset lacks (Low keeps 12 of 24) draws as a
+        //    stand-in module of the same body region (STAND), so every agent shows its kit on every tier.
+        //  - Shader cost: a masked kit vertex leaves the vertex shader right after color_vertex (no pose, no lighting).
         (function () {
             // V2.3: the highlight accent table (design 9.5) and the crosshair preview's practice bot colours (H27.2): V2.2's
             // strings for red, yellow and purple, and the cyan branch V2.2 lacked (it drew cyan as red)
@@ -16662,6 +16672,11 @@
             const ORB_BIT = 8388608;            // 2^23: kit module 23, the windup orb
             const FULL_MASK = 16777215;         // all 24 modules (the warm draw)
             const SHARED = ['instanceAnim', 'instanceAnim2', 'instanceAnim3'];
+            // V2.3: stand-ins for kit modules a tier's superset lacks (maskFor): 3 brimCap, 6 tallHat and 7 crestRidge the
+            // helmShell; 4 respHalf the segVisor; 5 boomMic the earGuard; 8 haloArc the visorBand; 10 collarFunnel and 14
+            // lamellar the frontPanel; 17 shoulderCape the left pauldron; 18 yoke both pauldrons; 20 tanksPair and 22
+            // backDisc the packSmall
+            const STAND = Object.freeze({ 3: [0], 4: [1], 5: [2], 6: [0], 7: [0], 8: [9], 10: [12], 14: [12], 17: [15], 18: [15, 16], 20: [19], 22: [19] });
             const B = {
                 built: false, on: false, making: false, tier: null, geom: null, mat: null, zero: null,
                 sets: [], pool: [], reserve: [], wing: [], rigs: [], slots: [], kits: [],
@@ -16679,23 +16694,25 @@
             const quiet = (fn) => V23.core._quiet(fn);
             const slotOf = (enemy) => {
                 const i = enemy.slot | 0;
-                return B.slots[i] || (B.slots[i] = { rep: -1, anim: null, d: 0, arch: -1, save: new Float64Array(15) });
+                return B.slots[i] || (B.slots[i] = { rep: -1, anim: null, d: 0, arch: -1, archGen: -1, save: new Float64Array(15) });
             };
 
-            // V2.3: an agent's kit data, cached by its resolved look (a redefined look resolves to a new object): the module
-            // mask, the primary (the palette base desaturated by half and at most 40% lightness, sRGB RGB24), the trim (the
-            // look's bot.accent slot, default glow) and the plain base colour (allies)
+            // V2.3: an agent's kit data, cached by its resolved look (a redefined look resolves to a new object): the kit's
+            // module ids, the primary (the palette base desaturated by half and at most 40% lightness, sRGB RGB24), the trim
+            // (the look's bot.accent slot, default glow) and the plain base colour (allies); the module mask per tier is
+            // maskFor's
             function kitOf(li) {
                 const id = AGENT_ORDER[li] || AGENT_ORDER[0];
                 const look = V23.core.resolve(id);
                 let K = B.kits[li];
                 if (K && K.look === look) return K;
-                K = B.kits[li] || (B.kits[li] = { look: null, mask: 0, prim: 0, trim: 0, base: 0, spec: null });
+                K = B.kits[li] || (B.kits[li] = { look: null, mods: [], masks: {}, prim: 0, trim: 0, base: 0, spec: null });
                 K.look = look;
-                let mask = 0;
+                K.masks = {};
+                const mods = [];
                 const kit = (look && look.bot && look.bot.kit) || [];
-                for (let i = 0; i < kit.length; i++) { const k = kit[i]; if (k >= 0 && k <= 22 && Math.floor(mask / Math.pow(2, k)) % 2 === 0) mask += Math.pow(2, k); }
-                K.mask = mask;
+                for (let i = 0; i < kit.length; i++) { const k = kit[i]; if (k >= 0 && k <= 22 && mods.indexOf(k) < 0) mods.push(k); }
+                K.mods = mods;
                 const pal = (look && look.palette) || {};
                 const base = pal.base || { c: 0x39414f, r: 0.6, m: 0.1 };
                 _col.setHex(base.c).getHSL(_hsl);
@@ -16706,6 +16723,23 @@
                 K.base = base.c;
                 K.spec = { c: base.c, r: base.r === undefined ? 0.6 : base.r, m: base.m === undefined ? 0.1 : base.m };
                 return K;
+            }
+            // V2.3: the 24-bit module mask of a kit on a kit superset (one tier), cached per tier. A module that superset
+            // does not hold (the Low superset keeps 12 of the 24) draws as its stand-in there (STAND: the nearest silhouette
+            // piece of the same body region), so every agent's kit shows on every tier
+            function maskFor(K, geom) {
+                const info = geom && geom.userData && geom.userData.kit;
+                const tier = info ? info.tier : 'medium';
+                if (K.masks[tier] !== undefined) return K.masks[tier];
+                const has = (k) => { if (!info) return true; for (const m of info.modules) if (m.id === k) return m.vertices > 0; return false; };
+                let mask = 0;
+                const bit = (k) => { if (Math.floor(mask / Math.pow(2, k)) % 2 === 0) mask += Math.pow(2, k); };
+                for (const k of K.mods) {
+                    if (has(k)) { bit(k); continue; }
+                    for (const s of (STAND[k] || [])) if (has(s)) bit(s);
+                }
+                K.masks[tier] = mask;
+                return mask;
             }
             // V2.3: the dissolve fraction (0 until 0.6 s into the lie, then up over 0.9 s), from the actor's topple record
             function dissolveOf(enemy, st) {
@@ -16727,7 +16761,7 @@
                 const d = dissolveOf(enemy, st);
                 st.d = d;
                 const flags = 1 + (enemy.flashUntil && enemy.flashUntil[0] ? 2 : 0);
-                attr.setXYZW(k, K.mask + (enemy.v23Orb === true ? ORB_BIT : 0), K.prim, K.trim, flags + d);
+                attr.setXYZW(k, maskFor(K, B.geom) + (enemy.v23Orb === true ? ORB_BIT : 0), K.prim, K.trim, flags + d);
                 stats.kitWrites++;
             }
 
@@ -16805,6 +16839,15 @@
                 _m4.makeTranslation(camera.position.x + _v3.x * 3, camera.position.y + _v3.y * 3 - 1.2, camera.position.z + _v3.z * 3);
                 for (let i = 0; i < RESERVE; i++) {
                     const page = createEnemyPage();   // inside _build's _quiet; onPage skips it (B.making)
+                    // V2.3: the page's own Enhanced Animations buffers (instanceAnim2/3, as enhancedAnim.geomAttrs makes them)
+                    // now, so the warm-up draw uploads them: a reserve page taken after EA is first switched on then gains
+                    // only the shared bone tags (no buffer). V2.2 reads them only while EA is on.
+                    for (const m of page.meshes) for (const name of ['instanceAnim2', 'instanceAnim3']) {
+                        if (m.geometry.attributes[name]) continue;
+                        const a = new THREE.InstancedBufferAttribute(new Float32Array(ENEMY_PAGE_CAP * 4), 4);
+                        a.setUsage(THREE.DynamicDrawUsage);
+                        m.geometry.setAttribute(name, a);
+                    }
                     attach(page);
                     for (const m of page.meshes) {
                         m.setMatrixAt(0, _m4);
@@ -16824,10 +16867,12 @@
                     stats.reserveMade++;
                 }
             }
-            // V2.3: a page V2.2 just made takes a reserve page's meshes and kit (uploaded in the warm-up) in place of its own
+            // V2.3: a page V2.2 just made takes a reserve page's meshes and kit (uploaded in the warm-up) in place of its own;
+            // a reserve page that does not match (another part count or material) stays held
             function fromReserve(page) {
-                const r = B.reserve.pop();
-                if (r.meshes.length !== page.meshes.length || r.meshes.some((m, p) => m.material !== page.meshes[p].material)) return false;
+                const r = B.reserve[B.reserve.length - 1];
+                if (!r || r.meshes.length !== page.meshes.length || r.meshes.some((m, p) => m.material !== page.meshes[p].material)) return false;
+                B.reserve.pop();
                 for (let p = 0; p < r.meshes.length; p++) {
                     const m = r.meshes[p];
                     delete m.userData.v23Warm;
@@ -16845,8 +16890,9 @@
                 kit.userData.v23.page = page;
                 page.kit = kit;
                 r.kit = null;
-                // V2.3: Enhanced Animations' attributes when it was built after the warm-up (its build skips the reserve)
-                if (enhancedAnim.built && !page.meshes[0].geometry.attributes.instanceAnim2) enhancedAnim.pageAttrs(page);
+                // V2.3: Enhanced Animations built after the warm-up (its build skips the reserve): the shared bone tags (the
+                // page's instanceAnim2/3 were made with the reserve, so nothing new is created)
+                if (enhancedAnim.built) enhancedAnim.pageAttrs(page);
                 stats.reserveUsed++;
                 return true;
             }
@@ -16856,10 +16902,10 @@
             // V2.3: a wingman's plain kit geometry for a tier: only its agent's modules (no orb) cut from the kit superset
             function wingGeom(rec, tier) {
                 if (rec.geoms[tier]) return rec.geoms[tier];
-                const src = V23.parts.kitSuperset(tier), K = kitOf(AGENT_ORDER.indexOf(rec.agentId));
+                const src = V23.parts.kitSuperset(tier), K = kitOf(AGENT_ORDER.indexOf(rec.agentId)), mask = maskFor(K, src);
                 const P = src.attributes.position.array, N = src.attributes.normal.array, U = src.attributes.uv.array, I = src.index.array;
                 const keep = new Int32Array(P.length / 3).fill(-1), pos = [], nor = [], idx = [];
-                const inKit = (v) => { const m = Math.round(U[v * 2]) - 2; return m < 23 && Math.floor(K.mask / Math.pow(2, m)) % 2 === 1; };
+                const inKit = (v) => { const m = Math.round(U[v * 2]) - 2; return m < 23 && Math.floor(mask / Math.pow(2, m)) % 2 === 1; };
                 for (let t = 0; t < I.length; t += 3) {
                     if (!inKit(I[t])) continue;
                     for (let j = 0; j < 3; j++) {
@@ -16907,7 +16953,7 @@
                 const li = w && w.agentId ? AGENT_ORDER.indexOf(w.agentId) : -1;
                 if (li < 0) { rec.attr.setXYZW(0, 0, 0, 0, 4); rec.attr.needsUpdate = true; return; }
                 const K = kitOf(li);
-                rec.attr.setXYZW(0, K.mask, K.base, K.trim, 1 + 4);
+                rec.attr.setXYZW(0, maskFor(K, B.geom), K.base, K.trim, 1 + 4);
                 rec.attr.needsUpdate = true;
             }
             function rigMake(rec) {
@@ -17108,8 +17154,11 @@
                     B.tier = t;
                     B.geom = quiet(() => V23.parts.kitSuperset(t));
                     for (const st of B.sets) bindSuperset(st.geom);
-                    for (const r of B.rigs) if (r.kit) bindSuperset(r.kit.geometry);
+                    for (const r of B.rigs) if (r.kit) { bindSuperset(r.kit.geometry); rigWrite(r); }
                     for (const w of B.wing) if (w.mesh) { w.mesh.geometry = wingGeom(w, t); wingShow(w); }
+                    // V2.3: a kit's mask can differ per tier (maskFor's stand-ins): every live bot rewrites its instanceKit
+                    // (a colour-path write, once per swap; identity off writes it at the next switch-on's repack)
+                    if (B.on) for (let i = 0; i < enemyObjects.length; i++) if (enemyObjects[i].isActive) enemyObjects[i].colorDirty = true;
                     stats.tierSwaps++;
                     stats.tierMs += performance.now() - t0;
                     sync();
@@ -17142,23 +17191,31 @@
                     st.d = 0;
                     return null;
                 },
-                // V2.3 (replays, WP9): draw this bot as a recorded agent ({ agentId } or { lookIdx }); null ends it
+                // V2.3 (replays, WP9): draw this bot as a recorded agent ({ agentId } or { lookIdx }); null ends it, with
+                // Agent Identity on or off (only starting one needs identity on)
                 kitRep: function (enemy, rec) {
                     sync();
-                    if (!B.on || !enemy) return false;
-                    let li = -1;
-                    if (rec) li = typeof rec.lookIdx === 'number' ? rec.lookIdx : AGENT_ORDER.indexOf(rec.agentId);
-                    if (rec && !(li >= 0 && li < AGENT_ORDER.length)) return false;
+                    if (!enemy) return false;
                     const st = slotOf(enemy);
+                    if (!rec) {
+                        if (st.rep >= 0) { st.rep = -1; enemy.colorDirty = true; }
+                        return true;
+                    }
+                    if (!B.on) return false;
+                    const li = typeof rec.lookIdx === 'number' ? rec.lookIdx : AGENT_ORDER.indexOf(rec.agentId);
+                    if (!(li >= 0 && li < AGENT_ORDER.length)) return false;
                     if (st.rep !== li) { st.rep = li; enemy.colorDirty = true; }
                     return true;
                 },
                 // V2.3 (replays, WP9): draw this bot with a recorded archetype's rest colours (with the highlight override)
-                // and scale; -1 puts the live scale and leaf colours back bit-exact
+                // and scale; -1 puts the live scale and leaf colours back bit-exact, with Agent Identity on or off (only
+                // starting an override needs identity on). The saved live values belong to one life (the generation): a
+                // new life (activateEnemy set its own scale and colours) drops a save left over from the last one
                 archOverride: function (enemy, archIndex) {
                     sync();
-                    if (!B.on || !enemy) return false;
+                    if (!enemy) return false;
                     const st = slotOf(enemy), sv = st.save, g = enemy.mesh, L = enemy.leaves;
+                    if (st.arch >= 0 && st.archGen !== (enemy.generation | 0)) st.arch = -1;
                     const id = (typeof archIndex === 'number' && archIndex >= 0) ? ENEMY_ARCHETYPE_ORDER[archIndex] : null;
                     if (!id) {
                         if (st.arch < 0) return false;
@@ -17169,9 +17226,11 @@
                         enemy.colorDirty = true;
                         return true;
                     }
+                    if (!B.on) return false;
                     if (st.arch < 0) {
                         sv[0] = g.scale.x; sv[1] = g.scale.y; sv[2] = g.scale.z;
                         for (let p = 0; p < L.length && p < 4; p++) { const c = L[p].material.color; sv[3 + p * 3] = c.r; sv[4 + p * 3] = c.g; sv[5 + p * 3] = c.b; }
+                        st.archGen = enemy.generation | 0;
                     }
                     const a = ENEMY_ARCHETYPES[id], c = a.colors, mode = B.mode;
                     // V2.3: enemyPartPalette's colours, without its array (called every replay frame)
@@ -17184,7 +17243,8 @@
                     enemy.colorDirty = true;
                     return true;
                 },
-                // data for the tests (never read by the game): counters and the build's state
+                // data for the tests (never read by the game): counters, the build's state, an agent's kit mask on a tier
+                _kitMask: function (agentId, tier) { return maskFor(kitOf(AGENT_ORDER.indexOf(agentId)), quiet(() => V23.parts.kitSuperset(tier))); },
                 _stats: stats,
                 _state: B
             };
