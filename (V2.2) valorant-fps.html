@@ -37279,8 +37279,12 @@
 
                 if (now < this.reynaDismissUntil) {
                     const remDismiss = Math.max(0.1, (this.reynaDismissUntil - now) / 1000).toFixed(1);
-                    if (game.activeAgent === 'yoru') {
+                    if (game.activeAgent === 'yoru' && this.isUltActive(now) && game.ultAgent === 'yoru') {
                         text = `YORU DIMENSIONAL DRIFT • ${remDismiss}s (INVULNERABLE + +45% SPEED — SHOOT TO UNMASK)`;
+                        borderColor = '#3b82f6';
+                    } else if (game.activeAgent === 'yoru') {
+                        // V2.2: Gatecrash's arrival phase is not the Drift: a shot in it unmasks nothing
+                        text = `YORU GATECRASH PHASE • ${remDismiss}s (INVULNERABLE + +45% SPEED)`;
                         borderColor = '#3b82f6';
                     } else if (game.activeAgent === 'chamber') {
                         text = `CHAMBER RENDEZVOUS PHASE • ${remDismiss}s (INVULNERABLE)`;
@@ -41685,7 +41689,9 @@
                 }
 
                 // If Yoru fires while in Dimensional Drift Ultimate, unmask from the rift with a close-range Unmask Flash!
-                if (game.activeAgent === 'yoru' && abilityNow < agentSystem.reynaDismissUntil) {
+                // V2.2: only in the ultimate. Gatecrash's 0.9 s arrival phase uses the same intangible timer, and a
+                // shot in it fired the Drift's unmask (its blind and flash) without the ultimate
+                if (game.activeAgent === 'yoru' && ultActive && game.ultAgent === 'yoru' && abilityNow < agentSystem.reynaDismissUntil) {
                     agentSystem.reynaDismissUntil = 0;
                     if (game.ultAgent === 'yoru') game.ultActiveUntil = abilityNow;
                     soundFX.yoruRift();
