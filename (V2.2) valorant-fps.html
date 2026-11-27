@@ -28039,13 +28039,14 @@
                     if (!this.gekkoWingman[i].inUse) { gw = this.gekkoWingman[i]; break; }
                 }
                 gw.inUse = true;
-                gw.position.set(sx, 0.05, sz);
+                // V2.2: on the floor in front of you (position.y is that floor); it was at a fixed 0.05 m, under any raised floor
+                gw.position.set(sx, this.findSupportFloorY(sx, characterController.position.y, sz), sz);
                 gw.dirX = fwdX;
                 gw.dirZ = fwdZ;
                 gw.speed = AGENT_TUNING.gekko.q.speedMps;
                 gw.startAt = now;
                 gw.expireAt = now + AGENT_TUNING.gekko.q.lifetimeMs;
-                gw.group.position.copy(gw.position);
+                gw.group.position.set(sx, gw.position.y + 0.05, sz);
                 gw.group.rotation.y = Math.atan2(fwdX, fwdZ);
                 gw.group.visible = true;
                 soundFX.gekkoWingman();
@@ -28059,8 +28060,9 @@
                 gw.group.visible = false;
                 soundFX.gekkoWingman();
                 abilityLook.tag = 'gekko.q';   // V2.2: Gekko's Wingman concuss (High Fidelity draws it)
-                this.spawnFlashBurst(gw.position.x, 0.85, gw.position.z, 0xfacc15, 5.8, 340, now);
-                this.spawnWindRing(gw.position.x, 0.25, gw.position.z, 0xa3e635, 5.8, now);
+                // V2.2: over the floor it runs on (gw.position.y), as the Wingman itself; they were at fixed heights
+                this.spawnFlashBurst(gw.position.x, gw.position.y + 0.85, gw.position.z, 0xfacc15, 5.8, 340, now);
+                this.spawnWindRing(gw.position.x, gw.position.y + 0.25, gw.position.z, 0xa3e635, 5.8, now);
                 abilityLook.tag = null;
                 const rSq = AGENT_TUNING.gekko.q.radiusM * AGENT_TUNING.gekko.q.radiusM;
                 let hitCount = 0;
@@ -28125,15 +28127,17 @@
                 gt.active = true;
                 gt.position.set(
                     Math.max(-44, Math.min(44, characterController.position.x + fwdX * AGENT_TUNING.gekko.x.spawnAheadM)),
-                    0.35,
+                    0,
                     Math.max(-44, Math.min(44, characterController.position.z + fwdZ * AGENT_TUNING.gekko.x.spawnAheadM))
                 );
+                // V2.2: on the floor in front of you (position.y is that floor); it was at a fixed 0.35 m, under any raised floor
+                gt.position.y = this.findSupportFloorY(gt.position.x, characterController.position.y, gt.position.z);
                 gt.dirX = fwdX;
                 gt.dirZ = fwdZ;
                 gt.speed = AGENT_TUNING.gekko.x.speedMps;
                 gt.startAt = now;
                 gt.expireAt = now + AGENT_DEFS.gekko.abilities.x.durationMs;
-                gt.group.position.copy(gt.position);
+                gt.group.position.set(gt.position.x, gt.position.y + 0.35, gt.position.z);
                 gt.group.rotation.y = Math.atan2(fwdX, fwdZ);
                 gt.group.visible = true;
             },
@@ -28150,8 +28154,9 @@
                 }
                 soundFX.gekkoThrash();
                 abilityLook.tag = 'gekko.x';   // V2.2: Gekko's Thrash lunge (High Fidelity draws it)
-                this.spawnFlashBurst(gt.position.x, 1.0, gt.position.z, 0xa3e635, 7.5, 420, now);
-                this.spawnWindRing(gt.position.x, 0.3, gt.position.z, 0xa3e635, 7.8, now);
+                // V2.2: over the floor it swims on (gt.position.y), as Thrash itself; they were at fixed heights
+                this.spawnFlashBurst(gt.position.x, gt.position.y + 1.0, gt.position.z, 0xa3e635, 7.5, 420, now);
+                this.spawnWindRing(gt.position.x, gt.position.y + 0.3, gt.position.z, 0xa3e635, 7.8, now);
                 abilityLook.tag = null;
                 const rSq = AGENT_TUNING.gekko.x.radiusM * AGENT_TUNING.gekko.x.radiusM;
                 let detained = 0;
@@ -28475,22 +28480,24 @@
                     if (!this.harborHighTides[i].inUse) { ht = this.harborHighTides[i]; break; }
                 }
                 ht.inUse = true;
-                ht.startPos.set(sx, 0, sz);
-                ht.endPos.set(ex, 0, ez);
+                // V2.2: on the floor under you, as Neon's Fast Lane and Viper's Toxic Screen are (it stood at a fixed 0, under any raised floor)
+                const floorY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z);
+                ht.startPos.set(sx, floorY, sz);
+                ht.endPos.set(ex, floorY, ez);
                 ht.length = actualLen;
                 ht.startAt = now;
                 ht.expireAt = now + AGENT_TUNING.harbor.e.lifetimeMs;
                 ht.nextTickAt = now + AGENT_TUNING.harbor.e.firstTickMs;
                 ht.wallMesh.scale.set(1, 1, actualLen);
                 ht.crestMesh.scale.set(1, 1, actualLen);
-                ht.group.position.set((sx + ex) * 0.5, 0, (sz + ez) * 0.5);
+                ht.group.position.set((sx + ex) * 0.5, floorY, (sz + ez) * 0.5);
                 ht.group.rotation.y = Math.atan2(ex - sx, ez - sz);
                 ht.group.visible = true;
 
                 this.healPlayer(AGENT_TUNING.harbor.e.healHp, now);
                 soundFX.harborWave();
                 abilityLook.tag = 'harbor.e';   // V2.2: High Tide's ring (High Fidelity)
-                this.spawnWindRing(sx, 0.2, sz, 0x06b6d4, 4.0, now);
+                this.spawnWindRing(sx, floorY + 0.2, sz, 0x06b6d4, 4.0, now);   // V2.2: on that floor (it was at a fixed 0.2 m)
                 abilityLook.tag = null;
                 showNotification("HIGH TIDE WALL DEPLOYED — 22m Hydro-Wall Blocking Vision & Slowing Hostiles (+12 HP)!", 1950);
             },
@@ -28505,7 +28512,9 @@
                 const sx = Math.max(-42, Math.min(42, characterController.position.x + fwdX * AGENT_TUNING.harbor.x.spawnAheadM));
                 const sz = Math.max(-42, Math.min(42, characterController.position.z + fwdZ * AGENT_TUNING.harbor.x.spawnAheadM));
                 hr.active = true;
-                hr.position.set(sx, 0.04, sz);
+                // V2.2: 0.04 m over the floor in front of you at your feet's level (a step counts, a crate under its middle
+                // does not; the step below keeps it so); it was at a fixed 0.04 m, under any raised floor
+                hr.position.set(sx, this.findSupportFloorY(sx, characterController.position.y - characterController.height + 0.1, sz) + 0.04, sz);
                 hr.dir.set(fwdX, 0, fwdZ).normalize();
                 hr.radius = AGENT_TUNING.harbor.x.radiusM;
                 hr.speed = AGENT_TUNING.harbor.x.speedMps;
@@ -28517,7 +28526,7 @@
                 hr.group.position.copy(hr.position);
                 hr.group.visible = true;
                 abilityLook.tag = 'harbor.x';   // V2.2: Reckoning's ring (High Fidelity)
-                this.spawnWindRing(sx, 0.25, sz, 0x22d3ee, 10.0, now);
+                this.spawnWindRing(sx, hr.position.y - 0.04 + 0.25, sz, 0x22d3ee, 10.0, now);   // V2.2: on its floor (it was at a fixed 0.25 m)
                 abilityLook.tag = null;
             },
 
@@ -28597,20 +28606,23 @@
                 const cz = Math.max(-38, Math.min(38, characterController.position.z + fwdZ * AGENT_TUNING.astra.x.spawnAheadM));
                 const halfLen = AGENT_TUNING.astra.x.halfLengthM;
 
+                // V2.2: on the floor under you, as Neon's Fast Lane and Viper's Toxic Screen are (the wall, its flash and
+                // ring stood at fixed heights from 0, under any raised floor)
+                const floorY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z);
                 cd.active = true;
-                cd.position.set(cx, 0, cz);
-                cd.startPos.set(cx - perpX * halfLen, 0, cz - perpZ * halfLen);
-                cd.endPos.set(cx + perpX * halfLen, 0, cz + perpZ * halfLen);
+                cd.position.set(cx, floorY, cz);
+                cd.startPos.set(cx - perpX * halfLen, floorY, cz - perpZ * halfLen);
+                cd.endPos.set(cx + perpX * halfLen, floorY, cz + perpZ * halfLen);
                 cd.halfLength = halfLen;
                 cd.startAt = now;
                 cd.expireAt = now + AGENT_DEFS.astra.abilities.x.durationMs;
                 cd.nextTickAt = now + AGENT_TUNING.astra.x.firstTickMs;
-                cd.group.position.set(cx, 0, cz);
+                cd.group.position.set(cx, floorY, cz);
                 cd.group.rotation.y = yaw;
                 cd.group.visible = true;
                 abilityLook.tag = 'astra.x';   // V2.2: Cosmic Divide's flash and ring (High Fidelity)
-                this.spawnFlashBurst(cx, 2.2, cz, 0xeab308, 6.5, 420, now);
-                this.spawnWindRing(cx, 0.25, cz, 0xa855f7, 9.5, now);
+                this.spawnFlashBurst(cx, floorY + 2.2, cz, 0xeab308, 6.5, 420, now);
+                this.spawnWindRing(cx, floorY + 0.25, cz, 0xa855f7, 9.5, now);
                 abilityLook.tag = null;
             },
 
@@ -28808,7 +28820,8 @@
                     if (!this.tejoStealthDrones[i].inUse) { td = this.tejoStealthDrones[i]; break; }
                 }
                 td.inUse = true;
-                td.position.set(sx, 1.35, sz);
+                // V2.2: 1.35 m over the floor in front of you; it was at a fixed 1.35 m, under any raised floor
+                td.position.set(sx, this.findSupportFloorY(sx, characterController.position.y, sz) + 1.35, sz);
                 td.dirX = fwdX;
                 td.dirZ = fwdZ;
                 td.speed = AGENT_TUNING.tejo.c.speedMps;
@@ -28843,7 +28856,7 @@
                 const dz = drone.position.z;
                 abilityLook.tag = 'tejo.c';   // V2.2: Tejo's Stealth Drone EMP (High Fidelity draws it)
                 this.spawnFlashBurst(dx, dy, dz, 0x38bdf8, 8.5, 420, now);
-                this.spawnWindRing(dx, 0.25, dz, 0xf59e0b, 11.0, now);
+                this.spawnWindRing(dx, dy - 1.35 + 0.25, dz, 0xf59e0b, 11.0, now);   // V2.2: on the floor under the drone (it was at a fixed 0.25 m)
                 abilityLook.tag = null;
 
                 const nowMs = Date.now();
@@ -28978,13 +28991,15 @@
                 ta.startAt = now;
                 ta.nextWaveAt = now + AGENT_TUNING.tejo.x.firstWaveMs;
                 ta.expireAt = now + AGENT_TUNING.tejo.x.lifetimeMs;
-                ta.floorMesh.position.set(ox + fwdX * 14.0, 0.05, oz + fwdZ * 14.0);
+                // V2.2: on the floor under you, as Neon's Fast Lane and Viper's Toxic Screen are (it was at a fixed 0.05 m, under any raised floor)
+                const floorY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z);
+                ta.floorMesh.position.set(ox + fwdX * 14.0, floorY + 0.05, oz + fwdZ * 14.0);
                 ta.floorMesh.rotation.y = yaw;
                 ta.waveMesh.position.set(ox, 1.8, oz);
                 ta.waveMesh.rotation.y = yaw;
                 ta.group.visible = true;
                 abilityLook.tag = 'tejo.x';   // V2.2: Tejo's Armageddon call-in ring (High Fidelity draws its own)
-                this.spawnWindRing(ox, 0.25, oz, 0xf97316, 8.5, now);
+                this.spawnWindRing(ox, floorY + 0.25, oz, 0xf97316, 8.5, now);   // V2.2: on that floor too (it was at a fixed 0.25 m)
                 abilityLook.tag = null;
             },
 
@@ -29075,7 +29090,9 @@
                 this.dashFxUntil = now + 520;
                 soundFX.waylayDash();
                 abilityLook.tag = 'waylay.q';   // V2.2: Lightspeed's ring (High Fidelity)
-                this.spawnWindRing(characterController.position.x, characterController.position.y + 0.3, characterController.position.z, 0xfde047, 5.2, now);
+                // V2.2: 0.3 m over the floor under you (position.y is your eye, so it was 0.3 m over your head)
+                const ringY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z) + 0.3;
+                this.spawnWindRing(characterController.position.x, ringY, characterController.position.z, 0xfde047, 5.2, now);
                 abilityLook.tag = null;
                 if (game.health < game.maxHealth) {
                     game.health = Math.min(game.maxHealth, game.health + AGENT_TUNING.waylay.q.healHp);
@@ -29123,8 +29140,11 @@
 
                 // Flash & hinder enemies near departure point
                 abilityLook.tag = 'waylay.e';   // V2.2: Refract's return, where you leave (High Fidelity)
-                this.spawnFlashBurst(oldX, oldY + 0.9, oldZ, 0xfde047, 5.5, 360, now);
-                this.spawnWindRing(oldX, oldY + 0.15, oldZ, 0x38bdf8, 5.8, now);
+                // V2.2: over the floor where you leave, as the arrival's are over the beacon's floor (oldY is your
+                // eye, so the flash was 0.9 m over your head and the ring at your eyes)
+                const oldFloor = this.findSupportFloorY(oldX, oldY, oldZ);
+                this.spawnFlashBurst(oldX, oldFloor + 0.9, oldZ, 0xfde047, 5.5, 360, now);
+                this.spawnWindRing(oldX, oldFloor + 0.15, oldZ, 0x38bdf8, 5.8, now);
                 abilityLook.tag = null;
                 const rSq = AGENT_TUNING.waylay.e.returnRadiusM * AGENT_TUNING.waylay.e.returnRadiusM;
                 for (let i = 0; i < enemyObjects.length; i++) {
@@ -29171,10 +29191,12 @@
                 const fwdZ = -Math.cos(yaw);
                 const ox = characterController.position.x;
                 const oz = characterController.position.z;
+                // V2.2: the lane, its trim, the mirage and the rings stand on the floor under you (they were at fixed heights from 0)
+                const floorY = this.findSupportFloorY(ox, characterController.position.y, oz);
 
                 cp.active = true;
                 cp.erupted = false;
-                cp.origin.set(ox, 0.04, oz);
+                cp.origin.set(ox, floorY + 0.04, oz);
                 cp.dir.set(fwdX, 0, fwdZ).normalize();
                 cp.length = AGENT_TUNING.waylay.x.lengthM;
                 cp.halfWidth = AGENT_TUNING.waylay.x.halfWidthM;
@@ -29184,15 +29206,15 @@
 
                 const midX = ox + fwdX * (cp.length * 0.5);
                 const midZ = oz + fwdZ * (cp.length * 0.5);
-                cp.laneMesh.position.set(midX, 0.05, midZ);
+                cp.laneMesh.position.set(midX, floorY + 0.05, midZ);
                 cp.laneMesh.rotation.y = yaw;
-                cp.trimMesh.position.set(midX, 0.07, midZ);
+                cp.trimMesh.position.set(midX, floorY + 0.07, midZ);
                 cp.trimMesh.rotation.y = yaw;
-                cp.mirageMesh.position.set(ox + fwdX * 2.5, 1.35, oz + fwdZ * 2.5);
+                cp.mirageMesh.position.set(ox + fwdX * 2.5, floorY + 1.35, oz + fwdZ * 2.5);
                 cp.mirageMesh.rotation.y = yaw;
                 cp.group.visible = true;
                 abilityLook.tag = 'waylay.x';   // V2.2: Convergent Paths' ring (High Fidelity)
-                this.spawnWindRing(ox, 0.25, oz, 0xfde047, 9.0, now);
+                this.spawnWindRing(ox, floorY + 0.25, oz, 0xfde047, 9.0, now);
                 abilityLook.tag = null;
             },
 
@@ -35001,7 +35023,9 @@
                         gw.position.x = nextX;
                         gw.position.z = nextZ;
                     }
-                    gw.group.position.set(gw.position.x, 0.05, gw.position.z);
+                    // V2.2: it runs on the floor under it, stepping up as Raze's Boom Bot does (it was at a fixed 0.05 m)
+                    gw.position.y = this.findSupportFloorY(gw.position.x, gw.position.y + 0.9, gw.position.z);
+                    gw.group.position.set(gw.position.x, gw.position.y + 0.05, gw.position.z);
                     gw.group.rotation.y = Math.atan2(gw.dirX, gw.dirZ);
                     if (nearestE && bestD2 <= AGENT_TUNING.gekko.q.triggerRadiusM * AGENT_TUNING.gekko.q.triggerRadiusM) {
                         this.detonateGekkoWingman(gw, now, nowMs);
@@ -35082,7 +35106,9 @@
                         gt.dirZ /= dLen;
                         gt.position.x = Math.max(-45, Math.min(45, gt.position.x + gt.dirX * gt.speed * dt));
                         gt.position.z = Math.max(-45, Math.min(45, gt.position.z + gt.dirZ * gt.speed * dt));
-                        gt.group.position.set(gt.position.x, 0.35, gt.position.z);
+                        // V2.2: it swims on the floor under it, stepping up as Raze's Boom Bot does (it was at a fixed 0.35 m)
+                        gt.position.y = this.findSupportFloorY(gt.position.x, gt.position.y + 0.9, gt.position.z);
+                        gt.group.position.set(gt.position.x, gt.position.y + 0.35, gt.position.z);
                         gt.group.rotation.y = Math.atan2(gt.dirX, gt.dirZ);
 
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -35429,6 +35455,9 @@
                     } else {
                         hr.position.x = Math.max(-38, Math.min(38, hr.position.x + hr.dir.x * hr.speed * dt));
                         hr.position.z = Math.max(-38, Math.min(38, hr.position.z + hr.dir.z * hr.speed * dt));
+                        // V2.2: the pool follows the floor under it as it advances: down off a ledge, up steps and stairs
+                        // (up to 0.9 m, so not onto a crate under its middle); it stayed at a fixed 0.04 m
+                        hr.position.y = this.findSupportFloorY(hr.position.x, hr.position.y - 0.04 + 0.1, hr.position.z) + 0.04;
                         hr.group.position.copy(hr.position);
                         if (now >= hr.nextGeyserAt) {
                             hr.nextGeyserAt = now + AGENT_TUNING.harbor.x.geyserIntervalMs;
@@ -35474,8 +35503,10 @@
                         gw.imploded = true;
                         soundFX.astraGravity();
                         abilityLook.tag = 'astra.c';   // V2.2: the Gravity Well's implosion (High Fidelity)
-                        this.spawnFlashBurst(gw.position.x, 0.95, gw.position.z, 0xeab308, gw.radius * 0.92, 360, now);
-                        this.spawnWindRing(gw.position.x, 0.25, gw.position.z, 0xa855f7, gw.radius, now);
+                        // V2.2: over the floor under the well; its flash and ring were at fixed heights from 0
+                        const fy = this.findSupportFloorY(gw.position.x, gw.position.y + 0.5, gw.position.z);
+                        this.spawnFlashBurst(gw.position.x, fy + 0.95, gw.position.z, 0xeab308, gw.radius * 0.92, 360, now);
+                        this.spawnWindRing(gw.position.x, fy + 0.25, gw.position.z, 0xa855f7, gw.radius, now);
                         abilityLook.tag = null;
                         let pulled = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -35529,8 +35560,10 @@
                         np.detonated = true;
                         soundFX.astraNova();
                         abilityLook.tag = 'astra.q';   // V2.2: the Nova Pulse going off (High Fidelity)
-                        this.spawnFlashBurst(np.position.x, 0.95, np.position.z, 0xeab308, np.radius, 360, now);
-                        this.spawnWindRing(np.position.x, 0.25, np.position.z, 0xa855f7, np.radius, now);
+                        // V2.2: over the floor under the star; its flash and ring were at fixed heights from 0
+                        const fy = this.findSupportFloorY(np.position.x, np.position.y + 0.5, np.position.z);
+                        this.spawnFlashBurst(np.position.x, fy + 0.95, np.position.z, 0xeab308, np.radius, 360, now);
+                        this.spawnWindRing(np.position.x, fy + 0.25, np.position.z, 0xa855f7, np.radius, now);
                         abilityLook.tag = null;
                         const rSq = np.radius * np.radius;
                         let concussed = 0;
@@ -35745,7 +35778,9 @@
                     td.dirZ /= dLen;
                     td.position.x = Math.max(-45, Math.min(45, td.position.x + td.dirX * td.speed * dt));
                     td.position.z = Math.max(-45, Math.min(45, td.position.z + td.dirZ * td.speed * dt));
-                    td.group.position.set(td.position.x, 1.35, td.position.z);
+                    // V2.2: it flies 1.35 m over the floor under it (the floor looked up as Raze's Boom Bot does); it was at a fixed 1.35 m
+                    td.position.y = this.findSupportFloorY(td.position.x, td.position.y - 1.35 + 0.9, td.position.z) + 1.35;
+                    td.group.position.copy(td.position);
                     td.group.rotation.y = Math.atan2(td.dirX, td.dirZ);
 
                     for (let j = 0; j < enemyObjects.length; j++) {
@@ -35906,8 +35941,9 @@
                         const midX = cp.origin.x + cp.dir.x * (cp.length * 0.5);
                         const midZ = cp.origin.z + cp.dir.z * (cp.length * 0.5);
                         abilityLook.tag = 'waylay.x';   // V2.2: Convergent Paths' eruption (High Fidelity)
-                        this.spawnFlashBurst(midX, 1.4, midZ, 0xfde047, 9.5, 450, now);
-                        this.spawnWindRing(midX, 0.3, midZ, 0xf472b6, 12.0, now);
+                        const laneFloor = cp.origin.y - 0.04;   // V2.2: on the lane's floor (they were at fixed heights from 0)
+                        this.spawnFlashBurst(midX, laneFloor + 1.4, midZ, 0xfde047, 9.5, 450, now);
+                        this.spawnWindRing(midX, laneFloor + 0.3, midZ, 0xf472b6, 12.0, now);
                         abilityLook.tag = null;
                         showNotification(`CONVERGENT PATHS ERUPTED! ${hitCount} ${hitCount === 1 ? 'Hostile' : 'Hostiles'} Hindered & Blinded across 26m Corridor!`, 2300);
                     }
