@@ -60572,7 +60572,10 @@
 
                 if (isControllerSmoke && typeof agentSystem !== 'undefined' && agentSystem.spawnSmokeSphere) {
                     const agentDef = (typeof AGENT_DEFS !== 'undefined' && AGENT_DEFS[game.activeAgent]) ? AGENT_DEFS[game.activeAgent] : { name: 'CONTROLLER', themeColor: '#38f6ff' };
-                    agentSystem.spawnSmokeSphere(new THREE.Vector3(worldX, 1.5, worldZ), 4.6, 8500, 0x38bdf8);
+                    // V2.2: the call's arguments match spawnSmokeSphere(x, y, z, colour, radius, ms, now) now (it passed a vector
+                    // and no clock, so the smoke sat at NaN and never expired, holding one of the four smoke slots). It is the
+                    // game's plain smoke (detonateProjectile's defaults), not 0x38bdf8, the colour that makes a Cyber Cage
+                    agentSystem.spawnSmokeSphere(worldX, 1.5, worldZ, 0x38f6ff, 4.6, 8500, gameNow());
                     this.spawnWorldPing(worldX, 0.5, worldZ, false, `☁ SKY-SMOKE (${agentDef.name})`);
                     showNotification(`MINIMAP SKY-SMOKE DEPLOYED AT X:${Math.round(worldX)} Z:${Math.round(worldZ)}!`, 2100);
                 } else {
