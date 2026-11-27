@@ -522,8 +522,15 @@ test('kill cam with Enhanced Animations on plays back the recorded values (a rel
     // it can be one from before Enhanced Animations went on, and a replay frame between a capture
     // without the new values and one with them draws the classic pose: CI caught that on a fast runner.)
     await page.waitForFunction(() => __k.eaGCode === 1 && __k.eaGT > 0.6 && replayRec.count > 6, null, { timeout: 60000 });
-    const rec = await evaluate(() => { const R = replayRec, i = (R.head - 1 + R.N) % R.N; return { t: R.t[i], on: R.eaOn[i], code: __k.eaGCode }; });
+    // V2.2 final check: the moment played back is the capture before the newest one, so the captures either side of
+    // it are both already recorded inside the reload
+    const rec = await evaluate(() => { const R = replayRec, i = (R.head - 2 + R.N) % R.N, j = (R.head - 1 + R.N) % R.N; return { t: R.t[i], on: R.eaOn[i] && R.eaOn[j], code: __k.eaGCode }; });
     assert.equal(rec.on, 1, 'the capture played back holds the new values');
+    // V2.2 final check: then the reload is run to its end (its time set to its length, as a shot jumps it on)
+    // instead of waiting out the rest of its 2.5 s of game time: the kill cam plays back the last 4.2 s of real
+    // time, and on a loaded machine game time runs slow, so the moment recorded fell out of the clip before the
+    // death (main failed this 2 times in 2 at a load of 9 on 4 cores)
+    await evaluate(() => { __k.eaGT = __k.eaGDur; });
     await page.waitForFunction(() => __k.eaGCode === 0, null, { timeout: 60000 });
     await frames(5);
     const death = await evaluate(() => {
