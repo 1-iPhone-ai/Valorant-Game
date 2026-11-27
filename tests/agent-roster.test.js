@@ -175,8 +175,25 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         out.again = {};
         for (const id of AGENT_ORDER) out.again[id] = V23.parts.figure(V23.core.resolve(id), 'show').userData.v23.hash;
         out.kit = ['low', 'medium', 'high', 'ultra'].map((t) => { const g = V23.parts.kitSuperset(t); return { tier: t, v: g.userData.kit.vertices, hash: g.userData.kit.hash, again: V23.parts.kitSuperset(t) === g }; });
+        // the first-person arm sets WP4 attaches: a sleeve and a detail geometry in hand space, slots from the look's fp
+        out.fp = {};
+        for (const id of ['sage', 'omen']) {
+            const a = V23.parts.fpArms(V23.core.resolve(id));
+            a.sleeve.computeBoundingBox();
+            out.fp[id] = { sleeve: a.sleeve.attributes.position.count, detail: a.detail.attributes.position.count, groups: [a.sleeve.groups.length, a.detail.groups.length],
+                slots: a.slots, wrist: a.wrist, overlay: a.overlay, box: [a.sleeve.boundingBox.min.toArray().map((v) => +v.toFixed(2)), a.sleeve.boundingBox.max.toArray().map((v) => +v.toFixed(2))] };
+        }
         return out;
     });
+    for (const id of ['sage', 'omen']) {
+        const f = builds.fp[id];
+        assert.ok(f.sleeve > 0 && f.detail > 0 && f.groups[0] >= 1 && f.groups[1] >= 1, id + ': first-person sleeve and detail geometry');
+        // both forearms, from the wrists (+-0.08, -0.09) down and back toward the camera
+        assert.ok(f.box[0][0] < -0.05 && f.box[1][0] > 0.05 && f.box[0][1] < -0.2 && f.box[1][2] > 0.15, id + ': sleeves in hand space ' + JSON.stringify(f.box));
+        console.log('#', id, 'fp arms', JSON.stringify(f));
+    }
+    assert.deepEqual([builds.fp.sage.slots.sleeve, builds.fp.sage.wrist], [['base', 'skin'], 'ampouleCuff'], 'Sage: a white sleeve over a bare forearm, jade ampoule cuffs');
+    assert.deepEqual([builds.fp.omen.slots.sleeve, builds.fp.omen.wrist, builds.fp.omen.overlay], [['under'], 'plateRing', 'basePlatesL'], 'Omen: the undersuit sleeve, plate rings, left forearm plates');
     assert.equal(builds.rand, 0, 'no Math.random call while every agent\'s show and world LOD builds and while motion samples');
     assert.ok(builds.pool.made, 'the object pool exists');
     assert.equal(builds.misses, 0, 'every build took its objects from the pool');
