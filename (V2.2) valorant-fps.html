@@ -22669,9 +22669,10 @@
                 q: { look: ['self'],
                     orbLifetimeMs: 3500,            // Reyna soul orb after a kill        [3 s]
                     orbRangeM: 15,                  // Devour / Dismiss reach to an orb   [~15 m]
-                    healHp: 50,                     // Devour instant heal                 [100 HP over 3 s]
+                    healHp: 50,                     // Devour heal, over time (step 0A)    [100 HP over 3 s]
                     shieldHp: 25,                   // Devour shield bonus                 [overheal up to 50]
-                    orbMinHeightM: 1.0, orbHeightM: 1.0 },
+                    orbMinHeightM: 1.0, orbHeightM: 1.0,
+                    healPerTickHp: 10, tickMs: 450 },   // V2.2: step 0A's ticks (the first at once), live now that the cast starts them
                 // E Dismiss: eat a soul orb to turn intangible (the extra speed is in the movement code)
                 e: { look: ['self'],
                     intangibleMs: 2000 },           // Dismiss intangible + haste          [2 s]
@@ -31591,7 +31592,12 @@
                 }
                 this.consumeSoulOrb(orb, now);
                 if (this.soulTether) this.soulTether.lookKey = 'reyna.q';   // V2.2: Devour's tether (High Fidelity)
-                this.healPlayer(AGENT_TUNING.reyna.q.healHp, now);
+                // V2.2: the heal comes over time (step 0A: healPerTickHp every tickMs, the first on the next step), as
+                // its session was meant to; it came all at once and the session never started. A second orb adds its ticks
+                const ds = this.reynaDevourSession;
+                ds.ticksLeft = (ds.active ? ds.ticksLeft : 0) + Math.round(AGENT_TUNING.reyna.q.healHp / AGENT_TUNING.reyna.q.healPerTickHp);
+                if (!ds.active) ds.nextTickAt = now;
+                ds.active = true;
                 game.maxShield = Math.max(game.maxShield || 25, 50);
                 game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.reyna.q.shieldHp);
                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
@@ -33349,10 +33355,11 @@
                 }
 
                 // 0A. Step Reyna Devour over-time Soul Heal ticks (+10 HP per tick)
+                // V2.2: castReynaDevour starts it (it never did, so this never ran); its numbers are in AGENT_TUNING.reyna.q
                 if (this.reynaDevourSession.active && now >= this.reynaDevourSession.nextTickAt) {
-                    this.healPlayer(10, now);
+                    this.healPlayer(AGENT_TUNING.reyna.q.healPerTickHp, now);
                     this.reynaDevourSession.ticksLeft--;
-                    this.reynaDevourSession.nextTickAt = now + 450;
+                    this.reynaDevourSession.nextTickAt = now + AGENT_TUNING.reyna.q.tickMs;
                     if (this.reynaDevourSession.ticksLeft <= 0) {
                         this.reynaDevourSession.active = false;
                     }
