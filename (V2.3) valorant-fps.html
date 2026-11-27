@@ -41935,7 +41935,7 @@
                     pos.z += (perpZ * 1.4 + nz * 0.9);
                     resolveEnemyMapCollision(pos, 0.68);
                     soundFX.at(pos.x, pos.y + 1, pos.z, () => soundFX.jettDash());
-                    abilityLook.botDash(enemy, dsx, dsz, gameNow());   // V2.3: the wind streaks age on game time, as R.self.tick does (V2.2 passed perfNow)
+                    abilityLook.botDash(enemy, dsx, dsz, gameNow());   // V2.3: game time, as R.self.tick ages it (V2.2 passed perfNow on, gNow only from updateEnemies)
 
                     const hz = this.acquireBotHazard();
                     if (hz) {

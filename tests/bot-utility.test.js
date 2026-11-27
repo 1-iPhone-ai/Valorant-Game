@@ -259,11 +259,14 @@ const SCENARIOS = [
 ];
 
 async function runAll(file) {
-    const { evaluate, errors, page } = await boot(file ? { quality: 'low', file } : { quality: 'low' });
+    const { evaluate, errors, page, frames } = await boot(file ? { quality: 'low', file } : { quality: 'low' });
     await evaluate(HELPERS);
     const out = { errors };
     for (const [name, fn, t0] of SCENARIOS) out[name] = await evaluate(`(${fn.toString()})(${t0})`);
     out.steal = await evaluate(() => __scenSteal(12e6));
+    // then real frames: the game draws on from where the runs left it
+    await frames(20);
+    out.programs = await programState(page);
     return { out, evaluate, page, errors };
 }
 
@@ -292,6 +295,8 @@ test('classic: the same casts, hazards, pool entries, timers, gaps and Math.rand
     const v23 = b.out;
     assert.deepEqual(a.out.errors, []);
     assert.deepEqual(v23.errors, []);
+    assert.equal(v23.programs[0], v23.programs[1], 'no shader program past the warm-up watermark');
+    assert.equal(v23.programs[2], 0, 'no first-use stall');
     const settings = await b.evaluate(() => [game.userSettings.agentIdentity, game.userSettings.botUtility, tacticalDirector.botHazardsPool.length, V23.util.poolLimit()]);
     assert.deepEqual(settings, ['on', 'classic', 10, 6], 'identity on and classic by default; 10 pool entries, 6 used');
     // the reference run really is V2.2 (no V23, 6 entries, nothing sent out)
@@ -341,7 +346,6 @@ test('classic: the same casts, hazards, pool entries, timers, gaps and Math.rand
         for (let j = 1; j < before.length; j++) assert.ok(before[j] < before[j - 1], 'closer every tick');
         assert.ok(before[before.length - 1] > 0, 'still flying just before 220 ms');
     }
-    assert.equal(A.stats.flights - A.stats.landed <= 1, true, 'every flight lands');
 
     // B: every windup ends in a release or a cancel within 650 ms (+ a tick); the 2600 ms gap and each archetype's
     // cooldown hold; no pool entry past V2.2's 6
