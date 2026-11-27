@@ -75,7 +75,7 @@ test('High Fidelity framework: the ten proof abilities out at once define the bu
     const ten = ['omen.e', 'sage.c', 'phoenix.c', 'sova.q', 'raze.e', 'phoenix.q', 'sova.x', 'breach.e', 'killjoy.e', 'jett.e'];
     const m = await kit.measure(g, ten);
     t.diagnostic('ten: ' + JSON.stringify(m));
-    // the budget was measured from this set (HIFI-CONTRACT.md): it must still hold, with the same CPU slack the roles get
+    // the budget was measured from this set (BUDGET in hifi-kit.js): it must still hold, with the same CPU slack the roles get
     assert.deepEqual(kit.overTen(m), []);
     assert.deepEqual(await kit.checkNoCompile(g), []);
     assert.deepEqual(g.errors, []);

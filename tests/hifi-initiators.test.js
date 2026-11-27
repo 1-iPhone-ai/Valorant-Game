@@ -1,5 +1,5 @@
 'use strict';
-// V2.2: High Fidelity looks, Initiators (their role block in the game file; HIFI-CONTRACT.md). Add each
+// V2.2: High Fidelity looks, Initiators (their role block in the game file; the API is in abilityLook's header). Add each
 // converted ability with the key>renderer pairs it binds; roleTest checks it and the role's budget.
 // 'absorb': a Classic piece another renderer draws (a blast's or a pulse's ring), so it is routed too.
 require('./hifi-kit').roleTest('Initiators', {

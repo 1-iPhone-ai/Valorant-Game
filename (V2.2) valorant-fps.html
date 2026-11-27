@@ -8708,9 +8708,9 @@
             
             setManual: function(quality) {
                 // V1.8: Ultra Realism needs WebGL 2; without it, Cinematic (and say so)
+                // V2.2: no fellBack flag (nothing read it: this notice and the panel's status, from isSupported(), say so)
                 if (quality === 'ultraRealism' && !ultraRealism.isSupported()) {
                     quality = 'cinematic';
-                    ultraRealism.fellBack = true;
                     showNotification(`ULTRA REALISM needs ${ultraRealism.reason}, which this browser does not have: using CINEMATIC`, 4000);
                 }
                 this.restoreShadowHz();
@@ -12210,6 +12210,10 @@
         
         // Create weapon models
         const weaponGroup = new THREE.Group();
+        // V2.2: the gun takes the camera's angles each frame (updateWeaponPosition), so it turns in the camera's
+        // order: in the default order (XYZ) the same pitch and yaw made another turn, and facing away from yaw 0
+        // the gun tipped off the view, by twice the pitch at yaw π
+        weaponGroup.rotation.order = 'YXZ';
         viewmodelScene.add(weaponGroup);
         
         function createWeapons() {
@@ -14186,6 +14190,12 @@
             if (members.length === 0) retireEnemyPage(page);
         }
         
+        // V2.2: the figure is built facing -Z, but the AI turns a bot's group so that +Z faces its target, so
+        // the default look drew every bot with its back to where it looks (Enhanced Animations turns it in its
+        // shader). The default look now draws each part half a turn round the group's own vertical axis: the
+        // group, and the hit proxies under it, stay exactly where they were; the shadow pass, which draws the
+        // same instance matrices, turns with it.
+        const _faceTurn = new THREE.Matrix4(), _faceInv = new THREE.Matrix4(), _faceHalf = new THREE.Matrix4().makeRotationY(Math.PI), _facePart = new THREE.Matrix4();
         function packEnemyBatches() {
             let packed = 0;
             for (let i = 0; i < enemyObjects.length; i++) {
@@ -14246,12 +14256,16 @@
                         const leaves = enemy.leaves;
                         const meshes = page.meshes;
                         const parts = Math.min(leaves.length, meshes.length);
+                        if (writeMatrix && !eaOn) {
+                            const gw = enemy.mesh.matrixWorld;   // V2.2: half a turn round the group (see _faceTurn)
+                            _faceTurn.multiplyMatrices(gw, _faceHalf).multiply(_faceInv.copy(gw).invert());
+                        }
                         for (let p = 0; p < parts; p++) {
                             if (writeMatrix) {
                                 // V2.2: Enhanced Animations writes its turned transform and values
                                 if (eaOn) enhancedAnim.packSlot(meshes[p], s, enemy, leaves[p].matrixWorld);
                                 else {
-                                    meshes[p].setMatrixAt(s, leaves[p].matrixWorld);
+                                    meshes[p].setMatrixAt(s, _facePart.multiplyMatrices(_faceTurn, leaves[p].matrixWorld));   // V2.2: facing its target
                                     meshes[p].geometry.attributes.instanceAnim.setXYZW(s, enemy.animPhase || 0, enemy.animAmt || 0, enemy.animFlinch || 0, enemy.animRecoil || 0);
                                 }
                                 perfTelemetry.enemyMatrixWrites++;
@@ -22606,6 +22620,8 @@
         const _abilityOrigin = new THREE.Vector3();
         const _abilityTempVec = new THREE.Vector3();
         const _abilityRay = new THREE.Ray();
+        // V2.2: Fast Lane's two walls for its damage tick (step 2R), reused: the tick built a new array of them each time
+        const _fastLaneWalls = [{ s: null, e: null }, { s: null, e: null }];
 
         // =============================================
         // V1.9.1: AGENT_TUNING, one table for agent ability numbers (it replaces ABILITY_TUNING).
@@ -22655,9 +22671,10 @@
                 q: { look: ['self'],
                     orbLifetimeMs: 3500,            // Reyna soul orb after a kill        [3 s]
                     orbRangeM: 15,                  // Devour / Dismiss reach to an orb   [~15 m]
-                    healHp: 50,                     // Devour instant heal                 [100 HP over 3 s]
+                    healHp: 50,                     // Devour heal, over time (step 0A)    [100 HP over 3 s]
                     shieldHp: 25,                   // Devour shield bonus                 [overheal up to 50]
-                    orbMinHeightM: 1.0, orbHeightM: 1.0 },
+                    orbMinHeightM: 1.0, orbHeightM: 1.0,
+                    healPerTickHp: 10, tickMs: 450 },   // V2.2: step 0A's ticks (the first at once), live now that the cast starts them
                 // E Dismiss: eat a soul orb to turn intangible (the extra speed is in the movement code)
                 e: { look: ['self'],
                     intangibleMs: 2000 },           // Dismiss intangible + haste          [2 s]
@@ -22674,7 +22691,7 @@
                 q: { look: ['projectile', 'flash'],
                     travelMs: 1300,                 // Paranoia travel time (x24 m/s)      [~1.2 s]
                     spawnAheadM: 1.2, speedMps: 24, radiusM: 2.8, enemyAimHeightM: 1.1, blindMs: 3800, slowMs: 3800, revealMs: 3800 },
-                // E Dark Cover: a thrown smoke (castSmokeProjectile, as Jett's and Sova's)
+                // E Dark Cover: a thrown smoke (castSmokeProjectile, as Jett's and Sova's); V2.2: it slows and reveals enemies inside it (the smoke loop in updateRender)
                 e: { look: ['projectile', 'smoke'],
                     lifetimeMs: 15000,              // Dark Cover smoke duration           [15 s]
                     fuseSec: 0.8, radiusM: 4.8 },
@@ -22955,7 +22972,7 @@
                 // E Guided Salvo: two target zones, each struck by three missiles (castTejoGuidedSalvo, Guided Salvo step)
                 e: { look: ['groundZone', 'blast'], rangeM: 30.0, zoneSpacingM: 5.8, radiusM: 5.4, lifetimeMs: 3800,
                     pulseCount: 3, firstPulseMs: 420, zoneStaggerMs: 240, pulseIntervalMs: 950, slowMs: 2600, revealMs: 3500, damage: 65 },
-                // X Armageddon: bombing waves that roll along a corridor ahead (spawnTejoArmageddon, Armageddon step)
+                // X Armageddon: bombing waves that roll along a corridor ahead (spawnTejoArmageddon, Armageddon step); V2.2: spawnAheadM and waveStartM both count from Tejo
                 x: { look: ['groundZone', 'blast'], spawnAheadM: 3.5, lifetimeMs: 5200, waveCount: 6, firstWaveMs: 260, waveIntervalMs: 460,
                     waveStartM: 3.5, waveSpacingM: 4.2, hitDepthM: 3.6, hitHalfWidthM: 5.8,
                     blindMs: 3400, slowMs: 4200, revealMs: 5000, damage: 125 }
@@ -27576,18 +27593,14 @@
                 mbqGroup.add(mbqEqArchMesh);
                 scene.add(mbqGroup);
                 this.warmupMeshes.push(mbqGroup);
+                // V2.2: without the fields nothing read or updated (originX/Y/Z, dirX/Z, rightX/Z, yaw, wavesDone,
+                // maxWaves): origin, dir and wavesFired below are the ones the spawn, the step, the radar and High Fidelity use
                 this.miksBassquake = {
                     active: false,
-                    originX: 0, originY: 0, originZ: 0,
-                    dirX: 0, dirZ: -1,
-                    rightX: 1, rightZ: 0,
-                    yaw: 0,
                     length: 30.0,
                     halfWidth: 6.0,
                     startAt: 0,
                     expireAt: 0,
-                    wavesDone: 0,
-                    maxWaves: AGENT_TUNING.miks.x.waveCount,
                     nextWaveAt: 0,
                     group: mbqGroup,
                     laneMesh: mbqLaneMesh,
@@ -27632,7 +27645,7 @@
                         markerEl.appendChild(diamondEl);
                         markerEl.appendChild(labelEl);
                         reconOverlay.appendChild(markerEl);
-                        this.hudDiamonds.push({ el: markerEl, labelEl: labelEl, visible: false });
+                        this.hudDiamonds.push({ el: markerEl, labelEl: labelEl, visible: false, burning: false });   // V2.2: burning (the .burning class is on)
                     }
                 }
 
@@ -27645,7 +27658,7 @@
                 game.activeAgent = agentId;
                 const def = AGENT_DEFS[agentId];
                 this.refreshAgentTheme();
-                this.syncHud(gameNow(), true);
+                this.syncHud(gameNow(), true);   // V2.2: on game time
                 agentStrip.show(); // V1.9: the agent strip shows for 4 s on an agent change
                 if (typeof tacticalDirector !== 'undefined' && game.agentPickerOpen) {
                     tacticalDirector.renderAgentPickerGrid();
@@ -27663,7 +27676,7 @@
 
             grantFullUltimate: function() {
                 game.ultPoints = game.maxUltPoints;
-                this.syncHud(gameNow(), true);
+                this.syncHud(gameNow(), true);   // V2.2: on game time
                 soundFX.ult();
                 showNotification(`${AGENT_DEFS[game.activeAgent].abilities.x.name} READY! Press X to activate`, 2400);
             },
@@ -27982,6 +27995,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.gekko.c.speedMps);
                 proj.velocity.y += AGENT_TUNING.gekko.c.upSpeedMps;
                 proj.gravity = AGENT_TUNING.gekko.c.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.gekko.c.fuseMs;
                 proj.mat.color.setHex(0xa3e635).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -28024,13 +28038,14 @@
                     if (!this.gekkoWingman[i].inUse) { gw = this.gekkoWingman[i]; break; }
                 }
                 gw.inUse = true;
-                gw.position.set(sx, 0.05, sz);
+                // V2.2: on the floor in front of you (position.y is that floor); it was at a fixed 0.05 m, under any raised floor
+                gw.position.set(sx, this.findSupportFloorY(sx, characterController.position.y, sz), sz);
                 gw.dirX = fwdX;
                 gw.dirZ = fwdZ;
                 gw.speed = AGENT_TUNING.gekko.q.speedMps;
                 gw.startAt = now;
                 gw.expireAt = now + AGENT_TUNING.gekko.q.lifetimeMs;
-                gw.group.position.copy(gw.position);
+                gw.group.position.set(sx, gw.position.y + 0.05, sz);
                 gw.group.rotation.y = Math.atan2(fwdX, fwdZ);
                 gw.group.visible = true;
                 soundFX.gekkoWingman();
@@ -28044,8 +28059,9 @@
                 gw.group.visible = false;
                 soundFX.gekkoWingman();
                 abilityLook.tag = 'gekko.q';   // V2.2: Gekko's Wingman concuss (High Fidelity draws it)
-                this.spawnFlashBurst(gw.position.x, 0.85, gw.position.z, 0xfacc15, 5.8, 340, now);
-                this.spawnWindRing(gw.position.x, 0.25, gw.position.z, 0xa3e635, 5.8, now);
+                // V2.2: over the floor it runs on (gw.position.y), as the Wingman itself; they were at fixed heights
+                this.spawnFlashBurst(gw.position.x, gw.position.y + 0.85, gw.position.z, 0xfacc15, 5.8, 340, now);
+                this.spawnWindRing(gw.position.x, gw.position.y + 0.25, gw.position.z, 0xa3e635, 5.8, now);
                 abilityLook.tag = null;
                 const rSq = AGENT_TUNING.gekko.q.radiusM * AGENT_TUNING.gekko.q.radiusM;
                 let hitCount = 0;
@@ -28110,15 +28126,17 @@
                 gt.active = true;
                 gt.position.set(
                     Math.max(-44, Math.min(44, characterController.position.x + fwdX * AGENT_TUNING.gekko.x.spawnAheadM)),
-                    0.35,
+                    0,
                     Math.max(-44, Math.min(44, characterController.position.z + fwdZ * AGENT_TUNING.gekko.x.spawnAheadM))
                 );
+                // V2.2: on the floor in front of you (position.y is that floor); it was at a fixed 0.35 m, under any raised floor
+                gt.position.y = this.findSupportFloorY(gt.position.x, characterController.position.y, gt.position.z);
                 gt.dirX = fwdX;
                 gt.dirZ = fwdZ;
                 gt.speed = AGENT_TUNING.gekko.x.speedMps;
                 gt.startAt = now;
                 gt.expireAt = now + AGENT_DEFS.gekko.abilities.x.durationMs;
-                gt.group.position.copy(gt.position);
+                gt.group.position.set(gt.position.x, gt.position.y + 0.35, gt.position.z);
                 gt.group.rotation.y = Math.atan2(fwdX, fwdZ);
                 gt.group.visible = true;
             },
@@ -28135,8 +28153,9 @@
                 }
                 soundFX.gekkoThrash();
                 abilityLook.tag = 'gekko.x';   // V2.2: Gekko's Thrash lunge (High Fidelity draws it)
-                this.spawnFlashBurst(gt.position.x, 1.0, gt.position.z, 0xa3e635, 7.5, 420, now);
-                this.spawnWindRing(gt.position.x, 0.3, gt.position.z, 0xa3e635, 7.8, now);
+                // V2.2: over the floor it swims on (gt.position.y), as Thrash itself; they were at fixed heights
+                this.spawnFlashBurst(gt.position.x, gt.position.y + 1.0, gt.position.z, 0xa3e635, 7.5, 420, now);
+                this.spawnWindRing(gt.position.x, gt.position.y + 0.3, gt.position.z, 0xa3e635, 7.8, now);
                 abilityLook.tag = null;
                 const rSq = AGENT_TUNING.gekko.x.radiusM * AGENT_TUNING.gekko.x.radiusM;
                 let detained = 0;
@@ -28197,6 +28216,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.deadlock.c.speedMps);
                 proj.velocity.y += AGENT_TUNING.deadlock.c.upSpeedMps;
                 proj.gravity = AGENT_TUNING.deadlock.c.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.deadlock.c.fuseMs;
                 proj.mat.color.setHex(0x38bdf8).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -28413,6 +28433,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.harbor.q.speedMps);
                 proj.velocity.y += AGENT_TUNING.harbor.q.upSpeedMps;
                 proj.gravity = AGENT_TUNING.harbor.q.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.harbor.q.fuseMs;
                 proj.mat.color.setHex(0x06b6d4).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -28460,22 +28481,24 @@
                     if (!this.harborHighTides[i].inUse) { ht = this.harborHighTides[i]; break; }
                 }
                 ht.inUse = true;
-                ht.startPos.set(sx, 0, sz);
-                ht.endPos.set(ex, 0, ez);
+                // V2.2: on the floor under you, as Neon's Fast Lane and Viper's Toxic Screen are (it stood at a fixed 0, under any raised floor)
+                const floorY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z);
+                ht.startPos.set(sx, floorY, sz);
+                ht.endPos.set(ex, floorY, ez);
                 ht.length = actualLen;
                 ht.startAt = now;
                 ht.expireAt = now + AGENT_TUNING.harbor.e.lifetimeMs;
                 ht.nextTickAt = now + AGENT_TUNING.harbor.e.firstTickMs;
                 ht.wallMesh.scale.set(1, 1, actualLen);
                 ht.crestMesh.scale.set(1, 1, actualLen);
-                ht.group.position.set((sx + ex) * 0.5, 0, (sz + ez) * 0.5);
+                ht.group.position.set((sx + ex) * 0.5, floorY, (sz + ez) * 0.5);
                 ht.group.rotation.y = Math.atan2(ex - sx, ez - sz);
                 ht.group.visible = true;
 
                 this.healPlayer(AGENT_TUNING.harbor.e.healHp, now);
                 soundFX.harborWave();
                 abilityLook.tag = 'harbor.e';   // V2.2: High Tide's ring (High Fidelity)
-                this.spawnWindRing(sx, 0.2, sz, 0x06b6d4, 4.0, now);
+                this.spawnWindRing(sx, floorY + 0.2, sz, 0x06b6d4, 4.0, now);   // V2.2: on that floor (it was at a fixed 0.2 m)
                 abilityLook.tag = null;
                 showNotification("HIGH TIDE WALL DEPLOYED — 22m Hydro-Wall Blocking Vision & Slowing Hostiles (+12 HP)!", 1950);
             },
@@ -28490,7 +28513,9 @@
                 const sx = Math.max(-42, Math.min(42, characterController.position.x + fwdX * AGENT_TUNING.harbor.x.spawnAheadM));
                 const sz = Math.max(-42, Math.min(42, characterController.position.z + fwdZ * AGENT_TUNING.harbor.x.spawnAheadM));
                 hr.active = true;
-                hr.position.set(sx, 0.04, sz);
+                // V2.2: 0.04 m over the floor in front of you at your feet's level (a step counts, a crate under its middle
+                // does not; the step below keeps it so); it was at a fixed 0.04 m, under any raised floor
+                hr.position.set(sx, this.findSupportFloorY(sx, characterController.position.y - characterController.height + 0.1, sz) + 0.04, sz);
                 hr.dir.set(fwdX, 0, fwdZ).normalize();
                 hr.radius = AGENT_TUNING.harbor.x.radiusM;
                 hr.speed = AGENT_TUNING.harbor.x.speedMps;
@@ -28502,7 +28527,7 @@
                 hr.group.position.copy(hr.position);
                 hr.group.visible = true;
                 abilityLook.tag = 'harbor.x';   // V2.2: Reckoning's ring (High Fidelity)
-                this.spawnWindRing(sx, 0.25, sz, 0x22d3ee, 10.0, now);
+                this.spawnWindRing(sx, hr.position.y - 0.04 + 0.25, sz, 0x22d3ee, 10.0, now);   // V2.2: on its floor (it was at a fixed 0.25 m)
                 abilityLook.tag = null;
             },
 
@@ -28582,20 +28607,23 @@
                 const cz = Math.max(-38, Math.min(38, characterController.position.z + fwdZ * AGENT_TUNING.astra.x.spawnAheadM));
                 const halfLen = AGENT_TUNING.astra.x.halfLengthM;
 
+                // V2.2: on the floor under you, as Neon's Fast Lane and Viper's Toxic Screen are (the wall, its flash and
+                // ring stood at fixed heights from 0, under any raised floor)
+                const floorY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z);
                 cd.active = true;
-                cd.position.set(cx, 0, cz);
-                cd.startPos.set(cx - perpX * halfLen, 0, cz - perpZ * halfLen);
-                cd.endPos.set(cx + perpX * halfLen, 0, cz + perpZ * halfLen);
+                cd.position.set(cx, floorY, cz);
+                cd.startPos.set(cx - perpX * halfLen, floorY, cz - perpZ * halfLen);
+                cd.endPos.set(cx + perpX * halfLen, floorY, cz + perpZ * halfLen);
                 cd.halfLength = halfLen;
                 cd.startAt = now;
                 cd.expireAt = now + AGENT_DEFS.astra.abilities.x.durationMs;
                 cd.nextTickAt = now + AGENT_TUNING.astra.x.firstTickMs;
-                cd.group.position.set(cx, 0, cz);
+                cd.group.position.set(cx, floorY, cz);
                 cd.group.rotation.y = yaw;
                 cd.group.visible = true;
                 abilityLook.tag = 'astra.x';   // V2.2: Cosmic Divide's flash and ring (High Fidelity)
-                this.spawnFlashBurst(cx, 2.2, cz, 0xeab308, 6.5, 420, now);
-                this.spawnWindRing(cx, 0.25, cz, 0xa855f7, 9.5, now);
+                this.spawnFlashBurst(cx, floorY + 2.2, cz, 0xeab308, 6.5, 420, now);
+                this.spawnWindRing(cx, floorY + 0.25, cz, 0xa855f7, 9.5, now);
                 abilityLook.tag = null;
             },
 
@@ -28666,9 +28694,11 @@
             },
 
             // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
-            detonateVyseArcRose: function(now) {
-                let targetRose = null;
-                for (let i = 0; i < this.vyseArcRoses.length; i++) {
+            // V2.2: the rose an enemy walked up to pops (step 2CCC passes it; it was ignored and the first live rose
+            // popped); a press pops the live one (with one charge, and Q pressed again detonating, only one is ever live)
+            detonateVyseArcRose: function(now, rose) {
+                let targetRose = (rose && rose.inUse && now < rose.expireAt) ? rose : null;
+                for (let i = 0; i < this.vyseArcRoses.length && !targetRose; i++) {
                     const vr = this.vyseArcRoses[i];
                     if (vr.inUse && now < vr.expireAt) {
                         targetRose = vr;
@@ -28719,6 +28749,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.vyse.e.speedMps);
                 proj.velocity.y += AGENT_TUNING.vyse.e.upSpeedMps;
                 proj.gravity = AGENT_TUNING.vyse.e.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.vyse.e.fuseMs;
                 proj.mat.color.setHex(0xc084fc).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -28791,7 +28822,8 @@
                     if (!this.tejoStealthDrones[i].inUse) { td = this.tejoStealthDrones[i]; break; }
                 }
                 td.inUse = true;
-                td.position.set(sx, 1.35, sz);
+                // V2.2: 1.35 m over the floor in front of you; it was at a fixed 1.35 m, under any raised floor
+                td.position.set(sx, this.findSupportFloorY(sx, characterController.position.y, sz) + 1.35, sz);
                 td.dirX = fwdX;
                 td.dirZ = fwdZ;
                 td.speed = AGENT_TUNING.tejo.c.speedMps;
@@ -28826,7 +28858,7 @@
                 const dz = drone.position.z;
                 abilityLook.tag = 'tejo.c';   // V2.2: Tejo's Stealth Drone EMP (High Fidelity draws it)
                 this.spawnFlashBurst(dx, dy, dz, 0x38bdf8, 8.5, 420, now);
-                this.spawnWindRing(dx, 0.25, dz, 0xf59e0b, 11.0, now);
+                this.spawnWindRing(dx, dy - 1.35 + 0.25, dz, 0xf59e0b, 11.0, now);   // V2.2: on the floor under the drone (it was at a fixed 0.25 m)
                 abilityLook.tag = null;
 
                 const nowMs = Date.now();
@@ -28865,6 +28897,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.tejo.q.speedMps);
                 proj.velocity.y += AGENT_TUNING.tejo.q.upSpeedMps;
                 proj.gravity = AGENT_TUNING.tejo.q.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.tejo.q.fuseMs;
                 proj.mat.color.setHex(0xf59e0b).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -28961,13 +28994,15 @@
                 ta.startAt = now;
                 ta.nextWaveAt = now + AGENT_TUNING.tejo.x.firstWaveMs;
                 ta.expireAt = now + AGENT_TUNING.tejo.x.lifetimeMs;
-                ta.floorMesh.position.set(ox + fwdX * 14.0, 0.05, oz + fwdZ * 14.0);
+                // V2.2: on the floor under you, as Neon's Fast Lane and Viper's Toxic Screen are (it was at a fixed 0.05 m, under any raised floor)
+                const floorY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z);
+                ta.floorMesh.position.set(ox + fwdX * 14.0, floorY + 0.05, oz + fwdZ * 14.0);
                 ta.floorMesh.rotation.y = yaw;
                 ta.waveMesh.position.set(ox, 1.8, oz);
                 ta.waveMesh.rotation.y = yaw;
                 ta.group.visible = true;
                 abilityLook.tag = 'tejo.x';   // V2.2: Tejo's Armageddon call-in ring (High Fidelity draws its own)
-                this.spawnWindRing(ox, 0.25, oz, 0xf97316, 8.5, now);
+                this.spawnWindRing(ox, floorY + 0.25, oz, 0xf97316, 8.5, now);   // V2.2: on that floor too (it was at a fixed 0.25 m)
                 abilityLook.tag = null;
             },
 
@@ -28984,6 +29019,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.waylay.c.speedMps);
                 proj.velocity.y += AGENT_TUNING.waylay.c.upSpeedMps;
                 proj.gravity = AGENT_TUNING.waylay.c.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.waylay.c.fuseMs;
                 proj.mat.color.setHex(0xfde047).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -29058,7 +29094,9 @@
                 this.dashFxUntil = now + 520;
                 soundFX.waylayDash();
                 abilityLook.tag = 'waylay.q';   // V2.2: Lightspeed's ring (High Fidelity)
-                this.spawnWindRing(characterController.position.x, characterController.position.y + 0.3, characterController.position.z, 0xfde047, 5.2, now);
+                // V2.2: 0.3 m over the floor under you (position.y is your eye, so it was 0.3 m over your head)
+                const ringY = this.findSupportFloorY(characterController.position.x, characterController.position.y, characterController.position.z) + 0.3;
+                this.spawnWindRing(characterController.position.x, ringY, characterController.position.z, 0xfde047, 5.2, now);
                 abilityLook.tag = null;
                 if (game.health < game.maxHealth) {
                     game.health = Math.min(game.maxHealth, game.health + AGENT_TUNING.waylay.q.healHp);
@@ -29106,8 +29144,11 @@
 
                 // Flash & hinder enemies near departure point
                 abilityLook.tag = 'waylay.e';   // V2.2: Refract's return, where you leave (High Fidelity)
-                this.spawnFlashBurst(oldX, oldY + 0.9, oldZ, 0xfde047, 5.5, 360, now);
-                this.spawnWindRing(oldX, oldY + 0.15, oldZ, 0x38bdf8, 5.8, now);
+                // V2.2: over the floor where you leave, as the arrival's are over the beacon's floor (oldY is your
+                // eye, so the flash was 0.9 m over your head and the ring at your eyes)
+                const oldFloor = this.findSupportFloorY(oldX, oldY, oldZ);
+                this.spawnFlashBurst(oldX, oldFloor + 0.9, oldZ, 0xfde047, 5.5, 360, now);
+                this.spawnWindRing(oldX, oldFloor + 0.15, oldZ, 0x38bdf8, 5.8, now);
                 abilityLook.tag = null;
                 const rSq = AGENT_TUNING.waylay.e.returnRadiusM * AGENT_TUNING.waylay.e.returnRadiusM;
                 for (let i = 0; i < enemyObjects.length; i++) {
@@ -29121,7 +29162,10 @@
                     }
                 }
 
-                characterController.position.set(targetX, targetY, targetZ);
+                // V2.2: the beacon is on the floor and the controller's position is the eye: stand on it (as Veto's
+                // Crosscut and Chamber's Rendezvous do). At the floor's height you were pushed off a raised floor's side
+                characterController.position.set(targetX, targetY + characterController.height, targetZ);
+                characterController.prevSimPosition.copy(characterController.position);
                 characterController.velocity.set(0, 0, 0);
                 camera.position.set(targetX, targetY + characterController.height, targetZ);
 
@@ -29151,10 +29195,12 @@
                 const fwdZ = -Math.cos(yaw);
                 const ox = characterController.position.x;
                 const oz = characterController.position.z;
+                // V2.2: the lane, its trim, the mirage and the rings stand on the floor under you (they were at fixed heights from 0)
+                const floorY = this.findSupportFloorY(ox, characterController.position.y, oz);
 
                 cp.active = true;
                 cp.erupted = false;
-                cp.origin.set(ox, 0.04, oz);
+                cp.origin.set(ox, floorY + 0.04, oz);
                 cp.dir.set(fwdX, 0, fwdZ).normalize();
                 cp.length = AGENT_TUNING.waylay.x.lengthM;
                 cp.halfWidth = AGENT_TUNING.waylay.x.halfWidthM;
@@ -29164,15 +29210,15 @@
 
                 const midX = ox + fwdX * (cp.length * 0.5);
                 const midZ = oz + fwdZ * (cp.length * 0.5);
-                cp.laneMesh.position.set(midX, 0.05, midZ);
+                cp.laneMesh.position.set(midX, floorY + 0.05, midZ);
                 cp.laneMesh.rotation.y = yaw;
-                cp.trimMesh.position.set(midX, 0.07, midZ);
+                cp.trimMesh.position.set(midX, floorY + 0.07, midZ);
                 cp.trimMesh.rotation.y = yaw;
-                cp.mirageMesh.position.set(ox + fwdX * 2.5, 1.35, oz + fwdZ * 2.5);
+                cp.mirageMesh.position.set(ox + fwdX * 2.5, floorY + 1.35, oz + fwdZ * 2.5);
                 cp.mirageMesh.rotation.y = yaw;
                 cp.group.visible = true;
                 abilityLook.tag = 'waylay.x';   // V2.2: Convergent Paths' ring (High Fidelity)
-                this.spawnWindRing(ox, 0.25, oz, 0xfde047, 9.0, now);
+                this.spawnWindRing(ox, floorY + 0.25, oz, 0xfde047, 9.0, now);
                 abilityLook.tag = null;
             },
 
@@ -29218,7 +29264,10 @@
                 abilityLook.tag = 'veto.c';   // V2.2: the teleport's rings and burst (High Fidelity)
                 this.spawnWindRing(oldX, oldY + 0.15, oldZ, 0x10b981, 5.0, now);
                 abilityLook.tag = null;
-                characterController.position.set(targetX, targetY, targetZ);
+                // V2.2: the anchor is on the floor and the controller's position is the eye: stand on it (as Rendezvous
+                // does). At the floor's height the feet were under it: on a raised floor you were pushed off its side
+                characterController.position.set(targetX, targetY + characterController.height, targetZ);
+                characterController.prevSimPosition.copy(characterController.position);
                 characterController.velocity.set(0, 0, 0);
                 camera.position.set(targetX, targetY + characterController.height, targetZ);
 
@@ -29268,6 +29317,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.veto.q.speedMps);
                 proj.velocity.y += AGENT_TUNING.veto.q.upSpeedMps;
                 proj.gravity = AGENT_TUNING.veto.q.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.veto.q.fuseMs;
                 proj.mat.color.setHex(0x10b981).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -29370,6 +29420,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.miks.c.speedMps);
                 proj.velocity.y += AGENT_TUNING.miks.c.upSpeedMps;
                 proj.gravity = AGENT_TUNING.miks.c.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.miks.c.fuseMs;
                 proj.mat.color.setHex(0xec4899).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -29663,9 +29714,12 @@
                     }
                 }
 
-                const ax = Math.max(-38, Math.min(38, characterController.position.x + fwdX * AGENT_TUNING.iso.x.arenaAheadM));
-                const az = Math.max(-38, Math.min(38, characterController.position.z + fwdZ * AGENT_TUNING.iso.x.arenaAheadM));
-                const floorY = this.findSupportFloorY(ax, characterController.position.y + 1.0, az);
+                // V2.2: the arena goes where you aim it, inside the map's bounds as the aim point is (±45 m: ±38 moved its
+                // centre up to 6 m, into walls), on the floor under it at your feet's level: a step counts, a wall's or
+                // a crate's top does not (looked up from 1 m over your eyes, a 3 m wall's top was taken for the floor)
+                const ax = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.iso.x.arenaAheadM));
+                const az = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.iso.x.arenaAheadM));
+                const floorY = this.findSupportFloorY(ax, characterController.position.y - characterController.height + 0.1, az);
 
                 kc.active = true;
                 kc.position.set(ax, floorY, az);
@@ -29726,6 +29780,7 @@
                 proj.velocity.copy(_abilityForward).multiplyScalar(AGENT_TUNING.clove.q.speedMps);
                 proj.velocity.y += AGENT_TUNING.clove.q.upSpeedMps;
                 proj.gravity = AGENT_TUNING.clove.q.gravity;
+                proj.spawnAt = now;   // V2.2: as every other cast (High Fidelity reads it: the throw's age, and a reused slot's new throw)
                 proj.detonateAt = now + AGENT_TUNING.clove.q.fuseMs;
                 proj.mat.color.setHex(0xf472b6).convertSRGBToLinear();
                 proj.mesh.position.copy(proj.position);
@@ -31460,12 +31515,13 @@
             },
 
             // --- C: Cloudburst Smoke / Hot Hands Molly / Sage Barrier Orb Ice Wall ---
-            castSmokeProjectile: function(now, colorHex, airburstSec, radius, durationMs) {
+            castSmokeProjectile: function(now, colorHex, airburstSec, radius, durationMs, isDarkCover) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'smoke';
                 proj.smokeColor = colorHex;
+                proj.isDarkCover = !!isDarkCover;   // V2.2: Omen's Dark Cover says so itself (its smoke's colour never matched isDarkCover's)
                 proj.smokeRadius = radius;
                 proj.smokeDurationMs = durationMs;
                 proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.0);
@@ -31568,7 +31624,12 @@
                 }
                 this.consumeSoulOrb(orb, now);
                 if (this.soulTether) this.soulTether.lookKey = 'reyna.q';   // V2.2: Devour's tether (High Fidelity)
-                this.healPlayer(AGENT_TUNING.reyna.q.healHp, now);
+                // V2.2: the heal comes over time (step 0A: healPerTickHp every tickMs, the first on the next step), as
+                // its session was meant to; it came all at once and the session never started. A second orb adds its ticks
+                const ds = this.reynaDevourSession;
+                ds.ticksLeft = (ds.active ? ds.ticksLeft : 0) + Math.round(AGENT_TUNING.reyna.q.healHp / AGENT_TUNING.reyna.q.healPerTickHp);
+                if (!ds.active) ds.nextTickAt = now;
+                ds.active = true;
                 game.maxShield = Math.max(game.maxShield || 25, 50);
                 game.shield = Math.min(50, (game.shield || 0) + AGENT_TUNING.reyna.q.shieldHp);
                 if (typeof tacticalDirector !== 'undefined') tacticalDirector.updateVitalsHUD();
@@ -31657,7 +31718,8 @@
             // V2.2: Omen's numbers are in AGENT_TUNING.omen
             castOmenDarkCover: function(now) {
                 // Long-lasting purple controller smoke through the shared smoke system
-                this.castSmokeProjectile(now, 0x6d28d9, AGENT_TUNING.omen.e.fuseSec, AGENT_TUNING.omen.e.radiusM, AGENT_TUNING.omen.e.lifetimeMs);
+                // V2.2: flagged as Dark Cover (its look, the slow and reveal inside it and its minimap colour read the flag)
+                this.castSmokeProjectile(now, 0x6d28d9, AGENT_TUNING.omen.e.fuseSec, AGENT_TUNING.omen.e.radiusM, AGENT_TUNING.omen.e.lifetimeMs, true);
             },
 
             castPhoenixHotHands: function(now) {
@@ -31794,7 +31856,7 @@
                 }, 80);
                 if (wall.health <= 0) {
                     abilityLook.tag = 'sage.c';   // V2.0: the Barrier Orb shatters
-                    this.spawnFlashBurst(wall.group.position.x, wall.group.position.y, wall.group.position.z, 0x34d399, 3.2, 280, gameNow());
+                    this.spawnFlashBurst(wall.group.position.x, wall.group.position.y, wall.group.position.z, 0x34d399, 3.2, 280, gameNow());   // V2.2: on game time
                     abilityLook.tag = null;
                     this.deactivateIceWall(wall);
                     soundFX.slowZone();
@@ -32004,7 +32066,8 @@
                         this.vipersPit.expireAt = now + def.abilities.x.durationMs;
                         this.vipersPit.nextTickAt = now + AGENT_TUNING.viper.x.firstTickMs;
                         this.vipersPit.group.position.copy(this.vipersPit.position);
-                        this.vipersPit.domeMesh.scale.set(this.vipersPit.radius, this.vipersPit.radius * 0.55, this.vipersPit.radius);
+                        // V2.2: the dome is the sphere sight stops at (radius up as well as across); it was squashed to 0.55 of its height
+                        this.vipersPit.domeMesh.scale.set(this.vipersPit.radius, this.vipersPit.radius, this.vipersPit.radius);
                         this.vipersPit.ringMesh.scale.set(this.vipersPit.radius, 1, this.vipersPit.radius);
                         this.vipersPit.discMesh.scale.set(this.vipersPit.radius, 1, this.vipersPit.radius);
                         this.vipersPit.group.visible = true;
@@ -32225,7 +32288,7 @@
                     soundFX.vyseGarden();
                     showNotification("ADAPT OR DIE! STEEL GARDEN ERUPTING (24m Liquid-Metal Thorn Field Jamming Enemy Weapons + 50 Armor)!", 3600);
                 } else if (agentId === 'tejo') {
-                    // Armageddon: Unleash a 28m Rolling Tactical Airstrike Corridor with 4 Sequential Carpet-Bombing Waves!
+                    // Armageddon: Unleash a 28m Rolling Tactical Airstrike Corridor with 6 Sequential Carpet-Bombing Waves! (V2.2: 6, as AGENT_TUNING.tejo.x.waveCount; this said 4)
                     game.ultChargesLeft = 0;
                     const st = this.stateByAgent.tejo;
                     if (st) {
@@ -32510,7 +32573,7 @@
 
             // Same rules as a kill: no gain while the ult is active, capped at max
             addUltPoint: function(points) {
-                const now = gameNow();
+                const now = gameNow();   // V2.2: on game time (the ult charge it grants is an ability timer)
                 if (this.isUltActive(now) || game.ultPoints >= game.maxUltPoints) return;
                 game.ultPoints = Math.min(game.maxUltPoints, game.ultPoints + (points || 1));
                 if (game.ultPoints === game.maxUltPoints) {
@@ -32787,7 +32850,7 @@
                 else abilityLook.bindNow(item, 'ring', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
-            spawnSmokeSphere: function(x, y, z, colorHex, radius, durationMs, now) {
+            spawnSmokeSphere: function(x, y, z, colorHex, radius, durationMs, now, isDarkCover) {
                 let item = this.smokes[0];
                 for (let i = 0; i < this.smokes.length; i++) {
                     if (!this.smokes[i].inUse) { item = this.smokes[i]; break; }
@@ -32800,7 +32863,7 @@
                 item.startAt = now;
                 item.expireAt = now + durationMs;
                 item.nextTickAt = now + 200;
-                item.isDarkCover = (colorHex === 0x6366f1);
+                item.isDarkCover = !!isDarkCover;   // V2.2: set by Dark Cover's cast (it matched 0x6366f1, a colour no smoke uses: Dark Cover's is 0x6d28d9)
                 item.isCyberCage = (colorHex === 0x38bdf8);
                 item.isPoisonCloud = (colorHex === 0x22c55e);
                 item.isRuseSmoke = (colorHex === 0xf472b6);
@@ -32907,7 +32970,7 @@
                 item.mesh.scale.set(0.3, 0.3, 0.3);
                 item.mesh.visible = true;
                 item.lookKey = abilityLook.tag;   // V2.0: the ability this burst belongs to (High Fidelity draws its own)
-                if (!abilityLook.claims(item, 'flash')) fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
+                if (!abilityLook.claims(item, 'flash')) fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake (V2.2: unless High Fidelity draws this flash)
                 else abilityLook.bindNow(item, 'flash', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
@@ -32939,7 +33002,7 @@
                 abilityLook.tag = abilityLook.projKey(proj);   // V2.2: what the detonation spawns belongs to the projectile's ability (its tag, or its type) for High Fidelity
 
                 if (proj.type === 'smoke') {
-                    this.spawnSmokeSphere(p.x, p.y, p.z, proj.smokeColor || 0x38f6ff, proj.smokeRadius || 4.6, proj.smokeDurationMs || 8500, now);
+                    this.spawnSmokeSphere(p.x, p.y, p.z, proj.smokeColor || 0x38f6ff, proj.smokeRadius || 4.6, proj.smokeDurationMs || 8500, now, proj.isDarkCover);   // V2.2: Dark Cover's flag
                 } else if (proj.type === 'molly') {
                     // Drop molly onto the floor or box surface directly underneath
                     const floorY = this.findSupportFloorY(p.x, p.y, p.z);
@@ -33325,10 +33388,11 @@
                 }
 
                 // 0A. Step Reyna Devour over-time Soul Heal ticks (+10 HP per tick)
+                // V2.2: castReynaDevour starts it (it never did, so this never ran); its numbers are in AGENT_TUNING.reyna.q
                 if (this.reynaDevourSession.active && now >= this.reynaDevourSession.nextTickAt) {
-                    this.healPlayer(10, now);
+                    this.healPlayer(AGENT_TUNING.reyna.q.healPerTickHp, now);
                     this.reynaDevourSession.ticksLeft--;
-                    this.reynaDevourSession.nextTickAt = now + 450;
+                    this.reynaDevourSession.nextTickAt = now + AGENT_TUNING.reyna.q.tickMs;
                     if (this.reynaDevourSession.ticksLeft <= 0) {
                         this.reynaDevourSession.active = false;
                     }
@@ -34112,10 +34176,10 @@
                     }
                     if (now >= fl.nextTickAt) {
                         fl.nextTickAt = now + AGENT_TUNING.neon.c.tickMs; // 5 ticks/sec * 7 dmg = 35 DPS
-                        const walls = [
-                            { s: fl.leftStart, e: fl.leftEnd },
-                            { s: fl.rightStart, e: fl.rightEnd }
-                        ];
+                        // V2.2: the walls go in one reused array (it was a new array of two new objects each tick)
+                        const walls = _fastLaneWalls;
+                        walls[0].s = fl.leftStart; walls[0].e = fl.leftEnd;
+                        walls[1].s = fl.rightStart; walls[1].e = fl.rightEnd;
                         for (let wIdx = 0; wIdx < walls.length; wIdx++) {
                             const w = walls[wIdx];
                             const abX = w.e.x - w.s.x;
@@ -34892,7 +34956,7 @@
                         soundFX.gekkoMosh();
                         abilityLook.tag = 'gekko.c';   // V2.2: Gekko's Mosh Pit eruption (High Fidelity draws it)
                         this.spawnFlashBurst(mp.position.x, 0.9, mp.position.z, 0xa3e635, mp.radius * 0.95, 360, now);
-                        this.spawnWindRing(mp.position.x, 0.35, mp.position.z, 0xa3e635, mp.radius * 1.05, 340, now);
+                        this.spawnWindRing(mp.position.x, 0.35, mp.position.z, 0xa3e635, mp.radius * 1.05, now);   // V2.2: no duration argument (340 went in as now: the ring had ended before it was drawn)
                         abilityLook.tag = null;
                         let hits = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -34919,7 +34983,8 @@
                             const dz = e.mesh.position.z - mp.position.z;
                             if (dx * dx + dz * dz <= rSq) {
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.gekko.c.tickSlowMs);
-                                damageEnemyActor(e, AGENT_TUNING.gekko.c.damagePerTick, now, nowMs, "Mosh Pit Acid", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.gekko.c.damagePerTick, now, nowMs, "Mosh Pit Acid", false);
                             }
                         }
                     }
@@ -34966,7 +35031,9 @@
                         gw.position.x = nextX;
                         gw.position.z = nextZ;
                     }
-                    gw.group.position.set(gw.position.x, 0.05, gw.position.z);
+                    // V2.2: it runs on the floor under it, stepping up as Raze's Boom Bot does (it was at a fixed 0.05 m)
+                    gw.position.y = this.findSupportFloorY(gw.position.x, gw.position.y + 0.9, gw.position.z);
+                    gw.group.position.set(gw.position.x, gw.position.y + 0.05, gw.position.z);
                     gw.group.rotation.y = Math.atan2(gw.dirX, gw.dirZ);
                     if (nearestE && bestD2 <= AGENT_TUNING.gekko.q.triggerRadiusM * AGENT_TUNING.gekko.q.triggerRadiusM) {
                         this.detonateGekkoWingman(gw, now, nowMs);
@@ -35047,7 +35114,9 @@
                         gt.dirZ /= dLen;
                         gt.position.x = Math.max(-45, Math.min(45, gt.position.x + gt.dirX * gt.speed * dt));
                         gt.position.z = Math.max(-45, Math.min(45, gt.position.z + gt.dirZ * gt.speed * dt));
-                        gt.group.position.set(gt.position.x, 0.35, gt.position.z);
+                        // V2.2: it swims on the floor under it, stepping up as Raze's Boom Bot does (it was at a fixed 0.35 m)
+                        gt.position.y = this.findSupportFloorY(gt.position.x, gt.position.y + 0.9, gt.position.z);
+                        gt.group.position.set(gt.position.x, gt.position.y + 0.35, gt.position.z);
                         gt.group.rotation.y = Math.atan2(gt.dirX, gt.dirZ);
 
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -35125,7 +35194,8 @@
                                 }
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.c.tickSlowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.c.tickRevealMs);
-                                damageEnemyActor(e, AGENT_TUNING.deadlock.c.damagePerTick, now, nowMs, "GravNet Nanowire", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.deadlock.c.damagePerTick, now, nowMs, "GravNet Nanowire", false);
                             }
                         }
                     }
@@ -35162,7 +35232,7 @@
                         soundFX.deadlockSensor();
                         abilityLook.tag = 'deadlock.q';   // V2.2: Sonic Sensor's concussion (High Fidelity)
                         this.spawnFlashBurst(ds.position.x, 0.9, ds.position.z, 0x38bdf8, 6.8, 340, now);
-                        this.spawnWindRing(ds.position.x, 0.3, ds.position.z, 0x38bdf8, 6.8, 320, now);
+                        this.spawnWindRing(ds.position.x, 0.3, ds.position.z, 0x38bdf8, 6.8, now);   // V2.2: no duration argument (320 went in as now: the ring had ended before it was drawn)
                         abilityLook.tag = null;
                         const blastRSq = AGENT_TUNING.deadlock.q.blastRadiusM * AGENT_TUNING.deadlock.q.blastRadiusM;
                         let stunned = 0;
@@ -35214,7 +35284,8 @@
                                 e.transformDirty = true;
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.e.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.e.revealMs);
-                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", true);
+                                // V2.2: body hits on both arms (true here meant 'head': each shock dealt four times its damagePerTick)
+                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", false);
                             } else if (Math.abs(localX) < AGENT_TUNING.deadlock.e.armHalfWidthM) {
                                 const pushX = (localX >= 0 ? AGENT_TUNING.deadlock.e.pushOutM : -AGENT_TUNING.deadlock.e.pushOutM) - localX;
                                 e.mesh.position.x += pushX * cosY;
@@ -35222,7 +35293,7 @@
                                 e.transformDirty = true;
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.e.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.e.revealMs);
-                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", true);
+                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", false);
                             }
                         }
                     }
@@ -35239,7 +35310,7 @@
                         soundFX.deadlockCocoon();
                         abilityLook.tag = 'deadlock.x';   // V2.2: Annihilation's execution (High Fidelity)
                         this.spawnFlashBurst(dc.position.x, 1.15, dc.position.z, 0x38bdf8, 5.5, 380, now);
-                        this.spawnWindRing(dc.position.x, 0.35, dc.position.z, 0x38bdf8, 5.8, 360, now);
+                        this.spawnWindRing(dc.position.x, 0.35, dc.position.z, 0x38bdf8, 5.8, now);   // V2.2: no duration argument (360 went in as now: the ring had ended before it was drawn)
                         abilityLook.tag = null;
                         if (tEnemy && tEnemy.isActive && !tEnemy.hit) {
                             damageEnemyActor(tEnemy, AGENT_TUNING.deadlock.x.damage, now, nowMs, "Annihilation Execution", false);
@@ -35375,7 +35446,8 @@
                             e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.harbor.e.slowMs);
                             e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.harbor.e.revealMs);
                             if (canTick) {
-                                damageEnemyActor(e, AGENT_TUNING.harbor.e.damagePerTick, now, nowMs, "High Tide", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.harbor.e.damagePerTick, now, nowMs, "High Tide", false);
                             }
                         }
                     }
@@ -35391,6 +35463,9 @@
                     } else {
                         hr.position.x = Math.max(-38, Math.min(38, hr.position.x + hr.dir.x * hr.speed * dt));
                         hr.position.z = Math.max(-38, Math.min(38, hr.position.z + hr.dir.z * hr.speed * dt));
+                        // V2.2: the pool follows the floor under it as it advances: down off a ledge, up steps and stairs
+                        // (up to 0.9 m, so not onto a crate under its middle); it stayed at a fixed 0.04 m
+                        hr.position.y = this.findSupportFloorY(hr.position.x, hr.position.y - 0.04 + 0.1, hr.position.z) + 0.04;
                         hr.group.position.copy(hr.position);
                         if (now >= hr.nextGeyserAt) {
                             hr.nextGeyserAt = now + AGENT_TUNING.harbor.x.geyserIntervalMs;
@@ -35436,8 +35511,10 @@
                         gw.imploded = true;
                         soundFX.astraGravity();
                         abilityLook.tag = 'astra.c';   // V2.2: the Gravity Well's implosion (High Fidelity)
-                        this.spawnFlashBurst(gw.position.x, 0.95, gw.position.z, 0xeab308, gw.radius * 0.92, 360, now);
-                        this.spawnWindRing(gw.position.x, 0.25, gw.position.z, 0xa855f7, gw.radius, now);
+                        // V2.2: over the floor under the well; its flash and ring were at fixed heights from 0
+                        const fy = this.findSupportFloorY(gw.position.x, gw.position.y + 0.5, gw.position.z);
+                        this.spawnFlashBurst(gw.position.x, fy + 0.95, gw.position.z, 0xeab308, gw.radius * 0.92, 360, now);
+                        this.spawnWindRing(gw.position.x, fy + 0.25, gw.position.z, 0xa855f7, gw.radius, now);
                         abilityLook.tag = null;
                         let pulled = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -35491,8 +35568,10 @@
                         np.detonated = true;
                         soundFX.astraNova();
                         abilityLook.tag = 'astra.q';   // V2.2: the Nova Pulse going off (High Fidelity)
-                        this.spawnFlashBurst(np.position.x, 0.95, np.position.z, 0xeab308, np.radius, 360, now);
-                        this.spawnWindRing(np.position.x, 0.25, np.position.z, 0xa855f7, np.radius, now);
+                        // V2.2: over the floor under the star; its flash and ring were at fixed heights from 0
+                        const fy = this.findSupportFloorY(np.position.x, np.position.y + 0.5, np.position.z);
+                        this.spawnFlashBurst(np.position.x, fy + 0.95, np.position.z, 0xeab308, np.radius, 360, now);
+                        this.spawnWindRing(np.position.x, fy + 0.25, np.position.z, 0xa855f7, np.radius, now);
                         abilityLook.tag = null;
                         const rSq = np.radius * np.radius;
                         let concussed = 0;
@@ -35535,7 +35614,8 @@
                             if (distSq <= AGENT_TUNING.astra.x.hitHalfWidthM * AGENT_TUNING.astra.x.hitHalfWidthM) {
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.astra.x.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.astra.x.revealMs);
-                                damageEnemyActor(e, AGENT_TUNING.astra.x.damagePerTick, now, nowMs, "Cosmic Divide", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.astra.x.damagePerTick, now, nowMs, "Cosmic Divide", false);
                             }
                         }
                     }
@@ -35645,7 +35725,8 @@
                             if (dx * dx + dz * dz <= rSq) {
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.vyse.e.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.vyse.e.revealMs);
-                                damageEnemyActor(e, AGENT_TUNING.vyse.e.damagePerTick, now, nowMs, "Razorvine Thorns", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.vyse.e.damagePerTick, now, nowMs, "Razorvine Thorns", false);
                             }
                         }
                     }
@@ -35705,7 +35786,9 @@
                     td.dirZ /= dLen;
                     td.position.x = Math.max(-45, Math.min(45, td.position.x + td.dirX * td.speed * dt));
                     td.position.z = Math.max(-45, Math.min(45, td.position.z + td.dirZ * td.speed * dt));
-                    td.group.position.set(td.position.x, 1.35, td.position.z);
+                    // V2.2: it flies 1.35 m over the floor under it (the floor looked up as Raze's Boom Bot does); it was at a fixed 1.35 m
+                    td.position.y = this.findSupportFloorY(td.position.x, td.position.y - 1.35 + 0.9, td.position.z) + 1.35;
+                    td.group.position.copy(td.position);
                     td.group.rotation.y = Math.atan2(td.dirX, td.dirZ);
 
                     for (let j = 0; j < enemyObjects.length; j++) {
@@ -35763,11 +35846,15 @@
                     } else if (ta.wavesFired < AGENT_TUNING.tejo.x.waveCount && now >= ta.nextWaveAt) {
                         ta.wavesFired++;
                         ta.nextWaveAt = now + AGENT_TUNING.tejo.x.waveIntervalMs;
-                        const distAlong = AGENT_TUNING.tejo.x.waveStartM + ta.wavesFired * AGENT_TUNING.tejo.x.waveSpacingM;
+                        // V2.2: waveStartM counts from Tejo, and the origin is already spawnAheadM ahead of Tejo: the offset
+                        // was applied twice, so the waves fell 3.5 m further on (the corridor's first 4 m were never hit and
+                        // 4 m past its end were). The Classic wave block follows the wave in world coordinates, as the
+                        // corridor's floor does (it was set as if in the corridor's own frame, so it ran the other way)
+                        const distAlong = AGENT_TUNING.tejo.x.waveStartM - AGENT_TUNING.tejo.x.spawnAheadM + ta.wavesFired * AGENT_TUNING.tejo.x.waveSpacingM;
                         const wx = Math.max(-44, Math.min(44, ta.origin.x + ta.dir.x * distAlong));
                         const wz = Math.max(-44, Math.min(44, ta.origin.z + ta.dir.z * distAlong));
                         ta.currentWavePos.set(wx, 0.2, wz);
-                        ta.waveMesh.position.set(0, 1.8, distAlong);
+                        ta.waveMesh.position.set(wx, 1.8, wz);
                         soundFX.tejoArmageddon();
                         abilityLook.tag = 'tejo.x';   // V2.2: an Armageddon bombing wave (High Fidelity draws it)
                         this.spawnFlashBurst(wx, 1.2, wz, 0xf59e0b, 6.4, 380, now);
@@ -35862,8 +35949,9 @@
                         const midX = cp.origin.x + cp.dir.x * (cp.length * 0.5);
                         const midZ = cp.origin.z + cp.dir.z * (cp.length * 0.5);
                         abilityLook.tag = 'waylay.x';   // V2.2: Convergent Paths' eruption (High Fidelity)
-                        this.spawnFlashBurst(midX, 1.4, midZ, 0xfde047, 9.5, 450, now);
-                        this.spawnWindRing(midX, 0.3, midZ, 0xf472b6, 12.0, now);
+                        const laneFloor = cp.origin.y - 0.04;   // V2.2: on the lane's floor (they were at fixed heights from 0)
+                        this.spawnFlashBurst(midX, laneFloor + 1.4, midZ, 0xfde047, 9.5, 450, now);
+                        this.spawnWindRing(midX, laneFloor + 0.3, midZ, 0xf472b6, 12.0, now);
                         abilityLook.tag = null;
                         showNotification(`CONVERGENT PATHS ERUPTED! ${hitCount} ${hitCount === 1 ? 'Hostile' : 'Hostiles'} Hindered & Blinded across 26m Corridor!`, 2300);
                     }
@@ -36157,9 +36245,11 @@
                         this.isoKillContract.active = false;
                         this.isoKillContract.group.visible = false;
                     }
+                    // V2.2: Thrash bursts when it runs out, as its own step and Wingman do. This frame's game time runs
+                    // ahead of the last step's by what waits to be simulated, so the ultimate's end (the same moment as
+                    // Thrash's) was often seen here first, and Thrash vanished with no burst or globule
                     if (game.ultAgent === 'gekko' && this.gekkoThrash && this.gekkoThrash.active) {
-                        this.gekkoThrash.active = false;
-                        this.gekkoThrash.group.visible = false;
+                        this.detonateGekkoThrash(now, Date.now());
                     }
                     if (game.ultAgent === 'deadlock' && this.deadlockCocoon && this.deadlockCocoon.active) {
                         this.deadlockCocoon.active = false;
@@ -37185,6 +37275,10 @@
 
                     if (markerIdx < this.hudDiamonds.length) {
                         const d = this.hudDiamonds[markerIdx];
+                        // V2.2: a bot in a fire, acid or gas zone (burningUntil, which each burn tick sets) gets the orange
+                        // diamond its CSS has had since V1.5 (.recon-marker.burning); nothing read burningUntil before
+                        const burning = e.burningUntil > now;
+                        if (d.burning !== burning) { d.el.classList.toggle('burning', burning); d.burning = burning; }
                         _abilityTempVec.set(e.mesh.position.x, e.mesh.position.y + 2.1, e.mesh.position.z);
                         const toEnemyX = _abilityTempVec.x - camera.position.x;
                         const toEnemyY = _abilityTempVec.y - camera.position.y;
@@ -37232,8 +37326,12 @@
 
                 if (now < this.reynaDismissUntil) {
                     const remDismiss = Math.max(0.1, (this.reynaDismissUntil - now) / 1000).toFixed(1);
-                    if (game.activeAgent === 'yoru') {
+                    if (game.activeAgent === 'yoru' && this.isUltActive(now) && game.ultAgent === 'yoru') {
                         text = `YORU DIMENSIONAL DRIFT • ${remDismiss}s (INVULNERABLE + +45% SPEED — SHOOT TO UNMASK)`;
+                        borderColor = '#3b82f6';
+                    } else if (game.activeAgent === 'yoru') {
+                        // V2.2: Gatecrash's arrival phase is not the Drift: a shot in it unmasks nothing
+                        text = `YORU GATECRASH PHASE • ${remDismiss}s (INVULNERABLE + +45% SPEED)`;
                         borderColor = '#3b82f6';
                     } else if (game.activeAgent === 'chamber') {
                         text = `CHAMBER RENDEZVOUS PHASE • ${remDismiss}s (INVULNERABLE)`;
@@ -39323,7 +39421,7 @@
                     const arch = enemy.archetypeDef || ENEMY_ARCHETYPES[enemy.archetype] || ENEMY_ARCHETYPES.standard;
 
                     // Sniper Laser Sight 3D telegraph when Sniper bot has line-of-sight on player
-                    if (enemy.archetype === 'sniper' && enemy.hasSight && enemy.blindedUntil <= gameNow() && game.gameMode !== 'range' && laserVerts < 16 * 2) {
+                    if (enemy.archetype === 'sniper' && enemy.hasSight && enemy.blindedUntil <= gameNow() && game.gameMode !== 'range' && laserVerts < 16 * 2) {   // V2.2: the blind, reveal and slow below are on game time
                         const base = laserVerts * 3;
                         const dirX = playerPos.x - pos.x;
                         const dirZ = playerPos.z - pos.z;
@@ -39339,7 +39437,7 @@
 
                     // Show floating bar if enemy has LoS, was recently hit, is revealed by Recon, or is in Range mode
                     const recentlyDamaged = (now - (enemy.lastDamagedAt || 0)) < 4800;
-                    const isRevealed = enemy.revealedUntil > gameNow();
+                    const isRevealed = enemy.revealedUntil > gameNow();   // V2.2: on game time
                     const showHud = enemy.hasSight || recentlyDamaged || isRevealed || game.gameMode === 'range' || distSq < 18 * 18;
                     if (!showHud || poolIdx >= this.enemyHudPool.length) continue;
 
@@ -39373,7 +39471,7 @@
                     hud.roleEl.style.color = arch.badgeColor;
 
                     // Status tag (BLINDED / LOCKING / RECON / SLOWED)
-                    if (enemy.blindedUntil > gameNow()) {
+                    if (enemy.blindedUntil > gameNow()) {   // V2.2: on game time
                         hud.statusEl.textContent = '★ BLINDED';
                         hud.statusEl.style.color = '#ffe066';
                     } else if (enemy.archetype === 'sniper' && enemy.hasSight && game.gameMode !== 'range') {
@@ -39382,7 +39480,7 @@
                     } else if (isRevealed) {
                         hud.statusEl.textContent = '◈ RECON';
                         hud.statusEl.style.color = '#38f6ff';
-                    } else if (enemy.slowedUntil > gameNow()) {
+                    } else if (enemy.slowedUntil > gameNow()) {   // V2.2: on game time
                         hud.statusEl.textContent = '❄ SLOWED';
                         hud.statusEl.style.color = '#7dd3fc';
                     } else {
@@ -40087,7 +40185,7 @@
                 this.updateVitalsHUD();
                 this.updateBuyMenuUI();
                 if (agentSystem && agentSystem.syncHud) {
-                    agentSystem.syncHud(gameNow(), true);
+                    agentSystem.syncHud(gameNow(), true);   // V2.2: on game time
                 }
             },
 
@@ -40494,7 +40592,7 @@
                     let defusingBot = null;
                     for (let i = 0; i < enemyObjects.length; i++) {
                         const e = enemyObjects[i];
-                        if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;
+                        if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;   // V2.2: the blind is on game time
                         const d = Math.hypot(e.mesh.position.x - sitePos.x, e.mesh.position.z - sitePos.z);
                         if (d <= 4.2) {
                             defusingBot = e;
@@ -41638,7 +41736,9 @@
                 }
 
                 // If Yoru fires while in Dimensional Drift Ultimate, unmask from the rift with a close-range Unmask Flash!
-                if (game.activeAgent === 'yoru' && abilityNow < agentSystem.reynaDismissUntil) {
+                // V2.2: only in the ultimate. Gatecrash's 0.9 s arrival phase uses the same intangible timer, and a
+                // shot in it fired the Drift's unmask (its blind and flash) without the ultimate
+                if (game.activeAgent === 'yoru' && ultActive && game.ultAgent === 'yoru' && abilityNow < agentSystem.reynaDismissUntil) {
                     agentSystem.reynaDismissUntil = 0;
                     if (game.ultAgent === 'yoru') game.ultActiveUntil = abilityNow;
                     soundFX.yoruRift();
@@ -42284,7 +42384,7 @@
                         anim.vel = -anim.vel * 0.22;
                         if (Math.abs(anim.vel) < 0.35) anim.lieT = anim.t;
                     }
-                    if (anim.eaAX === undefined) mesh.rotation.z = anim.rotationSpeed * Math.min(1, anim.angle / LIE);
+                    if (anim.eaAX === undefined) mesh.rotation.z = anim.rotationSpeed * Math.min(1, anim.angle / LIE);   // V2.2: Enhanced Animations tips it away from the shot instead (eaAX)
                 } else if (anim.t - anim.lieT > 0.9) {
                     anim.baseY -= 1.4 * dt;
                 }
@@ -43143,7 +43243,7 @@
             
             // 3. Chance to hit player based on distance & archetype accuracy (reduced if enemy is concussed/slowed or player is crouching)
             const distance = length;
-            const concussMult = (enemy.slowedUntil > gNow) ? 0.5 : 1.0;
+            const concussMult = (enemy.slowedUntil > gNow) ? 0.5 : 1.0;   // V2.2: the slow is on game time
             const crouchEvasion = characterController.isCrouching ? 0.82 : 1.0;
             const botDiff = (game.userSettings && game.userSettings.botDifficulty) || 'gold';
             const diffAccMult = botDiff === 'iron' ? 0.58 : (botDiff === 'immortal' ? 1.18 : (botDiff === 'radiant' ? 1.38 : 1.0));
@@ -43797,6 +43897,10 @@
             const weatherRanges = [weatherFX.mesh.geometry.drawRange.count, weatherFX.splash.geometry.drawRange.count];
             weatherFX.mesh.geometry.setDrawRange(0, 6);
             weatherFX.splash.geometry.setDrawRange(0, 6);
+            // V2.2: each ability object goes back where it was after the warm draws (below). Three of them never
+            // place their group and put their meshes in world coordinates (Convergent Paths, Armageddon, the
+            // Annihilation cocoon), so left at this point they drew about 11 m off and 1.7 m up
+            const warmPositions = agentSystem.warmupMeshes.map((wm) => wm.position.clone());
             for (let i = 0; i < agentSystem.warmupMeshes.length; i++) {
                 const wm = agentSystem.warmupMeshes[i];
                 wm.position.copy(p);
@@ -43812,6 +43916,7 @@
                 renderer.render(scene, camera);
             }
             for (const object of warmEffects) object.visible = false;
+            agentSystem.warmupMeshes.forEach((wm, i) => wm.position.copy(warmPositions[i]));   // V2.2 (see above)
             weatherFX.mesh.geometry.setDrawRange(0, weatherRanges[0]);
             weatherFX.splash.geometry.setDrawRange(0, weatherRanges[1]);
             weatherFX.afterWarm();
@@ -43879,8 +43984,7 @@
             supportChecked: false,
             supported: false,
             reason: '',
-            forceUnsupported: false, // test hook: behave as if WebGL 2 were missing
-            fellBack: false,
+            forceUnsupported: false, // test hook: behave as if WebGL 2 were missing (V2.2: the unread fellBack flag is gone)
             baseExposure: 1.5,
             lightingLook: null,
 
@@ -47165,8 +47269,8 @@
         //    colliders). In High Fidelity only their materials stop drawing (material.visible), and a
         //    High Fidelity visual follows the same transform and state. Gameplay never reads these.
         //  - One renderer per effect type, the look tags of AGENT_TUNING: smoke, wall, groundZone,
-        //    projectile, blast, flash, beam, pulse, deployable, self. Every other ability keeps its
-        //    Classic look.
+        //    projectile, blast, flash, beam, pulse, deployable, self. (V2.2: every ability has a look
+        //    now, registered below; the CONVERTED list of V2.0 is gone.)
         //  - Everything is pooled and pre-built the first time High Fidelity is used, in small steps
         //    (all at once inside the boot warm-up when High Fidelity is on at start). Every shader is
         //    an unlit ShaderMaterial (one program each, whatever the light count) or reuses the
@@ -47190,8 +47294,8 @@
         //    its style on each renderer;
         //  - defineModel(name, { count, mats, groups, parts, custom }): a device built from parts for
         //    the deployable renderer (and models for the projectile renderer).
-        // HIFI-CONTRACT.md (the V2.2 PR 3 notes) documents the API, every renderer's parameters and
-        // styles, the budget and the rules.
+        // Each renderer's parameters and styles are in the comment above its make_ function below; the
+        // budget and the rules every look keeps are in tests/hifi-kit.js (BUDGET, roleTest).
         const abilityLook = {
             mode: 'classic',          // what is drawn now
             wanted: 'classic',        // what the setting asks for (High Fidelity waits for its build)
@@ -47304,7 +47408,7 @@
             //     materials; keep: item fields whose materials stay drawn (a hit flash, a marker).
             //     An array: several renderers draw one item (a beam and its ground zone), each with its
             //     own adapter (all or none are drawn); hide and keep come from the first.
-            //   styles: { renderer: { preset, ... } } (each renderer's parameters, HIFI-CONTRACT.md)
+            //   styles: { renderer: { preset, ... } } (each renderer's parameters: the comment above its make_ function)
             defineLook: function (key, spec) {
                 const look = { key: key, routes: {}, styles: spec.styles || {}, _st: {} };
                 const norm = (r) => typeof r === 'string' ? { renderer: r } : r;
@@ -50523,7 +50627,7 @@
         // ability's visuals, and the bots' hazards. The V2.0 kinds keep their short names (in their old
         // scan order); every other kind is its agentSystem name. Then the owners: which ability each
         // item belongs to, when the item does not carry a tag (lookKey). A role block only defines looks
-        // (and tags its abilities' calls to the shared spawns); HIFI-MAP.md lists every kind's owner.
+        // (and tags its abilities' calls to the shared spawns); the addSource calls above list every kind.
         (function () {
             const L = abilityLook;
             L.addSource('projectile', {
@@ -50685,7 +50789,7 @@
         // =============================================
         // V2.2: High Fidelity looks, DUELISTS (role block: Jett, Phoenix, Reyna, Raze, Yoru, Neon, Iso, Waylay)
         // =============================================
-        // Looks only: defineLook, defineModel, addTimer and adapters (HIFI-CONTRACT.md). Each ability's
+        // Looks only: defineLook, defineModel, addTimer and adapters (abilityLook's header). Each ability's
         // tags go in its own spawn code. Converted here: iso.c, neon.e, raze.x (pilots), then every other
         // Duelist ability (stage 2, after the pilots).
         // ISO Contingency: a moving energy wall (the Classic 5.2 x 2.75 x 0.28 m box, 1.4 m up, turned with its group)
@@ -51349,7 +51453,7 @@
         // =============================================
         // V2.2: High Fidelity looks, CONTROLLERS (role block: Omen, Brimstone, Viper, Clove, Harbor, Astra, Miks)
         // =============================================
-        // Looks only (HIFI-CONTRACT.md). Converted here: all 27 (viper.q and brimstone.x were the pilots).
+        // Looks only (abilityLook's header). Converted here: all 27 (viper.q and brimstone.x were the pilots).
         // VIPER Poison Cloud: a gas canister, then a toxic cloud (castSmokeProjectile; its colour names it)
         abilityLook.defineModel('viper.canister', {
             count: 3,   // V2.2: Poison Cloud's and both Snake Bites' (viper.c uses it too)
@@ -51399,8 +51503,8 @@
         });
         // V2.2: the Controllers' other 25 abilities. Each adapter fills P in place from its Classic item and
         // allocates nothing. Timers that other agents share (reynaDismissUntil, brimStimUntil,
-        // clovePickMeUpUntil) count only while their own agent holds them (HIFI-MAP.md). The buffs use no
-        // screen edge: it hangs from the weapon group, whose turn is off the view's once you look up or down
+        // clovePickMeUpUntil) count only while their own agent holds them. The buffs use no screen edge
+        // (they were made while the edge hung from the weapon group and slid off the view; it is pinned to the camera now)
         (function () {
             const L = abilityLook;
             const sat = function (v) { return v < 0 ? 0 : (v > 1 ? 1 : v); };
@@ -51957,7 +52061,7 @@
         // =============================================
         // V2.2: High Fidelity looks, INITIATORS (role block: Sova, KAY/O, Skye, Fade, Breach, Gekko, Tejo)
         // =============================================
-        // Looks only (HIFI-CONTRACT.md). Converted here: sova.e, kayo.c, breach.q (pilots).
+        // Looks only (abilityLook's header). Converted here: sova.e, kayo.c, breach.q (pilots).
         // SOVA Recon Bolt: the arrow (a cyan tip), then the bolt stuck where it landed (its eye turning) and
         // its sonar pulses (one Classic item, two renderers)
         (function () {
@@ -52774,7 +52878,7 @@
         // =============================================
         // V2.2: High Fidelity looks, SENTINELS (role block: Sage, Killjoy, Cypher, Chamber, Deadlock, Vyse, Veto)
         // =============================================
-        // Looks only (HIFI-CONTRACT.md). Converted here: sage.q, killjoy.q (pilots).
+        // Looks only (abilityLook's header). Converted here: sage.q, killjoy.q (pilots).
         // SAGE Slow Orb: a frost orb, then a field of crystal goo (the shared slow zone pool: its tag says whose)
         abilityLook.defineLook('sage.q', {
             routes: { projectile: 'projectile', slowZones: 'groundZone' },
@@ -54175,7 +54279,7 @@
                         let planter = null;
                         for (let i = 0; i < enemyObjects.length; i++) {
                             const e = enemyObjects[i];
-                            if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;
+                            if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;   // V2.2: the blind is on game time
                             if (Math.hypot(e.mesh.position.x - site.x, e.mesh.position.z - site.z) <= 2.8) { planter = e; break; }
                         }
                         if (planter) {
@@ -54536,7 +54640,7 @@
             _duels: function (now) {
                 const pl = characterController.position;
                 for (const e of enemyObjects) {
-                    if (!e.isActive || e.hit || now < (e.dmNextShotAt || 0) || e.blindedUntil > gameNow()) continue;
+                    if (!e.isActive || e.hit || now < (e.dmNextShotAt || 0) || e.blindedUntil > gameNow()) continue;   // V2.2: the blind is on game time
                     e.dmNextShotAt = now + 500 + Math.random() * 600;
                     const ep = e.mesh.position;
                     const dPlayer = Math.hypot(pl.x - ep.x, pl.z - ep.z);
@@ -54622,7 +54726,7 @@
                 this.overlay.classList.add('visible');
                 document.getElementById('dm-again-btn').addEventListener('click', () => { this.overlay.classList.remove('visible'); this.start(); });
                 document.getElementById('dm-exit-btn').addEventListener('click', () => tacticalDirector.setGameMode('wave'));
-                for (const e of enemyObjects) if (e.isActive && !e.hit) e.blindedUntil = gameNow() + 1e9;
+                for (const e of enemyObjects) if (e.isActive && !e.hit) e.blindedUntil = gameNow() + 1e9;   // V2.2: on game time, as blinds are
                 if (document.pointerLockElement) document.exitPointerLock();
                 soundFX.ult();
             }
@@ -54677,7 +54781,7 @@
                 // All abilities full
                 const st = agentSystem.stateByAgent[game.activeAgent];
                 if (st) for (const k of ['c', 'q', 'e']) { st[k].charges = st[k].maxCharges; st[k].rechargeEnd = 0; }
-                agentSystem.syncHud(gameNow(), true);
+                agentSystem.syncHud(gameNow(), true);   // V2.2: on game time
                 game.creds = 0;
                 // Power-up orbs on open floor
                 for (const o of this.orbs) {
@@ -54715,7 +54819,7 @@
                 tacticalDirector.updateVitalsHUD();
                 healthFill.style.width = `${game.health}%`;
                 healthValue.textContent = game.health;
-                agentSystem.syncHud(gameNow(), true);
+                agentSystem.syncHud(gameNow(), true);   // V2.2: on game time
                 abilityLights.flash(o.x, 1, o.z, RUSH_ORBS[o.type].color, 6, 2, 400);
                 soundFX.playTone(660, 1320, 0.18, 'sine', 0.12, 0);
                 showNotification(RUSH_ORBS[o.type].label, 1600);
@@ -60335,9 +60439,10 @@
                             bot.lastFireAt = now + (i * 180);
                             const startVec = new THREE.Vector3(bot.group.position.x, 1.25, bot.group.position.z);
                             const endVec = new THREE.Vector3(bestEnemy.mesh.position.x, 1.25, bestEnemy.mesh.position.z);
-                            if (typeof spawnBulletTrail === 'function') {
-                                spawnBulletTrail(startVec, endVec);
-                            }
+                            // V2.2: the bots' own tracer, from the muzzle as theirs (spawnBulletTrail never existed: no tracer was drawn)
+                            this._wingTo.copy(endVec).sub(startVec).normalize();
+                            this._wingFrom.copy(startVec).addScaledVector(this._wingTo, 0.85);
+                            createBulletTrail(this._wingFrom, this._wingTo);
                             const wingDmg = 18;
                             this.combatMatrix.wingman.body++;
                             this.combatMatrix.wingman.damage += wingDmg;
@@ -60558,7 +60663,10 @@
 
                 if (isControllerSmoke && typeof agentSystem !== 'undefined' && agentSystem.spawnSmokeSphere) {
                     const agentDef = (typeof AGENT_DEFS !== 'undefined' && AGENT_DEFS[game.activeAgent]) ? AGENT_DEFS[game.activeAgent] : { name: 'CONTROLLER', themeColor: '#38f6ff' };
-                    agentSystem.spawnSmokeSphere(new THREE.Vector3(worldX, 1.5, worldZ), 4.6, 8500, 0x38bdf8);
+                    // V2.2: the call's arguments match spawnSmokeSphere(x, y, z, colour, radius, ms, now) now (it passed a vector
+                    // and no clock, so the smoke sat at NaN and never expired, holding one of the four smoke slots). It is the
+                    // game's plain smoke (detonateProjectile's defaults), not 0x38bdf8, the colour that makes a Cyber Cage
+                    agentSystem.spawnSmokeSphere(worldX, 1.5, worldZ, 0x38f6ff, 4.6, 8500, gameNow());
                     this.spawnWorldPing(worldX, 0.5, worldZ, false, `☁ SKY-SMOKE (${agentDef.name})`);
                     showNotification(`MINIMAP SKY-SMOKE DEPLOYED AT X:${Math.round(worldX)} Z:${Math.round(worldZ)}!`, 2100);
                 } else {

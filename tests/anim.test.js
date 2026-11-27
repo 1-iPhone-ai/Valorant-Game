@@ -41,7 +41,10 @@ test('Enhanced Animations is off by default: nothing of it is built and no shade
 // walk phases, a flinch, a recoil) are drawn alone, in both looks (box and High Detail figures), in this
 // build and in a boot of V2.1: the pixels must be identical. In this build the same frame is also drawn
 // with V2.1's own shader code (taken from the V2.1 file, compiled as a second material): identical too.
-const SHOOT = (v21Src) => {
+// V2.2 final check: V2.1 drew each bot with its back to where the AI turns it (the figure is built facing -Z,
+// the AI turns a bot's +Z to its target); this build draws it half a turn round, facing its target. So the
+// V2.1 boot's bots are turned half a turn (turn: π) to draw what this build draws.
+const SHOOT = ({ v21Src, turn }) => {
     window.updateEnemies = () => {};
     if (tacticalEnhancements.wingmanEnabled) tacticalEnhancements.toggleWingmanAI(false);
     while (enemyObjects.length < 5) createEnemyActor('standard');
@@ -67,7 +70,7 @@ const SHOOT = (v21Src) => {
         for (let i = 0; i < 5; i++) {
             const e = enemyObjects[i];
             activateEnemy(e, -14 + i * 1.6, 0, 2, 'standard');
-            e.mesh.rotation.set(0, 0.5 - i * 0.25, 0);
+            e.mesh.rotation.set(0, 0.5 - i * 0.25 + turn, 0);
             [e.animPhase, e.animAmt, e.animFlinch, e.animRecoil] = poses[i];
             e.poseDirty = true;
         }
@@ -104,17 +107,17 @@ const SHOOT = (v21Src) => {
     return out;
 };
 
-test('off, bots draw exactly as in V2.1 (same posed bots in both looks; and against V2.1 shader code in the same frame)', { timeout: 400000 }, async () => {
+test('off, bots draw exactly as V2.1 drew them turned to face their target (same posed bots in both looks; and against V2.1 shader code in the same frame)', { timeout: 400000 }, async () => {
     const src = fs.readFileSync(path.resolve(__dirname, '..', '(V2.1) valorant-fps.html'), 'utf8');
     const a = src.indexOf('function installEnemyAnimation(material, partIndex) {');
     const b = src.indexOf("material.customProgramCacheKey = () => 'enemyAnim';", a);
     assert.ok(a > 0 && b > a, 'V2.1 bot animation found');
     const v21Install = src.slice(a, b) + "material.customProgramCacheKey = () => 'enemyAnimV21';\n}";
     const mine = await boot({ quality: 'high' });
-    const r = await mine.evaluate(SHOOT, v21Install);
+    const r = await mine.evaluate(SHOOT, { v21Src: v21Install, turn: 0 });
     assert.deepEqual(mine.errors, []);
     const v21 = await boot({ quality: 'high', file: '(V2.1) valorant-fps.html' });
-    const old = await v21.evaluate(SHOOT, null);
+    const old = await v21.evaluate(SHOOT, { v21Src: null, turn: Math.PI });
     assert.deepEqual(v21.errors, []);
     assert.equal(r.uniform, 0);
     for (const k of ['classic', 'detailed']) {
@@ -505,6 +508,11 @@ test('kill cam with Enhanced Animations on plays back the recorded values (a rel
     await onPill(evaluate, true);
     await evaluate(() => {
         window.updateEnemies = () => {};
+        // V2.2 final check: no wingmen and no bot abilities. Both run on the real clock: on a loaded machine, where the
+        // reload's first 0.6 s of game time take seconds, a wingman shot the test bot dead 0.47 s into its reload
+        // (and a cast's gesture would replace the reload)
+        if (tacticalEnhancements.wingmanEnabled) tacticalEnhancements.toggleWingmanAI(false);
+        game.botAbilityAI = false;
         const e = enemyObjects.find((x) => x.isActive && !x.hit);
         window.__k = e;
         const p = characterController.position;
@@ -519,8 +527,15 @@ test('kill cam with Enhanced Animations on plays back the recorded values (a rel
     // it can be one from before Enhanced Animations went on, and a replay frame between a capture
     // without the new values and one with them draws the classic pose: CI caught that on a fast runner.)
     await page.waitForFunction(() => __k.eaGCode === 1 && __k.eaGT > 0.6 && replayRec.count > 6, null, { timeout: 60000 });
-    const rec = await evaluate(() => { const R = replayRec, i = (R.head - 1 + R.N) % R.N; return { t: R.t[i], on: R.eaOn[i], code: __k.eaGCode }; });
+    // V2.2 final check: the moment played back is the capture before the newest one, so the captures either side of
+    // it are both already recorded inside the reload
+    const rec = await evaluate(() => { const R = replayRec, i = (R.head - 2 + R.N) % R.N, j = (R.head - 1 + R.N) % R.N; return { t: R.t[i], on: R.eaOn[i] && R.eaOn[j], code: __k.eaGCode }; });
     assert.equal(rec.on, 1, 'the capture played back holds the new values');
+    // V2.2 final check: then the reload is run to its end (its time set to its length, as a shot jumps it on)
+    // instead of waiting out the rest of its 2.5 s of game time: the kill cam plays back the last 4.2 s of real
+    // time, and on a loaded machine game time runs slow, so the moment recorded fell out of the clip before the
+    // death (main failed this 2 times in 2 at a load of 9 on 4 cores)
+    await evaluate(() => { __k.eaGT = __k.eaGDur; });
     await page.waitForFunction(() => __k.eaGCode === 0, null, { timeout: 60000 });
     await frames(5);
     const death = await evaluate(() => {

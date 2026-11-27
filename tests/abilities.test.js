@@ -83,8 +83,12 @@ test('Reyna and Omen kits work end to end', { timeout: 240000 }, async () => {
         const p = characterController.position;
         agentSystem.onActorEliminated('enemy', new THREE.Vector3(p.x + 3, 0, p.z));
         out.orbs = agentSystem.soulOrbs.filter((o) => o.inUse).length;
+        // V2.2: Devour heals over time (its session's ticks): what the heals add up to, whatever else hits you meanwhile
+        window.__devourHealed = 0;
+        const heal = agentSystem.healPlayer;
+        agentSystem.healPlayer = function () { const hp = game.health; const r = heal.apply(this, arguments); __devourHealed += game.health - hp; return r; };
         agentSystem.castAbility('q');
-        out.hp = game.health; out.shield = game.shield;
+        out.hp = game.health; out.shield = game.shield; out.devouring = agentSystem.reynaDevourSession.active;
         const before = agentSystem.stateByAgent.reyna.e.charges;
         agentSystem.castAbility('e'); // no orb left: charge is refunded
         out.refunded = agentSystem.stateByAgent.reyna.e.charges === before;
@@ -97,7 +101,11 @@ test('Reyna and Omen kits work end to end', { timeout: 240000 }, async () => {
         return out;
     });
     assert.equal(r.orbs, 1, 'a kill drops a soul orb');
-    assert.ok(r.hp > 40 && r.shield > 0, 'Devour heals and shields');
+    // V2.2: the heal comes over time (it came at once, and Devour's heal session never ran)
+    assert.ok(r.devouring && r.hp === 40 && r.shield > 0, 'Devour starts its heal and shields');
+    await page.waitForFunction(() => !agentSystem.reynaDevourSession.active, null, { timeout: 120000, polling: 50 });
+    const [healed, healHp] = await page.evaluate(() => [window.__devourHealed, AGENT_TUNING.reyna.q.healHp]);
+    assert.equal(healed, healHp, 'Devour heals');
     assert.ok(r.refunded, 'Dismiss without an orb refunds its charge');
     assert.ok(r.stepped && r.portals === 2, 'Shrouded Step teleports with two portals');
     assert.deepEqual(errors, []);
