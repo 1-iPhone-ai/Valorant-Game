@@ -32066,7 +32066,8 @@
                         this.vipersPit.expireAt = now + def.abilities.x.durationMs;
                         this.vipersPit.nextTickAt = now + AGENT_TUNING.viper.x.firstTickMs;
                         this.vipersPit.group.position.copy(this.vipersPit.position);
-                        this.vipersPit.domeMesh.scale.set(this.vipersPit.radius, this.vipersPit.radius * 0.55, this.vipersPit.radius);
+                        // V2.2: the dome is the sphere sight stops at (radius up as well as across); it was squashed to 0.55 of its height
+                        this.vipersPit.domeMesh.scale.set(this.vipersPit.radius, this.vipersPit.radius, this.vipersPit.radius);
                         this.vipersPit.ringMesh.scale.set(this.vipersPit.radius, 1, this.vipersPit.radius);
                         this.vipersPit.discMesh.scale.set(this.vipersPit.radius, 1, this.vipersPit.radius);
                         this.vipersPit.group.visible = true;
