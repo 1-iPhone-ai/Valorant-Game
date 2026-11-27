@@ -12,6 +12,13 @@
 //    own build times next to the median;
 //  - the show LOD's hand nodes (children of the forearms at the wrist) swap the hand key's shared pose geometry by
 //    reference as the motion samples, and V23.motion.sample allocates nothing on the JS heap once warm;
+//  - intros are interruptible: an idle sampled right after an intro (into the same pose and the same root) equals a
+//    fresh idle, nothing carried over; Omen's idle turns his head on one seeded schedule (every interval in
+//    idle.tic.every, across the schedule's loop too) and flexes his right hand on its own (design 4.2);
+//  - seams and clearances on every show LOD's primitives (no shells that coincide or graze): the upper arm's capsule
+//    dome shares the sleeve's end ring, the elbow ball stands proud of both limb ends, coaxial cylinders on one node
+//    are 6 mm apart where they overlap and never stack caps within 3 mm, shoulder caps clear the sleeve, the pelvis
+//    floor clears the thighs; Omen's rift key stays clear of his right hand and forearm in every clip;
 //  - every kit module of every tier inside the union hit volume +0.03 m at every archetype scale; Medium modules at most
 //    48 vertices each (design 3.4);
 //  - the staged builder never steps in unpaused combat; in the menu it spreads a figure over frames, starting a unit only
@@ -118,7 +125,6 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
     for (const id of agents) {
         const r = reg.res[id];
         matrix(id, 'look entry valid (validator)', true, r.stub ? 'stub (role default ' + r.role + ')' : 'full entry, lint clean');
-        matrix(id, 'intro <= 1.4 s and interruptible', r.introMs <= 1400, r.intro + ' ' + r.introMs + ' ms');
     }
 
     // ---- the full lint for Sage and Omen and rejected entries -------------------------------------------------------
@@ -194,7 +200,7 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
                 root.traverse((o) => { if (o.isMesh && o.geometry.groups.length) meshes++; });
                 out[tier][id] = Object.assign({ hash: v.hash, objMeshes: meshes, nodes: v.nodeList.length }, v.stats);
                 // build: the figure itself (V23.parts' job time); total: with core.build's upload draw
-                if (!had && V23.parts.stats.builds === b0 + 1) out.ms.push({ id, tier, ms: V23.parts.stats.lastMs, total: ms, units: V23.parts.stats.lastUnits });
+                if (!had && V23.parts.stats.builds === b0 + 1) out.ms.push({ id, tier, ms: V23.parts.stats.lastMs, total: ms, units: V23.parts.stats.lastUnits, handMs: V23.parts.stats.lastHandMs });
             }
         }
         // motion sampling on a built root draws nothing either
@@ -206,7 +212,9 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         // a second, fresh build of every show LOD (V23.parts.figure) has the same hash; each goes back to the pool after
         const free0 = [V23.parts.pool.meshes, V23.parts.pool.groups, V23.parts.pool.vm];
         out.again = {};
-        for (const id of AGENT_ORDER) { const r = V23.parts.figure(V23.core.resolve(id), 'show'); out.again[id] = r.userData.v23.hash; out.released = V23.parts._release(r); }
+        // (each one's job time too: these are warm builds, with the hand keys' pose geometries and the primitives cached)
+        out.warmMs = {};
+        for (const id of AGENT_ORDER) { const r = V23.parts.figure(V23.core.resolve(id), 'show'); out.warmMs[id] = V23.parts.stats.lastMs; out.again[id] = r.userData.v23.hash; out.released = V23.parts._release(r); }
         out.poolBack = [V23.parts.pool.meshes, V23.parts.pool.groups, V23.parts.pool.vm].join() === free0.join();
         out.missesAll = V23.parts.stats.poolMisses - miss0;
         out.poolSize = V23.parts.pool.size;
@@ -220,11 +228,13 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         const g1 = V23.parts.pool.geoms;
         out.fpCached = AGENT_ORDER.every((id) => V23.parts.fpArms(V23.core.resolve(id)) === V23.parts.fpArms(V23.core.resolve(id))) && V23.parts.pool.geoms === g1;
         out.fpTaken = g0 - g1;
+        // design 7.2: the arm set is at most 3 draws (sleeve groups + detail groups), for every agent
+        out.fpDraws = AGENT_ORDER.map((id) => { const a = V23.parts.fpArms(V23.core.resolve(id)); return [id, a.draws, a.sleeve.groups.length + a.detail.groups.length, a.cuffFolded]; });
         for (const id of ['sage', 'omen']) {
             const a = V23.parts.fpArms(V23.core.resolve(id));
             a.sleeve.computeBoundingBox();
             out.fp[id] = { sleeve: a.sleeve.attributes.position.count, detail: a.detail.attributes.position.count, groups: [a.sleeve.groups.length, a.detail.groups.length],
-                slots: a.slots, wrist: a.wrist, overlay: a.overlay, box: [a.sleeve.boundingBox.min.toArray().map((v) => +v.toFixed(2)), a.sleeve.boundingBox.max.toArray().map((v) => +v.toFixed(2))] };
+                slots: a.slots, wrist: a.wrist, overlay: a.overlay, draws: a.draws, folded: a.cuffFolded, box: [a.sleeve.boundingBox.min.toArray().map((v) => +v.toFixed(2)), a.sleeve.boundingBox.max.toArray().map((v) => +v.toFixed(2))] };
         }
         return out;
     });
@@ -236,6 +246,10 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         console.log('#', id, 'fp arms', JSON.stringify(f));
     }
     assert.deepEqual([builds.fp.sage.slots.sleeve, builds.fp.sage.wrist], [['base', 'skin'], 'ampouleCuff'], 'Sage: a white sleeve over a bare forearm, jade ampoule cuffs');
+    // design 7.2: at most 3 draws per arm set; Sage's rolled sleeve needs four materials, so her cuff parts take the sleeve's
+    for (const [id, draws, groups] of builds.fpDraws) assert.ok(draws <= 3 && draws === groups, id + ': first-person arm set ' + draws + ' draws (<= 3)');
+    assert.deepEqual([builds.fp.sage.draws, builds.fp.sage.folded, builds.fp.sage.slots.detail], [3, true, ['glow']], 'Sage: [base, skin] + [glow], the cuff folded into the sleeve');
+    assert.deepEqual([builds.fp.omen.draws, builds.fp.omen.folded], [2, false], 'Omen: [under] + [trim]');
     assert.deepEqual([builds.fp.omen.slots.sleeve, builds.fp.omen.wrist, builds.fp.omen.overlay], [['under'], 'plateRing', 'basePlatesL'], 'Omen: the undersuit sleeve, plate rings, left forearm plates');
     assert.equal(builds.rand, 0, 'no Math.random call while every agent\'s show and world LOD builds and while motion samples');
     assert.ok(builds.pool.made, 'the object pool exists');
@@ -245,11 +259,22 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
     assert.ok(builds.fpCached, 'fpArms is cached per agent');
     assert.ok(builds.fpTaken <= 2 * 29, 'one arm set (2 geometries) per agent at most: ' + builds.fpTaken);
     console.log('# pool', JSON.stringify(builds.poolSize), 'sized in', builds.poolNeedsMs.toFixed(1), 'ms, made in', builds.pool.madeMs.toFixed(1), 'ms');
-    const median = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+    // the pool's node count, read from the entries without expanding them, is exactly what the built figures hold
+    const shownMeshes = reg.order.reduce((n, id) => n + 11 + builds.show[id].nodes, 0);
+    assert.equal(builds.poolSize.showMeshes, shownMeshes, 'the pool counts each agent\'s show meshes exactly (11 bones + its nodes)');
+    // medians: the true middle (the mean of the two middle values for an even count)
+    const median = (a) => { const b = a.slice().sort((x, y) => x - y), n = b.length; return n ? (n % 2 ? b[n >> 1] : (b[n / 2 - 1] + b[n / 2]) / 2) : NaN; };
+    const fix2 = (v) => (isFinite(v) ? v.toFixed(2) : '-');
     const fresh = builds.ms;
     const allMs = fresh.map((b) => b.ms), showMs = fresh.filter((b) => b.tier === 'show').map((b) => b.ms);
-    console.log('# build ms per figure (V23.parts job time; ' + fresh.length + ' figures built here): median', allMs.length ? median(allMs).toFixed(2) : '-',
-        '| show median', showMs.length ? median(showMs).toFixed(2) : '-', '| max', allMs.length ? Math.max(...allMs).toFixed(2) : '-');
+    console.log('# build ms per figure (V23.parts job time; ' + fresh.length + ' figures built here): median', fix2(median(allMs)),
+        '| show median', fix2(median(showMs)), '| max', allMs.length ? Math.max(...allMs).toFixed(2) : '-');
+    // the full entries' show figures apart (the stubs are cheap; each role batch adds full entries: re-measure then): cold
+    // is their first build here (a new hand key builds its eight pose geometries inside it), warm a rebuild
+    const fullShow = reg.order.filter((id) => !reg.res[id].stub);
+    const cold = fresh.filter((b) => b.tier === 'show' && fullShow.includes(b.id));
+    console.log('# full-entry show figures (' + fullShow.join(', ') + '): cold median', fix2(median(cold.map((b) => b.ms))), 'ms (' + cold.map((b) => b.id + ' ' + b.ms.toFixed(2) + ', ' + b.units + ' units, ' + b.handMs.toFixed(2) + ' ms of it its hand key\'s 8 poses').join('; ') +
+        ') | warm median', fix2(median(fullShow.map((id) => builds.warmMs[id]))), 'ms (' + fullShow.map((id) => id + ' ' + builds.warmMs[id].toFixed(2)).join('; ') + ') | target <= 8 ms per figure');
     for (const id of ['sage', 'omen']) {
         const own = fresh.filter((b) => b.id === id);
         console.log('#', id, 'build ms', own.map((b) => b.tier + ' ' + b.ms.toFixed(2) + ' (' + b.units + ' units; with the upload draw ' + b.total.toFixed(2) + ')').join(', ') || '(built at boot)',
@@ -322,6 +347,208 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
     assert.ok(hands.release.sageE >= 180 && hands.release.sageE <= 220, 'Sage\'s palm press releases near 200 ms (tempo 0.78): ' + hands.release.sageE);
     for (const id of ['sage', 'omen']) assert.ok(hands.breath[id].same < 1e-4, id + ': the breath repeats every ' + hands.breath[id].per + ' s (authored period)');
     for (const id of agents) matrix(id, 'show LOD hand nodes swap pose geometry by reference', hands[id].shared, hands[id].key + ', idle ' + hands[id].idle);
+
+    // ---- intros are interruptible; Omen's idle schedules ------------------------------------------------------------
+    // The sampler keeps no state between calls: an idle sampled right after an intro, into the same pose object and onto the
+    // same root, equals the idle sampled with nothing before it (bones, root, scale, glow, rift card, hand shapes, every node)
+    const motion = await evaluate(() => {
+        const snapRoot = (root) => {
+            const v = root.userData.v23, o = [];
+            root.updateMatrixWorld(true);
+            for (const b of v.bones) if (b) o.push(b.position.toArray(), b.rotation.toArray().slice(0, 3), b.scale.toArray());
+            for (const n of v.nodeList) { const m = v.nodes[n]; o.push(m.position.toArray(), m.rotation.toArray().slice(0, 3), m.scale.toArray(), [m.visible ? 1 : 0]); }
+            if (v.hands) o.push([v.hands.R.geometry.name, v.hands.L.geometry.name]);
+            const gi = v.slots.indexOf('glow');
+            if (gi >= 0) o.push([v.materials[gi].emissiveIntensity]);
+            return JSON.stringify(o);
+        };
+        const snapPose = (p) => {
+            const nodes = {};
+            for (const k of Object.keys(p.nodes)) { const a = Array.from(p.nodes[k]); if (a.some((x, i) => x !== (i >= 6 ? 1 : 0))) nodes[k] = a; }
+            return JSON.stringify([Array.from(p.bones), Array.from(p.root), p.scale, p.glow, p.fx.rift.open, p.hands.L, p.hands.R, p.events.length, nodes]);
+        };
+        const out = { interrupt: {} };
+        for (const id of AGENT_ORDER) {
+            const root = V23.core.build(id, 'show'), r = { root: true, pose: true, differs: false };
+            for (const t of [0.05, 0.3, 0.7, 1.1]) {
+                V23.motion.sample(id, 'idle', t, root);
+                const a = snapRoot(root);
+                V23.motion.sample(id, 'intro', t, root);
+                if (snapRoot(root) !== a) r.differs = true;
+                V23.motion.sample(id, 'idle', t, root);
+                if (snapRoot(root) !== a) r.root = false;
+                const fresh = snapPose(V23.motion.sample(id, 'idle', t, null));
+                const P = V23.motion.sample(id, 'intro', t, null);
+                if (snapPose(V23.motion.sample(id, 'idle', t, P)) !== fresh) r.pose = false;
+            }
+            V23.motion.sample(id, 'idle', 0, root);
+            out.interrupt[id] = r;
+        }
+        // Omen's idle for 300 s at 50 Hz (past the 48-event schedule's loop): his head yaw only changes in snaps, so a snap
+        // starts at the first sample that differs from the one before; his right hand flexes, his left never does
+        const L = V23.core.resolve('omen'), every = L.idle.tic.every.slice();
+        let pose = null, prevYaw = null, quiet = 0;
+        const starts = [], flex = [], flexL = [];
+        let inFlex = false;
+        for (let k = 0; k <= 300 * 50; k++) {
+            const t = k / 50;
+            pose = V23.motion.sample('omen', 'idle', t, pose);
+            const yaw = pose.bones[2 * 3 + 1];
+            if (prevYaw !== null && Math.abs(yaw - prevYaw) > 1e-6) { if (quiet >= 25) starts.push(t); quiet = 0; } else quiet++;
+            prevYaw = yaw;
+            const f = pose.hands.R !== L.idle.hands;
+            if (f && !inFlex) flex.push([t, pose.hands.R]);
+            if (inFlex && !f) flex[flex.length - 1].push(t);
+            inFlex = f;
+            if (pose.hands.L !== L.idle.hands) flexL.push(t);
+        }
+        out.snaps = { every, starts };
+        out.flex = { flex, flexL: flexL.length, idleHand: L.idle.hands };
+        return out;
+    });
+    for (const id of reg.order) {
+        const r = motion.interrupt[id];
+        assert.ok(r.root && r.pose, id + ': an intro cut short leaves nothing behind (root ' + r.root + ', pose ' + r.pose + ')');
+        assert.ok(r.differs, id + ': (the intro does move the figure, so the comparison means something)');
+    }
+    for (const id of agents) {
+        const r = reg.res[id], m = motion.interrupt[id];
+        matrix(id, 'intro <= 1.4 s and interruptible', r.introMs <= 1400 && m.root && m.pose, r.intro + ' ' + r.introMs + ' ms; idle after a cut intro equals a fresh idle');
+    }
+    // one head-snap schedule: every interval between snaps inside idle.tic.every [4, 6] s (+-1 sample), the loop included
+    const st = motion.snaps.starts, gaps = st.slice(1).map((t, i) => t - st[i]);
+    console.log('# omen head snaps in 300 s:', st.length, '| intervals', Math.min(...gaps).toFixed(2), '-', Math.max(...gaps).toFixed(2), 's (tic.every ' + motion.snaps.every.join('-') + ')');
+    assert.ok(st.length >= 300 / motion.snaps.every[1] - 1 && st.length <= 300 / motion.snaps.every[0] + 1, 'Omen snaps his head ' + st.length + ' times in 300 s');
+    assert.deepEqual(gaps.filter((g) => g < motion.snaps.every[0] - 0.021 || g > motion.snaps.every[1] + 0.021).map((g) => +g.toFixed(3)), [], 'every snap interval inside idle.tic.every: one schedule');
+    // the finger flex: the right hand leaves clawLow for about 150 ms every 5-8 s; the left hand never flexes
+    // (a flex already under way at t = 0 is cut by the window: it is not counted)
+    const fx = motion.flex.flex.filter((f) => f[0] > 0), fgaps = fx.slice(1).map((f, i) => f[0] - fx[i][0]), fdur = fx.filter((f) => f.length > 2).map((f) => f[2] - f[0]);
+    console.log('# omen finger flexes in 300 s:', fx.length, '(' + [...new Set(fx.map((f) => f[1]))].join(', ') + ') | intervals', Math.min(...fgaps).toFixed(2), '-', Math.max(...fgaps).toFixed(2), 's | lengths', Math.min(...fdur).toFixed(2), '-', Math.max(...fdur).toFixed(2), 's');
+    assert.ok(fx.length >= 300 / 8 - 1 && fx.every((f) => f[1] === 'relaxed'), 'Omen\'s right hand flexes to relaxed on its schedule: ' + fx.length);
+    assert.deepEqual(fgaps.filter((g) => g < 5 - 0.021 || g > 8 + 0.021), [], 'flex intervals in [5, 8] s');
+    assert.ok(fdur.every((d) => d >= 0.13 && d <= 0.17), 'each flex lasts about 150 ms');
+    assert.equal(motion.flex.flexL, 0, 'the left hand keeps its idle shape');
+
+    // ---- seams and clearances on the show LODs' primitives (no coincident or grazing shells) ---------------------------
+    const seams = await evaluate(() => {
+        const R0 = V23.parts.rig().rest, out = { problems: [], pairs: 0, checked: {} };
+        const bad = (id, what) => out.problems.push(id + ': ' + what);
+        const S1 = new THREE.Vector3(1, 1, 1);
+        // a primitive's frame (position and rotation; non-uniformly scaled primitives are left out of the cylinder pairs)
+        const frame = (s) => new THREE.Matrix4().compose(new THREE.Vector3(s.at[0], s.at[1], s.at[2]),
+            new THREE.Quaternion().setFromEuler(new THREE.Euler(s.rot ? s.rot[0] : 0, s.rot ? s.rot[1] : 0, s.rot ? s.rot[2] : 0, s.order || 'XYZ')), S1);
+        const axisOf = (s) => new THREE.Vector3(0, 1, 0).transformDirection(frame(s));
+        const keyOf = (s) => (s.node !== undefined && s.node !== null ? 'n:' + s.node : 'b' + (s.bone === undefined ? 0 : s.bone));
+        const uniform = (s) => !s.scl || s.scl.every((v) => Math.abs(v - 1) < 1e-9);
+        for (const id of AGENT_ORDER) {
+            const look = V23.core.resolve(id), X = V23.parts._prims(look, 'show'), P = X.prims;
+            const done = [];
+            if (X.nodeCount !== X.nodes.length) bad(id, 'node count from the entry ' + X.nodeCount + ' != ' + X.nodes.length);
+            // (1) coaxial cylinders on one node: at least 6 mm apart (less any tilt) where they overlap, and facing caps of
+            // cylinders that do not overlap at least 3 mm apart across the whole cap
+            const cyl = P.filter((s) => s.prim === 'cyl' && uniform(s));
+            for (let i = 0; i < cyl.length; i++) for (let j = i + 1; j < cyl.length; j++) {
+                const a = cyl[i], b = cyl[j];
+                if (keyOf(a) !== keyOf(b)) continue;
+                const ua = axisOf(a), dot = ua.dot(axisOf(b));
+                if (Math.abs(dot) < 0.999) continue;
+                const d = new THREE.Vector3(b.at[0] - a.at[0], b.at[1] - a.at[1], b.at[2] - a.at[2]), along = d.dot(ua);
+                if (d.clone().sub(ua.clone().multiplyScalar(along)).length() > 0.004) continue;
+                out.pairs++;
+                const ha = a.size[2] / 2, hb = b.size[2] / 2, sg = dot > 0 ? 1 : -1;
+                const rA = (y) => a.size[1] + (a.size[0] - a.size[1]) * (y + ha) / (2 * ha);
+                const rB = (y) => { const yb = (y - along) * sg; return b.size[1] + (b.size[0] - b.size[1]) * (yb + hb) / (2 * hb); };
+                const lo = Math.max(-ha, along - hb), hi = Math.min(ha, along + hb), ov = hi - lo;
+                const tilt = Math.sqrt(Math.max(0, 1 - dot * dot)), rmax = Math.max(a.size[0], a.size[1], b.size[0], b.size[1]);
+                if (ov > 0.002) {
+                    const dr = Math.min(Math.abs(rA(lo) - rB(lo)), Math.abs(rA(hi) - rB(hi)));
+                    if (dr - rmax * tilt < 0.006) bad(id, 'coaxial cylinders on ' + keyOf(a) + ' only ' + (dr * 1000).toFixed(1) + ' mm apart over ' + (ov * 1000).toFixed(1) + ' mm');
+                } else if (!a.open && !b.open && -ov - 2 * rmax * tilt < 0.003) bad(id, 'stacked caps on ' + keyOf(a) + ' ' + (-ov * 1000).toFixed(1) + ' mm apart, tilted ' + tilt.toFixed(3));
+            }
+            done.push('cylinders');
+            // (2) each arm: a capsule (the dome on the sleeve's axis at its top end, the same radius and columns) and, unless a
+            // rolled sleeve's roll covers it, an elbow of two shells on the pivot: a hemisphere coaxial with the upper arm and
+            // in phase with it, 9 mm or more proud of both limb ends, and a whole ball inside it, coaxial with the forearm
+            const near = (s, p) => new THREE.Vector3(...s.at).distanceTo(new THREE.Vector3(p[0], p[1], p[2])) < 1e-6;
+            for (const side of ['R', 'L']) {
+                const up = side === 'R' ? 3 : 5, fo = up + 1, el = side === 'R' ? R0.elbowR : R0.elbowL;
+                const arm = P.filter((s) => s.prim === 'cyl' && s.bone === up && s.node === undefined).sort((x, y) => y.size[2] - x.size[2])[0];
+                const fore = P.filter((s) => s.prim === 'cyl' && s.bone === fo && s.node === undefined && !s.hand).sort((x, y) => y.size[2] - x.size[2])[0];
+                const top = new THREE.Vector3(0, arm.size[2] / 2, 0).applyMatrix4(frame(arm));
+                const dome = P.find((s) => s.prim === 'sph' && s.bone === up && s.hemi === 0.5 && near(s, top.toArray()));
+                if (!dome) bad(id, side + ': no capsule dome on the sleeve\'s top end');
+                else if (Math.abs(dome.size[0] - arm.size[0]) > 1e-9 || dome.seg[0] !== arm.seg || axisOf(dome).dot(axisOf(arm)) < 0.999999) bad(id, side + ': the capsule dome does not share the sleeve\'s end ring');
+                const upper = P.find((s) => s.prim === 'sph' && s.bone === up && s.hemi === 0.5 && near(s, el));
+                const ball = P.find((s) => s.prim === 'sph' && !s.hemi && s.bone === fo && near(s, el));
+                if (X.flags.rolled) { if (upper || ball) bad(id, side + ': an elbow joint under a rolled sleeve'); }
+                else if (!upper || !ball) bad(id, side + ': the elbow joint is missing a shell');
+                else {
+                    const proud = upper.size[0] - Math.max(arm.size[1], fore.size[0]);
+                    if (proud < 0.009) bad(id, side + ': the elbow is only ' + (proud * 1000).toFixed(1) + ' mm proud of the limbs');
+                    if (upper.seg[0] !== arm.seg || axisOf(upper).dot(axisOf(arm)) < 0.999999) bad(id, side + ': the elbow hemisphere is not coaxial and in phase with the upper arm');
+                    if (ball.seg[0] !== fore.seg || axisOf(ball).dot(axisOf(fore)) < 0.999999) bad(id, side + ': the elbow ball is not coaxial and in phase with the forearm');
+                    if (!(ball.size[0] < upper.size[0] && ball.size[0] >= fore.size[0] + 0.009 && ball.size[0] > arm.size[1] + 0.004)) bad(id, side + ': the forearm ball does not sit inside the hemisphere and proud of both limbs');
+                }
+                // (3) a shoulder cap (an open dome on the upper arm) clears the capsule everywhere by 6 mm
+                for (const cap of P.filter((s) => s.prim === 'sph' && s.bone === up && s.hemi > 0.5 && s.hemi < 1)) {
+                    const F = frame(cap), a = new THREE.Vector3(...el), b = top, ab = b.clone().sub(a), L2 = ab.lengthSq();
+                    let min = 1e9;
+                    for (let j = 0; j <= 24; j++) for (let k = 0; k < 48; k++) {
+                        const th = Math.PI * cap.hemi * j / 24, ph = k / 48 * Math.PI * 2;
+                        const q = new THREE.Vector3(-Math.cos(ph) * Math.sin(th) * cap.size[0], Math.cos(th) * cap.size[1], Math.sin(ph) * Math.sin(th) * cap.size[2]).applyMatrix4(F);
+                        const t = Math.max(0, Math.min(1, q.clone().sub(a).dot(ab) / L2));
+                        const dist = q.distanceTo(a.clone().add(ab.clone().multiplyScalar(t))) - (arm.size[1] + (arm.size[0] - arm.size[1]) * t);
+                        if (dist < min) min = dist;
+                    }
+                    if (min < 0.006) bad(id, side + ': the shoulder cap comes within ' + (min * 1000).toFixed(1) + ' mm of the sleeve');
+                    (out.checked.cap = out.checked.cap || []).push(id + ' ' + (min * 1000).toFixed(1));
+                }
+            }
+            done.push('arms');
+            // (4) the pelvis floor holds both thighs' cross-sections with a centimetre to spare (rest pose)
+            const pel = P.find((s) => s.prim === 'lathe' && s.bone === 0), fy = pel.pts[1][1], Rx = pel.pts[1][0], Rz = Rx * (pel.scl ? pel.scl[2] : 1);
+            for (const bone of [9, 11]) {
+                const th = P.filter((s) => s.prim === 'cyl' && s.bone === bone).sort((x, y) => y.size[2] - x.size[2])[0];
+                const F = frame(th), h = th.size[2], u = axisOf(th), c0 = new THREE.Vector3(...th.at);
+                const t = (fy - c0.y) / u.y, c = c0.clone().add(u.clone().multiplyScalar(t)), r = th.size[1] + (th.size[0] - th.size[1]) * (t + h / 2) / h;
+                let worst = 1e9;
+                for (let k = 0; k < 64; k++) {
+                    const a = k / 64 * Math.PI * 2, qx = c.x + Math.cos(a) * r / Math.abs(u.y), qz = c.z + Math.sin(a) * r;
+                    // the gap to the floor's rim along the ray from the pelvis's centre through the point
+                    const e = Math.sqrt((qx / Rx) * (qx / Rx) + (qz / Rz) * (qz / Rz));
+                    worst = Math.min(worst, (1 - e) * Math.hypot(qx, qz) / e);
+                }
+                if (worst < 0.01) bad(id, 'thigh ' + bone + ' passes the pelvis floor only ' + (worst * 1000).toFixed(1) + ' mm inside its rim');
+                (out.checked.floor = out.checked.floor || []).push(id + ' ' + (worst * 1000).toFixed(1));
+            }
+            done.push('pelvis');
+            out.checked[id] = done;
+        }
+        // (5) Omen's rift key, in his right forearm's frame (where it orbits), stays 1.5 cm or more outside every vertex of
+        // the forearm mesh and the right hand, over the idle, the intro, the lock-in, the MVP pose and every slot clip
+        const root = V23.core.build('omen', 'show'), v = root.userData.v23, fo = v.bones[4], hand = v.nodes.handR, prop = v.nodes.prop;
+        const inv = new THREE.Matrix4(), m = new THREE.Matrix4(), p = new THREE.Vector3();
+        const ext = (mesh, into) => { m.multiplyMatrices(inv, mesh.matrixWorld); const a = mesh.geometry.attributes.position; for (let i = 0; i < a.count; i++) { p.fromBufferAttribute(a, i).applyMatrix4(m); if (p.x < into[0]) into[0] = p.x; if (p.x > into[1]) into[1] = p.x; } };
+        let gap = 1e9, samples = 0;
+        for (const clip of ['idle', 'intro', 'lockIn', 'mvp', 'c', 'q', 'e', 'x']) for (let t = 0; t < 6; t += 0.05) {
+            V23.motion.sample('omen', clip, t, root);
+            root.updateMatrixWorld(true);
+            inv.copy(fo.matrixWorld).invert();
+            const k = [1e9, -1e9], h = [1e9, -1e9];
+            ext(prop, k); ext(hand, h); ext(fo, h);
+            gap = Math.min(gap, k[0] - h[1]);
+            samples++;
+        }
+        V23.motion.sample('omen', 'idle', 0, root);
+        out.key = { parent: prop.parent === fo, gap, samples };
+        return out;
+    });
+    console.log('# seams: ' + seams.pairs + ' coaxial cylinder pairs checked; shoulder caps clear by (mm)', (seams.checked.cap || []).join(', '), '| pelvis floor margins (mm)',
+        [...new Set((seams.checked.floor || []).map((s) => s.split(' ')[1]))].join(', '), '| rift key gap', (seams.key.gap * 1000).toFixed(1), 'mm over', seams.key.samples, 'samples');
+    assert.deepEqual(seams.problems, [], 'no coincident or grazing shells, capsule shoulders, elbow balls, cap and floor clearances');
+    for (const id of reg.order) assert.deepEqual(seams.checked[id], ['cylinders', 'arms', 'pelvis'], id + ': seam checks ran');
+    assert.ok(seams.key.parent, 'Omen\'s rift key rides his right forearm');
+    assert.ok(seams.key.gap >= 0.015, 'the rift key stays 1.5 cm or more off the right hand and forearm in every clip: ' + (seams.key.gap * 1000).toFixed(1) + ' mm');
 
     // ---- V23.motion.sample allocates nothing once warm (design 15: no per-frame allocation in V23 update paths) ----------
     // The sampling heap profiler (64-byte interval, collected objects kept) attributes every JS heap allocation to its call

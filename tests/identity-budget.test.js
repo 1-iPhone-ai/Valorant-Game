@@ -137,9 +137,5 @@ test('identity budget skeleton: programs equal the watermark, no stalls, the con
 test('draw deltas against the formula, identity off vs on in one page', { todo: 'WP12: needs the identity build (WP2, WP4, WP6)' }, () => {});
 test('glBufferDataBytes per event', { todo: 'WP12' }, () => {});
 test("CPU ratio within hifi-kit's BUDGET.cpuSlack", { todo: 'WP12' }, () => {});
-// V2.3 (WP2): the exclusion this proof must make (V23.CONTRACT.bootNotes): with agentIdentity on, core.init (H2) makes the
-// part pool, the 4x4 upload target and the base material, and three.js draws each new object's uuid from Math.random
-// (4 calls per object); the first switch-on (applySettings) and the showroom's first build do the same. Count from after
-// the boot, or leave those constructions out. With agentIdentity off core.init makes nothing (the boot stream is V2.2's).
 test('zero Math.random while any V23 function runs, over 600 driven frames', { todo: 'WP12: wraps every V23 function with a flag' }, () => {});
 test('hitch probes: first cast per Sage/Omen slot, first bot in a new chunk, first variant, first killcam, MVP, showroom open, rapid switching', { todo: 'WP12' }, () => {});

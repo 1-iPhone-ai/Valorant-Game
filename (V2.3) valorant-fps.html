@@ -23967,11 +23967,6 @@
         //    before the saved settings load: they only record their targets, and nothing is built there; applySettings
         //    (cfg, null) runs before core.init, so it only records the values, and core.init builds (when agentIdentity is
         //    'on') from game.userSettings. V23.CONTRACT.bootOrder holds the list (identity-budget checks it).
-        //    Math.random at boot (V23.CONTRACT.bootNotes): with Agent Identity on, core.init makes the part pool, the 4x4
-        //    upload target and the base material, and three.js draws each one's uuid from Math.random (four calls per
-        //    object), so the boot stream differs from V2.2's there and only there; with it off core.init makes nothing and
-        //    the stream is V2.2's. The first switch-on and the showroom's first build make them the same way. same.js
-        //    reseeds per scenario; a proof of 'no Math.random while V2.3 code runs' excludes those calls.
         //  - Material rule: V23.mat is the only place V2.3 creates materials (between the V23.mat markers below), and every
         //    signature reuses a program V2.2 already compiles: vm(spec) MeshStandard toneMapped:false FrontSide (gun parts),
         //    card(color, additive) MeshBasic castFX radial texture (castFX halo/core), flat(color, opacity) MeshBasic
@@ -24125,12 +24120,7 @@
             bootOrder: Object.freeze(['arena.applyTier', 'arena.onMapBuilt', 'fp.attach', 'fp.initCast', 'replay.ghostInit', 'stage.buildShowcase',
                 'bots.assign', 'util.onActivate', 'core.onAgentChanged', 'stage.renderGrid', 'stage.setAgent', 'core.applySettings', 'bots.setRim',
                 'arena.onAtmosphere', 'bots.previewColors', 'bots.wingKit', 'vm.onSwitch', 'core.init', 'bots.onPage', 'bots.packPose', 'bots.packColor',
-                'bots.flush', 'core.warmPre', 'core.warmVm', 'core.warmWorld', 'fp.reapply', 'bots.onTier', 'core.warmPost']),
-            // the boot's Math.random exclusion (see the header's boot order note)
-            bootNotes: 'With agentIdentity on, core.init (H2) makes the part pool, the 4x4 upload target and the base material: three.js ' +
-                'draws each new object\'s uuid from Math.random (4 calls each), so the boot stream differs from V2.2\'s inside core.init only. ' +
-                'With it off core.init makes nothing and the boot stream is V2.2\'s. The first switch-on (applySettings) and the showroom\'s ' +
-                'first build do the same. Proofs of zero Math.random while V2.3 code runs exclude these pool, target and material constructions.'
+                'bots.flush', 'core.warmPre', 'core.warmVm', 'core.warmWorld', 'fp.reapply', 'bots.onTier', 'core.warmPost'])
         });
 
         // V2.3: mulberry32. A deterministic stream per agent, per bot slot + generation, per cast (V2.3 never calls Math.random)
@@ -24198,6 +24188,14 @@
         //    calls V23.fp.reapply() too.
         //  - Bots: BOT_POOLS (archetype -> agents) and assignLook(...), a pure function; V23.bots.assign (WP6) steps forward
         //    from its result to avoid duplicates (the result carries index, size and members).
+        //  - Math.random and object construction (a note for the coordinator, not part of the frozen contract; listed in
+        //    WP2's gaps for sign-off): three.js draws a uuid from Math.random (four calls) for every Object3D, BufferGeometry,
+        //    Material and render target it constructs. With Agent Identity on (the default), core.init (H2) makes the part
+        //    pool (about 520 materials and 1,270 groups, meshes and geometries), the 4x4 upload target and the base
+        //    material, so the boot's Math.random stream differs from V2.2's inside core.init and nowhere else; the first
+        //    switch-on (applySettings) and the showroom's first build at the start screen make them the same way. With it
+        //    off, core.init makes nothing and the boot stream is V2.2's (0 calls under V2.3 code). After the pool exists a
+        //    build, a sample or an upload draw makes no Math.random call (agent-roster.test counts them).
         // ---------------------------------------------------------------------------------------------------------------
 
         // V2.3: role defaults: a complete look per role, original and plain (a stub agent is drawn as its role default in
@@ -24543,6 +24541,9 @@
                 const v = T.radiusM || T.lengthM || T.wallLengthM || T.rangeM || 4;
                 return Math.max(0.4, Math.min(2.2, v * 0.35));
             };
+            // V2.3: a fresh LookSpec: the role default, then the look-tag defaults per slot (gesture, preview recipe, reach,
+            // PREVIEW_SOUNDS row), the bot pool from BOT_POOLS, then the entry merged over all of it (objects merge, arrays and
+            // nulls replace; previews merge per slot), then the identity fields; deep-frozen
             function resolveFresh(id) {
                 const def = AGENT_DEFS[id];
                 if (!def) return null;
@@ -24591,12 +24592,16 @@
             };
             const dE76 = (a, b) => { const p = lab(a), q = lab(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
 
+            // V2.3: resolve with the cache: one frozen object per agent until define() drops it (callers compare by identity)
             function resolveImpl(agentId) {
                 if (cache[agentId]) return cache[agentId];
                 const L = resolveFresh(agentId);
                 if (L) cache[agentId] = L;
                 return L;
             }
+            // V2.3: define: the schema check first (a problem throws and nothing changes); the entry is stored as a frozen
+            // copy and resolved at once, and if resolving throws, the previous entry comes back (rollback) and the error
+            // propagates, so the registry never holds an entry that does not resolve
             function defineImpl(agentId, def) {
                 const errs = check(agentId, def);
                 if (errs.length) throw new Error('V23.core.define(' + agentId + '): ' + errs.join('; '));
@@ -24634,13 +24639,18 @@
                 S.rt.texture.encoding = THREE.sRGBEncoding;
                 S.base = V23.mat.vm({ c: 0x808080, r: 0.6 });
             }
-            // a redefined look's old LOD: back to the pool now, or once nothing holds it (checked by the builder)
+            // V2.3: a redefined look's old LOD goes back to the part pool now when nothing holds it; one still attached (on
+            // the stage, as a ghost) is parked in S.retired instead, so its holder never draws an emptied figure
             function retire(root) { if (!root) return; if (root.parent) S.retired.push(root); else V23.parts._release(root); }
+            // V2.3: give back the parked LODs that have been detached since (run by build() and each staged step)
             function sweepRetired() {
                 for (let i = S.retired.length - 1; i >= 0; i--) if (!S.retired[i].parent) { V23.parts._release(S.retired[i]); S.retired.splice(i, 1); }
             }
+            // V2.3: Agent Identity is on unless the recorded setting (or, before applySettings ran, the saved one) is 'off'
             const enabledNow = () => { const v = (S.settings && S.settings.agentIdentity) || (typeof game !== 'undefined' && game.userSettings && game.userSettings.agentIdentity); return v !== 'off'; };
+            // V2.3: the content tier the kit superset is built for (the game's own character detail switches)
             const contentTier = () => ((typeof ultraChars !== 'undefined' && ultraChars.on) ? 'ultra' : (typeof characterDetail !== 'undefined' && characterDetail.enabled) ? 'high' : (CONTENT.detailedModels ? 'medium' : 'low'));
+            // V2.3: the staged queue holds 'agent|tier' keys, each once (front: the next to build)
             const dequeue = (key) => { const i = S.queue.indexOf(key); if (i >= 0) S.queue.splice(i, 1); };
             const enqueue = (key, front) => { if (S.queue.indexOf(key) >= 0) return; if (front) S.queue.unshift(key); else S.queue.push(key); };
             // V2.3: build one agent's LOD now (also the synchronous single-agent build on demand) and upload-draw it; a staged
@@ -24664,7 +24674,9 @@
                 V23.core.uploadDraw(root);
                 return root;
             }
-            // the boot set when Agent Identity is on: the kit superset for the content tier and the active agent's LODs
+            // V2.3: the boot set when Agent Identity is on (core.init, or the first switch-on): the kit superset for the
+            // content tier and the active agent's show and world LODs, built synchronously (their upload draws included), so
+            // the warm-up (H3) draws them and the first frame needs no build; everything else waits for the staged builder
             function bootBuild() {
                 S.identityBuilt = true;
                 V23.parts.kitSuperset(contentTier());
@@ -24682,7 +24694,8 @@
                 const kc = !!(typeof replayDirector !== 'undefined' && (replayDirector.pending || replayDirector.clip));
                 return menu || picker || post || dead || kc;
             }
-            // the median frame interval from perfTelemetry's ring, re-measured at most every 0.5 s
+            // V2.3: the staged builder's budget source: the median frame interval from perfTelemetry's ring (its own copy,
+            // sorted in a preallocated buffer), re-measured at most every 0.5 s; 16.7 ms until the ring holds 10 frames
             function medianFrame() {
                 const now = performance.now();
                 if (now - S.medianAt < 500) return S.median;
@@ -24714,6 +24727,8 @@
                 });
                 return best;
             }
+            // V2.3: the warm registry: objects tagged userData.v23Warm = kind under root, shown (and moved to the warm point
+            // when tagged v23WarmAt) for their warm step and restored by warmPost
             const tagged = (root, kind) => { const out = []; if (root) root.traverse((o) => { if (o.userData && o.userData.v23Warm === kind) out.push(o); }); return out; };
             const showForWarm = (o, p) => {
                 S.warm.shown.push([o, o.visible]);
@@ -24730,8 +24745,8 @@
                     S.active = game.activeAgent || S.active;
                     for (const id of AGENT_ORDER) enqueue(id + '|show');
                     // V2.3: with Agent Identity on, the boot set is built here: the part pool, the upload target and the base
-                    // material are made, and their THREE uuids draw from Math.random (the documented exclusion:
-                    // V23.CONTRACT.bootNotes); with it off nothing is made here and the boot's Math.random stream is V2.2's
+                    // material are made, and their THREE uuids draw from Math.random (see the IDENTITY CORE header's note on
+                    // object construction); with it off nothing is made here and the boot's Math.random stream is V2.2's
                     if (enabledNow()) bootBuild();
                     return null;
                 },
@@ -25319,6 +25334,18 @@
                 _e4.setFromQuaternion(_q4, 'XYZ');
                 return _CY(cx, ra, rb, len, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [_e4.x, _e4.y, _e4.z], bone, slot, seg, x);
             }
+            // V2.3: the Euler (XYZ) that turns +Y onto the axis from b to a (as _limb does), then turns yaw about that axis and
+            // tips roll about the result's own z. With yaw PI / 2 a sphere's vertex columns land on the limb cylinder's (the
+            // two generators start a quarter turn apart), so a dome closing a limb shares its end ring exactly.
+            function _axisRot(a, b, yaw, roll) {
+                const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(a[0] - b[0], a[1] - b[1], a[2] - b[2]).normalize());
+                if (yaw) q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
+                if (roll) q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll));
+                const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+                return [e.x, e.y, e.z];
+            }
+            // V2.3: the upper arm's radius at the shoulder (its capsule dome's radius; a shoulder cap clears it)
+            const _armTop = (D) => D.arm * 1.08;
             // V2.3: a node (prop, plate, shard) under a bone or another node, with its pivot in figure space
             function _node(cx, name, parent, pivot, extra) {
                 if (!cx.nodes.some((n) => n.name === name)) cx.nodes.push(Object.assign({ name: name, parent: parent, pivot: pivot.slice() }, extra || {}));
@@ -25339,7 +25366,8 @@
             };
             function _moduleExists(name) { const q = _parseName(name); return !!(q && (_MODULES[q.fam] || _CUSTOM[q.fam] || _CUSTOM[name])); }
 
-            // --- the base body (always first): head, neck, torso, arms, hands, legs, feet ---
+            // --- V2.3: the base body: head, neck, torso, arms, hands, legs, feet. It runs after every other module of the look,
+            // so it reads the flags they set (sleeve and leg slots, a sealed head, boots, a rolled sleeve) ---
             _MODULES.body = function (cx) {
                 const D = cx.D, L = cx.look || {}, F = cx.flags, hs = D.head;
                 const sk = 'skin', un = 'under';
@@ -25360,30 +25388,42 @@
                 // V2.3: where they overlap (0.98-1.06 m) the spine shell runs inside the pelvis shell, at least 7 mm in (they
                 // were within a millimetre at the waist's sides: a comb); the pelvis's rim turns inward under the spine shell,
                 // so it reads as a waist seam rather than an open edge
+                // V2.3: the pelvis's hem is a nearly flat floor (0.835-0.86 m) at least 1.5 cm wider than the thighs where
+                // they pass it, so the thighs leave the shell through that floor at a right angle; the old bottom sloped in
+                // from 0.88 m and met the posed thighs at 10-35 degrees (a comb along the hem). On a narrow-hipped rig the
+                // hips widen to keep that margin.
+                const hipR = Math.max(D.hipW * 0.5, 0.14 + D.thigh + 0.012);
                 _add(cx, 'lathe', null, [0, 0, 0], null, 0, un, { scl: [1, 1, D.chestD * 0.92 / D.hipW], seg: _segs(cx, 14, 8),
-                    pts: [[0.0, 0.8], [D.hipW * 0.42, 0.81], [D.hipW * 0.5, 0.88], [D.hipW * 0.5, 0.97], [D.waistW * 0.5, 1.06], [D.waistW * 0.44, 1.066]] });
+                    pts: [[0.0, 0.835], [hipR - 0.008, 0.837], [hipR, 0.86], [hipR, 0.97], [D.waistW * 0.5, 1.06], [D.waistW * 0.44, 1.066]] });
                 _add(cx, 'lathe', null, [0, 0, 0], null, 1, un, { scl: ez, seg: _segs(cx, 14, 8),
                     pts: [[D.waistW * 0.43, 0.98], [D.waistW * 0.5, 1.08], [D.chestW * 0.47, 1.28], [D.chestW * 0.5, 1.44], [D.chestW * 0.44, 1.56], [D.neck * 1.7, 1.63], [0.0, 1.65]] });
-                // arms: shoulder ball, upper arm, forearm (sleeve slot set by the torso layer), hands by glove type
+                // arms: upper arm (a capsule), elbow joint, forearm (sleeve slot set by the torso layer), hands by glove type
                 const R = AGENT_RIG.rest;
                 const sleeve = F.sleeveSlot || un, fore = F.foreSlot || sleeve;
                 for (const side of ['R', 'L']) {
                     const s = _mir(side), up = side === 'R' ? 3 : 5, fo = side === 'R' ? 4 : 6;
                     const sh = [s * 0.41, 1.52, 0], el = side === 'R' ? R.elbowR : R.elbowL, wr = side === 'R' ? R.wristR : R.wristL;
-                    // V2.3: the shoulder ball: coarse under a cap (which clears it by about 3 cm), finer when it shows, so the
-                    // sleeve's exit from it reads as a clean line
-                    _SP(cx, D.arm * 1.3, [s * 0.4, 1.5, 0], null, up, sleeve, F['cap' + side] ? _segs(cx, [10, 6], [6, 4]) : _segs(cx, [12, 8], [6, 4]));
-                    _limb(cx, sh, el, D.arm, D.arm * 0.9, up, sleeve, _segs(cx, 12, 7));
-                    if (cx.show) {
-                        // V2.3: a seam ring where the sleeve leaves the shoulder ball: the two cross at a grazing angle, and the
-                        // faceted crossing read as a torn edge; the ring (on the sleeve's axis) covers it
-                        const ex = el[0] - sh[0], ey = el[1] - sh[1], ez2 = el[2] - sh[2], el2 = Math.sqrt(ex * ex + ey * ey + ez2 * ez2);
-                        const a = Math.sqrt(Math.max(0, (D.arm * 1.3) * (D.arm * 1.3) - D.arm * D.arm)) + 0.02;
-                        _q4.setFromUnitVectors(_v4.set(0, 0, 1), new THREE.Vector3(ex / el2, ey / el2, ez2 / el2));
-                        _e4.setFromQuaternion(_q4, 'XYZ');
-                        _TO(cx, D.arm * (1 - 0.1 * a / el2) + 0.003, 0.011, [sh[0] + ex / el2 * a, sh[1] + ey / el2 * a, sh[2] + ez2 / el2 * a], [_e4.x, _e4.y, _e4.z], up, sleeve, [4, 12]);
+                    // V2.3: the upper arm is a capsule: a sleeve tapering from _armTop at the shoulder pivot to 0.9 x arm at the
+                    // elbow, closed at the top by a dome of the sleeve's own radius on the same axis, with the same segment
+                    // count and phase (_axisRot's quarter turn), so dome and sleeve share one ring of vertices and no shell
+                    // crosses another at the shoulder (the old shoulder ball crossed the sleeve at a grazing angle, and the
+                    // seam ring that hid that crossed the ball in turn: torn edges on the stage)
+                    const rTop = _armTop(D), segU = _segs(cx, 12, 7);
+                    _limb(cx, sh, el, rTop, D.arm * 0.9, up, sleeve, segU);
+                    _SP(cx, rTop, sh, _axisRot(sh, el, Math.PI / 2, 0), up, sleeve, [segU, _segs(cx, 4, 3)], { hemi: 0.5 });
+                    // V2.3: the elbow joint, centred on the elbow pivot and 1 cm proud of both limb ends, so the bending forearm
+                    // turns inside it and each cylinder meets it at 30-40 degrees (the upper arm's end used to cross the bent
+                    // forearm at a grazing angle: a comb). It is two shells, each coaxial with its own limb and with the same
+                    // 12 columns in phase (a faceted cylinder then crosses a faceted sphere in one flat ring): a hemisphere on
+                    // the upper arm, open toward the forearm, and a whole ball 2 mm smaller on the forearm, which fills it at
+                    // any bend (so the upper arm's crossing with that ball stays hidden inside the hemisphere). A rolled
+                    // sleeve's roll sheathes the elbow instead.
+                    if (!F.rolled) {
+                        const rJ = Math.max(D.arm * 0.9, D.fore) + 0.01;
+                        _SP(cx, rJ, el, _axisRot(sh, el, Math.PI / 2, 0), up, sleeve, [segU, _segs(cx, 6, 3)], { hemi: 0.5 });
+                        _SP(cx, rJ - 0.002, el, _axisRot(el, wr, Math.PI / 2, 0), fo, fore, [segU, _segs(cx, 12, 6)]);
                     }
-                    _limb(cx, el, wr, D.fore, D.fore * 0.85, fo, fore, _segs(cx, 10, 7));
+                    _limb(cx, el, wr, D.fore, D.fore * 0.85, fo, fore, _segs(cx, 12, 7));
                     const gt = (L.gloves && L.gloves.type) || 'full';
                     if (cx.show) {
                         // V2.3: show LOD: the hand is a node at the wrist (a child of the forearm) whose pose geometry the
@@ -25405,7 +25445,7 @@
                     if (!F.boots) _RB(cx, [0.12, 0.09, 0.26], 0.03, [s * 0.18, 0.045, -0.05], null, sn, 'dark');
                 }
             };
-            // --- hands: 7 glove types; poses by name ---
+            // --- V2.3: hands: 7 glove types; poses by name ---
             // V2.3: the hand poses: the six cast-hand poses of design 7.1 first, then the two idle-only ones the looks name.
             // The show LOD prebuilds all eight per glove key (_handSet) and swaps them by reference (pose.hands).
             const HAND_POSES = Object.freeze(['open', 'cup', 'fist', 'point', 'snap', 'flat', 'clawLow', 'relaxed']);
@@ -25494,7 +25534,7 @@
                 cx.inHand = was;
             }
 
-            // --- torso layers: one coat generator with presets, plus plates, vests and straps ---
+            // --- V2.3: torso layers: one coat generator with presets, plus plates, vests and straps ---
             // V2.3: len is the coat length (hem at 1.0 - 0.7 len: 0.72 is knee length), open leaves the front parted (a gap
             // that shows the layer under it and the legs: a coat, never a dress silhouette), panels around the skirt
             const _COATS = {
@@ -25563,6 +25603,8 @@
                 if (P.sleeves === 'full') { F.sleeveSlot = slot; F.foreSlot = slot; }
                 else if (P.sleeves === 'rolled' || P.sleeves === 'short') {
                     F.sleeveSlot = slot; F.foreSlot = 'skin';
+                    // V2.3: the roll sheathes the elbow, so the base body leaves out its elbow ball
+                    if (P.sleeves === 'rolled') F.rolled = true;
                     // V2.3: a rolled sleeve turns its lining out: the roll below the elbow is the trim slot (so the forearm
                     // carries trim, skin and glow, and the show LOD keeps its 36-draw cap with the hand nodes)
                     const lining = P.sleeves === 'rolled' ? 'trim' : slot;
@@ -25577,14 +25619,19 @@
                     }
                 } else if (P.sleeves === 'none') { F.sleeveSlot = F.sleeveSlot || 'under'; }
             }
+            // V2.3: one module per coat preset (fieldJacket to tabard), each through _coat
             for (const k of Object.keys(_COATS)) _MODULES[k] = function (cx, p, slot) { _coat(cx, p, slot, _COATS[k]); };
+            // V2.3: a vest: one rounded shell 2.5 cm outside the chest, two trim pockets on the front
             _MODULES.vest = function (cx, p, slot) {
                 const D = cx.D;
                 _RB(cx, [D.chestW + 0.05, 0.42, D.chestD + 0.05], 0.08, [0, 1.36, 0], null, 1, slot, { seg: _segs(cx, 2, 1) });
                 for (const s of [-1, 1]) _RB(cx, [0.12, 0.08, 0.05], 0.02, [s * 0.14, 1.26, -D.chestD / 2 - 0.035], null, 1, 'trim');
             };
+            // V2.3: a sleeveless top: bare arms unless another layer sets the sleeve slot
             _MODULES.singlet = function (cx, p, slot) { const D = cx.D; _RB(cx, [D.chestW * 0.92 + 0.02, 0.5, D.chestD + 0.02], 0.08, [0, 1.3, 0], null, 1, slot); cx.flags.sleeveSlot = cx.flags.sleeveSlot || 'skin'; };
+            // V2.3: a full suit: sleeves, forearms and legs take its slot; two thin trim seams down the front
             _MODULES.compressionSuit = function (cx, p, slot) { cx.flags.sleeveSlot = slot; cx.flags.foreSlot = slot; cx.flags.legSlot = slot; for (let k = 0; k < 2; k++) _B(cx, [0.02, 0.5, 0.012], [(k ? 1 : -1) * 0.2, 1.3, -cx.D.chestD / 2 - 0.006], null, 1, 'trim', { tiny: true }); };
+            // V2.3: overalls: a bib, a hip shell 2.5 cm outside the hips, the legs in its slot and one strap
             _MODULES.overalls = function (cx, p, slot) {
                 const D = cx.D;
                 _RB(cx, [D.chestW * 0.6, 0.26, D.chestD + 0.04], 0.05, [0, 1.3, -0.005], null, 1, slot);
@@ -25592,13 +25639,17 @@
                 cx.flags.legSlot = slot;
                 _B(cx, [0.05, 0.4, 0.02], [0.14, 1.42, -D.chestD / 2 - 0.02], [0, 0, 0.05], 1, slot);
             };
+            // V2.3: an apron panel hanging 4 cm in front of the chest; a harness of two straps and a band
             _MODULES.apron = function (cx, p, slot) { const D = cx.D; _RB(cx, [D.chestW * 0.75, 0.95, 0.03], 0.015, [0, 1.05, -D.chestD / 2 - 0.04], [0.04, 0, 0], 1, slot); };
             _MODULES.harness = function (cx, p, slot) { const D = cx.D; for (const s of [-1, 1]) _B(cx, [0.045, 0.5, D.chestD + 0.05], [s * 0.15, 1.36, 0], [0, 0, s * 0.08], 1, slot); _B(cx, [D.chestW + 0.04, 0.045, D.chestD + 0.05], [0, 1.3, 0], null, 1, slot); };
+            // V2.3: a chest plate centred 2 cm in front of the chest (asym: narrower, turned to one side) with three trim ribs
             _MODULES.plastron = function (cx, p, slot) {
                 const D = cx.D, asym = p && p.asym;
                 _RB(cx, [D.chestW * (asym ? 0.7 : 0.86), 0.42, 0.06], 0.03, [asym ? -0.06 : 0, 1.38, -D.chestD / 2 - 0.02], [0, asym ? -0.12 : 0, 0], 1, slot);
                 for (let k = 0; k < 3; k++) _B(cx, [D.chestW * 0.6, 0.012, 0.012], [0, 1.26 + k * 0.1, -D.chestD / 2 - 0.054], null, 1, 'trim', { tiny: true });
             };
+            // V2.3: lamellar: four rows of five small plates, each row 4 mm further out than the one above, so overlapping
+            // plates never share a face
             _MODULES.lamellar = function (cx, p, slot) {
                 const D = cx.D;
                 for (let r = 0; r < 4; r++) for (let c = -2; c <= 2; c++) _RB(cx, [0.11, 0.09, 0.025], 0.01, [c * 0.105, 1.18 + r * 0.085, -D.chestD / 2 - 0.02 - 0.004 * r], [0.06, 0, 0], 1, slot);
@@ -25621,6 +25672,7 @@
                     _B(cx, [0.012, 0.2, 0.012], [x - s * 0.02, 1.22, -dz * 0.96 - 0.006], [0, 0, s * 0.18], 1, 'glow');
                 }
             };
+            // V2.3: the under layer: it gives the legs its slot and, ribbed, adds five ribs across the side the plates leave bare
             _MODULES.underSuit = function (cx, p, slot) {
                 if (slot && slot !== 'under') cx.flags.legSlot = slot;
                 if (p && p.ribbed) {
@@ -25629,30 +25681,44 @@
                     for (let k = 0; k < 5; k++) { const y = 1.12 + k * 0.075, w = k < 2 ? D.waistW : D.chestW; _RB(cx, [w * 0.3, 0.018, 0.02], 0.006, [s * w * 0.2, y, -(k < 2 ? 0.5 : 0.48) * D.chestD - 0.006], [0, s * 0.35, 0], 1, slot || 'under', { tiny: true }); }
                 }
             };
-            // --- neck ---
+            // --- V2.3: neck pieces (a turned-down collar, a funnel, the gorget, a choker, a shawl collar) ---
             _MODULES.collarFold = function (cx, p, slot) {
                 // a turned-down collar lying on the shoulders, parted at the front (not a standing band)
                 const D = cx.D;
                 for (const s of [-1, 1]) _RB(cx, [0.17, 0.03, 0.15], 0.012, [s * 0.115, 1.615, -0.035], [-0.42, s * 0.35, s * 0.18], 1, slot);
                 _RB(cx, [0.26, 0.05, 0.05], 0.015, [0, 1.63, D.chestD * 0.3], [0.5, 0, 0], 1, slot);
             };
+            // V2.3: a standing funnel collar: a lathe flaring from the neck's base to just under the chin
             _MODULES.collarFunnel = function (cx, p, slot) { _add(cx, 'lathe', null, [0, 0, 0], null, 1, slot, { pts: [[0.1, 1.57], [0.118, 1.66], [0.135, 1.75]], seg: _segs(cx, 14, 8) }); };
             _MODULES.gorget = function (cx, p, slot) {
+                // V2.3: three telescoping rings, coaxial and untilted: each stands 1 cm down inside the ring below it and is
+                // 7 mm narrower there, so its side meets that ring's top face square on (14 facets in phase), and the lowest
+                // ring starts inside the torso. The old rings were tilted 0.04 rad apart over 4 mm gaps, so their caps
+                // crossed at about 2 degrees (a comb between the rings).
                 const D = cx.D;
-                for (let k = 0; k < 3; k++) _CY(cx, D.neck + 0.05 - k * 0.008, D.neck + 0.055 - k * 0.008, 0.034, [0, 1.6 + k * 0.038, 0.004], [k * 0.04, 0, 0], k < 2 ? 1 : 2, slot || 'trim', _segs(cx, 14, 8));
+                for (let k = 0; k < 3; k++) _CY(cx, D.neck + 0.048 - k * 0.011, D.neck + 0.052 - k * 0.011, 0.042, [0, 1.592 + k * 0.032, 0.004], null, k < 2 ? 1 : 2, slot || 'trim', _segs(cx, 14, 8));
             };
-            _MODULES.choker = function (cx, p, slot) { _CY(cx, cx.D.neck + 0.008, cx.D.neck + 0.008, 0.03, [0, 1.66, 0], null, 2, slot || 'trim', 12); };
+            // V2.3: a choker on the neck's axis, 9 mm outside the flared neck where it sits (it was 4.5 mm out and 5 mm off
+            // the neck's axis: touching at the back); a shawl collar: a thick torus lying on the shoulders
+            _MODULES.choker = function (cx, p, slot) { const r = cx.D.neck * 1.06 + 0.009; _CY(cx, r, r, 0.03, [0, 1.66, 0.005], null, 2, slot || 'trim', 12); };
             _MODULES.shawlCollar = function (cx, p, slot) { _TO(cx, 0.17, 0.055, [0, 1.6, 0], [Math.PI / 2, 0, 0], 1, slot, [6, 16]); };
-            // --- shoulders ---
+            // --- V2.3: shoulders (on the upper arm bone unless they sit on the torso) ---
             _MODULES.capRound = function (cx, p, slot, at, side) {
-                // V2.3: a rounded cap: an open dome over the shoulder, about 3 cm clear of the shoulder ball under it (the old
-                // closed cap nearly coincided with the ball and the sleeve crossed both at a grazing angle: torn edges); the
-                // sleeve leaves through its open rim, so no surface crosses the cap
-                const s = _mir(side), bone = side === 'R' ? 3 : 5;
-                cx.flags['cap' + side] = true;
-                _SP(cx, [0.1, 0.084, 0.114], [s * 0.41, 1.53, 0], [0, 0, -s * 0.3], bone, slot, _segs(cx, [16, 8], [10, 5]), { hemi: 0.7 });
-                _B(cx, [0.015, 0.015, 0.015], [s * 0.505, 1.5, 0], null, bone, 'trim', { tiny: true });
+                // V2.3: a rounded cap: an open dome over the shoulder, coaxial with the upper arm's capsule and 3.2 cm clear
+                // of its top, tipped 0.12 rad outward and open below 0.66 of its height, so its rim stays 13 mm or more off
+                // the sleeve on every rig (the old cap sat off-axis and its rim cut 3-16 mm into the sleeve: torn edges);
+                // the sleeve leaves through the open rim and no surface crosses the cap
+                const s = _mir(side), bone = side === 'R' ? 3 : 5, R0 = AGENT_RIG.rest;
+                const sh = [s * 0.41, 1.52, 0], el = side === 'R' ? R0.elbowR : R0.elbowL;
+                const rTop = _armTop(cx.D), R = rTop + 0.032, rot = _axisRot(sh, el, 0, -s * 0.12);
+                const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], 'XYZ'));
+                const c = new THREE.Vector3(0, 0.01, 0).applyQuaternion(q).add(new THREE.Vector3(sh[0], sh[1], sh[2]));
+                _SP(cx, [R, rTop + 0.022, R * 1.12], [c.x, c.y, c.z], rot, bone, slot, _segs(cx, [16, 8], [10, 5]), { hemi: 0.66 });
+                // a rivet on the cap's outer face
+                const rv = new THREE.Vector3(s * (R + 0.002), 0, 0).applyQuaternion(q).add(c);
+                _B(cx, [0.015, 0.015, 0.015], [rv.x, rv.y, rv.z], rot, bone, 'trim', { tiny: true });
             };
+            // V2.3: up to three plates fanning out and down the shoulder, each its own node when it settles (Omen's intro)
             _MODULES.pauldronStack = function (cx, p, slot, at, side) {
                 const s = _mir(side), n = (p && p.plates) || 3, bone = side === 'R' ? 3 : 5;
                 const P = [[0.44, 1.615, 0.22, 0.26, 0.42], [0.5, 1.545, 0.18, 0.24, 0.78], [0.535, 1.455, 0.14, 0.22, 1.05]];
@@ -25662,12 +25728,14 @@
                     _RB(cx, [w, 0.045, d], 0.018, at2, [0, 0, -s * rz], node ? undefined : bone, slot, node ? { node: node } : null);
                 }
             };
+            // V2.3: a plate hovering over the shoulder (a node); vent fins on the back; a yoke across both shoulders; a
+            // three-panel cape over one shoulder; two glassy pauldron plates
             _MODULES.floatingPlate = function (cx, p, slot, at, side) { const s = _mir(side); const node = cx.show ? _node(cx, 'float' + side, side === 'R' ? 3 : 5, [s * 0.47, 1.65, 0]) : null; _RB(cx, [0.2, 0.03, 0.24], 0.01, [s * 0.47, 1.65, 0], [0, 0, -s * 0.35], node ? undefined : side === 'R' ? 3 : 5, slot, node ? { node: node } : null); };
             _MODULES.ventFin = function (cx, p, slot, at, side) { const s = _mir(side); for (let k = 0; k < 3; k++) _B(cx, [0.012, 0.16 - k * 0.03, 0.09], [s * (0.12 + k * 0.05), 1.48, cx.D.chestD / 2 + 0.045], [0, 0, s * 0.2], 1, slot); };
             _MODULES.yoke = function (cx, p, slot) { const D = cx.D; _RB(cx, [D.chestW + 0.12, 0.1, D.chestD + 0.07], 0.045, [0, 1.575, 0], null, 1, slot); for (const s of [-1, 1]) _SP(cx, [0.11, 0.07, 0.13], [s * 0.4, 1.57, 0], null, 1, slot, [10, 6]); };
             _MODULES.shoulderCape = function (cx, p, slot, at, side) { const s = _mir(side || 'L'), D = cx.D; for (let k = 0; k < 3; k++) _RB(cx, [0.16, 0.5 - k * 0.06, 0.02], 0.01, [s * (0.13 + k * 0.12), 1.32 - k * 0.02, D.chestD / 2 + 0.02 + k * 0.012], [-0.05, s * 0.25 * k, s * 0.06 * k], 1, slot); _RB(cx, [0.3, 0.03, 0.3], 0.01, [s * 0.3, 1.6, 0.0], [0, 0, -s * 0.3], 1, slot); };
             _MODULES.glassPauldron = function (cx, p, slot, at, side) { const s = _mir(side); for (let k = 0; k < 2; k++) _RB(cx, [0.15, 0.035, 0.32], 0.012, [s * (0.45 + 0.05 * k), 1.6 - 0.07 * k, 0], [0, 0, -s * (0.35 + 0.35 * k)], side === 'R' ? 3 : 5, slot); };
-            // --- back ---
+            // --- V2.3: back pieces, each standing off the back by at least 5 cm at its centre ---
             _MODULES.medCase = function (cx, p, slot) {
                 const D = cx.D, z = D.chestD / 2 + 0.065;
                 _RB(cx, [0.3, 0.38, 0.12], 0.04, [0, 1.36, z], null, 1, slot);
@@ -25684,6 +25752,8 @@
                     }
                 }
             };
+            // V2.3: a pair of capped tanks; a pole with a glowing tip; a spool; an orrery ring with three glowing beads; a
+            // small pack; two pistons; an instrument case; a wind-key pack; an alembic
             _MODULES.tanksPair = function (cx, p, slot) { const z = cx.D.chestD / 2 + 0.065; for (const s of [-1, 1]) { _CY(cx, 0.055, 0.055, 0.36, [s * 0.09, 1.3, z], null, 1, slot, 12); _SP(cx, 0.055, [s * 0.09, 1.48, z], null, 1, slot, [10, 5]); } };
             _MODULES.backPole = function (cx, p, slot) { const z = cx.D.chestD / 2 + 0.05; _CY(cx, 0.016, 0.016, 1.05, [0.13, 1.6, z], [0, 0, -0.08], 1, slot, 8); _OC(cx, [0.03, 0.07, 0.03], [0.17, 2.14, z], null, 1, 'glow'); };
             _MODULES.spool = function (cx, p, slot) { const z = cx.D.chestD / 2 + 0.1; _CY(cx, 0.15, 0.15, 0.32, [0, 1.36, z], [0, 0, Math.PI / 2], 1, slot, 16); _CY(cx, 0.1, 0.1, 0.33, [0, 1.36, z], [0, 0, Math.PI / 2], 1, 'trim', 16); };
@@ -25693,10 +25763,13 @@
             _MODULES.instrumentCase = function (cx, p, slot) { const z = cx.D.chestD / 2 + 0.05; _RB(cx, [0.1, 0.95, 0.08], 0.03, [0, 1.3, z], [0, 0, 0.5], 1, slot); };
             _MODULES.windKeyPack = function (cx, p, slot) { const z = cx.D.chestD / 2 + 0.06; _RB(cx, [0.26, 0.26, 0.11], 0.04, [0, 1.32, z], null, 1, slot); _CY(cx, 0.015, 0.015, 0.1, [0, 1.32, z + 0.1], [Math.PI / 2, 0, 0], 1, 'trim', 8); _TO(cx, 0.07, 0.016, [0, 1.32, z + 0.16], [0, Math.PI / 2, 0], 1, 'trim', [5, 12]); };
             _MODULES.alembic = function (cx, p, slot) { const z = cx.D.chestD / 2 + 0.1; _SP(cx, [0.16, 0.11, 0.1], [0, 1.12, z], null, 1, slot, [12, 8]); _CY(cx, 0.02, 0.03, 0.18, [0.2, 1.16, z], [0, 0, Math.PI / 2 - 0.3], 1, slot, 8); _TO(cx, 0.06, 0.01, [-0.14, 1.12, z], [0, Math.PI / 2, 0], 1, 'trim', [4, 12]); };
-            // --- hips, legs and equipment ---
+            // --- V2.3: hips, legs and equipment ---
+            // V2.3: belts are open bands 2 cm outside the waist, elliptical like it, with pouches or a row of tubes in front
             _MODULES.beltPouches = function (cx, p, slot) { const D = cx.D; _CY(cx, D.waistW / 2 + 0.02, D.waistW / 2 + 0.02, 0.05, [0, 1.0, 0], null, 0, 'trim', 14, { open: true, scl: [1, 1, D.chestD * 0.95 / D.waistW]}); for (const x of [-0.17, 0.17, 0.05]) _RB(cx, [0.08, 0.09, 0.05], 0.015, [x, 0.97, -D.chestD * 0.46], null, 0, slot); };
             _MODULES.tubeBelt = function (cx, p, slot) { const D = cx.D; _CY(cx, D.waistW / 2 + 0.02, D.waistW / 2 + 0.02, 0.05, [0, 1.0, 0], null, 0, 'dark', 14, { open: true, scl: [1, 1, D.chestD * 0.95 / D.waistW]}); for (let k = 0; k < 6; k++) _CY(cx, 0.014, 0.014, 0.09, [-0.15 + k * 0.06, 0.99, -D.chestD * 0.47], null, 0, slot, 6); };
+            // V2.3: a thigh holster on the outside of the thigh
             _MODULES.holsterThigh = function (cx, p, slot, at, side) { const s = _mir(side); _RB(cx, [0.07, 0.18, 0.12], 0.02, [s * (0.17 + cx.D.thigh + 0.02), 0.72, 0.0], null, side === 'R' ? 9 : 11, slot); };
+            // V2.3: hip plates (tassets) hanging from the pelvis, turned outward; nodes when they settle
             _MODULES.tasset = function (cx, p, slot, at, side) {
                 const s = _mir(side || 'L'), n = (p && p.plates) || 2, D = cx.D;
                 for (let k = 0; k < n; k++) {
@@ -25705,14 +25778,20 @@
                     _RB(cx, [0.17, 0.12, 0.035], 0.015, at2, [0.12, s * 0.55, s * 0.12], node ? undefined : 0, slot, node ? { node: node } : null);
                 }
             };
+            // V2.3: a knee guard 1 cm proud of the shin's front
             _MODULES.kneeGuard = function (cx, p, slot, at, side) { const s = _mir(side); _RB(cx, [0.12, 0.13, 0.05], 0.02, [s * 0.17, 0.5, -cx.D.shin - 0.035], [0.1, 0, 0], side === 'R' ? 10 : 12, slot); };
+            // V2.3: a shin plate (greave) centred 1.8 cm in front of the shin; a node when it settles
             _MODULES.greave = function (cx, p, slot, at, side) {
                 const s = _mir(side || 'L'), bone = side === 'R' ? 10 : 12, at2 = [s * 0.176, 0.3, -cx.D.shin - 0.018];
                 const node = cx.show && p && p.settle ? _node(cx, 'plate9', bone, at2, { settle: true }) : null;
                 _RB(cx, [0.11, 0.27, 0.04], 0.018, at2, [0.03, 0, 0], node ? undefined : bone, slot, node ? { node: node } : null);
             };
-            _MODULES.gaiters = function (cx, p, slot) { for (const s of [-1, 1]) _CY(cx, cx.D.shin * 0.95, cx.D.shin * 0.85, 0.15, [s * 0.18, 0.18, 0], null, s > 0 ? 10 : 12, slot, 12); };
+            // V2.3: gaiters: 1.2 cm outside the shin, and they replace a tall boot's shaft (flags.gaiters: _expand drops it;
+            // the two shells would otherwise sit within a centimetre of each other)
+            _MODULES.gaiters = function (cx, p, slot) { cx.flags.gaiters = true; for (const s of [-1, 1]) _CY(cx, cx.D.shin * 0.95 + 0.012, cx.D.shin * 0.86 + 0.012, 0.13, [s * 0.18, 0.17, 0], null, s > 0 ? 10 : 12, slot, 12); };
+            // V2.3: cargo pockets on the outside of each thigh
             _MODULES.cargo = function (cx, p, slot) { for (const s of [-1, 1]) _RB(cx, [0.05, 0.14, 0.13], 0.02, [s * (0.17 + cx.D.thigh + 0.01), 0.66, 0], null, s > 0 ? 9 : 11, slot); };
+            // V2.3: wrapped shins: three bands 6 mm outside the shin, alternately tilted (tiny: the world LOD drops them)
             _MODULES.wrapped = function (cx, p, slot) {
                 const D = cx.D;
                 for (const s of [-1, 1]) {
@@ -25722,6 +25801,7 @@
                     if (p && p.gaiters) { cx.flags.gaiters = true; _CY(cx, D.shin * 0.95 + 0.012, D.shin * 0.86 + 0.012, 0.13, [s * 0.18, 0.17, 0], null, bone, slot, 10); }
                 }
             };
+            // V2.3: a satchel on the hip with a trim flap; Omen's shard holster on the thigh with a glowing shard in it
             _MODULES.medSatchel = function (cx, p, slot, at, side) { const s = _mir(side || 'R'), D = cx.D; _RB(cx, [0.11, 0.15, 0.19], 0.03, [s * (D.hipW / 2 + 0.055), 0.88, 0.02], null, 0, slot); _RB(cx, [0.115, 0.05, 0.195], 0.02, [s * (D.hipW / 2 + 0.056), 0.945, 0.02], null, 0, 'trim'); };
             _MODULES.riftShardHolster = function (cx, p, slot, at, side) {
                 const s = _mir(side || 'R'), x = s * (0.17 + cx.D.thigh + 0.02), bone = side === 'L' ? 11 : 9;
@@ -25742,7 +25822,7 @@
                     _B(cx, [0.05, 0.016, 0.03], [x, y, z + 0.006], [0, 0, ang], 1, clip, { tiny: true });
                 }
             };
-            // --- boots ---
+            // --- V2.3: boots: a rounded foot block per side; tall variants add a shaft 1.4 cm outside the shin (tagged shaft) ---
             const _BOOTS = { soft: [0.13, 0.11, 0.27, 0.035, 0.1], plate: [0.14, 0.12, 0.29, 0.02, 0.16], heavy: [0.16, 0.14, 0.31, 0.035, 0.18], runner: [0.12, 0.09, 0.28, 0.03, 0.07], rubber: [0.15, 0.12, 0.29, 0.045, 0.24], hightop: [0.14, 0.12, 0.28, 0.035, 0.2] };
             _MODULES.boot = function (cx, p, slot, at, side, variant) {
                 const B = _BOOTS[variant] || _BOOTS.soft;
@@ -25760,7 +25840,7 @@
                     if (variant === 'runner') _B(cx, [0.125, 0.02, 0.285], [s * 0.18, 0.012, -0.05], null, bone, 'trim', { tiny: true });
                 }
             };
-            // --- head gear (slot from the gear table below unless given) ---
+            // --- V2.3: head gear (slot from the gear table below unless given) ---
             const _GEAR_SLOT = { helmSealed: 'base', helmHalf: 'base', segVisor: 'visor', earGuard: 'trim', brimCap: 'base', sowester: 'base', tallHatMini: 'dark',
                 crestRidge: 'trim', haloArc: 'glow', antennaPair: 'trim', visorBand: 'glow', faceShieldUp: 'trim', respHalf: 'dark', loupeBand: 'trim', headwrap: 'base',
                 boomMic: 'dark', gorget: 'trim', collarFunnel: 'base', choker: 'trim' };
@@ -25773,18 +25853,22 @@
                 _RB(cx, [0.2, 0.08, 0.12], 0.035, [0, 1.735, -0.1], [-0.2, 0, 0], 2, slot);
                 for (const s of [-1, 1]) _RB(cx, [0.03, 0.12, 0.16], 0.012, [s * 0.172, 1.88, 0.0], null, 2, 'trim', { tiny: true });
             };
+            // V2.3: an open half helm (crown and back)
             _MODULES.helmHalf = function (cx, p, slot) { _RB(cx, [0.33, 0.17, 0.35], 0.1, [0, 2.0, 0.01], null, 2, slot); _RB(cx, [0.3, 0.12, 0.08], 0.03, [0, 1.86, 0.15], null, 2, slot); };
             _MODULES.segVisor = function (cx, p, slot, at, side, variant, n) {
                 // n separate emissive slats, 12 mm tall with 4 mm gaps, tapering toward the chin
                 const k = n || 5, y0 = 1.94;
                 for (let i = 0; i < k; i++) _B(cx, [0.21 - i * 0.012, 0.012, 0.012], [0, y0 - i * 0.016, -0.197], null, 2, slot || 'visor');
             };
+            // V2.3: an ear guard on one side with a small glowing disc and a thin band over the crown (Sage's)
             _MODULES.earGuard = function (cx, p, slot, at, side) {
                 const s = side === 'L' ? -1 : 1;
                 _RB(cx, [0.045, 0.11, 0.11], 0.02, [s * 0.165, 1.875, 0.0], null, 2, slot);
                 _CY(cx, 0.014, 0.014, 0.012, [s * 0.19, 1.875, 0.0], [0, 0, Math.PI / 2], 2, 'glow', 8, { tiny: true });
                 _TO(cx, 0.165, 0.008, [0, 1.9, 0.04], [0, 0, 0], 2, slot, [4, 10], Math.PI, { tiny: true });
             };
+            // V2.3: caps and hats: a brimmed cap, a sou'wester, a small tall hat, a crest ridge, a glowing half halo, two
+            // antennae, a glowing visor band, a raised face shield, a half respirator, a loupe band, a head wrap, a boom mic
             _MODULES.brimCap = function (cx, p, slot) { _RB(cx, [0.31, 0.12, 0.33], 0.09, [0, 2.0, 0.01], null, 2, slot); _RB(cx, [0.27, 0.015, 0.13], 0.006, [0, 1.96, -0.2], [0.12, 0, 0], 2, slot); };
             _MODULES.sowester = function (cx, p, slot) { _RB(cx, [0.32, 0.14, 0.34], 0.1, [0, 2.0, 0.01], null, 2, slot); _CY(cx, 0.25, 0.27, 0.02, [0, 1.94, 0.04], [-0.12, 0, 0], 2, slot, 16); };
             _MODULES.tallHatMini = function (cx, p, slot) { _CY(cx, 0.09, 0.1, 0.16, [0.06, 2.12, 0], [0, 0, -0.25], 2, slot, 12); _CY(cx, 0.14, 0.14, 0.012, [0.04, 2.04, 0], [0, 0, -0.25], 2, slot, 14); _CY(cx, 0.102, 0.102, 0.02, [0.05, 2.06, 0], [0, 0, -0.25], 2, 'trim', 12, { tiny: true }); };
@@ -25797,7 +25881,7 @@
             _MODULES.loupeBand = function (cx, p, slot) { _CY(cx, 0.16, 0.16, 0.025, [0, 1.98, 0.0], null, 2, slot, 16, { open: true }); _CY(cx, 0.025, 0.025, 0.04, [0.06, 1.95, -0.17], [Math.PI / 2, 0, 0], 2, 'dark', 10); };
             _MODULES.headwrap = function (cx, p, slot) { cx.flags.hairHidden = true; _RB(cx, [0.32, 0.18, 0.34], 0.12, [0, 1.99, 0.01], null, 2, slot); _RB(cx, [0.31, 0.04, 0.33], 0.02, [0, 1.95, 0.0], null, 2, 'trim'); };
             _MODULES.boomMic = function (cx, p, slot, at, side) { const s = side === 'L' ? -1 : 1; _RB(cx, [0.03, 0.07, 0.06], 0.012, [s * 0.16, 1.87, 0], null, 2, slot); _limb(cx, [s * 0.17, 1.84, -0.02], [s * 0.07, 1.76, -0.17], 0.006, 0.006, 2, slot, 6); };
-            // --- hair (no buns or top-knots in the shared set; knotLow sits at the nape) ---
+            // --- V2.3: hair (no buns or top-knots in the shared set; knotLow sits at the nape); a sealed helm hides it ---
             _MODULES.crop = function (cx, p, slot, at, side, variant) {
                 if (cx.flags.sealedHead || cx.flags.hairHidden) return;
                 // a close crop: a cap over the crown, thin sides and a short back, all hugging the head
@@ -25806,18 +25890,21 @@
                 _RB(cx, [0.26, 0.17, 0.05], 0.025, [0, 1.92, 0.13], null, 2, slot);
                 if (variant === 'swept') _RB(cx, [0.25, 0.05, 0.12], 0.024, [0, 2.035, -0.095], [-0.62, 0, 0], 2, slot);
             };
+            // V2.3: variants of the crop: swept forward, a bob, a short tail, twists, a knot at the nape, shaved
             _MODULES.swept = function (cx, p, slot) { _MODULES.crop(cx, p, slot, null, null, 'swept'); };
             _MODULES.bob = function (cx, p, slot, at, side, variant) { if (cx.flags.sealedHead) return; _RB(cx, [0.33, 0.13, 0.34], 0.06, [0, 2.0, 0.012], null, 2, slot); for (const s of [-1, 1]) _RB(cx, [0.04, 0.2 + (variant === 'asym' && s > 0 ? 0.06 : 0), 0.3], 0.02, [s * 0.16, 1.86, 0.02], null, 2, slot); _RB(cx, [0.3, 0.2, 0.05], 0.02, [0, 1.86, 0.16], null, 2, slot); };
             _MODULES.tail = function (cx, p, slot) { _MODULES.crop(cx, p, slot); _CY(cx, 0.03, 0.02, 0.16, [0, 1.84, 0.19], [0.3, 0, 0], 2, slot, 8); };
             _MODULES.twists = function (cx, p, slot) { if (cx.flags.sealedHead) return; _RB(cx, [0.31, 0.1, 0.33], 0.05, [0, 2.0, 0.01], null, 2, slot); for (let k = 0; k < 7; k++) _CY(cx, 0.018, 0.012, 0.07, [-0.12 + k * 0.04, 2.06, -0.02 + (k % 2) * 0.05], [0.3 * ((k % 3) - 1), 0, 0.25 * ((k % 2) * 2 - 1)], 2, slot, 6, { tiny: true }); };
             _MODULES.knotLow = function (cx, p, slot) { _MODULES.crop(cx, p, slot); _SP(cx, [0.05, 0.04, 0.04], [0, 1.83, 0.17], null, 2, slot, [8, 5]); };
             _MODULES.shaved = function (cx, p, slot, at, side, variant) { if (cx.flags.sealedHead) return; _RB(cx, [0.302, 0.08, 0.322], 0.04, [0, 2.01, 0.01], null, 2, slot, { tiny: true }); if (variant === 'ridge') _RB(cx, [0.04, 0.05, 0.3], 0.015, [0, 2.055, 0.01], null, 2, 'glow'); };
-            // --- face treatments (geometry strips and emissive slots, never textures) ---
+            // --- V2.3: face treatments (geometry strips and emissive slots, never textures) ---
             _MODULES.plain = function () {};
+            // V2.3: Sage's jade marks: two short glowing strips under the eyes and a small diamond on the brow
             _MODULES.jadeMarks = function (cx, p, slot) { for (const s of [-1, 1]) _B(cx, [0.036, 0.008, 0.006], [s * 0.066, 1.868, -0.158], [0, 0, s * 0.12], 2, slot || 'glow', { tiny: true }); _OC(cx, [0.009, 0.014, 0.004], [0, 1.985, -0.155], null, 2, slot || 'glow', { tiny: true }); };
+            // V2.3: visor slats on an open face (a sealed helm has its own); cheek plates
             _MODULES.visorSlats = function (cx) { if (!cx.flags.sealedHead) _MODULES.segVisor(cx, null, 'visor', null, null, null, 5); };
             _MODULES.cheekPlates = function (cx, p, slot) { for (const s of [-1, 1]) _RB(cx, [0.05, 0.06, 0.08], 0.015, [s * 0.12, 1.83, -0.11], [0, s * 0.4, 0], 2, slot || 'trim'); };
-            // --- wrists (both arms) ---
+            // --- V2.3: wrists (both arms) ---
             // V2.3: every wrist part is coaxial with the forearm (_foreAxis) and sits a fixed gap outside what it rests on:
             // the forearm, or the gauntlet's cuff (Omen's plate rings were 1 mm off the cuff and tilted against it: a comb)
             function _wrist(cx, name, n, slotAcc, slotBand) {
@@ -25842,10 +25929,16 @@
                     if (name === 'toolBracer') { const rb = _baseR(ax, a + 0.01) + 0.01; _RB(cx, [rb * 2, 0.1, rb * 2], 0.02, _axAt(ax, a + 0.01), ax.rot, fo, slotBand); }
                 }
             }
+            // V2.3: one module per wrist part, each through _wrist
             for (const w of ['band', 'ampouleCuff', 'plateRing', 'coilBand', 'capacitor', 'beadString', 'cableCuff', 'tapeWrap', 'compassDial', 'toolBracer'])
                 _MODULES[w] = function (cx, p, slot, at, side, variant, n) { _wrist(cx, w, n || (p && p.n), slot || 'glow', 'trim'); };
             // --- props (each an extra node so it can float, orbit or be held) ---
-            const _PROP_AT = { float: [0, 1.17, -0.32], handL: [-0.45, 0.85, -0.06], handR: [0.45, 0.85, -0.06], orbitR: [0.6, 1.02, -0.1], hip: [0.3, 0.88, 0.05], back: [0, 1.4, 0.3], stage: [0.45, 0.06, -0.35] };
+            // V2.3: orbitR is the centre of an orbit beside the right hand, in the right forearm's frame (the prop node rides
+            // the forearm, so the clearance holds in every pose): 22 cm outside the wrist at knuckle height, so a 0.3 m key
+            // (footprint radius about 8 cm with its roll) on its 4.5 cm orbit stays 2.5 cm or more off the hand, the gauntlet
+            // cuff and the wrist rings (the old centre, 15 cm out and pelvis-fixed with a 7 cm orbit, swept through them)
+            const _PROP_AT = { float: [0, 1.17, -0.32], handL: [-0.45, 0.85, -0.06], handR: [0.45, 0.85, -0.06], orbitR: [0.67, 0.93, -0.02], hip: [0.3, 0.88, 0.05], back: [0, 1.4, 0.3], stage: [0.45, 0.06, -0.35] };
+            const _ORBIT = Object.freeze({ r: 0.045, bob: 0.015, roll: 0.12, rate: 1.7 });
             // V2.3: where a look's prop sits (figure space). A floating prop carried in the cradle hovers 7.5 cm above the
             // midpoint of the two palms in the look's own stance (forward kinematics of its stance pose: Sage's crystal sits
             // between and above her cupped hands, not under them); other holds use the fixed points above. Cached per look.
@@ -25871,8 +25964,8 @@
             }
             function _propNode(cx, hold) {
                 const at = _propAt(cx.look, hold);
-                // a floating prop rides the spine, like the arms that carry it
-                const parent = hold === 'handL' ? 6 : (hold === 'handR' ? 4 : hold === 'float' ? 1 : 0);
+                // a floating prop rides the spine, like the arms that carry it; an orbiting one rides the forearm it circles
+                const parent = hold === 'handL' ? 6 : (hold === 'handR' || hold === 'orbitR' ? 4 : hold === 'float' ? 1 : 0);
                 return cx.show ? _node(cx, 'prop', parent, at, { hold: hold }) : null;
             }
             // V2.3: Sage's crystal: six shards that lock into an octahedral lattice floating between and above the cupped
@@ -25889,7 +25982,8 @@
                 }
                 if (!cx.show) _OC(cx, [0.03, 0.03, 0.03], c, [0, 0.7, 0], 1, slot || 'glow');
             };
-            // V2.3: Omen's rift key: a 0.3 m jagged slit frame with an emissive inner edge, orbiting the right hand
+            // V2.3: Omen's rift key: a 0.3 m jagged slit frame with an emissive inner edge, orbiting beside the right hand
+            // (_PROP_AT.orbitR, on the right forearm)
             _MODULES.riftKey = function (cx, p, slot) {
                 const hold = (cx.look && cx.look.prop && cx.look.prop.hold) || 'orbitR', c = _PROP_AT[hold] || _PROP_AT.orbitR;
                 const prop = _propNode(cx, hold), o = prop ? { node: prop } : null, b = prop ? undefined : 4;
@@ -25947,17 +26041,55 @@
 
             // ---- the object pool (no uuid draws after it is made; see the block header) -------------------------------------
             const _pool = { made: false, groups: [], meshes: [], vm: [], world: [], geoms: [], placeholder: null, madeMs: 0, size: null };
-            const _stats = { poolMisses: 0, builds: 0, lastMs: 0, lastUnits: 0, ms: [], released: 0, handSets: 0 };
-            // V2.3: the pool's size comes from the roster itself, after the LOOKS blocks loaded: a dry show-tier expansion of
-            // each agent counts its meshes (11 bones plus its nodes: prop, plates, shards and the two hands) and its hand key.
-            // Then: every agent's show and world LOD, two body LODs, the four kit tiers, an arm set per agent and the eight
-            // pose geometries per hand key, plus an eighth and 8 of each as margin. A role batch that adds nodes resizes it.
+            const _stats = { poolMisses: 0, builds: 0, lastMs: 0, lastUnits: 0, lastHandMs: 0, ms: [], released: 0, handSets: 0 };
+            // V2.3: the nodes each built-in module makes in a show LOD (their names, as the modules name them, so a set counts
+            // a shared name once): the prop and its shards, the settling plates, the floating plates. Every other built-in
+            // module makes none. A custom module (V23.parts.define) is not in the table: its look is counted by expansion.
+            const _P4 = [0, 1, 2, 3];
+            const _NODE_NAMES = {
+                crystalLattice: () => ['prop'].concat(_SHARD_N),
+                riftKey: () => ['prop'], roleToken: () => ['prop'], scanDisc: () => ['prop'], orbLantern: () => ['prop'], wardCube: () => ['prop'],
+                plateAsym: (p) => _P4.slice(0, Object.assign({ layers: 3 }, p || {}).layers + 1).map((k) => 'plate' + (3 + k)),
+                pauldronStack: (p) => (p && p.settle ? _P4.slice(0, Math.min(3, p.plates || 3)).map((k) => 'plate' + k) : []),
+                tasset: (p) => (p && p.settle ? _P4.slice(0, p.plates || 2).map((k) => 'plate' + (7 + k)) : []),
+                greave: (p) => (p && p.settle ? ['plate9'] : []),
+                floatingPlate: (p, side) => ['float' + side]
+            };
+            // V2.3: a look's show-LOD node count (the two hands included) read from its entry without expanding any geometry;
+            // null when it names a custom module
+            function _nodeCount(look) {
+                const L = look || {}, names = new Set(['handR', 'handL']);
+                let known = true;
+                const add = (m, p, side) => {
+                    const q = _parseName(m);
+                    if (!q) return;
+                    if (_CUSTOM[m] || _CUSTOM[q.fam]) { known = false; return; }
+                    const f = _NODE_NAMES[q.fam];
+                    if (f) for (const nm of f(p || null, side || null)) names.add(nm);
+                };
+                for (const o of L.outfit || []) add(o.m, o.p);
+                const H = L.head || {};
+                for (const g of H.gear || []) add(g);
+                if (H.hair) add(H.hair);
+                if (H.face) add(H.face.m);
+                for (const side of ['L', 'R']) { const sh = L.shoulders && L.shoulders[side]; if (sh) add(sh.m, sh.p, side); }
+                if (L.back) add(L.back.m, L.back.p);
+                for (const e of L.equipment || []) add(e.m, e.p, /L$/.test(e.at) ? 'L' : (/R$/.test(e.at) ? 'R' : null));
+                if (L.gloves && L.gloves.wrist && L.gloves.wrist.m) add(L.gloves.wrist.m);
+                if (L.prop && L.prop.m) add(L.prop.m);
+                return known ? names.size : null;
+            }
+            // V2.3: the pool's size comes from the roster itself, after the LOOKS blocks loaded: each agent's meshes (11 bones
+            // plus its nodes: prop, plates, shards and the two hands, counted from its entry by _nodeCount; a look with a
+            // custom module is expanded instead) and its hand key. Then: every agent's show and world LOD, two body LODs, the
+            // four kit tiers, an arm set per agent and the eight pose geometries per hand key, plus an eighth and 8 of each as
+            // margin. A role batch that adds nodes resizes it (agent-roster.test checks the count against the built figures).
             function _poolNeeds() {
                 const n = AGENT_ORDER.length, keys = new Set();
                 let showMeshes = 0;
                 for (const id of AGENT_ORDER) {
-                    const look = V23.core.resolve(id);
-                    showMeshes += _SHOW_BONES.length + _expand(look, 'show').nodes.length;
+                    const look = V23.core.resolve(id), nodes = _nodeCount(look);
+                    showMeshes += _SHOW_BONES.length + (nodes === null ? _expand(look, 'show').nodes.length : nodes);
                     keys.add(_handKey(look));
                 }
                 const m = (x) => Math.ceil(x * 1.125) + 8;
@@ -26252,16 +26384,20 @@
             //   job.root is complete; _jobAbort returns what an unfinished job took to the pool.
             function _job(look, tier, agentId) {
                 tier = tier === 'world' || tier === 'body' ? tier : 'show';
-                return { look: look, tier: tier, id: agentId || (look && look.id) || null, phase: 0, k: 0, units: 0, ms: 0, maxUnitMs: 0, root: null, info: null, done: false };
+                return { look: look, tier: tier, id: agentId || (look && look.id) || null, phase: 0, k: 0, units: 0, ms: 0, handMs: 0, hand: false, maxUnitMs: 0, root: null, info: null, done: false };
             }
             function _jobStep(J) {
                 if (J.done) return true;
                 const t0 = performance.now();
+                J.hand = false;
                 if (J.phase === 0) _jobExpand(J); else if (J.phase === 1) _jobFill(J); else _jobAssemble(J);
                 const ms = performance.now() - t0;
                 J.units++; J.ms += ms; if (ms > J.maxUnitMs) J.maxUnitMs = ms;
+                // V2.3: the share of a build spent on its hand key's shared pose geometries (only the first figure with a new
+                // hand key builds them; the build-time report shows it apart)
+                if (J.hand) J.handMs += ms;
                 if (J.done) {
-                    _stats.builds++; _stats.lastMs = J.ms; _stats.lastUnits = J.units;
+                    _stats.builds++; _stats.lastMs = J.ms; _stats.lastUnits = J.units; _stats.lastHandMs = J.handMs;
                     _stats.ms.push(J.ms);
                     if (_stats.ms.length > 256) _stats.ms.shift();
                 }
@@ -26343,7 +26479,7 @@
                     return;
                 }
                 const key = J.keys[J.k++];
-                if (key.charCodeAt(0) === 104) _handPose(J.hs, key.slice(2));   // 'h:<pose>'
+                if (key.charCodeAt(0) === 104) { _handPose(J.hs, key.slice(2)); J.hand = true; }   // 'h:<pose>'
                 else {
                     const mesh = _takeMesh(), list = J.byKey.get(key) || [];
                     info.meshList.push(mesh);
@@ -26516,7 +26652,8 @@
             // hand space: right wrist at (0.08, -0.09, 0), left at (-0.08, -0.09, 0), each forearm running from the wrist toward
             // (0, -0.75, 0.66) (down and back to the camera), scale 0.75, plus a sleeve that runs 0.25 m on past the elbow.
             // sleeve: groups [0 fp.sleeve slot, 1 skin where the forearm is bare]; detail: [0 fp.cuff slot (cuffs, bands,
-            // overlay plates), 1 accent (glow or visor parts)]
+            // overlay plates), 1 accent (glow or visor parts)], or [0 accent] when the cuff folds into the sleeve (slots says
+            // which; at most 3 draws in all)
             const _FP_SCALE = 0.75;
             function _fpFrame(side) {
                 const a = new THREE.Vector3(0, -0.75, 0.66).normalize(), pz = new THREE.Vector3(side === 'R' ? 1 : -1, 0, 0);   // figure +Z (back of hand) -> outward
@@ -26548,11 +26685,21 @@
                     sl.push(t);
                     if (fp.overlay === 'basePlatesL' && side === 'L') for (let k = 0; k < 3; k++) dt.push({ prim: 'rbox', size: [0.09, 0.05, 0.03], r: 0.012, at: [el[0] - s * 0.0, el[1] - 0.06 - k * 0.07, el[2] + 0.05], rot: [0.1, 0, 0], slot: fp.cuff, _pre: _fpFrameL, _grp: 0 });
                 }
+                // V2.3: at most 3 draws for the set (design 7.2: a sleeve mesh, and a detail mesh with [cuff, accent]). A rolled
+                // sleeve adds a fourth material (the bare forearm's skin), so for it the cuff's parts (the roll's lining, the
+                // wrist band) take the sleeve's material in first person: they join the sleeve geometry's first group, and the
+                // detail keeps the accent alone (Sage: [base, skin] + [glow])
+                const hasSkin = sl.some((s) => s._grp === 1), hasCuff = dt.some((s) => s._grp === 0), hasAcc = dt.some((s) => s._grp === 1);
+                const folded = hasSkin && hasCuff && hasAcc;
+                if (folded) {
+                    for (let i = dt.length - 1; i >= 0; i--) if (dt[i]._grp === 0) { dt[i]._grp = 0; sl.push(dt[i]); dt.splice(i, 1); }
+                    for (const t of dt) t._grp = 0;
+                }
                 const sleeve = _takeGeom(), detail = _takeGeom();
                 const r1 = _fillPosed(sleeve, sl, (s) => s._grp), r2 = _fillPosed(detail, dt, (s) => s._grp);
-                const hasSkin = sl.some((s) => s._grp === 1);
                 sleeve.name = 'v23:fp:sleeve'; detail.name = 'v23:fp:detail';
-                return { sleeve: sleeve, detail: detail, slots: { sleeve: hasSkin ? [fp.sleeve, 'skin'] : [fp.sleeve], detail: [fp.cuff, dt.some((s) => s._grp === 1) ? 'glow' : fp.cuff] },
+                return { sleeve: sleeve, detail: detail, slots: { sleeve: hasSkin ? [fp.sleeve, 'skin'] : [fp.sleeve], detail: folded ? ['glow'] : [fp.cuff, hasAcc ? 'glow' : fp.cuff] },
+                    draws: r1.groups + r2.groups, cuffFolded: folded,
                     wrist: fp.wrist, overlay: fp.overlay || null, glove: fp.glove, vertices: r1.v + r2.v,
                     space: 'hand space at handZ 0: wrists (+-0.08, -0.09, 0), forearms toward (0, -0.75, 0.66), x0.75' };
             }
@@ -26648,39 +26795,48 @@
             }
             // V2.3: a per-agent stream for idle schedules (weight shifts, tics, head looks): the same every time for an agent
             const _seedOf = (id) => { let h = 2166136261; const s = String(id || 'agent'); for (let k = 0; k < s.length; k++) { h ^= s.charCodeAt(k); h = Math.imul(h, 16777619) >>> 0; } return h; };
-            // a seeded schedule of 48 event times and values in [-1, 1], looping after its last one
+            // a seeded schedule of 48 event times and values in [-1, 1], looping after its last one. V2.3: the period is the
+            // sum of the 48 intervals (the 48th runs from the last event to the first one again), so every interval, the one
+            // across the loop included, lies in [lo, hi] (the old period added the first event's offset to the wrap: one
+            // 8-11 s gap per loop in a 4-6 s schedule)
             function _sched(id, key, lo, hi) {
                 const r = V23.rand(_seedOf(id + '|' + key + '|' + lo + '|' + hi)), t = [], v = [];
                 let at = lo + r() * (hi - lo) * 0.5;
                 for (let i = 0; i < 48; i++) { t.push(at); v.push(r() * 2 - 1); at += lo + r() * (hi - lo); }
-                return { t: t, v: v, period: at };
+                return { t: t, v: v, period: at - t[0] };
             }
-            // V2.3: a look's three schedules (weight shift, head look, tic), made at its first sample and cached on the look
-            // object (a WeakMap: a redefined look resolves to a new object and gets its own)
+            // V2.3: a look's schedules (weight shift, head look, tic, and a finger flex for a style that has one), made at its
+            // first sample and cached on the look object (a WeakMap: a redefined look resolves to a new object and gets its own)
             const _schCache = new WeakMap();
             function _schOf(look, id) {
                 const key = look || _NO_LOOK;
                 let S = _schCache.get(key);
                 if (S) return S;
-                const I = (look && look.idle) || _NO_LOOK, sh = I.shift || [6, 9], ev = (I.tic && I.tic.every) || [8, 12];
-                S = { shift: _sched(id, 'shift', sh[0], sh[1]), look: _sched(id, 'look', 4, 6), tic: _sched(id, 'tic', ev[0], ev[1]) };
+                const I = (look && look.idle) || _NO_LOOK, sh = I.shift || [6, 9], ev = (I.tic && I.tic.every) || [8, 12], fx = IDLES[I.style] && IDLES[I.style].flex;
+                S = { shift: _sched(id, 'shift', sh[0], sh[1]), look: _sched(id, 'look', 4, 6), tic: _sched(id, 'tic', ev[0], ev[1]),
+                    flex: fx ? _sched(id, 'flex', fx.every[0], fx.every[1]) : null };
                 _schCache.set(key, S);
                 return S;
             }
-            // the event index at time x (looping), the time since it and its value and the one before, written into r
-            const _SA = [{ i: 0, dt: 0, v: 0, prev: 0 }, { i: 0, dt: 0, v: 0, prev: 0 }, { i: 0, dt: 0, v: 0, prev: 0 }];
+            // the event index at time x (the schedule repeats every period from its first event on), the time since it and
+            // its value and the one before, written into r
+            const _SA = [{ i: 0, dt: 0, v: 0, prev: 0 }, { i: 0, dt: 0, v: 0, prev: 0 }, { i: 0, dt: 0, v: 0, prev: 0 }, { i: 0, dt: 0, v: 0, prev: 0 }];
             function _schedAt(s, x, r) {
-                const xx = x % s.period, n = s.t.length;
-                let i = -1;
-                for (let k = 0; k < n; k++) { if (s.t[k] <= xx) i = k; else break; }
-                if (i < 0) { r.i = n - 1; r.dt = xx + s.period - s.t[n - 1]; r.v = s.v[n - 1]; r.prev = s.v[n - 2]; }
-                else { r.i = i; r.dt = xx - s.t[i]; r.v = s.v[i]; r.prev = s.v[i > 0 ? i - 1 : n - 1]; }
+                const n = s.t.length, t0 = s.t[0];
+                let xx = (x - t0) % s.period;
+                if (xx < 0) xx += s.period;
+                xx += t0;
+                let i = 0;
+                for (let k = 1; k < n; k++) { if (s.t[k] <= xx) i = k; else break; }
+                r.i = i; r.dt = xx - s.t[i]; r.v = s.v[i]; r.prev = s.v[i > 0 ? i - 1 : n - 1];
                 return r;
             }
             // V2.3: IDLES, 8 styles; each adds breath, weight shift, head look, hand drift and its own signature motion
             const IDLES = {
                 deliberate: { breathMul: 1.0, lookHz: 0.09, shift: 0.012, sig: (o, t) => { _arm(o, 'R', 0, 0, 0.03 * Math.sin(t * 0.7), 0, 1); _arm(o, 'L', 0, 0, 0.03 * Math.sin(t * 0.7 + 1), 0, 1); } },
-                coiled: { breathMul: 0.6, lookHz: 0, shift: 0.004, snapLook: true, sig: (o, t) => { const f = Math.max(0, Math.sin(t * 1.9)); _add3(o, _BONE.foR, 0.04 * f * f * f, 0, 0); } },
+                // V2.3: coiled (design 4.2 coiledStill): near-motionless; its signature is one finger flex, a seeded hand-shape
+                // swap on the right hand (flex: every 5-8 s for 150 ms, to 'relaxed', or 'open' when the idle hand is relaxed)
+                coiled: { breathMul: 0.6, lookHz: 0, shift: 0.004, snapLook: true, flex: Object.freeze({ every: Object.freeze([5, 8]), dur: 0.15, pose: 'relaxed' }), sig: () => {} },
                 bouncy: { breathMul: 0.8, lookHz: 0.25, shift: 0.008, sig: (o, t, m) => { const b = Math.abs(Math.sin(t * Math.PI * 1.6 * m.tempo)); o.root[1] += 0.012 * b; _add3(o, _BONE.thR, 0.05 * b, 0, 0); _add3(o, _BONE.shR, -0.09 * b, 0, 0); _add3(o, _BONE.thL, 0.05 * b, 0, 0); _add3(o, _BONE.shL, -0.09 * b, 0, 0); } },
                 heavy: { breathMul: 1.4, lookHz: 0.06, shift: 0.02, sig: (o, t) => { o.root[0] += 0.015 * Math.sin(t * 1.2); _add3(o, _BONE.spine, 0, 0, -0.02 * Math.sin(t * 1.2)); } },
                 floaty: { breathMul: 0.9, lookHz: 0.07, shift: 0.006, sig: (o, t) => { o.root[1] += 0.008 * Math.sin(t * 1.9); _arm(o, 'R', 0.03 * Math.sin(t * 0.8), 0.04 + 0.03 * Math.sin(t * 0.6), 0, 0, 1); _arm(o, 'L', 0.03 * Math.sin(t * 0.8 + 2), 0.04 + 0.03 * Math.sin(t * 0.6 + 1), 0, 0, 1); } },
@@ -26724,6 +26880,12 @@
                     _add3(o, _BONE.head, 0, look2 * (ticLook ? 0.7 : 0.5) * (hs.prev + (hs.v - hs.prev) * k), 0);
                 } else _add3(o, _BONE.head, 0.02 * Math.sin(t * 0.37), look2 * Math.sin(t * Math.PI * 2 * st.lookHz * tm) * 0.75, 0);
                 st.sig(o, t, M);
+                // V2.3: the finger flex on the look's own seeded flex schedule (like the head snap on its tic schedule): the
+                // right hand leaves its idle shape for flex.dur seconds, then takes it back
+                if (st.flex && S.flex) {
+                    const fs = _schedAt(S.flex, t, _SA[3]);
+                    if (fs.dt < st.flex.dur) o.hands.R = o.hands.R === st.flex.pose ? 'open' : st.flex.pose;
+                }
                 // the tic: one clip every tic.every [a, b] s
                 if (tic && !ticLook) {
                     const tc = TICS[tic.clip], ts = _schedAt(S.tic, t, _SA[2]);
@@ -26734,13 +26896,14 @@
                 _prop(o, look, t);
                 return o;
             }
-            // V2.3: prop motion by hold: float bobs and turns (Sage's crystal 0.25 rev/s), orbitR circles the right hand
+            // V2.3: prop motion by hold: float bobs and turns (Sage's crystal 0.25 rev/s); orbitR circles its centre beside the
+            // right hand (_ORBIT: 4.5 cm radius, a 1.5 cm bob, spinning, rolled at most 0.12 rad, in the forearm's frame)
             function _prop(o, look, t) {
                 const pr = look && look.prop;
                 if (!pr) return;
                 const n = _nodeOf(o, 'prop');
                 if (pr.hold === 'float' || pr.hold === 'stage') { n[1] += 0.012 * Math.sin(t * 2.1); n[4] += t * Math.PI * 2 * 0.25; }
-                else if (pr.hold === 'orbitR') { const a = t * 1.7; n[0] += 0.07 * Math.cos(a); n[2] += 0.07 * Math.sin(a); n[1] += 0.02 * Math.sin(a * 2); n[4] += a; n[5] += 0.25 * Math.sin(a); }
+                else if (pr.hold === 'orbitR') { const a = t * _ORBIT.rate; n[0] += _ORBIT.r * Math.cos(a); n[2] += _ORBIT.r * Math.sin(a); n[1] += _ORBIT.bob * Math.sin(a * 2); n[4] += a; n[5] += _ORBIT.roll * Math.sin(a); }
             }
             // ---- GESTURES (18 families with variants): stage keys, first-person keys, bot code -----------------------------------
             // V2.3: stage keys [p, upper rx, upper rz, fore rx, fore ry, spine rx, spine ry] for the off (left) arm, mirrored to
@@ -27065,6 +27228,12 @@
                 _job: function (look, tier, agentId) { return _job(look, tier, agentId); },
                 _jobStep: function (job) { return _jobStep(job); },
                 _jobAbort: function (job) { return _jobAbort(job); },
+                // V2.3 (private, the tests): a look's expanded primitives for a tier (copies: figure space, rest pose), its
+                // node definitions and its rig sizes; agent-roster.test checks the seams and clearances on them
+                _prims: function (look, tier) {
+                    const cx = _expand(look, tier || 'show');
+                    return { prims: cx.out.map((s) => Object.assign({}, s)), nodes: cx.nodes.map((n) => Object.assign({}, n)), D: Object.assign({}, cx.D), flags: Object.assign({}, cx.flags), nodeCount: _nodeCount(look) };
+                },
                 // data (not functions): the module names, kit table, build statistics
                 modules: Object.keys(_MODULES).filter((k) => k !== 'body' && k !== 'hand'),
                 kit: _KIT,
