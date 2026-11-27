@@ -5,7 +5,7 @@ const { boot, closeBrowser, programState } = require('./harness');
 
 after(closeBrowser);
 
-test('loads, warms shaders, renders, and shows the V2.2 label', { timeout: 240000 }, async () => {
+test('loads, warms shaders, renders, and shows the V2.3 label', { timeout: 240000 }, async () => {
     const { page, errors, frames } = await boot();
     await frames(10);
     const state = await page.evaluate(() => ({
@@ -16,7 +16,7 @@ test('loads, warms shaders, renders, and shows the V2.2 label', { timeout: 24000
         enemies: enemyObjects.length
     }));
     assert.ok(state.loadingHidden, 'loading screen should be hidden once the game runs');
-    assert.match(state.label, /V2\.2/);
+    assert.match(state.label, /V2\.3/);
     assert.ok(state.hasEnv, 'environment map should be built before play');
     assert.ok(state.mapBatches > 0 && state.enemies > 0, 'map and enemies should exist');
     const [programs, watermark, stalls] = await programState(page);

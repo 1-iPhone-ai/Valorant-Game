@@ -41,6 +41,8 @@ async function closeBrowser() {
  * options.quality: graphics profile to force (default 'medium'); pass null to keep Auto.
  * options.menu: true to keep the start screen (it is skipped by default).
  * options.file: path (from the repository root) of another build to load.
+ * options.touch: true to open the page in a touch context (hasTouch: touch events and page.touchscreen work).
+ * options.viewport: { width, height } (default 480x270).
  * Returns { page, errors, frames, evaluate }.
  */
 // Only one game runs at a time: a page left open keeps its render loop going
@@ -50,7 +52,8 @@ let currentPage = null;
 async function boot(options = {}) {
     const browser = await getBrowser();
     if (currentPage) { await currentPage.close().catch(() => {}); currentPage = null; }
-    const page = await browser.newPage({ viewport: options.viewport || { width: 480, height: 270 } });
+    // V2.3: options.touch opens a hasTouch context (the showroom's touch input)
+    const page = await browser.newPage({ viewport: options.viewport || { width: 480, height: 270 }, hasTouch: !!options.touch });
     currentPage = page;
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));

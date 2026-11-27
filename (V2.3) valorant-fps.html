@@ -3554,6 +3554,18 @@
             text-align: start; white-space: normal; overflow: visible; text-overflow: clip; text-shadow: none;
         }
         body.hud-classic .wingman-hud-bar { display: none; }
+        /* ===== V2.3 CSS SHOWROOM [WP3] ===== */
+        /* Owner: WP3. The stage cells stay hidden until the SHOWROOM block shows them. */
+        #agent-stage, #mm-stage { display: none; }
+        /* ===== END V2.3 CSS SHOWROOM ===== */
+        /* ===== V2.3 CSS FP [WP4] ===== */
+        /* Owner: WP4. The ultimate's edge vignette: never takes the pointer, hidden until the FP block uses it. */
+        #ult-cue { display: none; pointer-events: none; }
+        /* ===== END V2.3 CSS FP ===== */
+        /* ===== V2.3 CSS SCREENS [WP9] ===== */
+        /* Owner: WP9. The MVP pose cell, hidden until the SCREENS block uses it. */
+        .mvp-pose { display: none; }
+        /* ===== END V2.3 CSS SCREENS ===== */
     </style>
 </head>
 <body>
@@ -3686,6 +3698,11 @@
 
         <div class="status-pill-banner" id="status-pill-banner"></div>
         <div class="recon-overlay" id="recon-overlay"></div>
+
+        <!-- V2.3: the ultimate's edge vignette (WP4) and the MVP pose cell (WP9: moved into #round-mvp when the card shows),
+             both display:none until their blocks use them -->
+        <div class="ult-cue" id="ult-cue"></div>
+        <div class="mvp-pose"></div>
 
         <div class="crosshair" id="crosshair">
             <div class="crosshair-inner" id="crosshair-inner"></div>
@@ -3962,6 +3979,8 @@
                     <button class="buy-close-btn" id="agent-picker-close-btn">CLOSE [G / ESC]</button>
                 </div>
                 <div class="agent-picker-body">
+                    <!-- V2.3: the showroom stage cell (WP3; display:none until the SHOWROOM block shows it) -->
+                    <div class="agent-stage" id="agent-stage"></div>
                     <div class="agent-picker-grid" id="agent-picker-grid"></div>
                     <div class="agent-inspector-panel" id="agent-inspector-panel">
                         <div>
@@ -4271,6 +4290,29 @@
                                 <div class="settings-pill-group" id="setting-anim-detail-pills">
                                     <button class="settings-pill-opt active" data-animdetail="off">OFF</button>
                                     <button class="settings-pill-opt" data-animdetail="on">ON</button>
+                                </div>
+                            </div>
+
+                            <!-- V2.3: Agent Identity and Weapon Animations (saved; read by the V2.3 blocks) -->
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Agent Identity</strong>
+                                    <small>Each agent's own look: sleeves, gloves and gestures in first person, outfits on bots and wingmen, the kill cam and the MVP card, and its own sound palette. Off: the V2.2 picture in a match. Looks only: hitboxes and timings are unchanged</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-agent-identity-pills">
+                                    <button class="settings-pill-opt active" data-agentidentity="on">ON</button>
+                                    <button class="settings-pill-opt" data-agentidentity="off">OFF</button>
+                                </div>
+                            </div>
+
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Weapon Animations</strong>
+                                    <small>V2.3: tactical and empty reloads with a visible magazine, draws and inspections by gun class. Classic: the V2.2 clips. Reload, draw and fire timings are the same in both</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-weapon-anims-pills">
+                                    <button class="settings-pill-opt active" data-weaponanims="v23">V2.3</button>
+                                    <button class="settings-pill-opt" data-weaponanims="classic">CLASSIC</button>
                                 </div>
                             </div>
 
@@ -5194,6 +5236,17 @@
                                     <button class="settings-pill-opt" data-botmech="on">ON</button>
                                 </div>
                             </div>
+                            <!-- V2.3: Bot Utility (Classic by default; Bot AI [F5] stays the master switch) -->
+                            <div class="settings-control-row">
+                                <div class="settings-control-label">
+                                    <strong>Bot Utility</strong>
+                                    <small>Classic: bots cast what and when they did in V2.2, with a windup and a throw you can see. Agent: bots use their agent's utility (a rusher's flash and push, smokes on chokes, a flash before a peek, slows on entries). Ranked always plays Classic</small>
+                                </div>
+                                <div class="settings-pill-group" id="setting-bot-utility-pills">
+                                    <button class="settings-pill-opt active" data-botutility="classic">CLASSIC</button>
+                                    <button class="settings-pill-opt" data-botutility="agent">AGENT</button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="settings-section-box">
@@ -5399,6 +5452,10 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
+        // V2.3: the Agent Identity namespace. Every V2.3 block attaches its module here (V23.core,
+        // V23.parts, V23.stage, ...); hooks elsewhere call them as `V23.x && V23.x.fn(...)`. `var`, not
+        // const, so a block can attach in any order (no TDZ). The contract is V23.CONTRACT (CORE block).
+        var V23 = {};   // V2.3: H1
         // V1.7 colour pipeline: the renderer outputs sRGB with ACES tone mapping,
         // so colours authored as sRGB hex are converted to linear exactly once, when
         // a material is created. Runtime colour writes append .convertSRGBToLinear().
@@ -6280,6 +6337,8 @@
                 mapDetail: 'off',      // V1.7: High Detail Maps, 'off' (default) | 'on'
                 charDetail: 'off',     // V1.7: High Detail Characters & Guns, 'off' (default) | 'on'
                 animDetail: 'off',     // V2.2: Enhanced Animations, 'off' (default) | 'on' (no quality tier turns it on)
+                agentIdentity: 'on',   // V2.3: H33.1a Agent Identity, 'on' (default) | 'off' (the V2.2 in-match picture)
+                weaponAnims: 'v23',    // V2.3: H33.1b Weapon Animations, 'v23' (default) | 'classic' (V2.2's clips)
                 gpLookSens: 1.0,       // V1.7 controller: right-stick look sensitivity (0.3-3.0x)
                 gpDeadzone: 12,        // V1.7 controller: stick deadzone % (5-30)
                 gpInvertY: false,
@@ -6336,6 +6395,7 @@
                 weaponSkin: 'standard', // 'standard' | 'prime' | 'reaver' | 'kuronami' | 'rgx' | level rewards: 'ember' | 'glacier' | 'neontide' | 'onyx' | workshop: 'custom1'..'custom3'
                 botDifficulty: 'gold', // 'iron' | 'gold' | 'immortal' | 'radiant'
                 botMechanics: 'off',   // V2.2: Bots Use Map Mechanics, 'off' (default) | 'on'
+                botUtility: 'classic', // V2.3: H33.1c Bot Utility, 'classic' (default: V2.2's casts) | 'agent' (Ranked pins 'classic')
                 infiniteAbilities: false,
                 infiniteUlt: false,
                 infiniteAmmo: false,
@@ -6952,6 +7012,8 @@
         floorAOTexture.generateMipmaps = false;
         floorAOTexture.needsUpdate = true;
         const floorHDUniform = { value: 0.0 };
+        // V2.3 REGION R11.floorShader [WP11]: single owner. The floor shader string below gains uV23Floor (Medium AO from .r,
+        // light pools from .g); the text change keeps one program
         floorMaterial.onBeforeCompile = (s) => {
             s.uniforms.uFloorHD = floorHDUniform;
             s.uniforms.tFloorAO = { value: floorAOTexture };
@@ -8299,6 +8361,7 @@
             characterDetail.set(charDetail);
             // V1.7 weather density follows the quality (off on Low)
             if (weatherState.onQuality) weatherState.onQuality();
+            V23.arena && V23.arena.applyTier();   // V2.3: H32.2 the arena polish follows the tier (stub: nothing)
         }
         
         // Applies visual budgets only. Population, AI radius and enemy shot rules
@@ -8313,6 +8376,7 @@
             postFX.enabled = !!profile.post;
             if (postFX.enabled) postFX.init();
             applyVisualOverrides(profile);
+            // V2.3 REGION R11.autoFog [WP11]: single owner. The 'auto' step re-applies the atmosphere fog (Competitive 0.0012)
             scene.fog.density = profile.fogDensity;
             
             // V1.7: suspend/resume instead of toggling shadowMap.enabled (no recompile)
@@ -9016,6 +9080,7 @@
                 const item = decals[i];
                 if (!item.inUse || !item.renderVisible) continue;
                 mesh.setMatrixAt(n, item.matrix);
+                // V2.3 REGION R11.decalColour [WP11]: single owner. H32.4 makes this linearColorFromHex(item.tint || 0x333333)
                 mesh.setColorAt(n, linearColorFromHex(0x333333));
                 opacities[n] = item.fadeOpacity;
                 n++;
@@ -9507,6 +9572,8 @@
         // all of it with one uniform branch.
         const mapHiDetailUniform = { value: 0.0 };
         const MAP_SURF = { none: 0, concrete: 1, stone: 2, metal: 3, wood: 4 };
+        // V2.3 REGION R11.mapShader [WP11]: single owner. The mapMaterial shader string below gains uV23Tone (per-surface gain
+        // and grime band, Ascent only); the text change keeps one program
         mapMaterial.onBeforeCompile = (s) => {
             s.uniforms.uDetail = mapDetailUniform;
             s.uniforms.uHiDetail = mapHiDetailUniform;
@@ -11572,6 +11639,7 @@
             packEnemyBatches();
             mapVisibilityDirty = true;
             if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
+            V23.replay && V23.replay.resetRing();   // V2.3: H30.17 no killcam replays old-map positions (stub: nothing)
         }
         
         function ensureUnitMapGeometry() {
@@ -11992,6 +12060,7 @@
                 mapDecor.build();
                 this.aoStale = true;
                 if (this.enabled) this._prepare();
+                V23.arena && V23.arena.onMapBuilt();   // V2.3: H32.1 the arena polish for this map (stub: nothing)
             },
 
             _prepare: function () {
@@ -12054,6 +12123,23 @@
                 this.lastBakeMs = performance.now() - t0;
             }
         };
+
+        // ===== V2.3 BLOCK ARENA [WP11] =====
+        // Owner: WP11 (Ascent as the V2.3 visual reference). Only WP11 edits this block (and its single-owner shader, decal
+        //   and fog lines).
+        // Purpose: the polish batch on mapMaterial, uV23Tone, uV23Floor (AO from .r, light pools from .g), palette ability
+        //   lights, frost and scorch marks through effectBatches.decals, seeded signature particles, Competitive caps.
+        //   MAP_PRESETS.ascent and piece.surf are never edited; nothing goes through createBox. Stubs only in WP1.
+        // Clocks: none per frame of its own (map build, tier and atmosphere events); its lights and particles run on
+        //   abilityLights' and fxKit's existing clocks.
+        V23.arena = {
+            enabled: true,                                                   // debug override for same.js 'views' (false: all off)
+            onMapBuilt: function () { return null; },                        // H32.1
+            applyTier: function () { return null; },                         // H32.2
+            onAtmosphere: function (mode) { return null; },                  // H32.3
+            mark: function (x, z, kind, colorHex) { return false; }
+        };
+        // ===== END V2.3 BLOCK ARENA =====
 
         function pointAabbDistanceSq(px, py, pz, b) {
             const dx = px < b.min.x ? b.min.x - px : (px > b.max.x ? px - b.max.x : 0);
@@ -12297,6 +12383,7 @@
             
             // Left and right hands (one merged mesh)
             rifleGroup.add(createHandsMesh(0.2));
+            V23.fp && V23.fp.attach(rifleGroup, 'rifle', 0.2);   // V2.3: H13.1 the agent's arms (index 9, right after the hands; stub: nothing)
             
             weaponGroup.add(rifleGroup);
             game.weapons.rifle.model = rifleGroup;
@@ -12410,6 +12497,7 @@
             
             // Hands (one merged mesh)
             sniperGroup.add(createHandsMesh(0.3));
+            V23.fp && V23.fp.attach(sniperGroup, 'sniper', 0.3);   // V2.3: H13.2 the agent's arms (index 9, right after the hands; stub: nothing)
             
             weaponGroup.add(sniperGroup);
             sniperGroup.visible = false;
@@ -12498,6 +12586,7 @@
 
             // Hands
             pistolGroup.add(createHandsMesh(0.16));
+            V23.fp && V23.fp.attach(pistolGroup, 'pistol', 0.16);   // V2.3: H13.3 the agent's arms (index 9, right after the hands; stub: nothing)
 
             weaponGroup.add(pistolGroup);
             pistolGroup.visible = false;
@@ -12560,6 +12649,7 @@
 
             // Hands
             knifeGroup.add(createHandsMesh(0.11));
+            V23.fp && V23.fp.attach(knifeGroup, 'knife', 0.11);   // V2.3: H13.4 the agent's arms (index 9, right after the hands; stub: nothing)
 
             weaponGroup.add(knifeGroup);
             knifeGroup.visible = false;
@@ -13354,6 +13444,7 @@
         // (+ = to its left), hit reaction (+ head snap, - legs buckle)); instanceAnim3 =
         // (gesture code + weight, gesture phase, lean (+ = to its right), idle phase).
         // Joints are rigid rotations about pivots in the figure's own space (front -Z, right +X).
+        // V2.3 REGION R7.EA_SHADER_POSE [WP7]: single owner (H24). Gesture codes 7-11 and the head mirror land here
         const EA_SHADER_POSE = `
             attribute float aBone;
             attribute vec4 instanceAnim2;
@@ -13467,6 +13558,7 @@
                 eaJoint(R, T, eaRZ(0.55 * tilt) * eaRX(wpi), vec3(0.24, 1.17, -0.38));
                 if (bone > 7.5) T += R * vec3(0.0, -(0.22 * (smoothstep(0.2, 0.32, gp) - smoothstep(0.62, 0.72, gp)) * wReload + 0.3 * down), 0.0);
             }`;
+        // V2.3 REGION R6.enemyAnimUniforms [WP6]: single owner (H23). Gains uIdentity, uRim and uRimBase
         const enemyAnimUniforms = {
             uSplitLegs: { value: 0 },
             uArmSwing: { value: 0 },
@@ -13477,6 +13569,8 @@
             enemyAnimUniforms.uSplitLegs.value = (CONTENT.detailedModels || detailed) ? 1 : 0;
             enemyAnimUniforms.uArmSwing.value = detailed ? 1 : 0;
         }
+        // V2.3 REGION R6.installEnemyAnimation [WP6]: single owner (H23). Kit branch, zone colours, rim and dissolve, all
+        // behind uIdentity with identical text for every material (one 'enemyAnim' program)
         function installEnemyAnimation(material, partIndex) {
             const uPart = { value: partIndex };
             material.onBeforeCompile = (shader) => {
@@ -13578,6 +13672,7 @@
         //    applyWeaponBobbingBase and playerBody.
         // The shared fields enemy.animAction / animActionAt: this sets and clears 'reload',
         // 'cast', 'plant' and 'defuse'; the map-mechanics code sets 'climb' and 'push'.
+        // V2.3 REGION R7.EA_GESTURES [WP7]: single owner (H24). Codes 7 throw, 8 channel, 9 snap/tap, 10 place/slam, 11 ready dip
         const EA_GESTURES = [null, 'reload', 'cast', 'plant', 'defuse', 'climb', 'push'];
         const EA_TAU = Math.PI * 2;
         const _eaUp = new THREE.Vector3(0, 1, 0), _eaAxis = new THREE.Vector3(), _eaQ = new THREE.Quaternion();
@@ -13639,6 +13734,7 @@
                     a.setUsage(THREE.DynamicDrawUsage);
                     geom.setAttribute(name, a);
                 }
+                V23.bots && V23.bots.geomAttrs(geom, src);   // V2.3: H22.6 instanceKit with neutral zeros (stub: nothing)
             },
             // The per-vertex bone attribute of a figure geometry (made once, from its tagged parts)
             bones: function (geo) {
@@ -13754,6 +13850,7 @@
             },
 
             // Every 60 Hz step (from updateEnemyAnimation), for the bots on screen
+            // V2.3 REGION R7.stepBots [WP7]: single owner (H24)
             stepBots: function (dt) {
                 const t0 = performance.now();
                 const P = characterController.position;
@@ -13829,6 +13926,7 @@
             // planting and defusing (the spike code's bot). One-shots: a cast (the bot's ability
             // timer moved on) and a reload after a magazine's worth of shots (looks only: when
             // it fires is unchanged; a shot cuts a reload short).
+            // V2.3 REGION R7._gesture [WP7]: single owner (H24)
             _gesture: function (e, dt, planter, defuser, gNow, dead) {
                 const act = e.animAction;
                 let want = 0;
@@ -13882,6 +13980,7 @@
 
             // From damageEnemyActor: head snaps back, legs buckle (the body flinch is the classic
             // one), and the shot's direction for the fall (from a wingman by name, else from you)
+            // V2.3 REGION R7.onHit [WP7]: single owner (H24)
             onHit: function (e, zone, label) {
                 if (!e.eaV) this._initState(e, e.mesh, e.slot);
                 if (zone === 'head') e.eaSnap = 1;
@@ -13895,6 +13994,7 @@
             },
             // From animateEnemyDeath: the classic topple's fall and timing, tipping away from the
             // last shot (turned by the classic random spin, so the same random numbers are used)
+            // V2.3 REGION R7.startDeath [WP7]: single owner (H24)
             startDeath: function (e, spin) {
                 if (!e.eaV) this._initState(e, e.mesh, e.slot);
                 const th = e.mesh.rotation.y;
@@ -13914,6 +14014,7 @@
 
             // The head bone's transform (figure space) for the values v: the same chain as
             // EA_SHADER_POSE (pelvis, spine joint, neck joint), for a head drawn as a plain mesh
+            // V2.3 REGION R7._headMatrix [WP7]: single owner (H24). Mirrors EA_SHADER_POSE (codes 7-11 included)
             _headMatrix: function (v, out) {
                 const walk = Math.min(v[1], 1), run = Math.min(1, Math.max(0, v[1] - 1)), ph = v[0];
                 const mf = Math.cos(v[2]), ms = Math.sin(v[2]);
@@ -13993,6 +14094,7 @@
                 const st = { slot: this.wingRigs.length + 3 };
                 this._initState(st, g, st.slot * 5);
                 this.wingRigs.push({ bot: bot, fig: fig, rig: rig, meshes: meshes, st: st, fire: bot.lastFireAt || 0, recoil: 0 });
+                V23.bots && V23.bots.wingRig(bot, rig, meshes);   // V2.3: H22.7 the one-instance agent kit for this rig (stub: nothing)
             },
             // Every frame while on (wingmen move on the frame clock); still while the game is paused
             stepWingmen: function (delta, now) {
@@ -14104,12 +14206,15 @@
                 freezeStaticTransform(mesh);
                 meshes.push(mesh);
             }
-            return { meshes: meshes, members: [], live: false, chunk: null, structureDirty: false, poseDirty: false, colorDirty: false };
+            const page = { meshes: meshes, members: [], live: false, chunk: null, structureDirty: false, poseDirty: false, colorDirty: false };
+            V23.bots && V23.bots.onPage(page);   // V2.3: H22.1 page.kit and instanceKit once identity is built (stub: nothing)
+            return page;
         }
         
         // Drop instance buffers only. Shared index/attributes are detached first so
         // geometry.dispose() cannot free buffers still used by live pages.
         function releaseEnemyPageGPU(page) {
+            V23.bots && V23.bots.releasePage(page);   // V2.3: H22.2 the kit mesh and instanceKit go first (stub: nothing)
             for (let p = 0; p < page.meshes.length; p++) {
                 const mesh = page.meshes[p];
                 scene.remove(mesh);
@@ -14275,6 +14380,8 @@
                                 perfTelemetry.enemyColorWrites++;
                             }
                         }
+                        writeMatrix && V23.bots && V23.bots.packPose(page, s, enemy);   // V2.3: H22.3 kit pose values on death ticks (stub: nothing)
+                        writeColor && V23.bots && V23.bots.packColor(page, s, enemy);   // V2.3: H22.4 kit colour and instanceKit (stub: nothing)
                         if (writeMatrix) { if (s < matrixLo) matrixLo = s; if (s > matrixHi) matrixHi = s; }
                         if (writeColor) { if (s < colorLo) colorLo = s; if (s > colorHi) colorHi = s; }
                         enemy.poseDirty = false;
@@ -14297,6 +14404,7 @@
                             perfTelemetry.requestUpload(mesh.instanceColor, colorLo * 3, (colorHi - colorLo + 1) * 3);
                         }
                     }
+                    V23.bots && V23.bots.flush(page, n, colorLo, colorHi);   // V2.3: H22.5 the kit's count and colour-range uploads (stub: nothing)
                     page.structureDirty = false;
                     page.poseDirty = false;
                     page.colorDirty = false;
@@ -15023,6 +15131,7 @@
             onKilled: function (enemy) {
                 this.release(enemy);
                 const partner = enemyObjects[enemy.slot ^ 1];
+                if (V23.proto && V23.proto.trade(enemy, partner)) return;   // V2.3: H34.2 the M4 trade prototype, 'agent' only (stub: false)
                 if (partner && partner.isActive && !partner.hit) partner.forceCover = true;
             },
 
@@ -15104,6 +15213,7 @@
                     if (enemy.hasSight || perfNow >= enemy.aiUntil) {
                         const peek = enemy.hasSight ? { x: pos.x, z: pos.z } : this._pickPeek(enemy, player, scaleY);
                         if (peek && enemy.peeks < L.maxPeeks) {
+                            if (V23.util && V23.util.peekHook(enemy, peek, perfNow)) return true;   // V2.3: H29.6 flash before the peek, 'agent' only (stub: false)
                             enemy.peekX = peek.x;
                             enemy.peekZ = peek.z;
                             enemy.peeks++;
@@ -16113,6 +16223,7 @@
                     const children = w.model.children.slice();
                     for (const child of children) {
                         if (!child.isMesh || child === w.muzzleFlash) continue;
+                        if (child.userData.isAgentArm) continue;   // V2.3: H14.3 the agent's arms get no rounded copy
                         let detailed = null;
                         if (child.userData.isHands) detailed = createHandsGeometry(child.userData.handZ, true);
                         else detailed = roundOf(child.geometry);
@@ -16290,8 +16401,10 @@
                     for (const chunk of enemyChunks.values()) for (const page of chunk.pages) if (page.meshes[p]) swap(page.meshes[p]);
                     for (const page of enemyPageFree) if (page.meshes[p]) swap(page.meshes[p]);
                 }
+                V23.bots && V23.bots.onTier();   // V2.3: H22.8 the kit geometry follows the body tier (stub: nothing)
                 syncEnemyAnimUniforms();
                 for (const s of this.gunSwaps) s.mesh.geometry = on ? s.detailed : s.simple;
+                V23.fp && V23.fp.reapply();   // V2.3: H15.1 grouped hands and the off-hand drawRange after the hands swap (stub: nothing)
                 for (const kit of this.kits) kit.visible = on;
                 for (const w of this.wingmanKits) {
                     w.kit.visible = on;
@@ -16328,6 +16441,8 @@
             const arch = ENEMY_ARCHETYPES[archKey] || ENEMY_ARCHETYPES.standard;
 
             actor.archetype = arch.id;
+            V23.bots && V23.bots.assign(actor);   // V2.3: H21.1 the bot's agent (actor.agentId, actor.lookIdx only; stub: nothing)
+            V23.util && V23.util.onActivate(actor);   // V2.3: H21.2 utility state for the new life (stub: nothing)
             actor.maxHealth = arch.maxHealth;
             actor.health = arch.maxHealth;
             actor.maxArmor = arch.maxArmor;
@@ -16395,6 +16510,46 @@
             shadowManager.markEvent();
         }
         
+        // ===== V2.3 BLOCK BOTKIT [WP6] =====
+        // Owner: WP6 (bot identity in the instanced pipeline). Only WP6 edits this block (and the single-owner
+        //   installEnemyAnimation / enemyAnimUniforms region).
+        // Purpose: deterministic agent assignment (actor.agentId, actor.lookIdx only), the kit superset geometry, page.kit and
+        //   instanceKit, packPose / packColor / flush, tier swaps, rim colours, wingman kits and the replay override API.
+        //   Stubs only in WP1 (no kit exists: zero extra draws).
+        // Clocks: assignment is pure (no clock); instanceKit is written on the colorDirty path and on death ticks (60 Hz sim).
+        V23.bots = {
+            assign: function (actor) { return null; },                       // H21.1
+            onPage: function (page) { return null; },                        // H22.1
+            releasePage: function (page) { return null; },                   // H22.2
+            packPose: function (page, k, enemy) { return null; },            // H22.3
+            packColor: function (page, k, enemy) { return null; },           // H22.4
+            flush: function (page, n, colorLo, colorHi) { return null; },    // H22.5
+            geomAttrs: function (geom, src) { return null; },                // H22.6
+            wingRig: function (bot, rig, meshes) { return null; },           // H22.7
+            onTier: function () { return null; },                            // H22.8 / H22.9
+            setRim: function (mode) { return null; },                        // H27.1
+            previewColors: function (mode) { return null; },                 // H27.2: { stroke, fill } for the crosshair preview's bot (null: V2.2's)
+            wingKit: function (bot, agentId) { return null; },               // H28
+            onKilled: function (enemy, hitZone, source) { return null; },    // H25.2
+            kitRep: function (enemy, rec) { return false; },
+            archOverride: function (enemy, archIndex) { return false; }
+        };
+        // ===== END V2.3 BLOCK BOTKIT =====
+
+        // ===== V2.3 BLOCK BOTMOTION [WP7] =====
+        // Owner: WP7 (bot motion, death styles and dissolve). Only WP7 edits this block (and the single-owner enhancedAnim
+        //   region: EA_GESTURES, EA_SHADER_POSE, _gesture, onHit, startDeath, _headMatrix, stepBots).
+        // Purpose: EA gesture codes 7-11, the aim spring, the ready dip, the five death styles and the dissolve, in both the
+        //   classic topple (H26) and EA's startDeath. It adds its functions to V23.bots. Stubs only in WP1 (deathStep false:
+        //   V2.2's topple runs exactly).
+        // Clocks: 60 Hz sim ticks (stepActorAnimation) for deaths and the dissolve; gNow for windups.
+        V23.bots = Object.assign(V23.bots || {}, {
+            deathStep: function (actor, anim) { return false; },             // H26
+            windup: function (enemy, code, t) { return null; },
+            hitFlash: function (enemy, zone) { return null; }
+        });
+        // ===== END V2.3 BLOCK BOTMOTION =====
+
         // Spawn targets in the environment
         function spawnTargets() {
             // Static targets around the environment
@@ -16799,6 +16954,7 @@
 
         // Mouse wheel cycles through the 4-weapon arsenal
         window.addEventListener('wheel', (e) => {
+            if (V23.stage && V23.stage.onWheel(e)) return;   // V2.3: H11.2 the wheel zooms the stage, never cycles guns behind a menu (stub: false)
             if (!gameInitialized || game.reloading || game.buyMenuOpen || game.agentPickerOpen || game.settingsOpen) return;
             if (WEAPON_SLOT_ORDER.indexOf(game.activeWeapon) === -1) return;
             // V1.8: skips slots you have no gun in (Match/Ranked)
@@ -16986,6 +17142,7 @@
                 }
                 return;
             }
+            if (game.agentPickerOpen && V23.stage && V23.stage.onKey(event)) return;   // V2.3: H11.1 picker-scoped keys, no leaks behind it (stub: false)
             if (game.settingsOpen) return;
             if (event.code === 'Enter' && game.agentPickerOpen) {
                 event.preventDefault();
@@ -17411,7 +17568,8 @@
                     e._stepAcc = 0;
                     const dx = x - p.x, dz = z - p.z;
                     if (dx * dx + dz * dz > ENEMY_STEP_RANGE_SQ) continue;
-                    soundFX.at(x, e.mesh.position.y + 0.1, z, () => soundFX.enemyStep());
+                    // V2.3: H31.1 the surface under the bot picks its step sound (stub: null, the V2.2 step)
+                    soundFX.at(x, e.mesh.position.y + 0.1, z, () => soundFX.enemyStep(V23.audio && V23.audio.surfAt(e)));
                 }
             }
         };
@@ -17638,7 +17796,7 @@
                 if (this.menuOpen()) {
                     if (!this._wasMenu) this.releaseAll();
                     this._wasMenu = true;
-                    this.navigate(pad, cur, pressed, left, now);
+                    this.navigate(pad, cur, pressed, left, now, right);   // V2.3: H12.1 the right stick too (the showroom turns with it)
                 } else {
                     if (this._wasMenu) { this._wasMenu = false; this.clearNavFocus(); }
                     this.gameplay(cur, pressed, released, heldFor, left, right, delta, now);
@@ -17807,6 +17965,7 @@
                 if (el) {
                     el.classList.add('gp-focus');
                     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    V23.stage && V23.stage.onFocus(el);   // V2.3: H12.3 a focused agent card is highlighted (stub: nothing)
                 }
             },
             
@@ -17847,7 +18006,8 @@
                 if (mainMenu.open) mainMenu.back();
             },
             
-            navigate: function(pad, cur, pressed, left, now) {
+            navigate: function(pad, cur, pressed, left, now, right) {
+                if (V23.stage && V23.stage.onPad(pad, pressed, left, right, now)) return;   // V2.3: H12.2 the picker's pad controls first (stub: false)
                 const root = this.menuRoot();
                 if (!root) return;
                 let dx = 0, dy = 0;
@@ -17948,6 +18108,7 @@
             shakeLast: { x: 0, y: 0, z: 0, rx: 0, ry: 0 },
             _c: new THREE.Color(),
             _m: new THREE.Matrix4(),
+            _rng: null,   // V2.3: the H31.4 indirection, a seeded stream while V23.seeded runs, else null (Math.random, read at call time)
 
             makeBatch: function (cap, additive) {
                 const geo = new THREE.PlaneGeometry(1, 1);
@@ -18034,7 +18195,7 @@
                 r.p.set(x, y, z); r.v.set(vx, vy, vz);
                 r.c.setHex(colorHex);
                 r.t = 0; r.life = life; r.s0 = s0; r.s1 = s1; r.a0 = a0; r.drag = drag; r.grav = grav;
-                r.seed = Math.random();
+                r.seed = (this._rng || Math.random)();   // V2.3: H31.4 (null: the same Math.random call as V2.2)
                 return r;
             },
 
@@ -18042,16 +18203,17 @@
 
             // Explosion / flash / impact: sparks, a glow flash, smoke for big ones, shake
             burst: function (x, y, z, colorHex, radius, opts) {
+                // V2.3: every draw here goes through fxKit._rng (the H31.4 indirection; null: Math.random, the same calls in the same order)
                 if (!this.enabled()) return;
                 opts = opts || {};
                 const R = Math.max(0.5, radius || 2);
                 const bright = this._bright(colorHex);
                 const n = Math.min(60, Math.round((opts.sparks !== undefined ? opts.sparks : 1) * (10 + R * 5)));
                 for (let i = 0; i < n; i++) {
-                    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
-                    const sp = (2.5 + Math.random() * 5.5) * Math.min(1.6, 0.5 + R * 0.18);
+                    const u = (this._rng || Math.random)() * 2 - 1, th = (this._rng || Math.random)() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const sp = (2.5 + (this._rng || Math.random)() * 5.5) * Math.min(1.6, 0.5 + R * 0.18);
                     this._emit(this.parts, FX_KIND.spark, x, y, z, rr * Math.cos(th) * sp, Math.abs(u) * sp * 0.9 + 1.2, rr * Math.sin(th) * sp,
-                        Math.random() < 0.3 ? 0xfff2c4 : bright, 0.35 + Math.random() * 0.4, 0.16 + Math.random() * 0.08, 0.07, 1, 1.8, 9.8);
+                        (this._rng || Math.random)() < 0.3 ? 0xfff2c4 : bright, 0.35 + (this._rng || Math.random)() * 0.4, 0.16 + (this._rng || Math.random)() * 0.08, 0.07, 1, 1.8, 9.8);
                 }
                 this._emit(this.parts, FX_KIND.glow, x, y, z, 0, 0, 0, bright, 0.22 + R * 0.02, R * 0.35, R * 1.25, 0.9, 0, 0);
                 // The blast lights the floor and walls around it
@@ -18059,10 +18221,10 @@
                 if (opts.smoke !== false && R >= 2.5) {
                     const puffs = Math.min(8, Math.round(R));
                     for (let i = 0; i < puffs; i++) {
-                        const a = Math.random() * Math.PI * 2, d = Math.random() * R * 0.35;
-                        this._emit(this.smokes, FX_KIND.smoke, x + Math.cos(a) * d, y + Math.random() * 0.6, z + Math.sin(a) * d,
-                            Math.cos(a) * 0.8, 0.5 + Math.random() * 0.5, Math.sin(a) * 0.8,
-                            this._mix(colorHex, 0x3a3f47, 0.75), 1.6 + Math.random() * 1.2, R * 0.35, R * 0.9, 0.42, 1.2, -0.25);
+                        const a = (this._rng || Math.random)() * Math.PI * 2, d = (this._rng || Math.random)() * R * 0.35;
+                        this._emit(this.smokes, FX_KIND.smoke, x + Math.cos(a) * d, y + (this._rng || Math.random)() * 0.6, z + Math.sin(a) * d,
+                            Math.cos(a) * 0.8, 0.5 + (this._rng || Math.random)() * 0.5, Math.sin(a) * 0.8,
+                            this._mix(colorHex, 0x3a3f47, 0.75), 1.6 + (this._rng || Math.random)() * 1.2, R * 0.35, R * 0.9, 0.42, 1.2, -0.25);
                     }
                 }
                 if (opts.shake !== false) this.shakeAt(x, y, z, Math.min(1, R / 6) * (opts.shakeScale || 1));
@@ -18070,65 +18232,69 @@
 
             // Ground shockwave rings (dashes, stomps, pulses): dust kicked out along the ring
             ring: function (x, y, z, colorHex, scale) {
+                // V2.3: every draw here goes through fxKit._rng (the H31.4 indirection; null: Math.random, the same calls in the same order)
                 if (!this.enabled()) return;
                 abilityLights.flash(x, y + 0.4, z, this._bright(colorHex), 3 + scale * 1.5, 1.4, 350);
                 const n = Math.min(14, 5 + Math.round(scale * 2));
                 for (let i = 0; i < n; i++) {
-                    const a = i / n * Math.PI * 2 + Math.random() * 0.4;
+                    const a = i / n * Math.PI * 2 + (this._rng || Math.random)() * 0.4;
                     const sp = 2 + scale * 0.8;
                     this._emit(this.smokes, FX_KIND.dust, x + Math.cos(a) * 0.4, Math.max(0.15, y - 0.2), z + Math.sin(a) * 0.4,
                         Math.cos(a) * sp, 0.3, Math.sin(a) * sp, this._mix(colorHex, 0x8b8070, 0.6), 0.8, 0.5, 1.6 + scale * 0.2, 0.55, 2.6, 0);
                 }
                 for (let i = 0; i < 6; i++) {
-                    const a = Math.random() * Math.PI * 2;
-                    this._emit(this.parts, FX_KIND.spark, x, y, z, Math.cos(a) * 4, 1.5 + Math.random() * 2, Math.sin(a) * 4,
+                    const a = (this._rng || Math.random)() * Math.PI * 2;
+                    this._emit(this.parts, FX_KIND.spark, x, y, z, Math.cos(a) * 4, 1.5 + (this._rng || Math.random)() * 2, Math.sin(a) * 4,
                         this._bright(colorHex), 0.3, 0.08, 0.04, 0.8, 2.2, 9.8);
                 }
             },
 
             // Smoke grenades: rolling puffs that fill the sphere as it forms
             smokeCloud: function (x, y, z, colorHex, radius) {
+                // V2.3: every draw here goes through fxKit._rng (the H31.4 indirection; null: Math.random, the same calls in the same order)
                 if (!this.enabled()) return;
                 for (let i = 0; i < 16; i++) {
-                    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
-                    const d = radius * (0.4 + Math.random() * 0.5);
+                    const u = (this._rng || Math.random)() * 2 - 1, th = (this._rng || Math.random)() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const d = radius * (0.4 + (this._rng || Math.random)() * 0.5);
                     this._emit(this.smokes, FX_KIND.smoke, x, y, z, rr * Math.cos(th) * d * 1.4, u * d * 0.9, rr * Math.sin(th) * d * 1.4,
-                        this._mix(colorHex, 0xd7dde5, 0.55), 1.4 + Math.random() * 0.8, radius * 0.3, radius * 0.85, 0.7, 2.2, 0);
+                        this._mix(colorHex, 0xd7dde5, 0.55), 1.4 + (this._rng || Math.random)() * 0.8, radius * 0.3, radius * 0.85, 0.7, 2.2, 0);
                 }
                 this.burst(x, y, z, colorHex, 1.2, { sparks: 0.4, smoke: false, shake: false });
             },
 
             // Active smoke spheres: puffs rolling over the surface (called every frame)
             smokeShell: function (x, y, z, linearColor, radius, dt, fade) {
+                // V2.3: every draw here goes through fxKit._rng (the H31.4 indirection; null: Math.random, the same calls in the same order)
                 if (!this.enabled()) return;
                 let n = dt * 14 * fade;
                 while (n > 0) {
-                    if (n < 1 && Math.random() > n) break;
+                    if (n < 1 && (this._rng || Math.random)() > n) break;
                     n -= 1;
-                    const u = Math.random() * 1.6 - 0.6, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+                    const u = (this._rng || Math.random)() * 1.6 - 0.6, th = (this._rng || Math.random)() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
                     const px = x + rr * Math.cos(th) * radius * 0.92, py = y + u * radius * 0.92, pz = z + rr * Math.sin(th) * radius * 0.92;
                     this._c.copy(linearColor).convertLinearToSRGB();
                     const hex = this._mix(this._c.getHex(), 0xe2e8f0, 0.45);
                     this._emit(this.smokes, FX_KIND.smoke, px, py, pz, -Math.sin(th) * 0.35, 0.08, Math.cos(th) * 0.35,
-                        hex, 2.4 + Math.random() * 1.0, radius * 0.45, radius * 0.8, 0.6, 0.3, 0);
+                        hex, 2.4 + (this._rng || Math.random)() * 1.0, radius * 0.45, radius * 0.8, 0.6, 0.3, 0);
                 }
             },
 
             // Fire / acid zones: called every frame per active zone
             embers: function (x, y, z, colorHex, radius, dt) {
+                // V2.3: every draw here goes through fxKit._rng (the H31.4 indirection; null: Math.random, the same calls in the same order)
                 if (!this.enabled()) return;
                 // Flickering firelight over the zone
                 const fl = 0.75 + 0.25 * Math.sin(performance.now() * 0.023 + x) * Math.sin(performance.now() * 0.037 + z);
                 abilityLights.add(x, y + 1.2, z, this._bright(colorHex), radius * 1.6 + 3, 3.2 * fl);
                 let n = dt * (6 + radius * 3);
                 while (n > 0) {
-                    if (n < 1 && Math.random() > n) break;
+                    if (n < 1 && (this._rng || Math.random)() > n) break;
                     n -= 1;
-                    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * radius * 0.9;
+                    const a = (this._rng || Math.random)() * Math.PI * 2, d = Math.sqrt((this._rng || Math.random)()) * radius * 0.9;
                     this._emit(this.parts, FX_KIND.ember, x + Math.cos(a) * d, y + 0.1, z + Math.sin(a) * d,
-                        (Math.random() - 0.5) * 0.6, 1.2 + Math.random() * 1.6, (Math.random() - 0.5) * 0.6,
-                        this._bright(colorHex), 0.8 + Math.random() * 0.8, 0.12, 0.05, 1, 0.6, -0.4);
-                    if (Math.random() < 0.18) {
+                        ((this._rng || Math.random)() - 0.5) * 0.6, 1.2 + (this._rng || Math.random)() * 1.6, ((this._rng || Math.random)() - 0.5) * 0.6,
+                        this._bright(colorHex), 0.8 + (this._rng || Math.random)() * 0.8, 0.12, 0.05, 1, 0.6, -0.4);
+                    if ((this._rng || Math.random)() < 0.18) {
                         this._emit(this.smokes, FX_KIND.smoke, x + Math.cos(a) * d, y + 0.4, z + Math.sin(a) * d, 0, 0.9, 0,
                             0x2e2a27, 1.6, 0.4, 1.4, 0.22, 0.6, -0.2);
                     }
@@ -18878,6 +19044,7 @@
                 }
                 if (w && w.slide && w.slideRestZ !== undefined) w.slide.position.z = w.slideRestZ;
                 this.clip = null;
+                V23.vm && V23.vm.reset();   // V2.3: H20.4a magazines and slides back at rest, magFX reset (stub: nothing)
             },
 
             // Keyframed offsets: keys = [[t, px, py, pz, rx, ry, rz], ...], eased between keys
@@ -18916,6 +19083,7 @@
                     return;
                 }
                 if (kind === 'draw') {
+                    if (V23.vm && V23.vm.pose(kind, p, w, o, this.clip, hand)) return;   // V2.3: H20.1 class-shaped draws (stub: false)
                     const e = _ease.back(p);
                     o.py += -0.25 * (1 - e);
                     o.rx += 0.6 * (1 - e);
@@ -18923,6 +19091,7 @@
                     return;
                 }
                 if (kind === 'inspect') {
+                    if (V23.vm && V23.vm.pose(kind, p, w, o, this.clip, hand)) return;   // V2.3: H20.2 class inspects (stub: false)
                     if (w && w.isMelee) {
                         // Knife: a flip over the knuckles and back
                         o.rx += _seg(p, 0.1, 0.6) * Math.PI * 2;
@@ -18942,6 +19111,7 @@
                     return;
                 }
                 if (kind === 'reload' && w) {
+                    if (V23.vm && V23.vm.pose(kind, p, w, o, this.clip, hand)) return;   // V2.3: H20.3 tactical and empty reloads (stub: false)
                     if (enhancedAnim.on && eaFP.reload(p, w, o, hand)) return;   // V2.2: a reload per gun type
                     // Tilt in, work the gun, tilt out
                     const tilt = _seg(p, 0, 0.14) * (1 - _seg(p, 0.86, 1));
@@ -19194,6 +19364,7 @@
                     this.wisps.push(w);
                 }
                 this.hide();
+                V23.fp && V23.fp.initCast(this);   // V2.3: H16.1 grouped cast hand, its 6 poses and hand2 (stub: nothing)
             },
 
             hide: function () {
@@ -19215,10 +19386,13 @@
                 this.active = { kind: kind, start: performance.now(), dur: this.CLIPS[kind], burst: false, hex: col.getHex() };
                 if (enhancedAnim.on && kind === 'cast' && abilityKey) this.active.variant = eaFP.castVariant(abilityKey);   // V2.2
                 if (vmAnim.clip && vmAnim.clip.kind === 'inspect') vmAnim.finishClip(game.weapons[game.activeWeapon]);
+                V23.fp && V23.fp.onStart(this, kind, abilityKey);   // V2.3: H16.2 the agent's gesture for this cast (stub: nothing)
             },
 
             // Hand pose and energy for clip progress p; returns how far the gun is moved aside (0-1)
             _pose: function (kind, p, now) {
+                const v23 = V23.fp && V23.fp.pose(this, kind, p, now, null);   // V2.3: H16.3 the gesture library (stub: null, V2.2's pose)
+                if (v23 != null) return v23;
                 const R = this.REST;
                 let up, push, charge, flare, tremble = 0;
                 if (kind === 'tap') {
@@ -19487,6 +19661,8 @@
             // castFX.apply: the hand and its energy for that gesture at clip progress p; returns how
             // far the gun is moved aside (0-1), as castFX._pose does
             castPose: function (fx, variant, p, now) {
+                const v23 = V23.fp && V23.fp.pose(fx, fx.active ? fx.active.kind : 'cast', p, now, variant);   // V2.3: H16.4 (stub: null)
+                if (v23 != null) return v23;
                 const R = fx.REST, hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
                 let up, x, y, z, rx, ry, rz, charge, flare;
                 if (variant === 'throw') {
@@ -19555,6 +19731,7 @@
                 w.magazine.position.y = w.magRestY - y * drop;
             },
             reload: function (p, w, o, hand) {
+                if (V23.vm && V23.vm.eaReload(p, w, o, hand)) return true;   // V2.3: H20.7 the V2.3 reload with EA's secondary motion (stub: false)
                 if (!w || w.isMelee) return false;
                 const cls = this.gunClass(w);
                 if (cls === 'smg') {
@@ -19614,8 +19791,44 @@
             }
         };
 
+        // ===== V2.3 BLOCK FP [WP4] =====
+        // Owner: WP4 (first-person identity). Only WP4 edits this block.
+        // Purpose: grouped hands, the agent's arms and wrists (fpArm, index 9 of each gun model), the cast hand's poses and
+        //   hand2, the gesture dispatch for castFX._pose and eaFP.castPose, second-stage fire feedback, the ultimate cue and
+        //   the off-hand drawRange API that VMANIM uses. Stubs only in WP1 (pose returns null: V2.2's pose runs).
+        // Clocks: castFX / vmAnim real clock (performance.now) for gestures and the ultimate vignette.
+        V23.fp = {
+            attach: function (model, slot, handZ) { return null; },            // H13 (createWeapons, after each createHandsMesh)
+            reapply: function () { return null; },                             // H15 (after the hands geometry swaps)
+            initCast: function (castFX) { return null; },                      // H16.1
+            onStart: function (castFX, kind, abilityKey) { return null; },     // H16.2
+            pose: function (castFX, kind, p, now, variant) { return null; },   // H16.3 / H16.4: null keeps V2.2's pose
+            onSecondaryFire: function (abilityKey) { return null; },           // H19.1-4
+            offHand: function (model, hidden) { return false; },
+            ultCue: function (agentId) { return null; }
+        };
+        // ===== END V2.3 BLOCK FP =====
+
+        // ===== V2.3 BLOCK VMANIM [WP5] =====
+        // Owner: WP5 (weapon animations, setting weaponAnims 'v23' | 'classic'). Only WP5 edits this block.
+        // Purpose: tactical and empty reloads with visible and pooled magazines (magFX), class-shaped draws with a holster
+        //   ghost, class inspects with per-gun overrides, the sway hold. Stubs only in WP1 (every pose returns false).
+        // Clocks: castFX / vmAnim real clock (performance.now) for clips and magazine-pool physics.
+        V23.vm = {
+            pose: function (kind, p, w, o, clip, hand) { return false; },     // H20.1-3: false keeps V2.2's draw, inspect, reload
+            reset: function () { return null; },                             // H20.4a finishClip, H20.4b cancelReload
+            onReload: function (weapon) { return null; },                    // H20.5
+            onSwitch: function (prev, next) { return null; },                // H20.6
+            eaReload: function (p, w, o, hand) { return false; },            // H20.7
+            swayHold: function () { return false; },                         // H20.8
+            onShot: function () { return null; },                            // H19.5
+            step: function (dt, now) { return null; }                        // H20.9: every frame after shellFX (magFX physics)
+        };
+        // ===== END V2.3 BLOCK VMANIM =====
+
         // Apply weapon sway based on mouse movement (scaled by viewmodelBob setting)
         function applyWeaponSway(moveX, moveY) {
+            if (V23.vm && V23.vm.swayHold()) return;   // V2.3: H20.8 a running V2.3 clip holds the sway (stub: false)
             const weapon = game.weapons[game.activeWeapon];
             const activeWeapon = weapon ? weapon.model : null;
             if (activeWeapon && !game.reloading) {
@@ -19727,7 +19940,8 @@
             }
             // Spike Rush haste orb
             const hasteMult = now < (game.powerHasteUntil || 0) ? 1.3 : 1.0;
-            characterController.speedMultiplier = knifeMult * adsMoveMult * ultMoveMult * hasteMult;
+            // V2.3: H29.8 an agent-mode bot slow folds in here (stub: 1, so the product is V2.2's exactly)
+            characterController.speedMultiplier = knifeMult * adsMoveMult * ultMoveMult * hasteMult * (V23.util ? V23.util.playerSpeedMult(gNow) : 1);
 
             // Update HUD Posture / Stance Badge
             if (stanceBadge) {
@@ -19906,6 +20120,7 @@
             }
             
             // Show the selected weapon (V1.8: a gun taken out starts a fresh spray)
+            const v23Prev = game.activeWeapon;   // V2.3: the outgoing gun, for the holster ghost (H20.6)
             game.activeWeapon = weaponName;
             game.sprayShotCount = 0;
             const selected = game.weapons[weaponName];
@@ -19937,6 +20152,7 @@
             weaponModel.rotation.set(0, 0, 0); // V1.7 fix: no PI base (see applyWeaponBobbing)
             // V1.7: animated draw (raise, roll in, settle) on the viewmodel animator
             vmAnim.switched();
+            V23.vm && V23.vm.onSwitch(v23Prev, weaponName);   // V2.3: H20.6 the holster ghost and class draw (stub: nothing)
             
             // Show notification
             const mv = selected.def && selected.def.moveMult;
@@ -20526,6 +20742,10 @@
         // =============================================
         const soundFX = {
             ctx: null,
+            // V2.3: the H31.2 / H31.3 call-time indirections, null by default (V2.2 exactly). V23.seeded sets _rand to a seeded
+            // stream for V2.3 sounds and restores null; the showroom routes previews through a bus in _out
+            _rand: null,
+            _out: null,
             ensureContext: function() {
                 if (!game.soundEnabled) return null;
                 if (!this.ctx) {
@@ -20588,8 +20808,13 @@
             },
             // Final hop for every synthesized voice: straight out, or via the panner
             _route: function(ctx, node) {
+                const out = this._out || ctx.destination;   // V2.3: H31.3 (null: the destination, as V2.2)
                 const p = this._pos;
-                if (!p) { node.connect(ctx.destination); this._send(ctx, node); return; }
+                if (!p) {
+                    node.connect(out);
+                    if (!this._out) this._send(ctx, node);   // V2.3: H31.3b a voice on soundFX._out gets no shared reverb (null: V2.2's send)
+                    return;
+                }
                 const panner = ctx.createPanner();
                 panner.panningModel = 'HRTF';
                 panner.distanceModel = 'inverse';
@@ -20610,8 +20835,8 @@
                 } else {
                     node.connect(panner);
                 }
-                panner.connect(ctx.destination);
-                this._send(ctx, panner);
+                panner.connect(out);
+                if (!this._out) this._send(ctx, panner);   // V2.3: H31.3c a voice on soundFX._out gets no shared reverb (null: V2.2's send)
             },
             _lFwd: new THREE.Vector3(),
             _lUp: new THREE.Vector3(),
@@ -20637,6 +20862,8 @@
                 this.playNoise(0.14, 0.34, 0, 3200);
                 this.playTone(240, 60, 0.16, 'sawtooth', 0.12, 0);
             },
+            // V2.3 REGION R10.enemyStep [WP10]: single owner. enemyStep(kind): one noise call (gain 0.16) plus surface and
+            // footwear tones; enemyStep() with no kind stays V2.2 exactly
             enemyStep: function() {
                 this.playNoise(0.07, 0.16, 0, 520);
                 this.playTone(95, 55, 0.08, 'sine', 0.07, 0);
@@ -20693,7 +20920,7 @@
                     src.connect(filter);
                     filter.connect(gain);
                     this._route(ctx, gain);
-                    src.start(t0, Math.random() * 0.04);
+                    src.start(t0, (this._rand || Math.random)() * 0.04);   // V2.3: H31.2a (null: the same Math.random call)
                     src.stop(t0 + dur + 0.02);
                 } catch (e) {}
             },
@@ -20798,6 +21025,7 @@
             // weaponType: a GUN_SOUNDS key, or 'pistol' / 'pistol_burst' / 'bulldog_burst';
             // rounds: shots in a burst (V1.8: the Stinger's 4-round ADS burst)
             gunshot: function(weaponType, rounds) {
+                // V2.3: the shot-to-shot variation goes through soundFX._rand (the H31.2 indirection; null: the same Math.random call)
                 let key = weaponType;
                 if (weaponType === 'pistol') key = game.pistolVariant === 'classic' ? 'classic' : 'sheriff';
                 if (weaponType === 'pistol_burst') key = 'classic';
@@ -20808,7 +21036,7 @@
                 this.lastGun = key;
                 for (let b = 0; b < bursts; b++) {
                     const d = b * (weaponType === 'pistol_burst' ? 0.055 : 0.048);
-                    const v = 0.9 + Math.random() * 0.2;   // a little variation shot to shot
+                    const v = 0.9 + (this._rand || Math.random)() * 0.2;   // a little variation shot to shot
                     if (P.crack) this.noiseLayer(P.crack[2], P.crack[3] * v, d, 'bandpass', P.crack[0] * v, P.crack[1]);
                     if (P.body) this.playTone(P.body[1] * v, P.body[2], P.body[3], P.body[0], P.body[4], d);
                     if (P.punch) this.playTone(P.punch[0], P.punch[1], P.punch[2], 'sine', P.punch[3], d);
@@ -20849,7 +21077,7 @@
                     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
                     src.connect(f); f.connect(g);
                     this._route(ctx, g);
-                    src.start(t0, Math.random() * 0.5);
+                    src.start(t0, (this._rand || Math.random)() * 0.5);   // V2.3: H31.2b (null: the same Math.random call)
                     src.stop(t0 + dur + 0.02);
                 } catch (e) {}
             },
@@ -21336,6 +21564,24 @@
             }
         };
 
+        // ===== V2.3 BLOCK AUDIO [WP10] =====
+        // Owner: WP10 (agent sound palettes, positional cues, surface enemy footsteps). Only WP10 edits this block (and the
+        //   single-owner soundFX.enemyStep body).
+        // Purpose: palette recipes, motifs at the gesture release, ultimate stings, previews through soundFX._out, one gain and
+        //   one panner per positional event (atShared), bot cues, the surface under a bot (surfAt). V2.3 noise always runs
+        //   inside V23.seeded. Stubs only in WP1 (surfAt returns null: the V2.2 enemy step).
+        // Clocks: AudioContext time for palette voices.
+        V23.audio = {
+            surfAt: function (enemy) { return null; },                       // H31.1: null keeps soundFX.enemyStep() exactly V2.2
+            motif: function (agentId, slot) { return null; },
+            ultSting: function (agentId) { return null; },
+            preview: function (agentId, slot) { return null; },
+            atShared: function (x, y, z, fn) { return null; },
+            botCue: function (enemy, kind) { return null; },
+            prebuild: function () { return null; }
+        };
+        // ===== END V2.3 BLOCK AUDIO =====
+
         // =============================================
         // Shared Actor Damage Helpers (Locational Damage: Headshots, Leg Shots, Bullseyes & Wallbangs)
         // =============================================
@@ -21494,7 +21740,7 @@
             // V1.7: damage stats count what was actually dealt (no overkill)
             const dealt = armorAbsorbed + Math.min(healthDamage, Math.max(0, enemy.health));
             enemy.health -= healthDamage;
-            deathRecap.onDealt(enemy, dealt, sourceLabel);
+            deathRecap.onDealt(enemy, dealt, sourceLabel, hitZone);   // V2.3: H25.1 the zone too (the recap's head/body/legs counts)
 
             const arch = ENEMY_ARCHETYPES[enemy.archetype] || ENEMY_ARCHETYPES.standard;
 
@@ -21559,6 +21805,7 @@
                 soundFX.kill(isHeadshot);
                 showHitMarker('kill');                       // V1.7: red kill marker
                 gamepadController.rumble(0.9, 0.6, 120);
+                V23.bots && V23.bots.onKilled(enemy, hitZone, sourceLabel);   // V2.3: H25.2 death style and dissolve (stub: nothing)
                 animateEnemyDeath(enemy);
 
                 if (typeof tacticalDirector !== 'undefined' && game.gameMode === 'range' && tacticalDirector.rangeActive) {
@@ -23651,6 +23898,340 @@
                 return K;
             }
         };
+
+        // ===== V2.3 BLOCK CORE [WP2] =====
+        // Owner: WP2 (identity core, the coordinator). Only WP2 edits this block; the contract changes only through the coordinator.
+        // Purpose: the look registry and resolver (V23.core), the only material factory (V23.mat), the warm registry used by
+        //   the shader warm-up (H3), settings and agent-change service, the staged builder, bot pool assignment data, and the
+        //   shared helpers V23.rand / V23.seeded. WP1 ships every function as a no-op stub, so the game plays as V2.2.
+        // Clocks: none at boot (init, warm-up); the staged builder runs on the display clock (animate delta/now), only in the
+        //   menu, the picker, post-round, while dead or while a killcam is pending.
+        //
+        // ---------------------------------------------------------------------------------------------------------------
+        // V2.3 CONTRACT v0 (WP1). Frozen as v1 at the M1 gate; after M1, shared-part or API changes go only through the
+        // coordinator. The same facts are data in V23.CONTRACT below (the static test reads that object).
+        //  - Namespace: `var V23 = {}` at the top of the main script (H1). Blocks attach V23.core, V23.mat, V23.parts,
+        //    V23.motion, V23.looks, V23.stage, V23.fp, V23.vm, V23.bots, V23.util, V23.replay, V23.audio, V23.arena and
+        //    V23.proto. Every hook outside a block is a guarded call `V23.x && V23.x.fn(...)` tagged `// V2.3: H<n>`.
+        //  - Markers (the static test enforces these exact forms): JS blocks `// ===== V2.3 BLOCK <NAME> [WPn] =====` ...
+        //    `// ===== END V2.3 BLOCK <NAME> =====`; CSS blocks `/* ===== V2.3 CSS <NAME> [WPn] ===== */` ...
+        //    `/* ===== END V2.3 CSS <NAME> ===== */` (the owner tag and the END marker are required, as for JS blocks);
+        //    single-owner regions `// V2.3 REGION <id> [WPn]` right above the region's first line. Each block's first lines
+        //    are `// Owner:`, `// Purpose:` and `// Clocks:`. Members whose name starts with `_` are private to their block.
+        //  - Block map and owners: CORE, PARTS (WP2); LOOKS-DUELISTS (WP2 stubs, WP13), LOOKS-INITIATORS (WP2 stubs, WP14),
+        //    LOOKS-CONTROLLERS (WP2 Omen, WP15), LOOKS-SENTINELS (WP2 Sage, WP16); SHOWROOM (WP3); FP (WP4); VMANIM (WP5);
+        //    BOTKIT (WP6); BOTMOTION (WP7); BOTUTIL (WP8); SCREENS (WP9); AUDIO (WP10); ARENA (WP11); PROTO (WP18);
+        //    CSS SHOWROOM (WP3), CSS FP (WP4), CSS SCREENS (WP9).
+        //  - Single-owner regions outside blocks (marked `// V2.3 REGION <id> [WPn]`): installEnemyAnimation and
+        //    enemyAnimUniforms (WP6); EA_GESTURES, EA_SHADER_POSE, enhancedAnim._gesture, onHit, startDeath, _headMatrix and
+        //    stepBots (WP7); tacticalDirector initBotAbilities3D, acquireBotHazard, tryCastBotAbility, updateBotAbilities
+        //    (WP8); soundFX.enemyStep (WP10); the floor shader string, the mapMaterial shader string, the packDecalBatch
+        //    colour line and the applyGraphicsProfile 'auto' fog line (WP11).
+        //  - API: V23.CONTRACT.api lists every function as 'name(args) -> kind'. Stub return by kind: void -> null,
+        //    bool -> false, list -> [], obj -> null, size -> 6 (pool size and limit), mult -> 1 (multipliers). Shared
+        //    helpers on V23 itself: rand(seed) -> a stream function, seeded(fn, rng) -> fn's result (V23.CONTRACT.helpers).
+        //  - EA gesture codes (instanceAnim3.x integer part): 7 throw, 8 channel, 9 snap/tap, 10 place/slam, 11 ready dip
+        //    (V2.2 keeps 1 reload, 2 cast, 3 plant, 4 defuse, 5 climb, 6 push).
+        //  - Kit module ids 0-23: 0 helmShell, 1 segVisor, 2 earGuard, 3 brimCap, 4 respHalf, 5 boomMic, 6 tallHat,
+        //    7 crestRidge, 8 haloArc, 9 visorBand, 10 collarFunnel, 11 bandolier, 12 frontPanel, 13 coatTails, 14 lamellar,
+        //    15 pauldronL, 16 pauldronR, 17 shoulderCape, 18 yoke, 19 packSmall, 20 tanksPair, 21 backPole, 22 backDisc,
+        //    23 orbHand (the windup orb; every agent). Kit geometry uv.x = 2 + module id, uv.y = zone (0 primary, 1 accent,
+        //    2 dark); bones from eaTag (head 2, back 1, shoulders 3/5, orb 4).
+        //  - instanceKit (vec4, one page-owned attribute shared by all 5 page meshes and the wingman EA rig meshes):
+        //    x 24-bit module mask (exact in float32); y primary RGB24 (sRGB bytes; desaturated agent base, <= 40% luminance);
+        //    z trim RGB24; w integer flags (1 kit on, 2 flat flash) plus the dissolve fraction. Written only on the
+        //    colorDirty path and on death ticks, uploaded in the colour range, neutral zeros until the first identity build.
+        //  - Clocks: display (animate delta/now): stage idles, intros, previews, drag inertia, MVP pose, staged builder;
+        //    castFX/vmAnim real clock: first-person gestures, weapon clips, ultimate vignette, magazine-pool physics;
+        //    AudioContext time: palette voices; gNow (game time): bot windups, releases, hazards, botDash; 60 Hz sim:
+        //    EA bot motion, classic death styles, dissolve; replayRec real clock: identity per recorded frame. Agent-mode
+        //    sequences sync on hz.detonated, never by comparing timestamps across clocks.
+        //  - Randomness: V2.3 code never calls Math.random. Streams come from V23.rand(seed) (mulberry32), one per agent,
+        //    per bot slot + generation and per cast; existing helpers are called inside V23.seeded(fn, rng) (rng is
+        //    required), which sets fxKit._rng and soundFX._rand to rng for the call and restores them in a finally block
+        //    (null by default: V2.2's Math.random, read at call time, so the calls and their order are V2.2's). Safe inside
+        //    V23.seeded (every draw goes through an indirection): fxKit._emit, burst, ring, smokeCloud, smokeShell and
+        //    embers; abilityLook.emit and spray; soundFX.playNoise, noiseLayer, playTone, gunshot and the voices built only
+        //    from them. Never call from V2.3 code: abilityLook's renderers (make_*, scorch and the per-ability updates),
+        //    which draw Math.random directly. The shared noise and reverb buffers draw Math.random once, when first built
+        //    (V23.audio.prebuild builds them at the first user gesture, as V2.2 would at its first sound).
+        //  - soundFX._out (null by default): while set, _route sends voices to it instead of ctx.destination, and they get
+        //    no shared reverb (_route skips _send), so a bus that is silenced or ramped silences its voices completely.
+        //  - Boot order (initGame; the hooks that run before the first frame, first call each): H32.2 arena.applyTier,
+        //    H32.1 arena.onMapBuilt, H13 fp.attach (x4), H16.1 fp.initCast, H30.4 replay.ghostInit, H10.1
+        //    stage.buildShowcase, H21 bots.assign / util.onActivate, H6 core.onAgentChanged, H9 stage.renderGrid, H7
+        //    stage.setAgent, H33.3 core.applySettings(cfg, null) (the saved settings are loaded by then; H27.1
+        //    bots.setRim and H32.3 arena.onAtmosphere follow), H27.2 bots.previewColors, H28 bots.wingKit, H20.6
+        //    vm.onSwitch, H2 core.init, H22 bots.onPage / packPose / packColor / flush, H3a core.warmPre, H3b warmVm,
+        //    H3c warmWorld, H15.1 / H22.8 fp.reapply / bots.onTier, H3d core.warmPost. So fp.attach and fp.initCast run
+        //    before the saved settings load: they only record their targets, and nothing is built there; applySettings
+        //    (cfg, null) runs before core.init, so it only records the values, and core.init builds (when agentIdentity is
+        //    'on') from game.userSettings. V23.CONTRACT.bootOrder holds the list (identity-budget checks it).
+        //  - Material rule: V23.mat is the only place V2.3 creates materials (between the V23.mat markers below), and every
+        //    signature reuses a program V2.2 already compiles: vm(spec) MeshStandard toneMapped:false FrontSide (gun parts),
+        //    card(color, additive) MeshBasic castFX radial texture (castFX halo/core), flat(color, opacity) MeshBasic
+        //    (mainMenu ringMat), world(spec) MeshStandard toneMapped:true (replay ghost and wingman figures), kitPage()
+        //    MeshStandard 0xffffff r0.5 m0.3 + installEnemyAnimation(mat, 4) ('enemyAnim'). Every V2.3 material sets
+        //    toneMapped explicitly; runtime colour writes use setHex(h).convertSRGBToLinear(). The stage scene has exactly
+        //    one HemisphereLight and one DirectionalLight (no shadow), no fog, environment = scene.environment. Exit rule:
+        //    an object that hits a new program key gets one compile in the boot warm-up per pipeline that draws it, its cost
+        //    is recorded and the watermark tests change deliberately; V2.3 code never bumps programWatermark.
+        //  - Gameplay never reads V2.3 objects; V2.3 writes no gameplay state except botUtility 'agent'.
+        // ---------------------------------------------------------------------------------------------------------------
+        V23.CONTRACT = Object.freeze({
+            version: 0,
+            blocks: Object.freeze({
+                CORE: 'WP2', PARTS: 'WP2', 'LOOKS-DUELISTS': 'WP2,WP13', 'LOOKS-INITIATORS': 'WP2,WP14',
+                'LOOKS-CONTROLLERS': 'WP2,WP15', 'LOOKS-SENTINELS': 'WP2,WP16', SHOWROOM: 'WP3', FP: 'WP4', VMANIM: 'WP5',
+                BOTKIT: 'WP6', BOTMOTION: 'WP7', BOTUTIL: 'WP8', SCREENS: 'WP9', AUDIO: 'WP10', ARENA: 'WP11', PROTO: 'WP18'
+            }),
+            css: Object.freeze({ SHOWROOM: 'WP3', FP: 'WP4', SCREENS: 'WP9' }),
+            regions: Object.freeze({
+                'R6.enemyAnimUniforms': 'WP6', 'R6.installEnemyAnimation': 'WP6',
+                'R7.EA_SHADER_POSE': 'WP7', 'R7.EA_GESTURES': 'WP7', 'R7.stepBots': 'WP7', 'R7._gesture': 'WP7',
+                'R7.onHit': 'WP7', 'R7.startDeath': 'WP7', 'R7._headMatrix': 'WP7',
+                'R8.initBotAbilities3D': 'WP8', 'R8.acquireBotHazard': 'WP8', 'R8.tryCastBotAbility': 'WP8', 'R8.updateBotAbilities': 'WP8',
+                'R10.enemyStep': 'WP10',
+                'R11.floorShader': 'WP11', 'R11.mapShader': 'WP11', 'R11.decalColour': 'WP11', 'R11.autoFog': 'WP11'
+            }),
+            // module -> the block(s) that define it (V23.bots: BOTKIT, and BOTMOTION adds deathStep, windup and hitFlash)
+            modules: Object.freeze({
+                core: ['CORE'], mat: ['CORE'], parts: ['PARTS'], motion: ['PARTS'], stage: ['SHOWROOM'], fp: ['FP'], vm: ['VMANIM'],
+                bots: ['BOTKIT', 'BOTMOTION'], util: ['BOTUTIL'], replay: ['SCREENS'], audio: ['AUDIO'], arena: ['ARENA'], proto: ['PROTO']
+            }),
+            // module -> { function: 'signature -> kind' }; kinds: void, bool, list, obj, size, mult (stub values above)
+            api: Object.freeze({
+                core: Object.freeze({
+                    init: 'init() -> void', warmPre: 'warmPre(p) -> void', warmVm: 'warmVm() -> list', warmWorld: 'warmWorld(p) -> list',
+                    warmPost: 'warmPost() -> void', onAgentChanged: 'onAgentChanged(agentId) -> void', applySettings: 'applySettings(cfg, key) -> void',
+                    enabled: 'enabled() -> bool', resolve: 'resolve(agentId) -> obj', define: 'define(agentId, def) -> obj', validate: 'validate() -> list',
+                    build: 'build(agentId, tier) -> obj', stagedStep: 'stagedStep(budgetMs) -> bool', uploadDraw: 'uploadDraw(object3d) -> bool',
+                    assignLook: 'assignLook(slot, generation, mapIndex, matchSeed, archetype) -> obj', previewSound: 'previewSound(agentId, slot) -> obj'
+                }),
+                mat: Object.freeze({
+                    vm: 'vm(spec) -> obj', card: 'card(color, additive) -> obj', flat: 'flat(color, opacity) -> obj', world: 'world(spec) -> obj', kitPage: 'kitPage() -> obj'
+                }),
+                parts: Object.freeze({
+                    prim: 'prim(spec) -> obj', module: 'module(name, params, tier) -> list', define: 'define(name, fn) -> bool',
+                    figure: 'figure(look, tier) -> obj', fpArms: 'fpArms(look) -> obj', kitSuperset: 'kitSuperset(tier) -> obj', rig: 'rig() -> obj'
+                }),
+                motion: Object.freeze({
+                    sample: 'sample(agentId, clip, t, out) -> obj', gesture: 'gesture(name) -> obj', botCode: 'botCode(gestureName) -> obj', idle: 'idle(agentId) -> obj'
+                }),
+                stage: Object.freeze({
+                    render: 'render(now) -> void', update: 'update(delta, now) -> void', setAgent: 'setAgent(agentId) -> void',
+                    open: 'open(ctx) -> void', close: 'close(ctx) -> void', renderGrid: 'renderGrid(director) -> bool',
+                    buildShowcase: 'buildShowcase(menu) -> bool', menuFrame: 'menuFrame(menu, agentId, dt, now) -> bool',
+                    onKey: 'onKey(event) -> bool', onWheel: 'onWheel(event) -> bool', onPad: 'onPad(pad, pressed, left, right, now) -> bool',
+                    onFocus: 'onFocus(el) -> void', preview: 'preview(slot) -> bool', renderPose: 'renderPose(agentId, rect, clip, ms) -> bool', active: 'active() -> bool'
+                }),
+                fp: Object.freeze({
+                    attach: 'attach(model, slot, handZ) -> void', reapply: 'reapply() -> void', initCast: 'initCast(castFX) -> void',
+                    onStart: 'onStart(castFX, kind, abilityKey) -> void', pose: 'pose(castFX, kind, p, now, variant) -> obj',
+                    onSecondaryFire: 'onSecondaryFire(abilityKey) -> void', offHand: 'offHand(model, hidden) -> bool', ultCue: 'ultCue(agentId) -> void'
+                }),
+                vm: Object.freeze({
+                    pose: 'pose(kind, p, w, o, clip, hand) -> bool', reset: 'reset() -> void', onReload: 'onReload(weapon) -> void',
+                    onSwitch: 'onSwitch(prev, next) -> void', eaReload: 'eaReload(p, w, o, hand) -> bool', swayHold: 'swayHold() -> bool', onShot: 'onShot() -> void',
+                    step: 'step(dt, now) -> void'
+                }),
+                bots: Object.freeze({
+                    assign: 'assign(actor) -> void', onPage: 'onPage(page) -> void', releasePage: 'releasePage(page) -> void',
+                    packPose: 'packPose(page, k, enemy) -> void', packColor: 'packColor(page, k, enemy) -> void', flush: 'flush(page, n, colorLo, colorHi) -> void',
+                    geomAttrs: 'geomAttrs(geom, src) -> void', wingRig: 'wingRig(bot, rig, meshes) -> void', onTier: 'onTier() -> void',
+                    setRim: 'setRim(mode) -> void', previewColors: 'previewColors(mode) -> obj', wingKit: 'wingKit(bot, agentId) -> void', onKilled: 'onKilled(enemy, hitZone, source) -> void',
+                    kitRep: 'kitRep(enemy, rec) -> bool', archOverride: 'archOverride(enemy, archIndex) -> bool',
+                    // BOTMOTION (WP7) adds these to V23.bots
+                    deathStep: 'deathStep(actor, anim) -> bool', windup: 'windup(enemy, code, t) -> void', hitFlash: 'hitFlash(enemy, zone) -> void'
+                }),
+                util: Object.freeze({
+                    onActivate: 'onActivate(actor) -> void', step: 'step(enemy, gNow, dist, nx, nz, perpX, perpZ) -> void',
+                    onCast: 'onCast(enemy, kind, hz, perfNow) -> void', onDetonate: 'onDetonate(hz, gNow) -> void',
+                    poolLimit: 'poolLimit() -> size', poolSize: 'poolSize() -> size', peekHook: 'peekHook(enemy, peek, perfNow) -> bool',
+                    blocksSight: 'blocksSight(a, b) -> bool', playerSpeedMult: 'playerSpeedMult(gNow) -> mult', rankedPin: 'rankedPin(on) -> void',
+                    cancelWindups: 'cancelWindups() -> void'
+                }),
+                replay: Object.freeze({
+                    alloc: 'alloc(rec, why) -> void', capture: 'capture(rec, i) -> void', ghostInit: 'ghostInit(director, ghost) -> void',
+                    onPlayerDeath: 'onPlayerDeath(director, clip, killer, now) -> void', start: 'start(director, clip, now) -> void',
+                    beginSlot: 'beginSlot(director, enemy, k, bracket, saved) -> void', ghostFrame: 'ghostFrame(director, ghost, clip, fall) -> void',
+                    endSlot: 'endSlot(director, enemy, k, saved, o) -> void', finish: 'finish(director) -> void', pollPad: 'pollPad(director) -> bool',
+                    recapHit: 'recapHit(recap, row, source, amount, shieldAbsorb, healthDamage) -> void',
+                    recapDealt: 'recapDealt(recap, row, enemy, amount, sourceLabel, hitZone) -> void', recapShow: 'recapShow(recap) -> void',
+                    weaponLabel: 'weaponLabel(enemy) -> obj', resetRing: 'resetRing() -> void', roundStart: 'roundStart(match, now) -> void',
+                    roundKill: 'roundKill(match, enemy, isHeadshot) -> void', roundMvp: 'roundMvp(match, won, reason, rs) -> void',
+                    matchFinish: 'matchFinish(match, won) -> void'
+                }),
+                audio: Object.freeze({
+                    surfAt: 'surfAt(enemy) -> obj', motif: 'motif(agentId, slot) -> void', ultSting: 'ultSting(agentId) -> void',
+                    preview: 'preview(agentId, slot) -> void', atShared: 'atShared(x, y, z, fn) -> void', botCue: 'botCue(enemy, kind) -> void',
+                    prebuild: 'prebuild() -> void'
+                }),
+                arena: Object.freeze({
+                    onMapBuilt: 'onMapBuilt() -> void', applyTier: 'applyTier() -> void', onAtmosphere: 'onAtmosphere(mode) -> void',
+                    mark: 'mark(x, z, kind, colorHex) -> bool'
+                }),
+                proto: Object.freeze({ body: 'body(playerBody, dt) -> void', trade: 'trade(enemy, partner) -> bool' })
+            }),
+            // data fields (not functions) and their stub values
+            fields: Object.freeze({ 'replay.SAVED': 0, 'arena.enabled': true }),
+            gestures: Object.freeze({ 7: 'throw', 8: 'channel', 9: 'snap/tap', 10: 'place/slam', 11: 'ready dip' }),
+            kitModules: Object.freeze(['helmShell', 'segVisor', 'earGuard', 'brimCap', 'respHalf', 'boomMic', 'tallHat', 'crestRidge',
+                'haloArc', 'visorBand', 'collarFunnel', 'bandolier', 'frontPanel', 'coatTails', 'lamellar', 'pauldronL', 'pauldronR',
+                'shoulderCape', 'yoke', 'packSmall', 'tanksPair', 'backPole', 'backDisc', 'orbHand']),
+            instanceKit: Object.freeze({
+                x: '24-bit module mask (exact in float32)',
+                y: 'primary RGB24, sRGB bytes (desaturated agent base, at most 40% luminance)',
+                z: 'trim RGB24, sRGB bytes',
+                w: 'integer flags (1 kit on, 2 flat flash) plus the dissolve fraction',
+                uv: 'kit geometry uv.x = 2 + module id, uv.y = zone (0 primary, 1 accent, 2 dark)',
+                writes: 'colorDirty path and death ticks only; uploaded in the colour range; neutral zeros until the first identity build'
+            }),
+            clocks: Object.freeze({
+                display: 'animate delta/now: stage idles, intros, previews, drag inertia, MVP pose, staged builder',
+                real: 'castFX/vmAnim performance.now: first-person gestures, weapon clips, ultimate vignette, magazine-pool physics',
+                audio: 'AudioContext time: palette voices',
+                game: 'gNow (game time): bot windups, releases, hazards, botDash',
+                sim: '60 Hz sim ticks: EA bot motion, classic death styles, dissolve value',
+                replay: 'replayRec real clock: identity per recorded frame'
+            }),
+            materialRule: 'V23.mat is the only material factory; every signature reuses a V2.2 program; toneMapped set explicitly; ' +
+                'runtime colours use setHex(h).convertSRGBToLinear(); the stage has exactly one HemisphereLight and one DirectionalLight, ' +
+                'no fog, environment = scene.environment; a new program key gets a boot warm-up compile (exit rule); never bump programWatermark',
+            settings: Object.freeze({ agentIdentity: ['on', 'off'], weaponAnims: ['v23', 'classic'], botUtility: ['classic', 'agent'] }),
+            // shared helpers on V23 itself (not stubs)
+            helpers: Object.freeze({ rand: 'rand(seed) -> fn', seeded: 'seeded(fn, rng) -> any' }),
+            // the exact marker forms the static test enforces
+            markers: Object.freeze({
+                block: '// ===== V2.3 BLOCK <NAME> [WPn] =====', blockEnd: '// ===== END V2.3 BLOCK <NAME> =====',
+                css: '/* ===== V2.3 CSS <NAME> [WPn] ===== */', cssEnd: '/* ===== END V2.3 CSS <NAME> ===== */',
+                region: '// V2.3 REGION <id> [WPn]', hook: '// V2.3: H<n>', header: ['Owner:', 'Purpose:', 'Clocks:'], private: '_'
+            }),
+            // the call-time indirections (null by default: V2.2's behaviour exactly)
+            indirections: Object.freeze({
+                'fxKit._rng': 'fxKit._emit, burst, ring, smokeCloud, smokeShell, embers and abilityLook.spray draw from it (else Math.random)',
+                'soundFX._rand': 'soundFX.playNoise, noiseLayer and gunshot draw from it (else Math.random)',
+                'soundFX._out': 'soundFX._route connects to it instead of ctx.destination; its voices get no shared reverb'
+            }),
+            // inside V23.seeded(fn, rng) these existing helpers take every draw from rng; everything else in V2.2 is off limits
+            seededSafe: Object.freeze(['fxKit._emit', 'fxKit.burst', 'fxKit.ring', 'fxKit.smokeCloud', 'fxKit.smokeShell', 'fxKit.embers',
+                'abilityLook.emit', 'abilityLook.spray', 'soundFX.playNoise', 'soundFX.noiseLayer', 'soundFX.playTone', 'soundFX.gunshot']),
+            // the hooks that run during initGame, in order (first call of each, from the hook lines); see the header
+            bootOrder: Object.freeze(['arena.applyTier', 'arena.onMapBuilt', 'fp.attach', 'fp.initCast', 'replay.ghostInit', 'stage.buildShowcase',
+                'bots.assign', 'util.onActivate', 'core.onAgentChanged', 'stage.renderGrid', 'stage.setAgent', 'core.applySettings', 'bots.setRim',
+                'arena.onAtmosphere', 'bots.previewColors', 'bots.wingKit', 'vm.onSwitch', 'core.init', 'bots.onPage', 'bots.packPose', 'bots.packColor',
+                'bots.flush', 'core.warmPre', 'core.warmVm', 'core.warmWorld', 'fp.reapply', 'bots.onTier', 'core.warmPost'])
+        });
+
+        // V2.3: mulberry32. A deterministic stream per agent, per bot slot + generation, per cast (V2.3 never calls Math.random)
+        V23.rand = function (seed) {
+            let a = seed >>> 0;
+            return function () {
+                a = (a + 0x6D2B79F5) >>> 0;
+                let t = a;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        };
+        // V2.3: run fn with fxKit._rng and soundFX._rand on the V2.3 stream rng (required: a V23.rand stream per agent, bot
+        // slot + generation or cast), restored in finally, so the helpers in V23.CONTRACT.seededSafe called inside fn take
+        // no draw from Math.random (the deterministic drivers' stream)
+        V23.seeded = function (fn, rng) {
+            if (typeof rng !== 'function') throw new TypeError('V23.seeded(fn, rng): rng must be a V23.rand stream');
+            const r = rng;
+            const fk = typeof fxKit !== 'undefined' ? fxKit : null, sf = typeof soundFX !== 'undefined' ? soundFX : null;
+            const prevF = fk ? fk._rng : null, prevS = sf ? sf._rand : null;
+            if (fk) fk._rng = r;
+            if (sf) sf._rand = r;
+            try {
+                return fn(r);
+            } finally {
+                if (fk) fk._rng = prevF;
+                if (sf) sf._rand = prevS;
+            }
+        };
+
+        // Stubs (contract v0): WP2 replaces each body; until then nothing is built and nothing changes.
+        V23.core = {
+            init: function () { return null; },                     // H2: the identity build when agentIdentity is 'on'
+            warmPre: function (p) { return null; },                 // H3a: a warm kit page before renderer.compile(scene)
+            warmVm: function () { return []; },                     // H3b: viewmodel objects shown for the viewmodel compile
+            warmWorld: function (p) { return []; },                 // H3c: world objects shown at p for the warm draws
+            warmPost: function () { return null; },                 // H3d: hide and restore, retire warm pages, stage pass
+            onAgentChanged: function (agentId) { return null; },    // H6
+            applySettings: function (cfg, key) { return null; },    // H33: on load (key null) and from each V2.3 pill
+            enabled: function () { return false; },
+            resolve: function (agentId) { return null; },
+            define: function (agentId, def) { return null; },
+            validate: function () { return []; },
+            build: function (agentId, tier) { return null; },
+            stagedStep: function (budgetMs) { return false; },
+            uploadDraw: function (object3d) { return false; },
+            assignLook: function (slot, generation, mapIndex, matchSeed, archetype) { return null; },
+            previewSound: function (agentId, slot) { return null; }
+        };
+        // ----- V23.mat begin (the only place V2.3 code may construct a THREE material) -----
+        V23.mat = {
+            vm: function (spec) { return null; },
+            card: function (color, additive) { return null; },
+            flat: function (color, opacity) { return null; },
+            world: function (spec) { return null; },
+            kitPage: function () { return null; }
+        };
+        // ----- V23.mat end -----
+        // ===== END V2.3 BLOCK CORE =====
+
+        // ===== V2.3 BLOCK PARTS [WP2] =====
+        // Owner: WP2. Only WP2 edits this block.
+        // Purpose: the shared primitive cache, the parametric part library (show, world, kit and fp tiers), AGENT_RIG (the
+        //   EA_SHADER_POSE pivots), the figure builders, and the motion libraries (GESTURES, IDLES, INTROS, LOCKIN, MVP) with
+        //   V23.motion.sample. Stubs only in WP1.
+        // Clocks: none of its own; motion is sampled at the caller's clock (stage: display, first person: castFX real clock).
+        V23.parts = {
+            prim: function (spec) { return null; },
+            module: function (name, params, tier) { return []; },
+            define: function (name, fn) { return false; },
+            figure: function (look, tier) { return null; },
+            fpArms: function (look) { return null; },
+            kitSuperset: function (tier) { return null; },
+            rig: function () { return null; }
+        };
+        V23.motion = {
+            sample: function (agentId, clip, t, out) { return null; },
+            gesture: function (name) { return null; },
+            botCode: function (gestureName) { return null; },
+            idle: function (agentId) { return null; }
+        };
+        // ===== END V2.3 BLOCK PARTS =====
+
+        // ===== V2.3 BLOCK LOOKS-DUELISTS [WP2,WP13] =====
+        // Owner: WP13 (role batch: jett, phoenix, reyna, raze, yoru, neon, iso, waylay); WP2 writes the stub entries first.
+        // Purpose: data only. Each agent is one V23.core.define(id, {...}) entry in the design's appearance schema.
+        // Clocks: none (data).
+        (V23.looks = V23.looks || {}).DUELIST = {};
+        // ===== END V2.3 BLOCK LOOKS-DUELISTS =====
+
+        // ===== V2.3 BLOCK LOOKS-INITIATORS [WP2,WP14] =====
+        // Owner: WP14 (role batch: sova, kayo, skye, fade, breach, gekko, tejo); WP2 writes the stub entries first.
+        // Purpose: data only (V23.core.define entries).
+        // Clocks: none (data).
+        (V23.looks = V23.looks || {}).INITIATOR = {};
+        // ===== END V2.3 BLOCK LOOKS-INITIATORS =====
+
+        // ===== V2.3 BLOCK LOOKS-CONTROLLERS [WP2,WP15] =====
+        // Owner: WP2 (the Omen pilot entry, first) and WP15 (role batch below it: brimstone, viper, clove, harbor, astra, miks).
+        // Purpose: data only (V23.core.define entries).
+        // Clocks: none (data).
+        (V23.looks = V23.looks || {}).CONTROLLER = {};
+        // ===== END V2.3 BLOCK LOOKS-CONTROLLERS =====
+
+        // ===== V2.3 BLOCK LOOKS-SENTINELS [WP2,WP16] =====
+        // Owner: WP2 (the Sage pilot entry, first) and WP16 (role batch below it: killjoy, cypher, chamber, deadlock, vyse, veto).
+        // Purpose: data only (V23.core.define entries).
+        // Clocks: none (data).
+        (V23.looks = V23.looks || {}).SENTINEL = {};
+        // ===== END V2.3 BLOCK LOOKS-SENTINELS =====
 
         const agentSystem = {
             initialized: false,
@@ -27699,6 +28280,7 @@
                     if (abilitySlots[slotKey]) abilitySlots[slotKey].title = ab.name;
                 });
                 this.fitAbilityNames(); // V1.9
+                V23.core && V23.core.onAgentChanged(game.activeAgent);   // V2.3: H6 arms, gloves, kit colours follow the agent (stub: nothing)
             },
 
             // V1.9: with Ability Names on, a name too wide for its slot (11 of the 116) first
@@ -27756,7 +28338,7 @@
                     game.ultChargesLeft--;
                     this.castOmenShroudedStep(now, true);
                     this.syncHud(now, true);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.1 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
@@ -27775,21 +28357,21 @@
                 // Yoru Gatecrash 2nd-Stage Activation: if a Rift Tether is active in the world, pressing [E] teleports Yoru to it immediately!
                 if (agentId === 'yoru' && slotKey === 'e' && this.yoruTether && this.yoruTether.active && now < this.yoruTether.expireAt) {
                     this.triggerYoruGatecrashTeleport(now);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.2 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
                 // Chamber Rendezvous 2nd-Stage Activation: if a Golden Anchor is active in the world, pressing [E] snaps Chamber back to it!
                 if (agentId === 'chamber' && slotKey === 'e' && this.chamberAnchor && this.chamberAnchor.active && now < this.chamberAnchor.expireAt) {
                     this.triggerChamberRendezvousTeleport(now);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.3 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
                 // Skye Guiding Light 2nd-Stage Activation: if an Emerald Hawk is in flight, pressing [E] detonates its Flash immediately!
                 if (agentId === 'skye' && slotKey === 'e' && this.hasActiveSkyeHawk(now)) {
                     this.triggerSkyeHawkFlash(now);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.4 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
@@ -27799,7 +28381,7 @@
                     _abilityRay.origin.copy(camera.position);
                     _abilityRay.direction.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                     if (this.checkShootIsoOrb(_abilityRay, now, AGENT_TUNING.iso.e.orbPressHitRadiusM)) {
-                        castFX.start('tap', def.themeColor);
+                        castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.5 the second press names its ability (inert until V2.3 reads it)
                         return;
                     }
                 }
@@ -27807,42 +28389,42 @@
                 // Gekko Thrash Early Lunge-Detonate: pressing [X] while Thrash is steering triggers immediate 7.5m Detain burst!
                 if (slotKey === 'x' && this.gekkoThrash && this.gekkoThrash.active) {
                     this.detonateGekkoThrash(now, Date.now());
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.6 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
                 // Harbor Cascade 2nd-Stage Anchor: pressing [C] while a Cascade tidal wave is advancing stops it in place!
                 if (agentId === 'harbor' && slotKey === 'c' && this.hasMovingHarborCascade(now)) {
                     this.stopHarborCascade(now);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.7 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
                 // Vyse Arc Rose 2nd-Stage Detonate: pressing [Q] while an Arc Rose is planted triggers its 22m metallic flash!
                 if (agentId === 'vyse' && slotKey === 'q' && this.hasActiveVyseArcRose(now)) {
                     this.detonateVyseArcRose(now);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.8 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
                 // Tejo Stealth Drone 2nd-Stage EMP Pulse: pressing [C] while Stealth Drone is flying triggers its 11m EMP Suppress & Scan!
                 if (agentId === 'tejo' && slotKey === 'c' && this.hasActiveTejoDrone(now)) {
                     this.detonateTejoDronePulse(now);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.9 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
                 // Waylay Refract 2nd-Stage Return: pressing [E] while a Crystal Beacon is active zips Waylay back in invulnerable light!
                 if (agentId === 'waylay' && slotKey === 'e' && this.hasActiveWaylayRefract(now)) {
                     this.triggerWaylayRefractReturn(now);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.10 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
                 // Veto Crosscut 2nd-Stage Teleport: pressing [C] while a Vortex Anchor is active teleports Veto to it!
                 if (agentId === 'veto' && slotKey === 'c' && this.hasActiveVetoCrosscut(now)) {
                     this.triggerVetoCrosscutTeleport(now);
-                    castFX.start('tap', def.themeColor);
+                    castFX.start('tap', def.themeColor, agentId + '.' + slotKey);   // V2.3: H17.11 the second press names its ability (inert until V2.3 reads it)
                     return;
                 }
 
@@ -31870,7 +32452,7 @@
             // V2.2: Sova's numbers are in AGENT_TUNING.sova (its branch here: blast count)
             activateUltimate: function(agentId, now) {
                 const def = AGENT_DEFS[agentId];
-                castFX.start('ult', def.themeColor);
+                castFX.start('ult', def.themeColor, agentId + '.x');   // V2.3: H18 the ultimate's key, for its own gesture (inert until V2.3 reads it)
                 game.ultPoints = 0;
                 game.ultAgent = agentId;
                 game.ultActiveUntil = now + def.abilities.x.durationMs;
@@ -33201,6 +33783,7 @@
 
             // --- Line-of-Sight Checks for Enemy AI & Recon ---
             isBlockedBySmoke: function(origin, targetPos) {
+                if (V23.util && V23.util.blocksSight(origin, targetPos)) return true;   // V2.3: H29.7 agent-mode bot smokes block sight both ways (stub: false)
                 _abilityTempVec.copy(targetPos).sub(origin);
                 const dist = _abilityTempVec.length();
                 if (dist <= 0.001) return false;
@@ -40192,6 +40775,7 @@
             setGameMode: function(mode) {
                 if (['wave', 'range', 'retake', 'match', 'deathmatch', 'spikerush', 'aim', 'ranked'].indexOf(mode) === -1) return;
                 replayDirector.stop();
+                V23.replay && V23.replay.resetRing();   // V2.3: H30.16 a new mode never replays the last one's ring (stub: nothing)
                 aimTrainer.stop();
                 if (matchMode.active) matchMode.stop();
                 if (dmMode.active) dmMode.stop();
@@ -40988,7 +41572,9 @@
                     if (!deviceInfo.touchEnabled && document.pointerLockElement === renderer.domElement) {
                         try { document.exitPointerLock(); } catch (err) {}
                     }
+                    V23.stage && V23.stage.open('picker');   // V2.3: H8.1 the stage in the in-game picker (stub: nothing)
                 } else {
+                    V23.stage && V23.stage.close('picker');   // V2.3: H8.2 every close path stops the stage (stub: nothing)
                     // V1.7: closed from the main menu without locking in: back to the menu
                     mainMenu.onPickerClosed();
                     if (!mainMenu.open && !deviceInfo.touchEnabled && !game.buyMenuOpen && document.pointerLockElement !== renderer.domElement) {
@@ -40998,6 +41584,7 @@
             },
 
             renderAgentPickerGrid: function() {
+                if (V23.stage && V23.stage.renderGrid(this)) return;   // V2.3: H9 cards built once, filters toggle classes (stub: false)
                 const grid = document.getElementById('agent-picker-grid');
                 if (!grid || typeof AGENT_ORDER === 'undefined' || typeof AGENT_DEFS === 'undefined') return;
                 const roleFilter = this.agentPickerFilter || 'ALL';
@@ -41105,6 +41692,7 @@
                     lockBtn.style.background = accentCol;
                     lockBtn.style.color = '#091018';
                 }
+                V23.stage && V23.stage.setAgent(agentId);   // V2.3: H7 the highlight shows that agent's own model (stub: nothing)
             },
 
             lockInPickerAgent: function(agentId) {
@@ -41249,6 +41837,7 @@
             botHazardsPool: [],
             lastBotAbilityCastAt: 0,
 
+            // V2.3 REGION R8.initBotAbilities3D [WP8]: single owner. H29.5 the pool size becomes V23.util.poolSize() (stub 6, as here)
             initBotAbilities3D: function() {
                 this.botHazardsPool = [];
                 const ringGeo = new THREE.RingGeometry(3.2, 3.8, 28);
@@ -41308,6 +41897,7 @@
                 showNotification(`Enemy Bot Ability AI: ${game.botAbilityAI ? 'ENABLED (Rushers Dash/Flash, Snipers Recon/TP, Juggernauts Mortar)' : 'DISABLED'}`, 2200);
             },
 
+            // V2.3 REGION R8.acquireBotHazard [WP8]: single owner. H29.4 the loop bound becomes V23.util.poolLimit() (stub 6, as here)
             acquireBotHazard: function() {
                 for (let i = 0; i < this.botHazardsPool.length; i++) {
                     if (!this.botHazardsPool[i].inUse) return this.botHazardsPool[i];
@@ -41315,6 +41905,7 @@
                 return this.botHazardsPool[0] || null;
             },
 
+            // V2.3 REGION R8.tryCastBotAbility [WP8]: single owner. H29.2 V23.util.onCast(e, kind, hz, perfNow) at each branch end
             tryCastBotAbility: function(enemy, perfNow, distToPlayer, nx, nz, perpX, perpZ) {
                 if (!game.botAbilityAI || game.gameMode === 'range') return;
                 if (!enemy.nextAbilityAt) {
@@ -41469,6 +42060,7 @@
                 }
             },
 
+            // V2.3 REGION R8.updateBotAbilities [WP8]: single owner. H29.3 V23.util.onDetonate(hz, gNow) where hz.detonated flips
             updateBotAbilities: function(delta, now) {
                 for (let i = 0; i < this.botHazardsPool.length; i++) {
                     const hz = this.botHazardsPool[i];
@@ -41562,6 +42154,28 @@
                 }
             }
         };
+
+        // ===== V2.3 BLOCK BOTUTIL [WP8] =====
+        // Owner: WP8 (bot utility, setting botUtility 'classic' | 'agent'). Only WP8 edits this block (and the single-owner
+        //   tacticalDirector region initBotAbilities3D .. updateBotAbilities). Helpers it calls from that region may be
+        //   added to tacticalDirector here with Object.assign(tacticalDirector, {...}).
+        // Purpose: classic read-only windups and throws, agent-mode casts (rusher flash and push, choke smokes, flash before a
+        //   peek, slowed entries), the Ranked pin. Stubs only in WP1 (pool size and limit 6, the speed multiplier 1).
+        // Clocks: gNow (game time) for windups, releases and hazards; sequences sync on hz.detonated.
+        V23.util = {
+            onActivate: function (actor) { return null; },                                   // H21.2
+            step: function (enemy, gNow, dist, nx, nz, perpX, perpZ) { return null; },       // H29.1
+            onCast: function (enemy, kind, hz, perfNow) { return null; },                    // H29.2 (WP8 region)
+            onDetonate: function (hz, gNow) { return null; },                                // H29.3 (WP8 region)
+            poolLimit: function () { return 6; },                                            // H29.4 (WP8 region): V2.2's 6
+            poolSize: function () { return 6; },                                             // H29.5 (WP8 region): V2.2's 6
+            peekHook: function (enemy, peek, perfNow) { return false; },                     // H29.6
+            blocksSight: function (a, b) { return false; },                                  // H29.7
+            playerSpeedMult: function (gNow) { return 1; },                                  // H29.8
+            rankedPin: function (on) { return null; },                                       // H33.4 / H33.5
+            cancelWindups: function () { return null; }
+        };
+        // ===== END V2.3 BLOCK BOTUTIL =====
 
         // =============================================
         // Tactical Knife Melee Attack (Slot 4: Left-Click Slash & Right-Click Heavy Lunge Stab)
@@ -41704,6 +42318,7 @@
                     if (nowMs - game.lastShot < AGENT_TUNING.sova.x.fireIntervalMs) return;
                     game.lastShot = nowMs;
                     agentSystem.fireSovaHunterBeam(abilityNow);
+                    V23.fp && V23.fp.onSecondaryFire('sova.x');   // V2.3: H19.1 a visual kick and a tap gesture (stub: nothing)
                     return;
                 }
 
@@ -41713,6 +42328,7 @@
                     if (nowMs - game.lastShot < AGENT_TUNING.raze.x.fireIntervalMs) return;
                     game.lastShot = nowMs;
                     agentSystem.fireRazeShowstopper(abilityNow);
+                    V23.fp && V23.fp.onSecondaryFire('raze.x');   // V2.3: H19.2 a visual kick and a tap gesture (stub: nothing)
                     return;
                 }
 
@@ -41722,6 +42338,7 @@
                     if (nowMs - game.lastShot < AGENT_TUNING.neon.x.fireIntervalMs) return;
                     game.lastShot = nowMs;
                     agentSystem.fireNeonOverdriveBeam(abilityNow);
+                    V23.fp && V23.fp.onSecondaryFire('neon.x');   // V2.3: H19.3 a visual kick and a tap gesture (stub: nothing)
                     return;
                 }
 
@@ -41732,6 +42349,7 @@
                     if (nowMs - game.lastShot < AGENT_TUNING.chamber.x.fireIntervalMs) return;
                     game.lastShot = nowMs;
                     agentSystem.fireChamberTourDeForce(abilityNow);
+                    V23.fp && V23.fp.onSecondaryFire('chamber.x');   // V2.3: H19.4 a visual kick and a tap gesture (stub: nothing)
                     return;
                 }
 
@@ -41875,6 +42493,7 @@
                 const recoilAmount = weapon.recoil * recoilScale * (Math.random() * 0.4 + 0.8);
                 // V1.7: the gun kicks back, rises and rolls on a damped spring (vmAnim)
                 vmAnim.fire(recoilAmount);
+                V23.vm && V23.vm.onShot();   // V2.3: H19.5 a shot ends an inspect, snaps the holster ghost (stub: nothing)
 
                 // V1.8 recoil = the gun's spray pattern. Each shot kicks the recoil on to where
                 // the next bullet of the pattern goes (see the end of the shot). The camera
@@ -42369,6 +42988,7 @@
         function stepActorAnimation(anim) {
             const mesh = anim.actor.mesh;
             if (anim.kind === 'topple') {
+                if (V23.bots && V23.bots.deathStep(anim.actor, anim)) return;   // V2.3: H26 the agent death styles and dissolve (stub: false, V2.2's topple)
                 // Fixed 60 Hz simulation tick. Falls like a toppled post (faster as it
                 // tips), lands with a small bounce, lies for a moment, then sinks.
                 const dt = 1 / 60;
@@ -42613,6 +43233,7 @@
             game.reloading = false;
             if (reloadIndicator) reloadIndicator.style.opacity = '0';
             if (vmAnim.clip && vmAnim.clip.kind === 'reload') vmAnim.finishClip(game.weapons[game.activeWeapon]);
+            V23.vm && V23.vm.reset();   // V2.3: H20.4b a cancelled reload never refills, magazines back (stub: nothing)
         }
 
         function reload() {
@@ -42658,6 +43279,7 @@
             // V1.7: reload choreography (tilt, magazine out and in, slide/bolt/charging
             // handle) is a smooth timeline on the viewmodel animator
             vmAnim.play('reload', weapon.reloadTime * 1000);
+            V23.vm && V23.vm.onReload(weapon);   // V2.3: H20.5 clip.empty for an empty reload (stub: nothing)
             if (game.activeWeapon === 'sniper') setTimeout(() => { if (game.activeWeapon === 'sniper') shellFX.eject(); }, weapon.reloadTime * 780);
             // V1.8: a reload cancelled by a purchase or a new round never finishes later
             const reloadSeq = game.reloadSeq = (game.reloadSeq || 0) + 1;
@@ -42740,7 +43362,7 @@
             }
 
             game.health = Math.max(0, game.health - healthDamage);
-            deathRecap.onPlayerHit(source, amount, sourcePos);
+            deathRecap.onPlayerHit(source, amount, sourcePos, shieldAbsorb, healthDamage);   // V2.3: H30.14 the shield / health split for the recap
             gamepadController.rumble(0.85, 0.4, 140);
             
             // Update health & shield HUD displays
@@ -42989,6 +43611,7 @@
                     if (game.botAbilityAI && typeof tacticalDirector !== 'undefined' && tacticalDirector.tryCastBotAbility) {
                         tacticalDirector.tryCastBotAbility(enemy, gNow, distanceToPlayer, nx, nz, perpX, perpZ);
                     }
+                    V23.util && V23.util.step(enemy, gNow, distanceToPlayer, nx, nz, perpX, perpZ);   // V2.3: H29.1 windups and agent-mode releases, reads state only in classic (stub: nothing)
 
                     // A bot that has reached the spike (to defuse it) or its plant site holds
                     // its ground and works, firing back if it can see the player
@@ -43256,7 +43879,8 @@
                 const baseDmg = arch.baseDamage || 16;
                 const distDrop = enemy.archetype === 'sniper' ? 0.1 : 0.28;
                 const damage = Math.max(5, Math.floor(baseDmg - distance * distDrop));
-                takeDamage(damage, enemy.mesh.position, { enemy: enemy });
+                // V2.3: H30.15 the source names the bot's weapon for the recap (stub: null; hit roll and damage unchanged)
+                takeDamage(damage, enemy.mesh.position, { enemy: enemy, weapon: V23.replay && V23.replay.weaponLabel(enemy) });
             }
         }
         
@@ -43851,13 +44475,15 @@
             if (game.weapons.pistol) game.weapons.pistol.model.visible = true;
             if (game.weapons.knife) game.weapons.knife.model.visible = true;
             if (tacticalDirector && tacticalDirector.spikeCanister) tacticalDirector.spikeCanister.visible = true;
+            V23.core && V23.core.warmPre(p);   // V2.3: H3a a warm kit page in front of the camera (stub: nothing)
             renderer.compile(scene, camera);
             // Viewmodel programs (env map + its own fixed light set). Also drawn once
             // so drivers that finish compiling on first draw do it here.
             viewmodelScene.environment = scene.environment;
             syncViewmodelCamera();
             // V1.7 cast hand and its energy cards: drawn with the viewmodel warm-up
-            const castParts = (castFX.group ? [castFX.group, castFX.halo, castFX.core].concat(castFX.wisps) : []).concat(mainMenu.showcase ? [mainMenu.showcase] : []);
+            const castParts = (castFX.group ? [castFX.group, castFX.halo, castFX.core].concat(castFX.wisps) : []).concat(mainMenu.showcase ? [mainMenu.showcase] : [])
+                .concat((V23.core && V23.core.warmVm()) || []);   // V2.3: H3b the arms, hand variants, hand2 and magazine (stub: [])
             for (const o of castParts) o.visible = true;
             renderer.compile(viewmodelScene, viewmodelCamera);
             const muzzleHalos = ['rifle', 'sniper', 'pistol'].map(k => game.weapons[k] && game.weapons[k].muzzleHalo).filter(Boolean);
@@ -43891,6 +44517,7 @@
                 b.instanceMatrix.needsUpdate = true;
             }
             const warmEffects = [trailBatch.mesh, particleBatch.mesh, decalBatch.mesh, haloSystem.mesh, shellFX.mesh, fxKit.add, fxKit.smoke, weatherFX.mesh, weatherFX.splash, replayDirector.ghost, breakables.group, playerBody.group, spikeRush.group];
+            warmEffects.push(...((V23.core && V23.core.warmWorld(p)) || []));   // V2.3: H3c the world LOD, magazine pool, wingman kits, shown at p (stub: [])
             for (const o of spikeRush.orbs) o.mesh.visible = true;
             const propsShown = breakables.glass.concat(breakables.barrels).map((p) => p.mesh.visible);
             for (const p of breakables.glass.concat(breakables.barrels)) p.mesh.visible = true;
@@ -43947,6 +44574,7 @@
             ultraRealism.warm();
             // V2.0: and High Fidelity's, built and compiled here only when it is on at start
             abilityLook.warm();
+            V23.core && V23.core.warmPost();   // V2.3: H3d hide and restore, retire warm pages, the stage pass (stub: nothing)
             perfTelemetry.shaderWarmupMs = performance.now() - start;
             perfTelemetry.programWatermark = renderer.info.programs ? renderer.info.programs.length : 0;
         }
@@ -46929,6 +47557,7 @@
                     if (!w || !w.model) continue;
                     w.model.traverse((o) => {
                         if (!o.isMesh) return;
+                        if (o.userData.isAgentArm || (o.parent && o.parent.userData.isAgentArm)) return;   // V2.3: H14.4 the agent's arms keep their materials
                         if (o.userData.isHands) {
                             if (seenHands.has(o)) return;
                             seenHands.add(o);
@@ -46962,6 +47591,7 @@
                         h.mesh.geometry = s ? (cd.enabled ? s.detailed : s.simple) : (h.prev || h.mesh.geometry);
                     }
                 }
+                V23.fp && V23.fp.reapply();   // V2.3: H15.2 grouped hands and the off-hand drawRange after the hands swap (stub: nothing)
                 for (const e of this.mats) {
                     const m = e.mat;
                     const want = this.on ? ULTRA_GUN_COMPILE : e.obc;
@@ -47112,6 +47742,7 @@
                     for (const chunk of enemyChunks.values()) for (const page of chunk.pages) if (page.meshes[p]) swap(page.meshes[p]);
                     for (const page of enemyPageFree) if (page.meshes[p]) swap(page.meshes[p]);
                 }
+                V23.bots && V23.bots.onTier();   // V2.3: H22.9 the kit geometry follows the Ultra bodies (stub: nothing)
                 syncEnemyAnimUniforms();
                 if (typeof shadowManager !== 'undefined') shadowManager.markEvent();
             }
@@ -48013,16 +48644,17 @@
             // { kind: 'spark' | 'glow' | 'smoke' | 'ember' | 'dust', hex, n, life, s0, s1, a0, drag,
             //   grav, up (upward speed), out (outward speed), jitter (random speed) }
             spray: function (spec, cx, cy, cz, hx, hy, hz, yaw, scale) {
+                // V2.3: every draw here goes through fxKit._rng (the H31.4 indirection; null: Math.random, the same calls in the same order)
                 if (!spec) return;
                 const k = FX_KIND[spec.kind || 'spark'], n = Math.max(0, Math.round((spec.n || 1) * (scale === undefined ? 1 : scale)));
                 const c = Math.cos(yaw || 0), s = Math.sin(yaw || 0), j = spec.jitter || 0;
                 for (let i = 0; i < n; i++) {
-                    const lx = (Math.random() * 2 - 1) * hx, lz = (Math.random() * 2 - 1) * hz, ly = (Math.random() * 2 - 1) * hy;
+                    const lx = ((fxKit._rng || Math.random)() * 2 - 1) * hx, lz = ((fxKit._rng || Math.random)() * 2 - 1) * hz, ly = ((fxKit._rng || Math.random)() * 2 - 1) * hy;
                     const x = cx + lx * c + lz * s, z = cz - lx * s + lz * c, y = cy + ly;
                     const d = Math.hypot(lx, lz) || 1, o = spec.out || 0;
                     const ox = (lx * c + lz * s) / d * o, oz = (-lx * s + lz * c) / d * o;
-                    this.emit(k, x, y, z, ox + (Math.random() - 0.5) * j, (spec.up || 0) + (Math.random() - 0.5) * j, oz + (Math.random() - 0.5) * j,
-                        spec.hex === undefined ? 0xffffff : spec.hex, (spec.life || 0.6) * (0.75 + Math.random() * 0.5), spec.s0 === undefined ? 0.06 : spec.s0, spec.s1 === undefined ? 0.02 : spec.s1,
+                    this.emit(k, x, y, z, ox + ((fxKit._rng || Math.random)() - 0.5) * j, (spec.up || 0) + ((fxKit._rng || Math.random)() - 0.5) * j, oz + ((fxKit._rng || Math.random)() - 0.5) * j,
+                        spec.hex === undefined ? 0xffffff : spec.hex, (spec.life || 0.6) * (0.75 + (fxKit._rng || Math.random)() * 0.5), spec.s0 === undefined ? 0.06 : spec.s0, spec.s1 === undefined ? 0.02 : spec.s1,
                         spec.a0 === undefined ? 1 : spec.a0, spec.drag === undefined ? 1 : spec.drag, spec.grav === undefined ? 0 : spec.grav);
                 }
             },
@@ -53814,6 +54446,8 @@
             mapDetail: 'off',
             charDetail: 'off',
             animDetail: 'off',        // V2.2: Enhanced Animations (older saves get it off from here)
+            agentIdentity: 'on',      // V2.3: H33.2a older saves get the defaults from here
+            weaponAnims: 'v23',       // V2.3: H33.2b
             glowHalos: 'auto',
             abilityEffects: 'auto',   // V2.0: older saves get Auto from here
             brightness: 100,
@@ -53870,6 +54504,7 @@
             weaponSkin: 'standard',
             botDifficulty: 'gold',
             botMechanics: 'off',      // V2.2: older saves get Off
+            botUtility: 'classic',    // V2.3: H33.2c older saves get Classic
             infiniteAbilities: false,
             infiniteUlt: false,
             infiniteAmmo: false,
@@ -54123,6 +54758,7 @@
                 breakables.reset();
                 if (typeof tacticalEnhancements !== 'undefined' && tacticalEnhancements.resetMapMechanics) tacticalEnhancements.resetMapMechanics();   // V2.1: doors open, wall whole
                 this.rs = { kills: [], dmg: 0, killer: null };
+                V23.replay && V23.replay.roundStart(this, now);   // V2.3: H30.20 round stats for the MVP pick, the pose hidden (stub: nothing)
                 this.round++;
                 agentStrip.show(); // V1.9: each Match / Ranked / Spike Rush round shows the agent strip for 4 s
                 const prevSide = this.side;
@@ -54313,6 +54949,7 @@
                 this.stats.kills++;
                 if (isHeadshot) this.stats.headshots++;
                 if (this.rs && this.phase === 'live') this.rs.kills.push({ t: performance.now(), hs: !!isHeadshot });
+                V23.replay && V23.replay.roundKill(this, enemy, isHeadshot);   // V2.3: H30.21 (stub: nothing)
                 if (this.phase !== 'live' || this.botsAlive() > 0) return;
                 if (this.side === 'attack') this.endRound(true, 'ALL DEFENDERS ELIMINATED', now);
                 else if (tacticalDirector.spikeState !== 'planted') this.endRound(true, 'ALL ATTACKERS ELIMINATED', now);
@@ -54387,6 +55024,7 @@
                         <div class="round-mvp-stats">${killer ? `took you down • ${killer.dmg} damage to you` : reason.toLowerCase()}</div>`;
                 }
                 replayDirector.showMvp(html, 4500);
+                V23.replay && V23.replay.roundMvp(this, won, reason, rs);   // V2.3: H30.22 the MVP's agent pose on the card (stub: nothing)
                 const hl = replayDirector.pickHighlight(rs.kills, won);
                 if (hl) {
                     replayDirector.queueHighlight(hl);
@@ -54442,6 +55080,7 @@
                         </div>
                     </div>`;
                 this.overlay.classList.add('visible');
+                V23.replay && V23.replay.matchFinish(this, won);   // V2.3: H30.23 the match MVP pose beside the result (stub: nothing)
                 if (rankChange) animateRankedBar();
                 const again = { variant: this.variant, ranked: this.ranked };
                 document.getElementById('match-again-btn').addEventListener('click', () => this.start(again.variant, again.ranked));
@@ -54854,16 +55493,17 @@
                 return { key: name, name: name, badge: '#94a3b8', enemy: null };
             },
 
-            onPlayerHit: function (source, amount, pos) {
+            onPlayerHit: function (source, amount, pos, shieldAbsorb, healthDamage) {
                 const s = this.sourceInfo(source);
                 let r = this.taken.get(s.key);
                 if (!r) { r = { name: s.name, badge: s.badge, enemy: s.enemy, dmg: 0, hits: 0 }; this.taken.set(s.key, r); }
                 r.dmg += amount;
                 r.hits++;
                 this.last = { info: r, pos: pos ? { x: pos.x, z: pos.z } : null };
+                V23.replay && V23.replay.recapHit(this, r, source, amount, shieldAbsorb, healthDamage);   // V2.3: H30.11 shield/health split, weapon (stub: nothing)
             },
 
-            onDealt: function (enemy, amount, sourceLabel) {
+            onDealt: function (enemy, amount, sourceLabel, hitZone) {
                 if (typeof sourceLabel === 'string' && /wingman/i.test(sourceLabel)) return;
                 let r = this.dealt.get(enemy);
                 if (!r) { r = { dmg: 0, hits: 0 }; this.dealt.set(enemy, r); }
@@ -54871,6 +55511,7 @@
                 r.hits++;
                 if (matchMode.active && matchMode.stats) matchMode.stats.damage += amount;
                 if (matchMode.active && matchMode.rs) matchMode.rs.dmg += amount;
+                V23.replay && V23.replay.recapDealt(this, r, enemy, amount, sourceLabel, hitZone);   // V2.3: H30.12 hits by zone, HS% (stub: nothing)
             },
 
             show: function () {
@@ -54896,6 +55537,7 @@
                     ${rows || '<div class="death-recap-row">No damage recorded</div>'}
                     <div class="death-recap-foot">Damage you dealt this life: <b>${dealtTotal}</b></div>`;
                 this.el.classList.add('visible');
+                V23.replay && V23.replay.recapShow(this);   // V2.3: H30.13 the killer's agent, weapon and zones (stub: nothing)
             },
 
             hide: function () {
@@ -54928,10 +55570,12 @@
                 if (this.ea) this._eaAlloc();   // V2.2
                 this.head = 0; this.count = 0;
                 this.shots.length = 0; this.kills.length = 0;
+                V23.replay && V23.replay.alloc(this, 'init');   // V2.3: H30.1 the agent id / generation / archetype rings (stub: nothing)
             },
             _eaAlloc: function () {
                 this.ea = new Float32Array(this.N * Math.max(1, this.E) * this.EA);
                 this.eaOn = new Uint8Array(this.N);
+                V23.replay && V23.replay.alloc(this, 'ea');   // V2.3: H30.2 (stub: nothing)
             },
 
             capture: function (now) {
@@ -54951,6 +55595,7 @@
                     this.en[o + 6] = e.renderActive ? 1 : 0;
                     this.en[o + 7] = e.animPhase || 0; this.en[o + 8] = e.animAmt || 0;
                 }
+                V23.replay && V23.replay.capture(this, i);   // V2.3: H30.3 each bot's agent, generation and archetype (stub: nothing)
                 // V2.2: Enhanced Animations' values, while it is on
                 if (enhancedAnim.on) {
                     if (!this.ea) this._eaAlloc();
@@ -55019,6 +55664,7 @@
                 g.userData.parts = [g.children[0], g.children[1], g.children[3]];
                 scene.add(g);
                 this.ghost = g;
+                V23.replay && V23.replay.ghostInit(this, g);   // V2.3: H30.4 your agent's world LOD as the ghost (stub: nothing)
                 const ov = document.createElement('div');
                 ov.id = 'replay-overlay';
                 ov.className = 'replay-overlay';
@@ -55057,6 +55703,7 @@
                     clip: { kind: 'killcam', from: now - span * 1000, to: now + 350, slowFrom: now - 550, slowRate: 0.35, killer: idx, deathT: now,
                             tag: 'KILL CAM', name: arch.shortName, color: arch.badgeColor }
                 };
+                V23.replay && V23.replay.onPlayerDeath(this, this.pending.clip, killer, now);   // V2.3: H30.5 killer and player agents at death (stub: nothing)
             },
 
             // Match round end: best play of the round from the player's view
@@ -55107,6 +55754,7 @@
                 nm.style.color = clip.color || '#fff';
                 this.overlay.classList.add('visible');
                 document.body.classList.add('replay-active');
+                V23.replay && V23.replay.start(this, clip, now);   // V2.3: H30.6 agent tag, pad A primed (stub: nothing)
             },
 
             _finish: function () {
@@ -55115,6 +55763,7 @@
                 this.overlay.classList.remove('visible');
                 document.body.classList.remove('replay-active');
                 if (this.ghost) this.ghost.visible = false;
+                V23.replay && V23.replay.finish(this);   // V2.3: H30.18 the V2.3 ghost hidden too (stub: nothing)
                 if (!this.pending && this.queue.length === 0) {
                     const fns = this.after.splice(0);
                     for (const fn of fns) { try { fn(); } catch (e) { console.error(e); } }
@@ -55134,6 +55783,7 @@
             },
 
             _pollPad: function () {
+                if (V23.replay && V23.replay.pollPad(this)) return;   // V2.3: H30.19 the primed pad A edge (stub: false)
                 let down = false;
                 const pads = navigator.getGamepads ? navigator.getGamepads() : [];
                 for (const p of pads) if (p && p.buttons && p.buttons[0] && p.buttons[0].pressed) down = true;
@@ -55175,6 +55825,7 @@
                     e.animAmt = R.en[oa + 8] + (R.en[ob + 8] - R.en[oa + 8]) * f;
                     e.poseDirty = true;
                     if (enhancedAnim.on) this._eaPose(e, k, br.a, br.b, f);   // V2.2: Enhanced Animations' recorded values
+                    V23.replay && V23.replay.beginSlot(this, e, k, br, saved);   // V2.3: H30.7 recorded identity, SAVED more values stashed (stub: nothing)
                 }
                 packEnemyBatches();
                 // Camera
@@ -55211,6 +55862,7 @@
                     g.userData.parts[1].material.color.set(ac);
                     g.userData.parts[1].material.emissive.set(ac);
                     g.userData.parts[2].material.color.set(ac);
+                    V23.replay && V23.replay.ghostFrame(this, g, c, fall);   // V2.3: H30.8 the agent ghost in place of the tinted figure (stub: nothing)
                 } else {
                     camera.position.set(px, py, pz);
                     camera.rotation.set(pitch, yaw, 0, 'YXZ');
@@ -55261,7 +55913,8 @@
             endFrame: function () {
                 if (!this.clip || !this.saved || !this.saved.length) return;
                 const s = this.saved;
-                for (let k = 0, o = 0; k < enemyObjects.length && o < s.length; k++, o += 10) {
+                const RS = 10 + (V23.replay ? V23.replay.SAVED : 0);   // V2.3: H30.9 the saved stride (stub SAVED 0: V2.2's 10)
+                for (let k = 0, o = 0; k < enemyObjects.length && o < s.length; k++, o += RS) {
                     const e = enemyObjects[k], m = e.mesh;
                     m.position.set(s[o], s[o + 1], s[o + 2]);
                     m.rotation.set(s[o + 3], s[o + 4], s[o + 5]);
@@ -55271,6 +55924,7 @@
                     e.animAmt = s[o + 9];
                     if (e.eaRepOn) e.eaRepOn = false;   // V2.2
                     e.poseDirty = true;
+                    V23.replay && V23.replay.endSlot(this, e, k, s, o + 10);   // V2.3: H30.10 live identity restored bit-exact (stub: nothing)
                 }
                 s.length = 0;
                 camera.position.copy(this.savedCam.p);
@@ -55282,6 +55936,36 @@
                 shadowManager.markEvent();
             }
         };
+
+        // ===== V2.3 BLOCK SCREENS [WP9] =====
+        // Owner: WP9 (killcam identity, death recap and MVP pose). Only WP9 edits this block.
+        // Purpose: the agent / generation / archetype rings in replayRec, the killcam's recorded identity (saved stride
+        //   10 + SAVED, restored bit-exact), the agent ghost, the recap's fields, round stats and the MVP pose, the ring reset
+        //   on map and mode changes. Stubs only in WP1 (SAVED 0: V2.2's stride of 10).
+        // Clocks: replayRec real clock (identity per recorded frame); the MVP pose on the display clock through the stage.
+        V23.replay = {
+            SAVED: 0,                                                                        // H30.9: extra saved values per bot
+            alloc: function (rec, why) { return null; },                                     // H30.1 / H30.2
+            capture: function (rec, i) { return null; },                                     // H30.3
+            ghostInit: function (director, ghost) { return null; },                          // H30.4
+            onPlayerDeath: function (director, clip, killer, now) { return null; },          // H30.5
+            start: function (director, clip, now) { return null; },                          // H30.6
+            beginSlot: function (director, enemy, k, bracket, saved) { return null; },       // H30.7
+            ghostFrame: function (director, ghost, clip, fall) { return null; },             // H30.8
+            endSlot: function (director, enemy, k, saved, o) { return null; },               // H30.10
+            finish: function (director) { return null; },                                    // H30.18
+            pollPad: function (director) { return false; },                                  // H30.19
+            recapHit: function (recap, row, source, amount, shieldAbsorb, healthDamage) { return null; },   // H30.11
+            recapDealt: function (recap, row, enemy, amount, sourceLabel, hitZone) { return null; },        // H30.12
+            recapShow: function (recap) { return null; },                                    // H30.13
+            weaponLabel: function (enemy) { return null; },                                  // H30.15
+            resetRing: function () { return null; },                                         // H30.16 / H30.17
+            roundStart: function (match, now) { return null; },                              // H30.20
+            roundKill: function (match, enemy, isHeadshot) { return null; },                 // H30.21
+            roundMvp: function (match, won, reason, rs) { return null; },                    // H30.22
+            matchFinish: function (match, won) { return null; }                              // H30.23
+        };
+        // ===== END V2.3 BLOCK SCREENS =====
 
         // =============================================
         // V1.7 Main menu and agent select. Start screen over a slow camera orbit of
@@ -55727,6 +56411,7 @@
                 g.rotation.y = yaw;
                 const s = Math.max(0.6, (cc.height || 1.7) / 1.7);
                 g.scale.set(1, s, 1);
+                V23.proto && V23.proto.body(this, dt);   // V2.3: H34.1 the M4 legs and shadow prototypes (stub: nothing)
                 // V2.2 Enhanced Animations: steps that follow the way you move (side steps, backwards),
                 // crouch-walking, a tuck in the air and a landing
                 if (enhancedAnim.on) {
@@ -56378,6 +57063,7 @@
                     if (o.userData.isHands) o.visible = false;
                     if (o === src.userData.muzzleFlash || (o.material && o.material.blending === THREE.AdditiveBlending)) o.visible = false;
                 });
+                for (const c of clone.children.filter((o) => o.userData.isAgentArm)) clone.remove(c);   // V2.3: H14.2 no agent arms in the workshop clone
                 clone.updateMatrixWorld(true);
                 const box = new THREE.Box3().setFromObject(clone);
                 const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
@@ -57060,11 +57746,13 @@
                 this._savedDiff = game.userSettings.botDifficulty;
                 game.userSettings.botDifficulty = this.botSkill();
                 this.inMatch = true;
+                V23.util && V23.util.rankedPin(true);   // V2.3: H33.4 Ranked plays Bot Utility 'classic' (stub: nothing)
             },
             restoreDifficulty: function () {
                 if (this._savedDiff !== null) game.userSettings.botDifficulty = this._savedDiff;
                 this._savedDiff = null;
                 this.inMatch = false;
+                V23.util && V23.util.rankedPin(false);   // V2.3: H33.5 the player's Bot Utility back (stub: nothing)
             },
 
             // r: { won, us, them, kills, deaths, mvps, abandoned }
@@ -57200,7 +57888,9 @@
                         </div>
                         <div class="mm-foot">Enter / Ⓐ select • Esc / Ⓑ back</div>
                     </div>
+                    <div class="mm-stage" id="mm-stage"></div>
                     <div class="mm-agent-tag"><span id="mm-agent-name">JETT</span><small id="mm-agent-role">DUELIST</small><div id="mm-card"></div></div>`;
+                // V2.3: #mm-stage above is the menu showcase's stage cell (WP3; display:none until the SHOWROOM block shows it)
                 document.getElementById('ui-root').appendChild(el);
                 this.el = el;
                 el.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -57227,6 +57917,7 @@
             // A figure in the agent's colour on a glowing ring, drawn with the
             // viewmodel (never clipped by walls); gun-material programs, so no compiles
             buildShowcase: function () {
+                if (V23.stage && V23.stage.buildShowcase(this)) return;   // V2.3: H10.1 the stage root as mainMenu.showcase (stub: false)
                 const body = new THREE.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.5, metalness: 0.2, toneMapped: false });
                 this.accentMat = new THREE.MeshStandardMaterial({ color: 0x38f6ff, emissive: 0x38f6ff, emissiveIntensity: 0.6, roughness: 0.35, toneMapped: false });
                 this.ringMat = new THREE.MeshBasicMaterial({ color: 0x38f6ff, transparent: true, opacity: 0.85, toneMapped: false });
@@ -57272,6 +57963,7 @@
                 this.render();
                 const first = this.el.querySelector('.mm-view.active .mm-btn');
                 if (first) first.focus({ preventScroll: true });
+                V23.stage && V23.stage.open('menu');   // V2.3: H10.2 the menu showcase stage (stub: nothing)
             },
 
             hide: function () {
@@ -57294,6 +57986,7 @@
                 weaponGroup.visible = true;
                 slideCamera.roll = slideCamera.applied = 0;
                 if (typeof timingResetPending !== 'undefined') timingResetPending = true;
+                V23.stage && V23.stage.close('menu');   // V2.3: H10.3 (stub: nothing)
             },
 
             setView: function (v) { this.view = v; this.render(); const b = this.el.querySelector('.mm-view.active .mm-btn'); if (b) b.focus({ preventScroll: true }); },
@@ -57350,6 +58043,7 @@
 
             // From lockInPickerAgent: the agent is chosen, start (or resume) the game
             onAgentLocked: function () {
+                V23.stage && V23.stage.close('locked');   // V2.3: H10.4 also when the picker stays open (stub: nothing)
                 if (!this.selecting) return;
                 this.selecting = false;
                 document.body.classList.remove('agent-select');
@@ -57357,6 +58051,7 @@
             },
             // The picker was closed without locking in: back to the menu
             onPickerClosed: function () {
+                V23.stage && V23.stage.close('pickerClosed');   // V2.3: H10.5 (stub: nothing)
                 if (!this.selecting) return;
                 this.selecting = false;
                 document.body.classList.remove('agent-select');
@@ -57417,29 +58112,32 @@
                 weaponGroup.visible = false;
                 // Preview: right of the menu, or left of the agent list in agent select
                 const id = (this.selecting && tacticalDirector.agentPickerSelectedId) || game.activeAgent || 'jett';
-                const def = AGENT_DEFS[id];
-                const col = (def && def.themeColor) || '#38f6ff';
-                this.accentMat.color.set(col).convertSRGBToLinear();
-                this.accentMat.emissive.copy(this.accentMat.color);
-                this.ringMat.color.set(col).convertSRGBToLinear();
-                this.ringMat.opacity = 0.6 + 0.3 * Math.sin(this.t * 3);
-                const sc = this.showcase;
-                sc.visible = true;
-                this._off.set(this.selecting ? -1.75 : 1.55, -1.05, -3.0).applyQuaternion(camera.quaternion);
-                sc.position.copy(camera.position).add(this._off);
-                // Stand upright, facing the camera, turning slowly
-                const yaw = Math.atan2(camera.position.x - sc.position.x, camera.position.z - sc.position.z);
-                sc.rotation.set(0, yaw, 0);
-                this.figure.rotation.y = Math.PI + Math.sin(this.t * 0.6) * 0.9;
-                // Workshop: the gun you are designing turns in place of the figure
-                const ws = this.view === 'workshop';
-                this.figure.visible = !ws;
-                if (ws) {
-                    const p = skinWorkshop.ensurePreview(sc);
-                    if (p) { p.position.set(-0.2, 1.15, 0.4); p.rotation.set(0.25, this.t * 0.8, 0); }
-                } else if (skinWorkshop.preview) skinWorkshop.removePreview();
-                document.getElementById('mm-agent-name').textContent = def ? def.name : '';
-                document.getElementById('mm-agent-role').textContent = def ? def.role : '';
+                // V2.3: H10.6 the stage drives the showcase; V2.2's per-frame recolour, placement and texts run only without it
+                if (!(V23.stage && V23.stage.menuFrame(this, id, dt, now))) {
+                    const def = AGENT_DEFS[id];
+                    const col = (def && def.themeColor) || '#38f6ff';
+                    this.accentMat.color.set(col).convertSRGBToLinear();
+                    this.accentMat.emissive.copy(this.accentMat.color);
+                    this.ringMat.color.set(col).convertSRGBToLinear();
+                    this.ringMat.opacity = 0.6 + 0.3 * Math.sin(this.t * 3);
+                    const sc = this.showcase;
+                    sc.visible = true;
+                    this._off.set(this.selecting ? -1.75 : 1.55, -1.05, -3.0).applyQuaternion(camera.quaternion);
+                    sc.position.copy(camera.position).add(this._off);
+                    // Stand upright, facing the camera, turning slowly
+                    const yaw = Math.atan2(camera.position.x - sc.position.x, camera.position.z - sc.position.z);
+                    sc.rotation.set(0, yaw, 0);
+                    this.figure.rotation.y = Math.PI + Math.sin(this.t * 0.6) * 0.9;
+                    // Workshop: the gun you are designing turns in place of the figure
+                    const ws = this.view === 'workshop';
+                    this.figure.visible = !ws;
+                    if (ws) {
+                        const p = skinWorkshop.ensurePreview(sc);
+                        if (p) { p.position.set(-0.2, 1.15, 0.4); p.rotation.set(0.25, this.t * 0.8, 0); }
+                    } else if (skinWorkshop.preview) skinWorkshop.removePreview();
+                    document.getElementById('mm-agent-name').textContent = def ? def.name : '';
+                    document.getElementById('mm-agent-role').textContent = def ? def.role : '';
+                }
             }
         };
 
@@ -57486,6 +58184,8 @@
                                 keybinds: mergedBinds,
                                 localStorageEnabled: true
                             });
+                            // V2.3: H33.9 an unknown value of a V2.3 key falls back to its default (design 16; a valid save is unchanged)
+                            { const u = game.userSettings; u.agentIdentity = u.agentIdentity === 'off' ? 'off' : 'on'; u.weaponAnims = u.weaponAnims === 'classic' ? 'classic' : 'v23'; u.botUtility = u.botUtility === 'agent' ? 'agent' : 'classic'; }
                             loadedFromStorage = true;
                         } else {
                             game.userSettings.localStorageEnabled = true;
@@ -57793,6 +58493,18 @@
                 this.bindPillGroup('setting-anim-detail-pills', 'data-animdetail', (val) => {
                     game.userSettings.animDetail = val === 'on' ? 'on' : 'off';
                     enhancedAnim.set(game.userSettings.animDetail === 'on');
+                    this.saveToStorage();
+                });
+
+                // V2.3: Agent Identity and Weapon Animations, saved like the others (the V2.3 blocks apply them)
+                this.bindPillGroup('setting-agent-identity-pills', 'data-agentidentity', (val) => {
+                    game.userSettings.agentIdentity = val === 'off' ? 'off' : 'on';
+                    V23.core && V23.core.applySettings(game.userSettings, 'agentIdentity');   // V2.3: H33.6 (stub: nothing)
+                    this.saveToStorage();
+                });
+                this.bindPillGroup('setting-weapon-anims-pills', 'data-weaponanims', (val) => {
+                    game.userSettings.weaponAnims = val === 'classic' ? 'classic' : 'v23';
+                    V23.core && V23.core.applySettings(game.userSettings, 'weaponAnims');   // V2.3: H33.7 (stub: nothing)
                     this.saveToStorage();
                 });
 
@@ -58317,6 +59029,13 @@
                     showNotification(`Bots Use Map Mechanics: ${val === 'on' ? 'ON' : 'OFF'}`, 1800);
                     this.saveToStorage();
                 });
+                // V2.3: Bot Utility, saved like the others (Ranked pins Classic for the match)
+                this.bindPillGroup('setting-bot-utility-pills', 'data-botutility', (val) => {
+                    game.userSettings.botUtility = val === 'agent' ? 'agent' : 'classic';
+                    V23.core && V23.core.applySettings(game.userSettings, 'botUtility');   // V2.3: H33.8 (stub: nothing)
+                    showNotification(`Bot Utility: ${val === 'agent' ? 'AGENT' : 'CLASSIC'}`, 1800);
+                    this.saveToStorage();
+                });
 
                 this.bindPillGroup('setting-cheat-abilities-pills', 'data-infab', (val) => {
                     const on = (val === 'on');
@@ -58469,6 +59188,8 @@
                     }
                     enemy.colorDirty = true;
                 }
+                // V2.3: H27.1 rim and kit accents in the highlight colour; also the load path (applyAllSettings calls this) (stub: nothing)
+                V23.bots && V23.bots.setRim((game.userSettings && game.userSettings.enemyHighlightColor) || 'red');
             },
 
             applyAtmosphereTheme: function() {
@@ -58500,6 +59221,7 @@
                 // V1.7: ambient/sun/exposure per mode (ATMOSPHERE_LIGHTING, scaled by
                 // the map's sunIntensity), env map and sky dome follow the new sky.
                 refreshSceneLighting();
+                V23.arena && V23.arena.onAtmosphere(mode);   // V2.3: H32.3 Competitive caps for the V2.3 visuals (stub: nothing)
             },
 
             applyWeaponSkin: function(skinId, themeOverride) {
@@ -58523,6 +59245,7 @@
                         if (!mesh || !mesh.material || mesh === wObj.muzzleFlash) continue;
                         // Skip the skin-tone hands mesh (V1.7: no longer always the last child)
                         if (mesh.userData.isHands) continue;
+                        if (mesh.userData.isAgentArm) continue;   // V2.3: H14.1 the agent's arms keep their own colours
                         // Glowing parts are found once, by an actual glow colour (parts made without
                         // one still report the default intensity of 1, so intensity alone is not
                         // enough), and keep their original intensity as the base
@@ -58908,6 +59631,7 @@
                 qualityController.setFrameTarget(cfg.autoTargetHz || 55);
                 applyVisualOverrides();
                 enhancedAnim.set(cfg.animDetail === 'on');   // V2.2: Enhanced Animations (waits for the game to be built)
+                V23.core && V23.core.applySettings(cfg, null);   // V2.3: H33.3 the three V2.3 settings on load (stub: nothing)
 
                 mouseLookController.sensitivity = cfg.sensitivity || 0.002;
                 mouseLookController.smoothing = typeof cfg.smoothing === 'number' ? cfg.smoothing : 0.5;
@@ -59017,6 +59741,8 @@
                 setActivePill('setting-mantle-pills', 'data-mantle', cfg.mantle === false ? 'off' : 'on');
                 setActivePill('setting-char-detail-pills', 'data-chardetail', cfg.charDetail === 'on' ? 'on' : 'off');
                 setActivePill('setting-anim-detail-pills', 'data-animdetail', cfg.animDetail === 'on' ? 'on' : 'off');   // V2.2
+                setActivePill('setting-agent-identity-pills', 'data-agentidentity', cfg.agentIdentity === 'off' ? 'off' : 'on');   // V2.3
+                setActivePill('setting-weapon-anims-pills', 'data-weaponanims', cfg.weaponAnims === 'classic' ? 'classic' : 'v23');   // V2.3
                 setActivePill('setting-gp-invert-pills', 'data-gpinv', cfg.gpInvertY ? 'on' : 'off');
                 setActivePill('setting-audio-3d-pills', 'data-audio3d', cfg.positionalAudio === false ? 'off' : 'on');
                 setActivePill('setting-audio-steps-pills', 'data-audiosteps', cfg.enemyFootsteps === false ? 'off' : 'on');
@@ -59042,6 +59768,7 @@
                 setActivePill('setting-hud-dmg-pills', 'data-dmgnums', cfg.showDamageNumbers ? 'show' : 'hide');
                 setActivePill('setting-bot-diff-pills', 'data-botdiff', cfg.botDifficulty || 'gold');
                 setActivePill('setting-bot-mech-pills', 'data-botmech', cfg.botMechanics === 'on' ? 'on' : 'off');   // V2.2
+                setActivePill('setting-bot-utility-pills', 'data-botutility', cfg.botUtility === 'agent' ? 'agent' : 'classic');   // V2.3
                 setActivePill('setting-cheat-abilities-pills', 'data-infab', cfg.infiniteAbilities ? 'on' : 'off');
                 setActivePill('setting-cheat-ult-pills', 'data-infult', cfg.infiniteUlt ? 'on' : 'off');
                 setActivePill('setting-cheat-ammo-pills', 'data-infammo', cfg.infiniteAmmo ? 'on' : 'off');
@@ -59122,8 +59849,10 @@
                 // Practice Bot Head Silhouette at center (tinted by Enemy Highlight Color!)
                 const cfg = game.userSettings;
                 const hlMode = cfg.enemyHighlightColor || 'red';
-                const botStroke = hlMode === 'yellow' ? 'rgba(255, 209, 102, 0.75)' : (hlMode === 'purple' ? 'rgba(217, 70, 239, 0.75)' : 'rgba(255, 70, 85, 0.65)');
-                const botFill = hlMode === 'yellow' ? 'rgba(255, 209, 102, 0.24)' : (hlMode === 'purple' ? 'rgba(217, 70, 239, 0.24)' : 'rgba(255, 70, 85, 0.22)');
+                const v23c = V23.bots && V23.bots.previewColors(hlMode);   // V2.3: H27.2 the practice bot's colours, cyan included (stub: null keeps V2.2's)
+                // V2.3: { stroke, fill } from the BOTKIT block when it gives them, else V2.2's colours exactly
+                const botStroke = v23c ? v23c.stroke : (hlMode === 'yellow' ? 'rgba(255, 209, 102, 0.75)' : (hlMode === 'purple' ? 'rgba(217, 70, 239, 0.75)' : 'rgba(255, 70, 85, 0.65)'));
+                const botFill = v23c ? v23c.fill : (hlMode === 'yellow' ? 'rgba(255, 209, 102, 0.24)' : (hlMode === 'purple' ? 'rgba(217, 70, 239, 0.24)' : 'rgba(255, 70, 85, 0.22)'));
 
                 ctx.fillStyle = botFill;
                 ctx.beginPath();
@@ -60336,6 +61065,8 @@
                         lastFireAt: 0,
                         patrolPhase: i * Math.PI
                     });
+                    // V2.3: H28 the wingman's agent kit as a 5th figure child (children 0-3 unchanged; stub: nothing)
+                    V23.bots && V23.bots.wingKit(this.wingmanBots[i], (s.name.split('//')[1] || '').trim().toLowerCase());
                 }
                 scene.add(this.wingmanGroup);
             },
@@ -60804,6 +61535,42 @@
         };
         window.tacticalEnhancements = tacticalEnhancements;
 
+        // ===== V2.3 BLOCK SHOWROOM [WP3] =====
+        // Owner: WP3 (the 3D agent showroom). Only WP3 edits this block (and CSS SHOWROOM).
+        // Purpose: stageScene (exactly one HemisphereLight and one DirectionalLight, no fog, environment = scene.environment)
+        //   drawn as the last canvas pass (H4), the model swap on highlight, idles and intros, picker-scoped inputs, small
+        //   screens, the 116 previews and the stage lifecycle. Stubs only in WP1 (every handler returns false).
+        // Clocks: display clock (animate delta/now) for idles, intros, previews, drag inertia and the MVP pose.
+        V23.stage = {
+            render: function (now) { return null; },                                         // H4
+            update: function (delta, now) { return null; },                                  // H5
+            setAgent: function (agentId) { return null; },                                   // H7
+            open: function (ctx) { return null; },                                           // H8.1, H10.2
+            close: function (ctx) { return null; },                                          // H8.2, H10.3-5
+            renderGrid: function (director) { return false; },                               // H9
+            buildShowcase: function (menu) { return false; },                                // H10.1
+            menuFrame: function (menu, agentId, dt, now) { return false; },                  // H10.6
+            onKey: function (event) { return false; },                                       // H11.1
+            onWheel: function (event) { return false; },                                     // H11.2
+            onPad: function (pad, pressed, left, right, now) { return false; },              // H12.2
+            onFocus: function (el) { return null; },                                         // H12.3
+            preview: function (slot) { return false; },
+            renderPose: function (agentId, rect, clip, ms) { return false; },
+            active: function () { return false; }
+        };
+        // ===== END V2.3 BLOCK SHOWROOM =====
+
+        // ===== V2.3 BLOCK PROTO [WP18] =====
+        // Owner: WP18 (M4 prototypes, each kept only if it passes). Only WP18 edits this block.
+        // Purpose: first-person legs and the matching player shadow from the agent's modules (H34.1), coordinated bot trades
+        //   in botUtility 'agent' only (H34.2). Stubs only in WP1 (trade false: V2.2's forced cover).
+        // Clocks: display clock (playerBody.update dt) for the body; gNow for trades.
+        V23.proto = {
+            body: function (playerBody, dt) { return null; },                                // H34.1
+            trade: function (enemy, partner) { return false; }                               // H34.2
+        };
+        // ===== END V2.3 BLOCK PROTO =====
+
         function initGame() {
             // Graphics profile (visual budgets only)
             initializeAdaptiveQuality();
@@ -60907,6 +61674,7 @@
             // already include the environment map (no first-frame recompiles).
             refreshSceneLighting();
             shadowManager.init();
+            V23.core && V23.core.init();   // V2.3: H2 the identity build when Agent Identity is on (stub: nothing)
             warmShaderVariants();
             gameInitialized = true;
             // V1.7 High Detail Characters & Guns: everything it swaps now exists
@@ -61054,11 +61822,13 @@
             if (photoMode.active) photoMode.update(delta, now);
             else presentPlayerCamera(simAccumulator / SIM_DT);
             mainMenu.update(delta, now);
+            V23.stage && V23.stage.update(delta, now);   // V2.3: H5 stage idles, intros, previews, staged builder (stub: nothing)
             playerBody.update(delta);
             updateGunplayAndCrosshair(delta, time, now);
             updateWeaponPosition();
             applyWeaponBobbing(time, game.keys.w || game.keys.a || game.keys.s || game.keys.d);
             shellFX.update(Math.min(0.05, delta));
+            V23.vm && V23.vm.step(Math.min(0.05, delta), now);   // V2.3: H20.9 magFX (dropped magazines) after shellFX, every frame (stub: nothing)
             fxKit.update(Math.min(0.05, delta), now);
             weatherFX.update(Math.min(0.05, delta), now);
             breakables.update(now);
@@ -61133,6 +61903,7 @@
                 syncViewmodelCamera();
                 renderer.render(viewmodelScene, viewmodelCamera);
             }
+            V23.stage && V23.stage.render(now);   // V2.3: H4 the showroom stage, the last canvas pass in every pipeline (stub: nothing)
             replayDirector.endFrame();
             photoMode.afterRender();
             perfTelemetry.summary.drawCalls = renderer.info.render.calls;
