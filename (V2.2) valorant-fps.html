@@ -14186,6 +14186,12 @@
             if (members.length === 0) retireEnemyPage(page);
         }
         
+        // V2.2: the figure is built facing -Z, but the AI turns a bot's group so that +Z faces its target, so
+        // the default look drew every bot with its back to where it looks (Enhanced Animations turns it in its
+        // shader). The default look now draws each part half a turn round the group's own vertical axis: the
+        // group, and the hit proxies under it, stay exactly where they were; the shadow pass, which draws the
+        // same instance matrices, turns with it.
+        const _faceTurn = new THREE.Matrix4(), _faceInv = new THREE.Matrix4(), _faceHalf = new THREE.Matrix4().makeRotationY(Math.PI), _facePart = new THREE.Matrix4();
         function packEnemyBatches() {
             let packed = 0;
             for (let i = 0; i < enemyObjects.length; i++) {
@@ -14246,12 +14252,16 @@
                         const leaves = enemy.leaves;
                         const meshes = page.meshes;
                         const parts = Math.min(leaves.length, meshes.length);
+                        if (writeMatrix && !eaOn) {
+                            const gw = enemy.mesh.matrixWorld;   // V2.2: half a turn round the group (see _faceTurn)
+                            _faceTurn.multiplyMatrices(gw, _faceHalf).multiply(_faceInv.copy(gw).invert());
+                        }
                         for (let p = 0; p < parts; p++) {
                             if (writeMatrix) {
                                 // V2.2: Enhanced Animations writes its turned transform and values
                                 if (eaOn) enhancedAnim.packSlot(meshes[p], s, enemy, leaves[p].matrixWorld);
                                 else {
-                                    meshes[p].setMatrixAt(s, leaves[p].matrixWorld);
+                                    meshes[p].setMatrixAt(s, _facePart.multiplyMatrices(_faceTurn, leaves[p].matrixWorld));   // V2.2: facing its target
                                     meshes[p].geometry.attributes.instanceAnim.setXYZW(s, enemy.animPhase || 0, enemy.animAmt || 0, enemy.animFlinch || 0, enemy.animRecoil || 0);
                                 }
                                 perfTelemetry.enemyMatrixWrites++;
