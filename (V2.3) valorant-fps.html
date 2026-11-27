@@ -16635,6 +16635,9 @@
         //    modules (V23.mat.world, its palette base) as the 5th child of the figure Group (children 0-3 unchanged), drawn
         //    with Enhanced Animations off; wingRig adds a one-instance kit to the EA rig (it shares the rig torso's instance
         //    attributes; the rig's instanceKit carries the ally flag, so no highlight rim). 5 draws per wingman either way.
+        //  - Kits come from each agent's resolved look (bot.kit, the palette's base and its bot.accent slot): Sage and Omen
+        //    are full entries, the other 27 stubs carry their brief's kit and colours, so a role batch (M2) needs no change
+        //    here; a redefined look is picked up on the next colour write (kitOf caches by the resolved look).
         //  - Protocols for other blocks (they write these on the enemy and mark enemy.colorDirty): enemy.v23Orb === true
         //    shows kit module 23 (the windup orb in the right hand) in the trim colour (BOTMOTION's windup). The dissolve
         //    follows the actor's 'topple' record (anim.t, anim.lieT on the 60 Hz sim), so a death style that keeps those
