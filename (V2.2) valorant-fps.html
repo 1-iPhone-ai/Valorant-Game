@@ -27646,7 +27646,7 @@
                         markerEl.appendChild(diamondEl);
                         markerEl.appendChild(labelEl);
                         reconOverlay.appendChild(markerEl);
-                        this.hudDiamonds.push({ el: markerEl, labelEl: labelEl, visible: false });
+                        this.hudDiamonds.push({ el: markerEl, labelEl: labelEl, visible: false, burning: false });   // V2.2: burning (the .burning class is on)
                     }
                 }
 
@@ -37221,6 +37221,10 @@
 
                     if (markerIdx < this.hudDiamonds.length) {
                         const d = this.hudDiamonds[markerIdx];
+                        // V2.2: a bot in a fire, acid or gas zone (burningUntil, which each burn tick sets) gets the orange
+                        // diamond its CSS has had since V1.5 (.recon-marker.burning); nothing read burningUntil before
+                        const burning = e.burningUntil > now;
+                        if (d.burning !== burning) { d.el.classList.toggle('burning', burning); d.burning = burning; }
                         _abilityTempVec.set(e.mesh.position.x, e.mesh.position.y + 2.1, e.mesh.position.z);
                         const toEnemyX = _abilityTempVec.x - camera.position.x;
                         const toEnemyY = _abilityTempVec.y - camera.position.y;
