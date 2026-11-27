@@ -12210,6 +12210,10 @@
         
         // Create weapon models
         const weaponGroup = new THREE.Group();
+        // V2.2: the gun takes the camera's angles each frame (updateWeaponPosition), so it turns in the camera's
+        // order: in the default order (XYZ) the same pitch and yaw made another turn, and facing away from yaw 0
+        // the gun tipped off the view, by twice the pitch at yaw π
+        weaponGroup.rotation.order = 'YXZ';
         viewmodelScene.add(weaponGroup);
         
         function createWeapons() {

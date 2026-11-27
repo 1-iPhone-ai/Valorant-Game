@@ -103,3 +103,28 @@ test('viewmodel: draw, recoil spring, reload choreography, inspect, shell casing
     assert.equal(stalls, 0);
     assert.deepEqual(errors, []);
 });
+
+// V2.2 final check: the gun took the camera's pitch and yaw in another rotation order (XYZ against the camera's
+// YXZ), so facing away from yaw 0 it tipped off the view: 28.6 degrees at yaw pi looking 14 degrees down.
+test('viewmodel: the gun turns with the view whichever way you face and look', { timeout: 300000 }, async () => {
+    const { errors, frames, evaluate } = await boot({ quality: 'medium' });
+    await evaluate(() => { window.updateEnemies = () => {}; });
+    const off = [];
+    for (const [pitch, yaw] of [[-0.25, Math.PI], [0.3, -2.2], [0.2, Math.PI / 2], [-0.4, 0.8], [0, 0]]) {
+        await evaluate(([p, y]) => {
+            const cc = characterController;
+            camera.rotation.set(p, y, 0, 'YXZ');
+            if (cc.targetRotation) { cc.targetRotation.x = p; cc.targetRotation.y = y; }
+        }, [pitch, yaw]);
+        await frames(2);
+        off.push(await evaluate(() => {
+            weaponGroup.updateMatrixWorld(true);
+            const q = new THREE.Quaternion();
+            weaponGroup.getWorldQuaternion(q);
+            return +(q.angleTo(viewmodelCamera.quaternion) * 180 / Math.PI).toFixed(3);
+        }));
+    }
+    // the slide/strafe tilt eases back to 0 (rotation.z), so standing still the gun turns exactly as the view
+    for (const a of off) assert.ok(a < 0.05, `the gun turns as the view does (off by ${off.join(', ')} degrees)`);
+    assert.deepEqual(errors, []);
+});
