@@ -43837,6 +43837,10 @@
             const weatherRanges = [weatherFX.mesh.geometry.drawRange.count, weatherFX.splash.geometry.drawRange.count];
             weatherFX.mesh.geometry.setDrawRange(0, 6);
             weatherFX.splash.geometry.setDrawRange(0, 6);
+            // V2.2: each ability object goes back where it was after the warm draws (below). Three of them never
+            // place their group and put their meshes in world coordinates (Convergent Paths, Armageddon, the
+            // Annihilation cocoon), so left at this point they drew about 11 m off and 1.7 m up
+            const warmPositions = agentSystem.warmupMeshes.map((wm) => wm.position.clone());
             for (let i = 0; i < agentSystem.warmupMeshes.length; i++) {
                 const wm = agentSystem.warmupMeshes[i];
                 wm.position.copy(p);
@@ -43852,6 +43856,7 @@
                 renderer.render(scene, camera);
             }
             for (const object of warmEffects) object.visible = false;
+            agentSystem.warmupMeshes.forEach((wm, i) => wm.position.copy(warmPositions[i]));   // V2.2 (see above)
             weatherFX.mesh.geometry.setDrawRange(0, weatherRanges[0]);
             weatherFX.splash.geometry.setDrawRange(0, weatherRanges[1]);
             weatherFX.afterWarm();
