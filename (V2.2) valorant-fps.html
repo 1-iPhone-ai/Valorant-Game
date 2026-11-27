@@ -22688,7 +22688,7 @@
                 q: { look: ['projectile', 'flash'],
                     travelMs: 1300,                 // Paranoia travel time (x24 m/s)      [~1.2 s]
                     spawnAheadM: 1.2, speedMps: 24, radiusM: 2.8, enemyAimHeightM: 1.1, blindMs: 3800, slowMs: 3800, revealMs: 3800 },
-                // E Dark Cover: a thrown smoke (castSmokeProjectile, as Jett's and Sova's)
+                // E Dark Cover: a thrown smoke (castSmokeProjectile, as Jett's and Sova's); V2.2: it slows and reveals enemies inside it (the smoke loop in updateRender)
                 e: { look: ['projectile', 'smoke'],
                     lifetimeMs: 15000,              // Dark Cover smoke duration           [15 s]
                     fuseSec: 0.8, radiusM: 4.8 },
@@ -31474,12 +31474,13 @@
             },
 
             // --- C: Cloudburst Smoke / Hot Hands Molly / Sage Barrier Orb Ice Wall ---
-            castSmokeProjectile: function(now, colorHex, airburstSec, radius, durationMs) {
+            castSmokeProjectile: function(now, colorHex, airburstSec, radius, durationMs, isDarkCover) {
                 camera.updateMatrixWorld();
                 _abilityForward.set(0, 0, -1).transformDirection(camera.matrixWorld).normalize();
                 const proj = this.acquireProjectile();
                 proj.type = 'smoke';
                 proj.smokeColor = colorHex;
+                proj.isDarkCover = !!isDarkCover;   // V2.2: Omen's Dark Cover says so itself (its smoke's colour never matched isDarkCover's)
                 proj.smokeRadius = radius;
                 proj.smokeDurationMs = durationMs;
                 proj.position.copy(camera.position).addScaledVector(_abilityForward, 1.0);
@@ -31671,7 +31672,8 @@
             // V2.2: Omen's numbers are in AGENT_TUNING.omen
             castOmenDarkCover: function(now) {
                 // Long-lasting purple controller smoke through the shared smoke system
-                this.castSmokeProjectile(now, 0x6d28d9, AGENT_TUNING.omen.e.fuseSec, AGENT_TUNING.omen.e.radiusM, AGENT_TUNING.omen.e.lifetimeMs);
+                // V2.2: flagged as Dark Cover (its look, the slow and reveal inside it and its minimap colour read the flag)
+                this.castSmokeProjectile(now, 0x6d28d9, AGENT_TUNING.omen.e.fuseSec, AGENT_TUNING.omen.e.radiusM, AGENT_TUNING.omen.e.lifetimeMs, true);
             },
 
             castPhoenixHotHands: function(now) {
@@ -32801,7 +32803,7 @@
                 else abilityLook.bindNow(item, 'ring', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
-            spawnSmokeSphere: function(x, y, z, colorHex, radius, durationMs, now) {
+            spawnSmokeSphere: function(x, y, z, colorHex, radius, durationMs, now, isDarkCover) {
                 let item = this.smokes[0];
                 for (let i = 0; i < this.smokes.length; i++) {
                     if (!this.smokes[i].inUse) { item = this.smokes[i]; break; }
@@ -32814,7 +32816,7 @@
                 item.startAt = now;
                 item.expireAt = now + durationMs;
                 item.nextTickAt = now + 200;
-                item.isDarkCover = (colorHex === 0x6366f1);
+                item.isDarkCover = !!isDarkCover;   // V2.2: set by Dark Cover's cast (it matched 0x6366f1, a colour no smoke uses: Dark Cover's is 0x6d28d9)
                 item.isCyberCage = (colorHex === 0x38bdf8);
                 item.isPoisonCloud = (colorHex === 0x22c55e);
                 item.isRuseSmoke = (colorHex === 0xf472b6);
@@ -32953,7 +32955,7 @@
                 abilityLook.tag = abilityLook.projKey(proj);   // V2.2: what the detonation spawns belongs to the projectile's ability (its tag, or its type) for High Fidelity
 
                 if (proj.type === 'smoke') {
-                    this.spawnSmokeSphere(p.x, p.y, p.z, proj.smokeColor || 0x38f6ff, proj.smokeRadius || 4.6, proj.smokeDurationMs || 8500, now);
+                    this.spawnSmokeSphere(p.x, p.y, p.z, proj.smokeColor || 0x38f6ff, proj.smokeRadius || 4.6, proj.smokeDurationMs || 8500, now, proj.isDarkCover);   // V2.2: Dark Cover's flag
                 } else if (proj.type === 'molly') {
                     // Drop molly onto the floor or box surface directly underneath
                     const floorY = this.findSupportFloorY(p.x, p.y, p.z);
