@@ -323,6 +323,7 @@ const HOOKS = [
     H('H29.6', 'enemyTactics.step', 'if (V23.util && V23.util.peekHook(enemy, peek, perfNow)) return true;'),
     H('H29.7', 'agentSystem.isBlockedBySmoke', 'if (V23.util && V23.util.blocksSight(origin, targetPos)) return true;'),
     H('H29.8', 'updateGunplayAndCrosshair', '* (V23.util ? V23.util.playerSpeedMult(gNow) : 1);'),
+    H('H29.9', 'make_flash', 'P.x = it.x + (o ? o.x : 0); P.y = it.y + (o ? o.y : 0); P.z = it.z + (o ? o.z : 0);'),
     H('H30.1', 'replayRec.init', "V23.replay && V23.replay.alloc(this, 'init')"),
     H('H30.2', 'replayRec._eaAlloc', "V23.replay && V23.replay.alloc(this, 'ea')"),
     H('H30.3', 'replayRec.capture', 'V23.replay && V23.replay.capture(this, i)'),
@@ -451,9 +452,17 @@ test('inside V2.3 blocks: no Math.random, no lights, no material constructor out
     const matStart = SRC.indexOf('// ----- V23.mat begin'), matEnd = SRC.indexOf('// ----- V23.mat end');
     const core = JS.blocks.find((b) => b.name === 'CORE');
     assert.ok(matStart > core.start && matEnd > matStart && matEnd < core.end, 'the V23.mat markers are inside CORE');
+    // V2.3 (coordinator): the one sanctioned exception, CORE's quiet(fn) between its markers: it swaps Math.random for a
+    // V23.rand stream while three.js constructs objects (uuids) and restores it; it never calls Math.random
+    const qStart = SRC.indexOf('// ----- V23 quiet begin'), qEnd = SRC.indexOf('// ----- V23 quiet end');
+    assert.ok(qStart > core.start && qEnd > qStart && qEnd < core.end, 'the V23 quiet markers are inside CORE');
+    const qCode = SCAN.codeOnly.slice(qStart, qEnd);
+    assert.deepEqual(qCode.match(/Math\s*\.\s*random[^;]*;/g), ['Math.random;', 'Math.random = V23.rand(((performance.now() * 1000) ^ Math.imul(++quietN, 0x9E3779B1)) >>> 0);', 'Math.random = mr;'],
+        'quiet only saves, swaps and restores Math.random');
     for (const b of JS.blocks) {
         const code = SCAN.codeOnly.slice(b.start, b.end);
-        assert.ok(!/Math\s*\.\s*random/.test(code), `${b.name}: no Math.random`);
+        const outsideQuiet = b.name === 'CORE' ? code.slice(0, qStart - b.start) + code.slice(qEnd - b.start) : code;
+        assert.ok(!/Math\s*\.\s*random/.test(outsideQuiet), `${b.name}: no Math.random`);
         const lights = code.match(/THREE\s*\.\s*\w*Light\b/g) || [];
         if (b.name === 'SHOWROOM') {
             const hemi = (code.match(/new\s+THREE\s*\.\s*HemisphereLight\s*\(/g) || []).length;

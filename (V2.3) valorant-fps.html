@@ -24188,14 +24188,12 @@
         //    calls V23.fp.reapply() too.
         //  - Bots: BOT_POOLS (archetype -> agents) and assignLook(...), a pure function; V23.bots.assign (WP6) steps forward
         //    from its result to avoid duplicates (the result carries index, size and members).
-        //  - Math.random and object construction (a note for the coordinator, not part of the frozen contract; listed in
-        //    WP2's gaps for sign-off): three.js draws a uuid from Math.random (four calls) for every Object3D, BufferGeometry,
-        //    Material and render target it constructs. With Agent Identity on (the default), core.init (H2) makes the part
-        //    pool (about 520 materials and 1,270 groups, meshes and geometries), the 4x4 upload target and the base
-        //    material, so the boot's Math.random stream differs from V2.2's inside core.init and nowhere else; the first
-        //    switch-on (applySettings) and the showroom's first build at the start screen make them the same way. With it
-        //    off, core.init makes nothing and the boot stream is V2.2's (0 calls under V2.3 code). After the pool exists a
-        //    build, a sample or an upload draw makes no Math.random call (agent-roster.test counts them).
+        //  - Math.random and object construction (coordinator sign-off): three.js draws a uuid from Math.random (four calls)
+        //    for every Object3D, BufferGeometry, Material and render target it constructs. The part pool (about 520
+        //    materials and 1,270 groups, meshes and geometries, made by core.init at boot when Agent Identity is on, else at
+        //    the first switch-on or the showroom's first build), a pool miss, and the 4x4 upload target with the base
+        //    material are made while Math.random is a V23.rand stream (restored in finally), so V2.3 code takes no draw
+        //    from the game's Math.random stream at boot or after, with Agent Identity on or off (agent-roster.test counts).
         // ---------------------------------------------------------------------------------------------------------------
 
         // V2.3: role defaults: a complete look per role, original and plain (a stub agent is drawn as its role default in
@@ -24633,11 +24631,25 @@
             // V2.3: the 4x4 sRGB upload target and the base vm material, made when first needed (an upload, or the warm-up's
             // stage draw): with Agent Identity off and no stage scene nothing is made at boot, so no THREE uuid draws from
             // Math.random there and the boot stream is V2.2's
+            // ----- V23 quiet begin (the only place V2.3 code may name Math.random: it swaps it, never calls it) -----
+            // V2.3 (coordinator): three.js draws every uuid from Math.random (four draws for each Object3D, BufferGeometry,
+            // Material and render target). quiet(fn) runs fn while Math.random is a V23.rand stream salted from the clock and
+            // a counter, restored in finally, so objects V2.3 constructs take no draw from the game's Math.random stream.
+            // V23.core._quiet is the same function, for PARTS' pool and pool misses.
+            let quietN = 0;
+            function quiet(fn) {
+                const mr = Math.random;
+                Math.random = V23.rand(((performance.now() * 1000) ^ Math.imul(++quietN, 0x9E3779B1)) >>> 0);
+                try { return fn(); } finally { Math.random = mr; }
+            }
+            // ----- V23 quiet end -----
             function ensureUpload() {
                 if (S.rt) return;
-                S.rt = new THREE.WebGLRenderTarget(4, 4);
-                S.rt.texture.encoding = THREE.sRGBEncoding;
-                S.base = V23.mat.vm({ c: 0x808080, r: 0.6 });
+                quiet(() => {   // V2.3 (coordinator): no draw from the game's Math.random stream (see quiet)
+                    S.rt = new THREE.WebGLRenderTarget(4, 4);
+                    S.rt.texture.encoding = THREE.sRGBEncoding;
+                    S.base = V23.mat.vm({ c: 0x808080, r: 0.6 });
+                });
             }
             // V2.3: a redefined look's old LOD goes back to the part pool now when nothing holds it; one still attached (on
             // the stage, as a ghost) is parked in S.retired instead, so its holder never draws an emptied figure
@@ -24832,6 +24844,7 @@
                     return null;
                 },
                 enabled: function () { return enabledNow(); },
+                _quiet: quiet,   // V2.3 (coordinator): run fn with Math.random swapped for a V23.rand stream (private; PARTS' pool)
                 // V2.3: the agent's frozen LookSpec (role defaults <- look tags <- PREVIEW_SOUNDS <- entry), cached
                 resolve: function (agentId) { return resolveImpl(agentId); },
                 // V2.3: validate and store an entry (throws, leaving the registry unchanged, on any problem)
@@ -25078,8 +25091,10 @@
         //     materials from one pool (_pool) made once, at the first build (core.init at boot when Agent Identity is on, or
         //     the showroom's first build at the start screen), sized from the roster (a dry expansion of every look counts
         //     its meshes and hand keys); BufferAttribute has no uuid, so filling a pooled geometry draws nothing.
-        //   After the pool exists, a build makes no Math.random call (agent-roster.test counts them). A build that finds the
-        //   pool empty still works, counts the miss in V23.parts.stats.poolMisses and warns (its new objects draw uuids).
+        //   The pool and any pool miss are made inside _quiet, which swaps Math.random for a V23.rand stream and restores it,
+        //   so their uuids take no draw from the game's stream; after the pool exists a build makes no Math.random call at
+        //   all (agent-roster.test counts them). A build that finds the pool empty still works, counts the miss in
+        //   V23.parts.stats.poolMisses and warns.
         //   V23.parts._release(root) gives a figure's objects back (CORE does it when a look is redefined); fpArms is cached
         //   per agent, so repeated calls take nothing more.
         // V2.3: figure format (what build / figure return). A THREE.Group root with userData.v23 = {
@@ -26096,7 +26111,11 @@
                 return { groups: m(n * 2 + 2), meshes: m(showMeshes + n + 2 * _SHOW_BONES.length), geoms: m(4 + n * 2 + keys.size * HAND_POSES.length),
                     vm: m(n * _SLOTS.length), world: m((n + 2) * _WORLD_GROUPS.length), handKeys: keys.size, showMeshes: showMeshes };
             }
-            function _ensurePool() {
+            // V2.3 (coordinator): the pool (and a pool miss) is made inside V23.core._quiet, which swaps Math.random for a
+            // V23.rand stream and restores it, so their three.js uuids take no draw from the game's Math.random stream
+            const _quiet = (fn) => V23.core._quiet(fn);
+            function _ensurePool() { if (!_pool.made) _quiet(_makePool); }
+            function _makePool() {
                 if (_pool.made) return;
                 const t0 = performance.now();
                 _pool.made = true;
@@ -26117,7 +26136,7 @@
                 if (list.length) return list.pop();
                 _stats.poolMisses++;
                 if (_stats.poolMisses === 1 || _stats.poolMisses % 50 === 0) console.warn('V2.3: the part pool ran out (' + _stats.poolMisses + ' misses); a new object was made');
-                return make();
+                return _quiet(make);
             };
             const _takeGroup = () => _take(_pool.groups, () => new THREE.Group());
             const _takeMesh = () => _take(_pool.meshes, () => new THREE.Mesh(new THREE.BufferGeometry(), _pool.placeholder));
@@ -45076,50 +45095,56 @@
                 const sphereGeo = new THREE.SphereGeometry(1.0, 14, 12);
 
                 const poolSize = this.botUtilPoolSize();   // V2.3: 10 entries (V2.2: 6), every one in the scene from boot, so the warm-up compiles them
-                for (let i = 0; i < poolSize; i++) {   // V2.3: poolSize (V2.2: 6)
-                    const group = new THREE.Group();
-                    group.visible = false;
+                // V2.3 (coordinator): three.js draws each uuid from Math.random, so the entries past V2.2's 6 are made while
+                // Math.random is a V23.rand stream (restored in finally): the boot's Math.random sequence stays V2.2's
+                const v23mr = Math.random;
+                try {
+                    for (let i = 0; i < poolSize; i++) {   // V2.3: poolSize (V2.2: 6)
+                        if (i === 6) Math.random = this.botUtilStream();   // V2.3: the 4 entries past V2.2's 6 on a V23.rand stream
+                        const group = new THREE.Group();
+                        group.visible = false;
 
-                    const ringMat = new THREE.MeshBasicMaterial({ color: 0xff4655, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
-                    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-                    ringMesh.rotation.x = -Math.PI * 0.5;
+                        const ringMat = new THREE.MeshBasicMaterial({ color: 0xff4655, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
+                        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                        ringMesh.rotation.x = -Math.PI * 0.5;
 
-                    const discMat = new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false });
-                    const discMesh = new THREE.Mesh(discGeo, discMat);
-                    discMesh.rotation.x = -Math.PI * 0.5;
+                        const discMat = new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false });
+                        const discMesh = new THREE.Mesh(discGeo, discMat);
+                        discMesh.rotation.x = -Math.PI * 0.5;
 
-                    const orbMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.82, depthWrite: false });
-                    const orbMesh = new THREE.Mesh(sphereGeo, orbMat);
+                        const orbMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.82, depthWrite: false });
+                        const orbMesh = new THREE.Mesh(sphereGeo, orbMat);
 
-                    group.add(ringMesh);
-                    group.add(discMesh);
-                    group.add(orbMesh);
-                    scene.add(group);
+                        group.add(ringMesh);
+                        group.add(discMesh);
+                        group.add(orbMesh);
+                        scene.add(group);
 
-                    this.botHazardsPool.push({
-                        inUse: false,
-                        type: 'mortar', // 'mortar' | 'flash' | 'sonar' | 'smoke'
-                        group: group,
-                        ringMesh: ringMesh,
-                        ringMat: ringMat,
-                        discMesh: discMesh,
-                        discMat: discMat,
-                        orbMesh: orbMesh,
-                        orbMat: orbMat,
-                        x: 0,
-                        y: 0,
-                        z: 0,
-                        radius: 3.8,
-                        startTime: 0,
-                        detonateAt: 0,
-                        endTime: 0,
-                        detonated: false,
-                        lastTickAt: 0,     // V2.3: a comma now, for the three fields below (V2.2: the last field)
-                        owner: null,       // V2.3: the bot that cast it (V23.util.onCast; gameplay never reads these three)
-                        abilityId: null,   // V2.3: 'bot.flash' | 'bot.sonar' | 'bot.mortar' | 'bot.smoke'
-                        caster: null       // V2.3: {enemy, slot, generation, agentId, archetype} at the cast (the recap's caster)
-                    });
-                }
+                        this.botHazardsPool.push({
+                            inUse: false,
+                            type: 'mortar', // 'mortar' | 'flash' | 'sonar' | 'smoke'
+                            group: group,
+                            ringMesh: ringMesh,
+                            ringMat: ringMat,
+                            discMesh: discMesh,
+                            discMat: discMat,
+                            orbMesh: orbMesh,
+                            orbMat: orbMat,
+                            x: 0,
+                            y: 0,
+                            z: 0,
+                            radius: 3.8,
+                            startTime: 0,
+                            detonateAt: 0,
+                            endTime: 0,
+                            detonated: false,
+                            lastTickAt: 0,     // V2.3: a comma now, for the three fields below (V2.2: the last field)
+                            owner: null,       // V2.3: the bot that cast it (V23.util.onCast; gameplay never reads these three)
+                            abilityId: null,   // V2.3: 'bot.flash' | 'bot.sonar' | 'bot.mortar' | 'bot.smoke'
+                            caster: null       // V2.3: {enemy, slot, generation, agentId, archetype} at the cast (the recap's caster)
+                        });
+                    }
+                } finally { Math.random = v23mr; }
             },
 
             toggleBotAbilityAI: function(forceState) {
@@ -45418,8 +45443,8 @@
         //    'bot.sonar', 'bot.mortar' or 'bot.smoke') and hz.caster {enemy, slot, generation, agentId, archetype} (a fresh
         //    record per cast, so a respawned slot never renames an old hazard); the mortar's tick passes {label, caster} to
         //    takeDamage (no source.enemy: no kill cam, as in V2.2). abilityLook.botDash is given gameNow(). None of these
-        //    fields is read by gameplay. (The 4 entries past V2.2's 6 are 28 more THREE objects at boot, and r128's
-        //    generateUUID draws Math.random 4 times for each: 112 more draws at boot than V2.2, before any seeded play.)
+        //    fields is read by gameplay. (The 4 entries past V2.2's 6 are 28 more THREE objects at boot; they are made while
+        //    Math.random is a V23.rand stream, so their uuids take no draw from the game's stream.)
         //  - Classic with Agent Identity on (identity 'off' is V2.2's picture exactly: none of this runs, and switching it
         //    off ends a windup and lands an orb in flight at once):
         //    step() reads V2.2's decision state only (nextAbilityAt, the 2600 ms global gap, the archetype's range with a
@@ -45804,6 +45829,8 @@
         // and on hook lines there (the static rule); each forwards to V23.util
         Object.assign(tacticalDirector, {
             botUtilPoolSize: function () { return V23.util.poolSize(); },
+            // V2.3 (coordinator): the stream initBotAbilities3D makes its 4 extra entries on (their uuids leave Math.random alone)
+            botUtilStream: function () { return V23.rand(0x51ED0006); },
             botUtilPoolLimit: function () { return V23.util.poolLimit(); },
             botUtilOnCast: function (enemy, kind, hz, perfNow) { V23.util.onCast(enemy, kind, hz, perfNow); },
             botUtilOnDetonate: function (hz, now) { V23.util.onDetonate(hz, now); },
@@ -54093,7 +54120,9 @@
                         // a Classic flash burst (agentSystem.flashes): it pops at once
                         flash: function (P, it) { P.x = it.position.x; P.y = it.position.y; P.z = it.position.z; P.go = true; P.dur = Math.max(120, it.expireAt - it.startAt); },
                         // a bot's telegraphed flash (tacticalDirector.botHazardsPool): an orb, then the pop
-                        hazard: function (P, it, now) { P.x = it.x; P.y = it.y; P.z = it.z; P.go = !!it.detonated; P.dur = Math.max(120, it.endTime - now); }
+                        // V2.3: the orb's flight from the bot's hand: V23.util moves orbMesh's local offset for 220 ms; it is exactly
+                        // 0 otherwise and whenever Agent Identity is off, so the point is V2.2's then
+                        hazard: function (P, it, now) { const o = it.detonated ? null : it.orbMesh.position; P.x = it.x + (o ? o.x : 0); P.y = it.y + (o ? o.y : 0); P.z = it.z + (o ? o.z : 0); P.go = !!it.detonated; P.dur = Math.max(120, it.endTime - now); }   // V2.3: H29.9
                     },
                     resolve: function (st) {
                         st._core = L.lin(L.hex(st.core)); st._glow = L.lin(L.hex(st.glow));
