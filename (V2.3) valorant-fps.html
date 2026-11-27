@@ -16670,7 +16670,7 @@
             const _white = new THREE.Color(1, 1, 1), _col = new THREE.Color(), _hsl = { h: 0, s: 0, l: 0 };
             const _m4 = new THREE.Matrix4(), _v3 = new THREE.Vector3();
             // data for the tests (never read by the game)
-            const stats = { built: 0, sets: 0, reserveMade: 0, reserveUsed: 0, kitWrites: 0, deathWrites: 0, uploadBytes: 0, tierSwaps: 0, wingKits: 0, rigKits: 0 };
+            const stats = { built: 0, sets: 0, reserveMade: 0, reserveUsed: 0, kitWrites: 0, deathWrites: 0, uploadBytes: 0, tierSwaps: 0, wingKits: 0, rigKits: 0, buildMs: 0, tierMs: 0 };
 
             // V2.3: Agent Identity as the game shows it: the setting on (V23.core.enabled) and CORE's boot set built
             const wanted = () => !!(V23.core && V23.core.enabled() && V23.core.stats && V23.core.stats.identityBuilt);
@@ -16941,6 +16941,7 @@
             function build() {
                 if (B.built || B.making) return;
                 B.making = true;
+                const t0 = performance.now();
                 try {
                     quiet(() => {   // V2.3: every object below takes its uuid from a V23.rand stream
                         B.tier = tierNow();
@@ -16957,6 +16958,7 @@
                     for (const r of B.rigs) rigMake(r);
                 } finally {
                     B.making = false;
+                    stats.buildMs = performance.now() - t0;
                 }
             }
             function setOn(on) {
@@ -17102,12 +17104,14 @@
                     }
                     const t = tierNow();
                     if (t === B.tier) return null;
+                    const t0 = performance.now();
                     B.tier = t;
                     B.geom = quiet(() => V23.parts.kitSuperset(t));
                     for (const st of B.sets) bindSuperset(st.geom);
                     for (const r of B.rigs) if (r.kit) bindSuperset(r.kit.geometry);
                     for (const w of B.wing) if (w.mesh) { w.mesh.geometry = wingGeom(w, t); wingShow(w); }
                     stats.tierSwaps++;
+                    stats.tierMs += performance.now() - t0;
                     sync();
                     return null;
                 },
