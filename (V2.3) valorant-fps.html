@@ -25709,15 +25709,18 @@
             const _stats = { poolMisses: 0, builds: 0, lastMs: 0, ms: [] };
             function _ensurePool() {
                 if (_pool.made) return;
+                const t0 = performance.now();
                 _pool.made = true;
                 const n = (typeof AGENT_ORDER !== 'undefined' ? AGENT_ORDER.length : 29);
                 _pool.placeholder = V23.mat.vm({ c: 0x808080 });
-                // V2.3: sized for every agent's show, world and body LOD, the four kit tiers and 29 arm sets, with headroom
+                // V2.3: sized for every agent's show LOD (11 bones and up to ~20 nodes), a world LOD each, two body LODs, the four
+                // kit tiers and 29 arm sets; a build past it still works and counts poolMisses
                 for (let i = 0; i < n * 2 + 8; i++) _pool.groups.push(new THREE.Group());
-                for (let i = 0; i < n * 15 + n + 30; i++) _pool.meshes.push(new THREE.Mesh(new THREE.BufferGeometry(), _pool.placeholder));
+                for (let i = 0; i < n * 20 + n + 40; i++) _pool.meshes.push(new THREE.Mesh(new THREE.BufferGeometry(), _pool.placeholder));
                 for (let i = 0; i < 8 + n * 2; i++) _pool.geoms.push(new THREE.BufferGeometry());
                 for (let i = 0; i < n * 9 + 9; i++) _pool.vm.push(V23.mat.vm({ c: 0xffffff }));
-                for (let i = 0; i < n * 6 + 12; i++) _pool.world.push(V23.mat.world({ c: 0xffffff }));
+                for (let i = 0; i < (n + 2) * 6 + 12; i++) _pool.world.push(V23.mat.world({ c: 0xffffff }));
+                _pool.madeMs = performance.now() - t0;
             }
             const _take = (list, make) => { if (list.length) return list.pop(); _stats.poolMisses++; return make(); };
             const _takeGroup = () => _take(_pool.groups, () => new THREE.Group());
@@ -26496,7 +26499,7 @@
                 library: { builtIn: _MODULES, custom: _CUSTOM },
                 // the pool's free counts (the test checks a build takes from it)
                 pool: { get made() { return _pool.made; }, get groups() { return _pool.groups.length; }, get meshes() { return _pool.meshes.length; },
-                    get geoms() { return _pool.geoms.length; }, get vm() { return _pool.vm.length; }, get world() { return _pool.world.length; } }
+                    get geoms() { return _pool.geoms.length; }, get vm() { return _pool.vm.length; }, get world() { return _pool.world.length; }, get madeMs() { return _pool.madeMs || 0; } }
             };
             V23.motion = {
                 // V2.3: sample(agentId, clip, t, out): out may be a pose from an earlier call (reused, nothing allocated) or a
