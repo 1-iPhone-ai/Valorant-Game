@@ -34935,7 +34935,8 @@
                             const dz = e.mesh.position.z - mp.position.z;
                             if (dx * dx + dz * dz <= rSq) {
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.gekko.c.tickSlowMs);
-                                damageEnemyActor(e, AGENT_TUNING.gekko.c.damagePerTick, now, nowMs, "Mosh Pit Acid", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.gekko.c.damagePerTick, now, nowMs, "Mosh Pit Acid", false);
                             }
                         }
                     }
@@ -35393,7 +35394,8 @@
                             e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.harbor.e.slowMs);
                             e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.harbor.e.revealMs);
                             if (canTick) {
-                                damageEnemyActor(e, AGENT_TUNING.harbor.e.damagePerTick, now, nowMs, "High Tide", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.harbor.e.damagePerTick, now, nowMs, "High Tide", false);
                             }
                         }
                     }
@@ -35553,7 +35555,8 @@
                             if (distSq <= AGENT_TUNING.astra.x.hitHalfWidthM * AGENT_TUNING.astra.x.hitHalfWidthM) {
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.astra.x.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.astra.x.revealMs);
-                                damageEnemyActor(e, AGENT_TUNING.astra.x.damagePerTick, now, nowMs, "Cosmic Divide", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.astra.x.damagePerTick, now, nowMs, "Cosmic Divide", false);
                             }
                         }
                     }
