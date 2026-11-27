@@ -45,16 +45,27 @@ test('viewmodel: draw, recoil spring, reload choreography, inspect, shell casing
     await frames(10);
     assert.ok(await evaluate(() => Math.abs(vmAnim.sp.p) < 0.002 && Math.abs(vmAnim.sp.z) < 0.002), 'spring settles');
 
+    // V2.2 final check: the magazine's drop and the inspect's turn are read on every animator step, inside the
+    // page. The test read them once per round trip, which on a slow renderer can be three reads in a 3.3 s reload,
+    // so it could miss the bottom of the drop or the turn's widest swing on any build (main's included; the clips
+    // are the same value for value). The thresholds are as before.
+    await evaluate(() => {
+        const end = vmAnim.end;
+        window.__vmRec = { minY: Infinity, maxRy: 0 };
+        vmAnim.end = function () {
+            const r = end.apply(this, arguments);
+            const w = game.weapons.rifle;
+            if (w && w.magazine) __vmRec.minY = Math.min(__vmRec.minY, w.magazine.position.y);
+            __vmRec.maxRy = Math.max(__vmRec.maxRy, Math.abs(vmAnim.last.ry || 0));
+            return r;
+        };
+    });
+
     // Reload: the magazine drops out and comes back; ammo refills
-    await evaluate(() => { const w = game.weapons.rifle; w.ammo = 3; reload(); });
+    await evaluate(() => { const w = game.weapons.rifle; w.ammo = 3; __vmRec.minY = Infinity; reload(); });
     const restY = await evaluate(() => game.weapons.rifle.magRestY !== undefined ? game.weapons.rifle.magRestY : game.weapons.rifle.magazine.position.y);
-    let lowest = 0;
-    const until = Date.now() + 15000;
-    while (Date.now() < until && await evaluate(() => game.reloading)) {
-        const y = await evaluate(() => game.weapons.rifle.magazine.position.y);
-        lowest = Math.min(lowest, y);
-        await frames(1);
-    }
+    await page.waitForFunction(() => !game.reloading, null, { timeout: 15000, polling: 50 });
+    const lowest = await evaluate(() => __vmRec.minY);
     assert.ok(lowest < restY - 0.2, `magazine drops out (lowest ${lowest.toFixed(2)})`);
     await frames(5);
     const after = await evaluate(() => ({ ammo: game.weapons.rifle.ammo, max: game.weapons.rifle.maxAmmo, y: game.weapons.rifle.magazine.position.y, vis: game.weapons.rifle.magazine.visible }));
@@ -62,11 +73,9 @@ test('viewmodel: draw, recoil spring, reload choreography, inspect, shell casing
     assert.ok(Math.abs(after.y - restY) < 1e-6 && after.vis, 'magazine back in place');
 
     // Inspect: turns the gun to show its sides
-    await evaluate(() => inspectWeapon());
-    await page.waitForTimeout(500);
-    await frames(2);
-    assert.ok(Math.abs(await evaluate(() => vmAnim.last.ry)) > 0.2, 'gun turns during inspect');
+    await evaluate(() => { __vmRec.maxRy = 0; inspectWeapon(); });
     await page.waitForFunction(() => !vmAnim.clip, null, { timeout: 15000 });
+    assert.ok((await evaluate(() => __vmRec.maxRy)) > 0.2, 'gun turns during inspect');
     await frames(30);
     assert.ok((await restDelta(evaluate)) < 0.02, 'back at rest after inspect (no drift)');
 
