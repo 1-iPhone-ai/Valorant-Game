@@ -45067,14 +45067,16 @@
             botHazardsPool: [],
             lastBotAbilityCastAt: 0,
 
-            // V2.3 REGION R8.initBotAbilities3D [WP8]: single owner. H29.5 the pool size becomes V23.util.poolSize() (stub 6, as here)
+            // V2.3 REGION R8.initBotAbilities3D [WP8]: single owner. H29.5 the pool size comes from V23.util.poolSize() (10), through
+            // tacticalDirector.botUtilPoolSize (the BOTUTIL block); classic acquires from the first 6 only, as V2.2 did
             initBotAbilities3D: function() {
                 this.botHazardsPool = [];
                 const ringGeo = new THREE.RingGeometry(3.2, 3.8, 28);
                 const discGeo = new THREE.CircleGeometry(3.75, 28);
                 const sphereGeo = new THREE.SphereGeometry(1.0, 14, 12);
 
-                for (let i = 0; i < 6; i++) {
+                const poolSize = this.botUtilPoolSize();   // V2.3: 10 entries (V2.2: 6), every one in the scene from boot, so the warm-up compiles them
+                for (let i = 0; i < poolSize; i++) {   // V2.3: poolSize (V2.2: 6)
                     const group = new THREE.Group();
                     group.visible = false;
 
@@ -45112,7 +45114,10 @@
                         detonateAt: 0,
                         endTime: 0,
                         detonated: false,
-                        lastTickAt: 0
+                        lastTickAt: 0,     // V2.3: a comma now, for the three fields below (V2.2: the last field)
+                        owner: null,       // V2.3: the bot that cast it (V23.util.onCast; gameplay never reads these three)
+                        abilityId: null,   // V2.3: 'bot.flash' | 'bot.sonar' | 'bot.mortar' | 'bot.smoke'
+                        caster: null       // V2.3: {enemy, slot, generation, agentId, archetype} at the cast (the recap's caster)
                     });
                 }
             },
@@ -45127,15 +45132,18 @@
                 showNotification(`Enemy Bot Ability AI: ${game.botAbilityAI ? 'ENABLED (Rushers Dash/Flash, Snipers Recon/TP, Juggernauts Mortar)' : 'DISABLED'}`, 2200);
             },
 
-            // V2.3 REGION R8.acquireBotHazard [WP8]: single owner. H29.4 the loop bound becomes V23.util.poolLimit() (stub 6, as here)
+            // V2.3 REGION R8.acquireBotHazard [WP8]: single owner. H29.4 the loop bound comes from V23.util.poolLimit() (classic 6,
+            // agent 10), through tacticalDirector.botUtilPoolLimit
             acquireBotHazard: function() {
-                for (let i = 0; i < this.botHazardsPool.length; i++) {
+                const limit = Math.min(this.botHazardsPool.length, this.botUtilPoolLimit());   // V2.3: classic searches V2.2's 6 of the 10
+                for (let i = 0; i < limit; i++) {   // V2.3: limit (V2.2: the pool's length, 6)
                     if (!this.botHazardsPool[i].inUse) return this.botHazardsPool[i];
                 }
                 return this.botHazardsPool[0] || null;
             },
 
-            // V2.3 REGION R8.tryCastBotAbility [WP8]: single owner. H29.2 V23.util.onCast(e, kind, hz, perfNow) at each branch end
+            // V2.3 REGION R8.tryCastBotAbility [WP8]: single owner. H29.2 V23.util.onCast(e, kind, hz, perfNow) at each branch end,
+            // through tacticalDirector.botUtilOnCast; every decision, timer write and Math.random draw here is V2.2's
             tryCastBotAbility: function(enemy, perfNow, distToPlayer, nx, nz, perpX, perpZ) {
                 if (!game.botAbilityAI || game.gameMode === 'range') return;
                 if (!enemy.nextAbilityAt) {
@@ -45157,7 +45165,7 @@
                     pos.z += (perpZ * 1.4 + nz * 0.9);
                     resolveEnemyMapCollision(pos, 0.68);
                     soundFX.at(pos.x, pos.y + 1, pos.z, () => soundFX.jettDash());
-                    abilityLook.botDash(enemy, dsx, dsz, perfNow);
+                    abilityLook.botDash(enemy, dsx, dsz, gameNow());   // V2.3: game time, as R.self.tick ages it (V2.2 passed perfNow on, gNow only from updateEnemies)
 
                     const hz = this.acquireBotHazard();
                     if (hz) {
@@ -45180,6 +45188,7 @@
                         hz.orbMat.opacity = 0.92;
                         hz.group.visible = true;
                     }
+                    this.botUtilOnCast(enemy, 'flash', hz, perfNow);   // V2.3: the caster on the hazard, the throw, the orb's flight from the hand
                     return;
                 }
 
@@ -45199,6 +45208,7 @@
                             agentSystem.spawnFlashBurst(pos.x, pos.y + 1.0, pos.z, 0x38bdf8, 2.4, 280, perfNow);
                         }
                         soundFX.at(pos.x, pos.y + 1, pos.z, () => soundFX.omenTeleport());
+                        this.botUtilOnCast(enemy, 'teleport', null, perfNow);   // V2.3: the snap on the cast tick (no hazard)
                         return;
                     }
                     if (enemy.hasSight && distToPlayer <= 27.0) {
@@ -45225,6 +45235,7 @@
                             hz.group.visible = true;
                             soundFX.at(hz.x, hz.y + 0.5, hz.z, () => soundFX.sovaSonarPing());
                         }
+                        this.botUtilOnCast(enemy, 'sonar', hz, perfNow);   // V2.3: the caster on the hazard, the wrist tap
                         return;
                     }
                 }
@@ -45259,6 +45270,7 @@
                         hz.group.visible = true;
                         soundFX.at(hz.x, hz.y + 0.5, hz.z, () => soundFX.mollyCast());
                     }
+                    this.botUtilOnCast(enemy, 'mortar', hz, perfNow);   // V2.3: the caster on the hazard (the tick names it), the channel
                     return;
                 }
 
@@ -45287,10 +45299,12 @@
                         hz.group.visible = true;
                         soundFX.at(hz.x, hz.y + 0.5, hz.z, () => soundFX.smokeDeploy());
                     }
+                    this.botUtilOnCast(enemy, 'smoke', hz, perfNow);   // V2.3: the caster on the hazard, the underhand lob of the orb
                 }
             },
 
-            // V2.3 REGION R8.updateBotAbilities [WP8]: single owner. H29.3 V23.util.onDetonate(hz, gNow) where hz.detonated flips
+            // V2.3 REGION R8.updateBotAbilities [WP8]: single owner. H29.3 V23.util.onDetonate(hz, gNow) where hz.detonated flips,
+            // through tacticalDirector.botUtilOnDetonate; the frame's windups and orb flights after the loop (botUtilFrame)
             updateBotAbilities: function(delta, now) {
                 for (let i = 0; i < this.botHazardsPool.length; i++) {
                     const hz = this.botHazardsPool[i];
@@ -45328,6 +45342,7 @@
                                     showNotification("DODGED HOSTILE CURVEBALL FLASH! (Turned away)", 1300);
                                 }
                             }
+                            this.botUtilOnDetonate(hz, now);   // V2.3: the pop, after V2.2's (agent mode's push syncs here)
                         }
                     } else if (hz.type === 'sonar') {
                         const t = Math.min(1, (now - hz.startTime) / Math.max(1, hz.endTime - hz.startTime));
@@ -45341,6 +45356,7 @@
                                 hz.detonated = true;
                                 hz.discMesh.scale.setScalar(1.0);
                                 hz.discMat.opacity = 0.42;
+                                this.botUtilOnDetonate(hz, now);   // V2.3: the mortar arms
                             }
                         } else {
                             hz.ringMesh.rotation.z += delta * 2.2;
@@ -45349,7 +45365,7 @@
                                 const px = characterController.position.x - hz.x;
                                 const pz = characterController.position.z - hz.z;
                                 if (px * px + pz * pz <= hz.radius * hz.radius) {
-                                    takeDamage(4, hz.group.position, { label: 'Incendiary Mortar' });
+                                    takeDamage(4, hz.group.position, { label: 'Incendiary Mortar', caster: hz.caster });   // V2.3: the caster for the recap (no source.enemy: no kill cam, as in V2.2)
                                 }
                             }
                         }
@@ -45360,6 +45376,7 @@
                         }
                     }
                 }
+                this.botUtilFrame(delta, now);   // V2.3: windups that end (Bot Ability AI off, no cast in 650 ms) and the orbs in flight
             },
 
             update: function(delta, now) {
@@ -45390,21 +45407,408 @@
         //   tacticalDirector region initBotAbilities3D .. updateBotAbilities). Helpers it calls from that region may be
         //   added to tacticalDirector here with Object.assign(tacticalDirector, {...}).
         // Purpose: classic read-only windups and throws, agent-mode casts (rusher flash and push, choke smokes, flash before a
-        //   peek, slowed entries), the Ranked pin. Stubs only in WP1 (pool size and limit 6, the speed multiplier 1).
+        //   peek, slowed entries), the Ranked pin. M1b: both-mode data and classic are complete (below); agent mode is M2
+        //   (until then 'agent' plays as classic with the 10-entry pool, and its hooks keep their neutral values).
         // Clocks: gNow (game time) for windups, releases and hazards; sequences sync on hz.detonated.
+        //
+        // V2.3: what each mode does (design 10):
+        //  - Both modes: tacticalDirector builds the hazard pool with poolSize() = 10 entries (V2.2's MeshBasic signatures,
+        //    all in the scene from boot, so the warm-up compiles them); classic acquires from the first 6 only (poolLimit()),
+        //    so steal-[0] and every pool index are V2.2's. Each cast records hz.owner (the bot), hz.abilityId ('bot.flash',
+        //    'bot.sonar', 'bot.mortar' or 'bot.smoke') and hz.caster {enemy, slot, generation, agentId, archetype} (a fresh
+        //    record per cast, so a respawned slot never renames an old hazard); the mortar's tick passes {label, caster} to
+        //    takeDamage (no source.enemy: no kill cam, as in V2.2). abilityLook.botDash is given gameNow(). None of these
+        //    fields is read by gameplay. (The 4 entries past V2.2's 6 are 28 more THREE objects at boot, and r128's
+        //    generateUUID draws Math.random 4 times for each: 112 more draws at boot than V2.2, before any seeded play.)
+        //  - Classic with Agent Identity on (identity 'off' is V2.2's picture exactly: none of this runs, and switching it
+        //    off ends a windup and lands an orb in flight at once):
+        //    step() reads V2.2's decision state only (nextAbilityAt, the 2600 ms global gap, the archetype's range with a
+        //    0.5 m margin, sight, health, nextTpAt) and starts a windup when the cast will be possible within 350 ms; the
+        //    windup ends at the cast (the release), or is cancelled 650 ms after it started without one, when another bot's
+        //    cast moves the gap past the window, when the bot dies or respawns, when it cannot cast on the next tick (a
+        //    later sim tick stepped some bot but not it, it left the near tier, or it is blinded; with no bot stepped at
+        //    all, as while bots are frozen or a lone bot is moved by botMechanics, the 650 ms timeout ends it), or when
+        //    Bot Ability AI, identity or a change of the mode (the setting or the Ranked pin) turns it off; step and
+        //    _frame notice those switches themselves, no caller is needed. On the cast tick the arm releases (throw,
+        //    wrist tap, two-hand channel or underhand lob) and a flash or smoke hazard's orb child flies from the bot's
+        //    right hand to V2.2's hazard point in 220 ms (only orbMesh's local offset is animated, as design 10 says: the
+        //    smoke flies at V2.2's scale; the hazard's x/y/z, times, scale and group are V2.2's). A caster whose look is
+        //    built (not a stub) tints the orb with its palette glow; identity 'off' puts V2.2's colour back on a live
+        //    tinted orb at once, and an entry that ends or is cast again as a sonar or mortar gets V2.2's colour back.
+        //  - Outbound protocols (other blocks implement them; every call is guarded and made inside V23.seeded, so
+        //    whatever they draw through a V23.CONTRACT.seededSafe helper never touches Math.random: a windup's calls on
+        //    the stream made at its start, every other event on its own V23.rand stream):
+        //    V23.bots.windup(enemy, code, t): code 7-10 is the gesture (contract v0: 7 throw, 8 channel, 9 snap/tap,
+        //      10 place/slam; V23.motion.botCode(name) answers first when it knows the gesture), t the windup's progress:
+        //      0 at the start, then every sim tick in [0, 0.95] toward the predicted cast, 1 on the cast tick (the release);
+        //      code 0 ends it (the pose goes back to rest).
+        //    V23.audio.botCue(enemy, kind, hz): 'windup.<k>' at the windup start (the positional warning sting, design
+        //      12.3) and 'cast.<k>' on the cast tick, k one of flash, sonar, mortar, smoke, teleport (no third argument);
+        //      'arm.mortar' when a mortar arms (detonateAt, 850 ms after the cast; design 12.3 and open decision 7), with
+        //      the hazard as the third argument: the sting belongs at hz.x/y/z (the danger zone, up to 21 m from the
+        //      bot), the enemy names the caster's palette. Sent only while the caster is alive and the life that cast it.
+        //  - Ranked: rankedPin(true) makes the mode 'classic' for the match without writing game.userSettings (so the
+        //    pinned value is never saved); rankedPin(false) gives the player's setting back.
         V23.util = {
-            onActivate: function (actor) { return null; },                                   // H21.2
-            step: function (enemy, gNow, dist, nx, nz, perpX, perpZ) { return null; },       // H29.1
-            onCast: function (enemy, kind, hz, perfNow) { return null; },                    // H29.2 (WP8 region)
-            onDetonate: function (hz, gNow) { return null; },                                // H29.3 (WP8 region)
-            poolLimit: function () { return 6; },                                            // H29.4 (WP8 region): V2.2's 6
-            poolSize: function () { return 6; },                                             // H29.5 (WP8 region): V2.2's 6
-            peekHook: function (enemy, peek, perfNow) { return false; },                     // H29.6
-            blocksSight: function (a, b) { return false; },                                  // H29.7
-            playerSpeedMult: function (gNow) { return 1; },                                  // H29.8
-            rankedPin: function (on) { return null; },                                       // H33.4 / H33.5
-            cancelWindups: function () { return null; }
+            // V2.3: design 10's numbers
+            _POOL: 10, _CLASSIC: 6, _LEAD: 350, _CANCEL: 650, _ORB: 220, _GAP: 2600, _MARGIN: 0.5,
+            // V2.3: the gesture each cast kind plays: [GESTURES id, contract v0 code]
+            _GEST: {
+                flash: ['overhandThrow', 7], smoke: ['underhandLob', 7], mortar: ['twoHandChannel', 8],
+                sonar: ['wristTap', 9], teleport: ['fingerSnap', 9]
+            },
+            // per bot slot: the classic windup {on, enemy, kind, code, t0, open, gen, block, seenAt, rng, pc, pt, fn}
+            // (made once per slot by _rec; rng is the windup's stream, fn its pose call, so a tick allocates nothing)
+            _w: [],
+            _fl: [],           // per hazard pool index: the orb flight {on, t0, stamp, ox, oy, oz, lob}
+            _tn: [],           // per hazard pool index: the tint on its orb {on, stamp, kind} (V2.2's colour comes back from it)
+            _tinted: 0,        // tints on
+            _live: 0,          // windups on
+            _stepAt: -1,       // the game time of the latest H29.1 call for any bot (the latest sim tick that stepped one)
+            _lastMode: null,   // the mode step and _frame saw last (a change ends the windups)
+            _pinned: false,    // Ranked: 'classic' for the match
+            _seq: 0,           // events so far (the per-event stream's seed)
+            _hand: { x: 0, y: 0, z: 0 },
+            // V2.3: counters and the last 64 events, for the tests (never read by the game)
+            _stats: { windups: 0, released: 0, cancelled: 0, casts: 0, castsLed: 0, minLead: Infinity, flights: 0, landed: 0, detonations: 0, arms: 0, log: [] },
+
+            onActivate: function (actor) {                                                     // H21.2
+                // V2.3: a new life: a windup left from the old one ends (its pose goes back to rest)
+                const w = this._w[actor.slot];
+                if (w && w.on) this._cancel(w, 'respawn');
+                return null;
+            },
+            step: function (enemy, gNow, dist, nx, nz, perpX, perpZ) {                         // H29.1
+                // V2.3: classic, read-only: V2.2's decision state in, the windup pose out; nothing a decision reads is written
+                const w = this._w[enemy.slot];
+                // V2.3: stepped on this sim tick; _stepAt is the latest tick that stepped any bot (_frame ends a windup
+                // whose bot a later tick did not step)
+                this._stepAt = gNow;
+                if (w) w.seenAt = gNow;
+                this._modeCheck();
+                if (!game.botAbilityAI || game.gameMode === 'range' || !this._identity()) {
+                    if (w && w.on) this._cancel(w, game.botAbilityAI ? 'off' : 'botAI');
+                    return null;
+                }
+                const open = this._open(enemy);
+                if (w && w.on) {
+                    if (w.gen !== enemy.generation) this._cancel(w, 'respawn');
+                    else if (gNow - w.t0 >= this._CANCEL) this._cancel(w, 'timeout');
+                    else if (open - gNow > this._LEAD) this._cancel(w, 'gap');   // another bot's cast moved the gap on
+                    else {
+                        w.open = open;
+                        // V2.3: the progress toward the predicted cast, on the windup's own stream
+                        this._poseW(w, w.code, Math.min(0.95, Math.max(0, (gNow - w.t0) / Math.max(1, open - w.t0))));
+                    }
+                    return null;
+                }
+                const kind = this._predict(enemy, dist, gNow, open);
+                if (kind && !(w && w.block === open)) this._start(enemy, kind, gNow, open);
+                return null;
+            },
+            onCast: function (enemy, kind, hz, perfNow) {                                      // H29.2 (WP8 region)
+                const now = gameNow();
+                // V2.3: both modes: who cast it, for the recap and the replays (inert for gameplay)
+                if (hz) {
+                    hz.owner = enemy;
+                    hz.abilityId = 'bot.' + kind;
+                    hz.caster = { enemy: enemy, slot: enemy.slot, generation: enemy.generation, agentId: enemy.agentId || null, archetype: enemy.archetype || null };
+                }
+                const S = this._stats, w = this._w[enemy.slot], idOn = this._identity();
+                const led = !!(idOn && w && w.on && w.gen === enemy.generation);
+                const lead = led ? now - w.t0 : 0;
+                if (w && w.on) {
+                    // V2.3: the release below ends a windup of this life; otherwise (identity switched off on the cast
+                    // tick itself, or a windup left from an old life) the pose goes back to rest here, as no release follows
+                    // for it
+                    if (led) { w.on = false; this._live--; }
+                    else this._cancel(w, idOn ? 'respawn' : 'off');
+                }
+                // V2.3: an old cast's tint on this entry: a flash or smoke cast just set V2.2's own colour; a sonar or
+                // mortar does not touch the orb, so the colour the old cast had in V2.2 comes back
+                if (hz) {
+                    const ti = tacticalDirector.botHazardsPool.indexOf(hz), tn = this._tn[ti];
+                    if (tn && tn.on) this._untint(ti, hz, !(kind === 'flash' || kind === 'smoke'));
+                }
+                S.casts++;
+                if (led) { S.castsLed++; S.released++; if (lead < S.minLead) S.minLead = lead; }
+                this._log(['cast', enemy.slot, kind, now, lead, hz ? tacticalDirector.botHazardsPool.indexOf(hz) : -1]);
+                if (!idOn) return null;
+                // V2.3: the release on the cast tick, then the orb's flight and the caster's tint
+                this._emit(enemy, this._code(kind), 1, 'cast.' + kind, this._stream(enemy));
+                if (hz) {
+                    this._tint(hz, kind, enemy);
+                    this._fly(hz, kind, enemy, now);
+                }
+                return null;
+            },
+            onDetonate: function (hz, gNow) {                                                  // H29.3 (WP8 region)
+                // V2.3: classic counts it; agent mode's push syncs here in M2
+                this._stats.detonations++;
+                this._log(['pop', hz.owner ? hz.owner.slot : -1, hz.type, gNow, 0, tacticalDirector.botHazardsPool.indexOf(hz)]);
+                // V2.3: the mortar arming is the armored bot's heaviest utility: its positional warning sting (design 12.3,
+                // open decision 7), placed at the hazard (the third argument), in the caster's palette. Only while the
+                // caster is alive and still the life that cast it: a dead bot or a respawned slot sends no sting
+                const o = hz.owner, c = hz.caster;
+                if (hz.type === 'mortar' && o && c && o.generation === c.generation && !o.hit && o.isActive && this._identity()) {
+                    this._stats.arms++;
+                    this._emit(o, -1, 0, 'arm.mortar', this._stream(o), hz);
+                }
+                return null;
+            },
+            poolLimit: function () { return this._mode() === 'agent' ? this._POOL : this._CLASSIC; },   // H29.4 (WP8 region)
+            poolSize: function () { return this._POOL; },                                     // H29.5 (WP8 region)
+            peekHook: function (enemy, peek, perfNow) { return false; },                     // H29.6: agent mode's flashPeek (M2)
+            blocksSight: function (a, b) { return false; },                                  // H29.7: agent mode's choke smokes (M2)
+            playerSpeedMult: function (gNow) { return 1; },                                  // H29.8: agent mode's slowEntry (M2)
+            rankedPin: function (on) {                                                       // H33.4 / H33.5
+                // V2.3: a flag, not a settings write, so the pinned 'classic' is never saved
+                this._pinned = !!on;
+                return null;
+            },
+            cancelWindups: function () {
+                // V2.3: every windup back to rest, for a caller that resets play (the tests' setup). Bot Ability AI off,
+                // identity off and a mode change need no caller: step and _frame notice them
+                for (let i = 0; i < this._w.length; i++) { const w = this._w[i]; if (w && w.on) this._cancel(w, 'cancel'); }
+                return null;
+            },
+
+            // ---- private -------------------------------------------------------------------------------------------
+            _mode: function () {
+                return (!this._pinned && game.userSettings && game.userSettings.botUtility === 'agent') ? 'agent' : 'classic';
+            },
+            // V2.3: a change of the mode (the setting, or the Ranked pin) ends every windup: agent mode's windups are not
+            // classic's (M2). The first look only records it
+            _modeCheck: function () {
+                const m = this._mode();
+                if (m === this._lastMode) return;
+                const first = this._lastMode === null;
+                this._lastMode = m;
+                if (first || this._live <= 0) return;
+                for (let i = 0; i < this._w.length; i++) { const w = this._w[i]; if (w && w.on) this._cancel(w, 'mode'); }
+            },
+            // V2.3: Agent Identity (design 16): 'off' restores V2.2's in-match picture, so no windup, flight, tint or cue
+            _identity: function () { return !(game.userSettings && game.userSettings.agentIdentity === 'off'); },
+            // V2.3: when tryCastBotAbility can next cast for this bot: its own timer and the 2600 ms global gap
+            _open: function (enemy) {
+                return Math.max(enemy.nextAbilityAt || 0, tacticalDirector.lastBotAbilityCastAt + this._GAP);
+            },
+            // V2.3: the cast tryCastBotAbility will make within 350 ms, from its own conditions with a 0.5 m margin (null: none)
+            _predict: function (enemy, dist, gNow, open) {
+                if (!enemy.nextAbilityAt || open - gNow > this._LEAD) return null;
+                const m = this._MARGIN, arch = enemy.archetype || 'standard';
+                if (arch === 'rusher') return (dist > 6.5 + m && dist < 21.0 - m) ? 'flash' : null;
+                if (arch === 'sniper') {
+                    if (enemy.health < enemy.maxHealth && Math.max(open, enemy.nextTpAt || 0) - gNow <= this._LEAD) return 'teleport';
+                    return (enemy.hasSight && dist <= 27.0 - m) ? 'sonar' : null;
+                }
+                if (arch === 'armored') return dist <= 21.0 - m ? 'mortar' : null;
+                if (arch === 'standard') return ((!enemy.hasSight || enemy.health < enemy.maxHealth) && dist <= 20.0 - m) ? 'smoke' : null;
+                return null;
+            },
+            // V2.3: the windup record of a bot slot, made once (its pose call fn is bound to it, so a tick allocates nothing)
+            _rec: function (slot) {
+                let w = this._w[slot];
+                if (w) return w;
+                const self = this;
+                w = this._w[slot] = { on: false, enemy: null, kind: null, code: 0, t0: 0, open: 0, gen: 0, block: -1, seenAt: -1, rng: null, pc: 0, pt: 0, fn: null };
+                w.fn = function () { self._pose(w.enemy, w.pc, w.pt); };
+                return w;
+            },
+            _start: function (enemy, kind, gNow, open) {
+                const w = this._rec(enemy.slot);
+                w.on = true; w.enemy = enemy; w.kind = kind; w.code = this._code(kind); w.t0 = gNow; w.open = open; w.gen = enemy.generation;
+                w.block = -1;
+                w.seenAt = gNow;
+                // V2.3: the windup's stream: its start, its progress ticks and its end all draw from it
+                w.rng = this._stream(enemy);
+                this._live++;
+                this._stats.windups++;
+                this._log(['windup', enemy.slot, kind, gNow, open - gNow, -1]);
+                this._emit(enemy, w.code, 0, 'windup.' + kind, w.rng);
+            },
+            _cancel: function (w, why) {
+                w.on = false;
+                this._live--;
+                // V2.3: a windup that ran out, was cancelled outright, or lost its bot's sim step stays down until the bot's
+                // next cast time (no restart on the same prediction, so a bot moved by botMechanics or blinded for a tick
+                // never flickers its pose or repeats its cue); the cast itself still comes when V2.2's does, with its
+                // release only
+                if (why === 'timeout' || why === 'cancel' || why === 'unseen' || why === 'blind' || why === 'mode') w.block = w.open;
+                this._stats.cancelled++;
+                this._log(['cancel', w.enemy.slot, why, gameNow(), 0, -1]);
+                this._poseW(w, 0, 0);
+            },
+            _log: function (ev) {
+                const L = this._stats.log;
+                L.push(ev);
+                if (L.length > 64) L.shift();
+            },
+            // V2.3: the gesture code for a cast kind
+            _code: function (kind) {
+                const g = this._GEST[kind];
+                if (!g) return 7;
+                const c = (V23.motion && V23.motion.botCode) ? V23.motion.botCode(g[0]) : null;
+                const n = typeof c === 'number' ? c : (c && typeof c.code === 'number' ? c.code : g[1]);
+                return (n >= 7 && n <= 10) ? n : g[1];
+            },
+            _pose: function (enemy, code, t) {
+                if (V23.bots && V23.bots.windup) V23.bots.windup(enemy, code, t);
+            },
+            // V2.3: a windup's progress or end, inside V23.seeded on the windup's own stream (made at its start)
+            _poseW: function (w, code, t) {
+                w.pc = code; w.pt = t;
+                V23.seeded(w.fn, w.rng);
+            },
+            // V2.3: a fresh stream per bot slot, generation and event
+            _stream: function (enemy) {
+                this._seq = (this._seq + 1) >>> 0;
+                return V23.rand(((enemy.slot + 1) * 73856093) ^ ((enemy.generation + 1) * 19349663) ^ (this._seq * 83492791));
+            },
+            // V2.3: a windup start, a release or a mortar arming: the pose (code -1: none) and the positional cue, on rng
+            // (hz: the armed hazard, where an arming sting is placed; absent for the others)
+            _emit: function (enemy, code, t, cue, rng, hz) {
+                const self = this;
+                V23.seeded(function () {
+                    if (code >= 0) self._pose(enemy, code, t);
+                    if (V23.audio && V23.audio.botCue) {
+                        if (hz) V23.audio.botCue(enemy, cue, hz);
+                        else V23.audio.botCue(enemy, cue);
+                    }
+                }, rng);
+            },
+            // V2.3: the caster's look, when it is built (stub looks and no look keep V2.2's colours)
+            _look: function (enemy) {
+                if (!enemy.agentId || !V23.core || !V23.core.resolve) return null;
+                const look = V23.core.resolve(enemy.agentId);
+                return (look && !look.stub && look.palette) ? look : null;
+            },
+            _tint: function (hz, kind, enemy) {
+                const look = this._look(enemy);
+                const g = look && look.palette.glow ? look.palette.glow.c : undefined;
+                if (typeof g !== 'number') return;
+                if (!(kind === 'flash' || kind === 'smoke')) return;
+                const i = tacticalDirector.botHazardsPool.indexOf(hz);
+                if (i < 0) return;
+                // V2.3: the flash orb in the caster's glow; the smoke keeps half its hostile crimson so it still reads as theirs
+                if (kind === 'flash') hz.orbMat.color.setHex(g).convertSRGBToLinear();
+                else hz.orbMat.color.setHex(this._mix(g, 0x991b1b, 0.5)).convertSRGBToLinear();
+                // V2.3: marked, so identity 'off', the entry's end or a sonar / mortar cast on it puts V2.2's colour back
+                let tn = this._tn[i];
+                if (!tn) tn = this._tn[i] = { on: false, stamp: 0, kind: null };
+                if (!tn.on) this._tinted++;
+                tn.on = true; tn.stamp = hz.startTime; tn.kind = kind;
+            },
+            // V2.3: an entry's tint ends; restore: put back the colour V2.2 has on that orb now (a flash that has not popped
+            // 0xfbbf24, a smoke 0x991b1b; a flash that popped already has V2.2's white, set by updateBotAbilities)
+            _untint: function (i, hz, restore) {
+                const tn = this._tn[i];
+                if (!tn || !tn.on) return;
+                tn.on = false;
+                this._tinted--;
+                if (!restore || !hz) return;
+                if (tn.kind === 'flash') hz.orbMat.color.setHex(0xfbbf24).convertSRGBToLinear();
+                else if (tn.kind === 'smoke') hz.orbMat.color.setHex(0x991b1b).convertSRGBToLinear();
+            },
+            _mix: function (a, b, t) {
+                const ch = (s) => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t);
+                return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+            },
+            // V2.3: the bot's right glove as drawn (buildHumanoidEnemyGeometry's grip at (0.24, 1.17, -0.38), turned half
+            // round about the group as packEnemyBatches draws it), raised a little for the release
+            _handAt: function (enemy) {
+                const m = enemy.mesh, s = m.scale, r = m.rotation.y, c = Math.cos(r), sn = Math.sin(r), o = this._hand;
+                const lx = -0.24 * s.x, ly = 1.3 * s.y, lz = 0.38 * s.z;
+                o.x = m.position.x + lx * c + lz * sn;
+                o.y = m.position.y + ly;
+                o.z = m.position.z - lx * sn + lz * c;
+                return o;
+            },
+            // V2.3: start the orb's flight: its local offset starts at the hand and reaches 0 (V2.2's point) in 220 ms
+            _fly: function (hz, kind, enemy, now) {
+                if (!(kind === 'flash' || kind === 'smoke') || !hz.orbMesh || !hz.orbMesh.visible) return;
+                const i = tacticalDirector.botHazardsPool.indexOf(hz);
+                if (i < 0) return;
+                const h = this._handAt(enemy), gp = hz.group.position;
+                let f = this._fl[i];
+                if (!f) f = this._fl[i] = { on: false, t0: 0, stamp: 0, ox: 0, oy: 0, oz: 0, lob: false };
+                f.on = true; f.t0 = now; f.stamp = hz.startTime;
+                f.ox = h.x - gp.x; f.oy = h.y - gp.y; f.oz = h.z - gp.z;
+                f.lob = kind === 'smoke';   // V2.3: the lob's higher arc (its scale stays V2.2's 3.4: only the offset moves)
+                hz.orbMesh.position.set(f.ox, f.oy, f.oz);
+                this._stats.flights++;
+            },
+            // V2.3: once a frame from updateBotAbilities (game time): windups that must end, and the orbs in flight
+            _frame: function (delta, now) {
+                const idOn = this._identity();
+                this._modeCheck();
+                if (this._live > 0) {
+                    const stop = !game.botAbilityAI || game.gameMode === 'range' || !idOn;
+                    for (let i = 0; i < this._w.length; i++) {
+                        const w = this._w[i];
+                        if (!w || !w.on) continue;
+                        const e = w.enemy;
+                        if (stop) this._cancel(w, game.botAbilityAI ? 'off' : 'botAI');
+                        else if (e.hit || !e.isActive || e.generation !== w.gen) this._cancel(w, 'dead');
+                        // V2.3: read-only checks that it cannot cast on the next tick, so its pose must not hold: a later
+                        // sim tick stepped another bot but not this one (blinded, out of the near tier or moved by
+                        // botMechanics then), or updateEnemies put it out of the near tier; or it is blinded now (a blind
+                        // landed between ticks). Never against gameClock: a timing reset (a resume, photo mode, a tab
+                        // change) moves gameClock with no sim step. With no bot stepped at all (bots frozen, a lone bot
+                        // moved by botMechanics), the 650 ms timeout below ends it
+                        else if (w.seenAt < this._stepAt || e.tier !== 'near') this._cancel(w, 'unseen');
+                        else if (e.blindedUntil > now) this._cancel(w, 'blind');
+                        else if (now - w.t0 >= this._CANCEL) this._cancel(w, 'timeout');
+                    }
+                }
+                const pool = tacticalDirector.botHazardsPool;
+                for (let i = 0; i < this._fl.length; i++) {
+                    const f = this._fl[i];
+                    if (!f || !f.on) continue;
+                    const hz = pool[i];
+                    // ended, or taken by another cast (whose own setup stands): back to V2.2's offset
+                    if (!hz || !hz.inUse || hz.startTime !== f.stamp) {
+                        f.on = false;
+                        if (hz) hz.orbMesh.position.set(0, 0, 0);
+                        continue;
+                    }
+                    // V2.3: identity switched off mid-flight lands the orb on V2.2's point at once
+                    const s = idOn ? (now - f.t0) / this._ORB : 1;
+                    if (s >= 1) {
+                        f.on = false;
+                        hz.orbMesh.position.set(0, 0, 0);
+                        this._stats.landed++;
+                        continue;
+                    }
+                    const k = Math.max(0, s), e = 1 - (1 - k) * (1 - k), left = 1 - e;
+                    const lift = (f.lob ? 0.9 : 0.35) * 4 * k * (1 - k);
+                    hz.orbMesh.position.set(f.ox * left, f.oy * left + lift, f.oz * left);
+                }
+                // V2.3: the tints: identity 'off' or the entry's end puts V2.2's colour back; a flash that popped has V2.2's
+                // white already (updateBotAbilities set it this frame), so its mark just ends
+                if (this._tinted > 0) {
+                    for (let i = 0; i < this._tn.length; i++) {
+                        const tn = this._tn[i];
+                        if (!tn || !tn.on) continue;
+                        const hz = pool[i];
+                        if (!hz) { tn.on = false; this._tinted--; continue; }
+                        // (a cast on the entry ends its mark in onCast, so a new stamp here is no cast of V2.2's: left as it is)
+                        const same = hz.startTime === tn.stamp;
+                        if (!same || (tn.kind === 'flash' && hz.detonated)) this._untint(i, hz, false);
+                        else if (!idOn || !hz.inUse) this._untint(i, hz, true);
+                    }
+                }
+            }
         };
+        // V2.3: what the WP8 region (initBotAbilities3D .. updateBotAbilities) calls, so V23 appears only in this block
+        // and on hook lines there (the static rule); each forwards to V23.util
+        Object.assign(tacticalDirector, {
+            botUtilPoolSize: function () { return V23.util.poolSize(); },
+            botUtilPoolLimit: function () { return V23.util.poolLimit(); },
+            botUtilOnCast: function (enemy, kind, hz, perfNow) { V23.util.onCast(enemy, kind, hz, perfNow); },
+            botUtilOnDetonate: function (hz, now) { V23.util.onDetonate(hz, now); },
+            botUtilFrame: function (delta, now) { V23.util._frame(delta, now); }
+        });
         // ===== END V2.3 BLOCK BOTUTIL =====
 
         // =============================================
