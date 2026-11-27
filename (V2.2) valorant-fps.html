@@ -60375,9 +60375,10 @@
                             bot.lastFireAt = now + (i * 180);
                             const startVec = new THREE.Vector3(bot.group.position.x, 1.25, bot.group.position.z);
                             const endVec = new THREE.Vector3(bestEnemy.mesh.position.x, 1.25, bestEnemy.mesh.position.z);
-                            if (typeof spawnBulletTrail === 'function') {
-                                spawnBulletTrail(startVec, endVec);
-                            }
+                            // V2.2: the bots' own tracer, from the muzzle as theirs (spawnBulletTrail never existed: no tracer was drawn)
+                            this._wingTo.copy(endVec).sub(startVec).normalize();
+                            this._wingFrom.copy(startVec).addScaledVector(this._wingTo, 0.85);
+                            createBulletTrail(this._wingFrom, this._wingTo);
                             const wingDmg = 18;
                             this.combatMatrix.wingman.body++;
                             this.combatMatrix.wingman.damage += wingDmg;
