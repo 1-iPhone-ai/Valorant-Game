@@ -29137,7 +29137,10 @@
                     }
                 }
 
-                characterController.position.set(targetX, targetY, targetZ);
+                // V2.2: the beacon is on the floor and the controller's position is the eye: stand on it (as Veto's
+                // Crosscut and Chamber's Rendezvous do). At the floor's height you were pushed off a raised floor's side
+                characterController.position.set(targetX, targetY + characterController.height, targetZ);
+                characterController.prevSimPosition.copy(characterController.position);
                 characterController.velocity.set(0, 0, 0);
                 camera.position.set(targetX, targetY + characterController.height, targetZ);
 
