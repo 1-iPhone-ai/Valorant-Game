@@ -23967,6 +23967,11 @@
         //    before the saved settings load: they only record their targets, and nothing is built there; applySettings
         //    (cfg, null) runs before core.init, so it only records the values, and core.init builds (when agentIdentity is
         //    'on') from game.userSettings. V23.CONTRACT.bootOrder holds the list (identity-budget checks it).
+        //    Math.random at boot (V23.CONTRACT.bootNotes): with Agent Identity on, core.init makes the part pool, the 4x4
+        //    upload target and the base material, and three.js draws each one's uuid from Math.random (four calls per
+        //    object), so the boot stream differs from V2.2's there and only there; with it off core.init makes nothing and
+        //    the stream is V2.2's. The first switch-on and the showroom's first build make them the same way. same.js
+        //    reseeds per scenario; a proof of 'no Math.random while V2.3 code runs' excludes those calls.
         //  - Material rule: V23.mat is the only place V2.3 creates materials (between the V23.mat markers below), and every
         //    signature reuses a program V2.2 already compiles: vm(spec) MeshStandard toneMapped:false FrontSide (gun parts),
         //    card(color, additive) MeshBasic castFX radial texture (castFX halo/core), flat(color, opacity) MeshBasic
@@ -24120,7 +24125,12 @@
             bootOrder: Object.freeze(['arena.applyTier', 'arena.onMapBuilt', 'fp.attach', 'fp.initCast', 'replay.ghostInit', 'stage.buildShowcase',
                 'bots.assign', 'util.onActivate', 'core.onAgentChanged', 'stage.renderGrid', 'stage.setAgent', 'core.applySettings', 'bots.setRim',
                 'arena.onAtmosphere', 'bots.previewColors', 'bots.wingKit', 'vm.onSwitch', 'core.init', 'bots.onPage', 'bots.packPose', 'bots.packColor',
-                'bots.flush', 'core.warmPre', 'core.warmVm', 'core.warmWorld', 'fp.reapply', 'bots.onTier', 'core.warmPost'])
+                'bots.flush', 'core.warmPre', 'core.warmVm', 'core.warmWorld', 'fp.reapply', 'bots.onTier', 'core.warmPost']),
+            // the boot's Math.random exclusion (see the header's boot order note)
+            bootNotes: 'With agentIdentity on, core.init (H2) makes the part pool, the 4x4 upload target and the base material: three.js ' +
+                'draws each new object\'s uuid from Math.random (4 calls each), so the boot stream differs from V2.2\'s inside core.init only. ' +
+                'With it off core.init makes nothing and the boot stream is V2.2\'s. The first switch-on (applySettings) and the showroom\'s ' +
+                'first build do the same. Proofs of zero Math.random while V2.3 code runs exclude these pool, target and material constructions.'
         });
 
         // V2.3: mulberry32. A deterministic stream per agent, per bot slot + generation, per cast (V2.3 never calls Math.random)
@@ -24160,7 +24170,8 @@
         //    palette colours, bot pool and kit) and resolves from its role's defaults; resolve(id).stub is true for it.
         //  - resolve(id) merges LOOK_ROLE_DEFAULTS[role] <- look-tag defaults (AGENT_TUNING[id][slot].look: the gesture
         //    and preview recipe per slot) <- PREVIEW_SOUNDS ('agent.slot': the soundFX calls the cast itself makes) <- the
-        //    entry, deep-freezes the result and caches it (define drops that id's cache).
+        //    entry, deep-freezes the result and caches it (define drops that id's cache, gives its built LODs back to the
+        //    part pool, or retires one still attached until it is detached, and queues its show and world LODs again).
         //  - validate() returns the problems ({ id, rule, msg }) for the design 3.7 rules that run in the page: roster sets,
         //    coverage, signature Hamming distance (>= 4 within a role, >= 3 overall), same-role sound palettes, shared
         //    themeColor Lab dE76 >= 20 on base and glow, bot pools (one pool per agent, kits >= 2 modules apart), avoid
@@ -24168,11 +24179,15 @@
         //    and idle distance are measured in tests/agent-roster.test.js.
         //  - Builds: build(id, tier) returns the agent's figure for 'show' (stage, MVP), 'world' (killcam ghost) or 'body'
         //    (prototypes), building it synchronously the first time (and upload-drawing it). The staged builder
-        //    (stagedStep, called each frame by V23.stage.update) builds the queue in the background on a token bucket of
-        //    min(3 ms, 0.15 x the median frame) per frame, only in the menu, the picker, post-round, while dead or while a
-        //    killcam is pending; never in live combat. Priority: the highlighted agent, its role-filter neighbours, roster.
+        //    (stagedStep, called each frame by V23.stage.update) builds the queue in the background with a per-frame budget
+        //    of min(3 ms, 0.15 x the median frame): a figure is built as units across frames (V23.parts._job: expand, one
+        //    mesh or slice per unit, assemble, then its upload draw), a unit starting only while the frame is under budget;
+        //    only in the menu, the picker, post-round, while dead or while a killcam is pending; never in live combat.
+        //    Priority: the highlighted agent, its role-filter neighbours, roster order.
         //  - uploadDraw(obj) draws obj once into a 4x4 sRGB target through viewmodelScene (exactly the stage's light set)
-        //    with overrideMaterial = one V23.mat.vm material, so its buffers upload and no program is made (the gun's).
+        //    with overrideMaterial = one V23.mat.vm material, so its buffers upload and no program is made (the gun's); a
+        //    show figure's hand key draws its eight pose geometries once as well. The target and that material are made
+        //    at the first upload (nothing at boot when Agent Identity is off).
         //  - Warm registry (H3): any V2.3 object tagged userData.v23Warm = 'pre' | 'vm' | 'world' (userData.v23WarmAt true
         //    to be moved to the warm point) is shown for that warm step and restored in warmPost; with identity on, the
         //    active agent's world LOD joins the world draws and its show LOD the viewmodel draws. warmPost also draws the
@@ -24274,7 +24289,7 @@
             }
         };
         // V2.3: look-tag defaults (AGENT_TUNING[id][slot].look, first tag): the gesture and the preview recipe per slot;
-        // the ultimate (x) defaults to a two-hand channel, and second presses (c2, q2, e2, x2) to a wrist tap
+        // the ultimate (x) defaults to a two-hand channel, and second presses (c2, q2, e2: design 3.1) to a wrist tap
         const LOOK_TAG_DEFAULTS = {
             gesture: { projectile: 'overhandThrow', smoke: 'underhandLob', groundZone: 'underhandLob', blast: 'overhandThrow', flash: 'overhandFlick',
                 wall: 'twoHandRaise', deployable: 'palmPlace', self: 'palmPress', pulse: 'wristTap', beam: 'pointDirect', x: 'twoHandChannel', second: 'wristTap' },
@@ -24498,7 +24513,7 @@
                 const S = d.showroom;
                 need(isObj(S) && !!V23.motion.INTROS[S.intro] && inR(S.introMs, 200, 1400) && !!V23.motion.LOCKIN[S.lockIn] && V23.motion.LOCKIN[S.lockIn].ms <= 400
                     && Array.isArray(S.detail) && S.detail.every((a) => ANCHORS.indexOf(a) >= 0), 'showroom {intro, introMs <= 1400, lockIn <= 400 ms, detail [anchors]}');
-                need(isObj(d.gestures) && ['c', 'q', 'e', 'x'].every((s) => gestureOk(d.gestures[s])) && Object.keys(d.gestures).every((k) => /^[cqex]2?$/.test(k) && gestureOk(d.gestures[k])), 'gestures {c, q, e, x, c2?, q2?, e2?, x2?} from GESTURES');
+                need(isObj(d.gestures) && ['c', 'q', 'e', 'x'].every((s) => gestureOk(d.gestures[s])) && Object.keys(d.gestures).every((k) => /^(?:[cqex]|[cqe]2)$/.test(k) && gestureOk(d.gestures[k])), 'gestures {c, q, e, x, c2?, q2?, e2?} from GESTURES');
                 need(isObj(d.previews) && Object.keys(d.previews).every((k) => /^[cqex]$/.test(k) && isObj(d.previews[k]) && (d.previews[k].gesture === undefined || gestureOk(d.previews[k].gesture))), 'previews {slot: {recipe?, gesture?, sound?, scale?}}');
                 const fp = d.fp;
                 need(isObj(fp) && slot(fp.sleeve) && slot(fp.cuff) && slot(fp.glove) && moduleOk(fp.wrist), 'fp {sleeve, cuff, glove, wrist, overlay?}');
@@ -24539,7 +24554,7 @@
                 for (const s of ['c', 'q', 'e', 'x']) {
                     const tags = tagsOf(id, s);
                     L.gestures[s] = s === 'x' ? LOOK_TAG_DEFAULTS.gesture.x : (LOOK_TAG_DEFAULTS.gesture[tags[0]] || 'palmPress');
-                    L.gestures[s + '2'] = LOOK_TAG_DEFAULTS.gesture.second;
+                    if (s !== 'x') L.gestures[s + '2'] = LOOK_TAG_DEFAULTS.gesture.second;
                     const rec = LOOK_TAG_DEFAULTS.recipe[tags[0]] || 'selfAura';
                     L.previews[s] = { recipe: rec, base: rec, impact: tags[1] ? (LOOK_TAG_DEFAULTS.recipe[tags[1]] || null) : null, tags: tags.slice(), scale: reachOf(id, s),
                         sound: PREVIEW_SOUNDS[id + '.' + s] || { calls: [], from: null, note: 'no row' } };
@@ -24590,26 +24605,62 @@
                 delete cache[agentId];
                 let out;
                 try { out = resolveImpl(agentId); } catch (e) { if (prev) AGENT_LOOKS[agentId] = prev; else delete AGENT_LOOKS[agentId]; delete cache[agentId]; throw e; }
-                // a look that changes after it was built is rebuilt from the queue
-                if (S.built[agentId]) { delete S.built[agentId]; enqueue(agentId + '|show'); }
+                // V2.3: a look that changes after it was built: its built LODs go back to the pool (one still attached, on the
+                // stage or as a ghost, is retired and given back once it is detached), an unfinished staged job for it is
+                // dropped, and its show and world LODs are queued again (the world first for the active agent)
+                const had = S.built[agentId];
+                if (had) {
+                    delete S.built[agentId];
+                    for (const t of Object.keys(had)) retire(had[t]);
+                }
+                if (S.job && S.job.id === agentId) { V23.parts._jobAbort(S.job.j); S.job = null; }
+                if (had || (S.booted && S.queue.indexOf(agentId + '|show') >= 0)) {
+                    enqueue(agentId + '|show');
+                    enqueue(agentId + '|world', agentId === S.active);
+                    if (agentId === S.active && S.booted && enabledNow()) V23.fp && V23.fp.reapply();
+                }
                 return out;
             }
             _v23DefineLook = defineImpl;
             // ---- the core's state -----------------------------------------------------------------------------------------
-            const S = { booted: false, settings: null, active: 'jett', built: {}, queue: [], credit: 0, est: 2.5, medBuf: new Float32Array(600), median: 16.7, medianAt: -1,
-                rt: null, base: null, warm: null, steps: 0, identityBuilt: false, uploads: 0 };
+            const S = { booted: false, settings: null, active: 'jett', built: {}, queue: [], job: null, retired: [], medBuf: new Float32Array(600), median: 16.7, medianAt: -1,
+                rt: null, base: null, warm: null, steps: 0, units: 0, lastStep: null, maxUnitMs: 0, identityBuilt: false, uploads: 0, upHidden: [], upCulled: [] };
+            // V2.3: the 4x4 sRGB upload target and the base vm material, made when first needed (an upload, or the warm-up's
+            // stage draw): with Agent Identity off and no stage scene nothing is made at boot, so no THREE uuid draws from
+            // Math.random there and the boot stream is V2.2's
+            function ensureUpload() {
+                if (S.rt) return;
+                S.rt = new THREE.WebGLRenderTarget(4, 4);
+                S.rt.texture.encoding = THREE.sRGBEncoding;
+                S.base = V23.mat.vm({ c: 0x808080, r: 0.6 });
+            }
+            // a redefined look's old LOD: back to the pool now, or once nothing holds it (checked by the builder)
+            function retire(root) { if (!root) return; if (root.parent) S.retired.push(root); else V23.parts._release(root); }
+            function sweepRetired() {
+                for (let i = S.retired.length - 1; i >= 0; i--) if (!S.retired[i].parent) { V23.parts._release(S.retired[i]); S.retired.splice(i, 1); }
+            }
             const enabledNow = () => { const v = (S.settings && S.settings.agentIdentity) || (typeof game !== 'undefined' && game.userSettings && game.userSettings.agentIdentity); return v !== 'off'; };
             const contentTier = () => ((typeof ultraChars !== 'undefined' && ultraChars.on) ? 'ultra' : (typeof characterDetail !== 'undefined' && characterDetail.enabled) ? 'high' : (CONTENT.detailedModels ? 'medium' : 'low'));
             const dequeue = (key) => { const i = S.queue.indexOf(key); if (i >= 0) S.queue.splice(i, 1); };
             const enqueue = (key, front) => { if (S.queue.indexOf(key) >= 0) return; if (front) S.queue.unshift(key); else S.queue.push(key); };
-            // V2.3: build one agent's LOD now (also the synchronous single-agent build on demand) and upload-draw it
-            function buildNow(id, tier) {
-                const look = resolveImpl(id);
-                if (!look) return null;
-                const root = V23.parts.figure(look, tier);
+            // V2.3: build one agent's LOD now (also the synchronous single-agent build on demand) and upload-draw it; a staged
+            // job already under way for it is finished rather than started over
+            function register(id, tier, root) {
                 root.userData.v23.agentId = id;
                 (S.built[id] = S.built[id] || {})[tier] = root;
                 dequeue(id + '|' + tier);
+            }
+            function buildNow(id, tier) {
+                const look = resolveImpl(id);
+                if (!look) return null;
+                let root;
+                if (S.job && S.job.id === id && S.job.tier === tier) {
+                    const J = S.job;
+                    S.job = null;
+                    while (!V23.parts._jobStep(J.j));
+                    root = J.j.root;
+                } else root = V23.parts.figure(look, tier);
+                register(id, tier, root);
                 V23.core.uploadDraw(root);
                 return root;
             }
@@ -24677,10 +24728,10 @@
                     S.booted = true;
                     if (!S.settings) V23.core.applySettings(game.userSettings, null);
                     S.active = game.activeAgent || S.active;
-                    S.rt = new THREE.WebGLRenderTarget(4, 4);
-                    S.rt.texture.encoding = THREE.sRGBEncoding;
-                    S.base = V23.mat.vm({ c: 0x808080, r: 0.6 });
                     for (const id of AGENT_ORDER) enqueue(id + '|show');
+                    // V2.3: with Agent Identity on, the boot set is built here: the part pool, the upload target and the base
+                    // material are made, and their THREE uuids draw from Math.random (the documented exclusion:
+                    // V23.CONTRACT.bootNotes); with it off nothing is made here and the boot's Math.random stream is V2.2's
                     if (enabledNow()) bootBuild();
                     return null;
                 },
@@ -24733,7 +24784,8 @@
                     const mm = typeof mainMenu !== 'undefined' ? mainMenu : null;
                     let st = mm && mm.showcase;
                     while (st && st.parent) st = st.parent;
-                    if (st && st.isScene && st !== scene && st !== viewmodelScene && S.rt) {
+                    if (st && st.isScene && st !== scene && st !== viewmodelScene) {
+                        ensureUpload();
                         const vis = [];
                         st.traverse((o) => { vis.push([o, o.visible]); o.visible = true; });
                         const prev = renderer.getRenderTarget();
@@ -24794,6 +24846,13 @@
                         }
                         if (!L.stub && !(L.avoid && L.avoid.length)) bad(id, 'originality', 'no avoid list');
                     }
+                    // V2.3: every gesture's first-person keys (and each variant's) name one of the six cast-hand poses (design
+                    // 7.1: open, cup, fist, point, snap, flat), so WP4 has a pose geometry for each
+                    const casts = V23.motion.CAST_POSES || [];
+                    for (const gn of Object.keys(V23.motion.GESTURES)) {
+                        const vs = [gn].concat(Object.keys(V23.motion.GESTURES[gn].variants || {}).map((v) => gn + '.' + v));
+                        for (const name of vs) { const g = V23.motion.gesture(name); for (const k of (g ? g.fp : [])) if (casts.indexOf(k[7]) < 0) bad(name, 'gestures', 'first-person key pose ' + k[7] + ' is not a cast-hand pose'); }
+                    }
                     // bot pools: each agent in exactly one pool, matching its entry; kits within a pool >= 2 modules apart
                     for (const id of ids) {
                         const n = Object.keys(BOT_POOLS).filter((p) => BOT_POOLS[p].indexOf(id) >= 0).length;
@@ -24836,40 +24895,62 @@
                     const t = tier === 'world' || tier === 'body' ? tier : 'show';
                     const b = S.built[agentId];
                     if (b && b[t]) return b[t];
+                    if (S.retired.length) sweepRetired();
                     return buildNow(agentId, t);
                 },
-                // V2.3: one staged-builder step (called each frame by V23.stage.update): true when it built something.
-                // Token bucket: budgetMs (default min(3 ms, 0.15 x the median frame)) is credited per call and a build runs
-                // when the credit covers its expected cost, so the average per frame stays within the budget.
+                // V2.3: one staged-builder step (called each frame by V23.stage.update); true when it ran a unit. The budget is
+                // per frame: budgetMs, by default min(3 ms, 0.15 x the median frame) (design 2.5). A figure is built across
+                // frames as units (expand, one mesh or a slice of primitives each, assemble, then the upload draw), and a unit
+                // starts only while the frame's spend is under the budget, so a frame overruns it by at most its last unit.
                 stagedStep: function (budgetMs) {
-                    if (!S.booted || !S.queue.length || !stagedAllowed()) return false;
+                    if (!S.booted || !stagedAllowed()) return false;
+                    if (S.retired.length) sweepRetired();
+                    if (!S.job && !S.queue.length) return false;
                     const budget = typeof budgetMs === 'number' && budgetMs > 0 ? budgetMs : Math.min(3, 0.15 * medianFrame());
-                    S.credit = Math.min(S.credit + budget, budget * 4);
-                    if (S.credit < Math.min(S.est, budget * 4)) return false;
-                    const key = nextKey();
-                    if (!key) return false;
-                    const [id, tier] = key.split('|');
                     const t0 = performance.now();
-                    if (S.built[id] && S.built[id][tier]) dequeue(key); else buildNow(id, tier);
-                    const ms = performance.now() - t0;
-                    S.est = S.est * 0.7 + ms * 0.3;
-                    S.credit -= ms;
-                    S.steps++;
-                    return true;
+                    let units = 0, spent = 0, before = 0, maxU = 0, key = null;
+                    while (spent < budget) {
+                        if (!S.job) {
+                            const k = nextKey();
+                            if (!k) break;
+                            const bar = k.indexOf('|'), id = k.slice(0, bar), tier = k.slice(bar + 1);
+                            if (S.built[id] && S.built[id][tier]) { dequeue(k); continue; }
+                            S.job = { key: k, id: id, tier: tier, j: V23.parts._job(resolveImpl(id), tier, id), up: false };
+                        }
+                        const J = S.job, u0 = performance.now();
+                        before = u0 - t0;
+                        key = J.key;
+                        if (!J.up) { if (V23.parts._jobStep(J.j)) { register(J.id, J.tier, J.j.root); J.up = true; } }
+                        else { V23.core.uploadDraw(J.j.root); S.job = null; S.steps++; }
+                        const u1 = performance.now();
+                        units++;
+                        if (u1 - u0 > maxU) maxU = u1 - u0;
+                        spent = u1 - t0;
+                    }
+                    S.units += units;
+                    if (maxU > S.maxUnitMs) S.maxUnitMs = maxU;
+                    // the last step's record (tests): its spend, units, budget, its longest unit, and the spend before its last unit
+                    S.lastStep = { ms: spent, units: units, budget: budget, maxUnitMs: maxU, beforeLast: before, key: key };
+                    return units > 0;
                 },
-                // V2.3: draw an object once into the 4x4 sRGB target through viewmodelScene (the stage's light set) with the
-                // base vm material as overrideMaterial: its buffers upload, no program is made. Everything is put back.
+                // V2.3: draw an object once into the 4x4 sRGB target through viewmodelScene (the stage's light set; the design's
+                // stageScene once WP3's lands) with the base vm material as overrideMaterial: its buffers upload, no program
+                // is made (the gun's). A show figure's hand key draws its eight pose geometries once too (they are swapped by
+                // reference later). Everything is put back: the object's parent, index and visibility, and each scene child's
+                // own visibility (restored object by object).
                 uploadDraw: function (object3d) {
-                    if (!object3d || !S.rt || typeof renderer === 'undefined') return false;
+                    if (!object3d || typeof renderer === 'undefined') return false;
+                    ensureUpload();
                     const sc = viewmodelScene;
-                    const vis = sc.children.map((c) => c.visible);
-                    for (const c of sc.children) if (!c.isLight) c.visible = false;
                     const parent = object3d.parent, at = parent ? parent.children.indexOf(object3d) : -1, wasVis = object3d.visible;
-                    const culled = [];
-                    object3d.traverse((o) => { if (o.isMesh) { culled.push([o, o.frustumCulled]); o.frustumCulled = false; } });
                     if (parent) parent.remove(object3d);
+                    const hidden = S.upHidden, culled = S.upCulled;
+                    hidden.length = 0; culled.length = 0;
+                    for (const c of sc.children) if (!c.isLight && c.visible) { hidden.push(c); c.visible = false; }
+                    object3d.traverse((o) => { if (o.isMesh) { culled.push(o, o.frustumCulled); o.frustumCulled = false; } });
                     sc.add(object3d);
                     object3d.visible = true;
+                    const info = object3d.userData && object3d.userData.v23, H = info && info.hands;
                     const prevO = sc.overrideMaterial, prevT = renderer.getRenderTarget(), prevE = sc.environment;
                     sc.environment = scene.environment;
                     sc.overrideMaterial = S.base;
@@ -24877,15 +24958,32 @@
                         renderer.setRenderTarget(S.rt);
                         renderer.render(sc, viewmodelCamera);
                         S.uploads++;
+                        if (H && H.set && !H.set.uploaded && H.R) {
+                            // the hand key's other poses: the right hand node alone, once per pose geometry
+                            const hm = H.R, hp = hm.parent, hi = hp ? hp.children.indexOf(hm) : -1, g0 = hm.geometry;
+                            object3d.visible = false;
+                            sc.add(hm);
+                            try {
+                                for (const pose of V23.motion.HAND_POSES) { const g = H.set.geoms[pose]; if (g && g !== g0) { hm.geometry = g; renderer.render(sc, viewmodelCamera); } }
+                                H.set.uploaded = true;
+                            } finally {
+                                sc.remove(hm);
+                                hm.geometry = g0;
+                                if (hp) { hp.children.splice(hi, 0, hm); hm.parent = hp; }
+                                object3d.visible = true;
+                            }
+                        }
                     } finally {
                         renderer.setRenderTarget(prevT);
                         sc.overrideMaterial = prevO;
                         sc.environment = prevE;
                         sc.remove(object3d);
-                        sc.children.forEach((c, i) => { c.visible = vis[i]; });
+                        for (const c of hidden) c.visible = true;
+                        hidden.length = 0;
                         if (parent) { parent.children.splice(at, 0, object3d); object3d.parent = parent; }
                         object3d.visible = wasVis;
-                        for (const [o, f] of culled) o.frustumCulled = f;
+                        for (let i = 0; i < culled.length; i += 2) culled[i].frustumCulled = culled[i + 1];
+                        culled.length = 0;
                     }
                     return true;
                 },
@@ -24907,9 +25005,10 @@
                     return PREVIEW_SOUNDS[agentId + '.' + slot] || null;
                 },
                 // data: the staged builder's and the upload pass's counters (tests and the bench read them)
-                stats: { get queue() { return S.queue.slice(); }, get steps() { return S.steps; }, get uploads() { return S.uploads; }, get est() { return S.est; },
+                stats: { get queue() { return S.queue.slice(); }, get steps() { return S.steps; }, get units() { return S.units; }, get uploads() { return S.uploads; },
+                    get job() { return S.job ? S.job.key : null; }, get lastStep() { return S.lastStep; }, get maxUnitMs() { return S.maxUnitMs; }, get retired() { return S.retired.length; },
                     get built() { const o = {}; for (const id in S.built) o[id] = Object.keys(S.built[id]); return o; }, get identityBuilt() { return S.identityBuilt; },
-                    get allowed() { return stagedAllowed(); }, get active() { return S.active; }, get settings() { return S.settings; } }
+                    get allowed() { return stagedAllowed(); }, get active() { return S.active; }, get settings() { return S.settings; }, get uploadTarget() { return !!S.rt; } }
             };
             // ----- V23.mat begin (the only place V2.3 code may construct a THREE material) -----
             // V2.3: every signature reuses a program V2.2 already compiles (design 2.4); toneMapped is always explicit and
@@ -24960,19 +25059,26 @@
         // V2.3: how this block builds without touching the Math.random stream. THREE gives every Object3D, BufferGeometry,
         //   Material and Texture a uuid drawn from Math.random (four draws each, inside three.js). So:
         //   - primitives are raw typed arrays made here (no THREE geometry objects), cached by shape;
-        //   - figures, kit supersets and arm sets take their Groups, Meshes, BufferGeometries and materials from one pool
-        //     (_pool) made once, at the first build (core.init at boot when Agent Identity is on, or the showroom's first
-        //     build at the start screen); BufferAttribute has no uuid, so filling a pooled geometry draws nothing.
+        //   - figures, kit supersets, arm sets and hand pose geometries take their Groups, Meshes, BufferGeometries and
+        //     materials from one pool (_pool) made once, at the first build (core.init at boot when Agent Identity is on, or
+        //     the showroom's first build at the start screen), sized from the roster (a dry expansion of every look counts
+        //     its meshes and hand keys); BufferAttribute has no uuid, so filling a pooled geometry draws nothing.
         //   After the pool exists, a build makes no Math.random call (agent-roster.test counts them). A build that finds the
-        //   pool empty still works and counts the miss in V23.parts.stats.poolMisses (its new objects draw uuids).
+        //   pool empty still works, counts the miss in V23.parts.stats.poolMisses and warns (its new objects draw uuids).
+        //   V23.parts._release(root) gives a figure's objects back (CORE does it when a look is redefined); fpArms is cached
+        //   per agent, so repeated calls take nothing more.
         // V2.3: figure format (what build / figure return). A THREE.Group root with userData.v23 = {
         //   agentId, tier ('show' | 'world' | 'body'), bones: [13 nodes or null, AGENT_RIG ids], nodes: { name: node },
-        //   rest: { name: [x, y, z] } (rest positions of every node, parent space), stats: { vertices, triangles, draws,
-        //   meshes }, hash (FNV-1a of every position and index), slots: [palette slot per material index], materials }.
+        //   rest: { name: [x, y, z] } (rest positions of every node, parent space), nodeList, nodeMirror (-1 for the left
+        //   hand), stats: { vertices, triangles, draws, meshes }, hash (FNV-1a of every position and index), slots: [palette
+        //   slot per material index], materials, meshList (every pooled mesh it holds), hands: { R, L, set, idle } or null }.
         //   Show and body: one Mesh per bone and per extra node (prop, plates[i], shards[i]), each with geometry groups per
-        //   palette slot and the figure's material array (draws = groups). World: one Mesh baked in the stance pose with
-        //   at most 6 groups (6 world material slots). Feet at y 0, facing -Z, right +X, the root scaled by look.height.
-        //   V23.motion.sample(agentId, clip, t, root) poses a show or body root directly (bones and nodes).
+        //   palette slot and the figure's material array (draws = groups). The show LOD adds a hand node per side (handR,
+        //   handL: children of the forearms at the wrist pivot) showing the shared pose geometry of the look's hand key
+        //   (glove type, bare tips or not: _handSet, eight poses, groups [glove, tips, trim]); the left hand mirrors it with
+        //   scale.x -1. World: one Mesh baked in the stance pose with at most 6 groups (6 world material slots); world and
+        //   body bake a simplified hand on the forearm. Feet at y 0, facing -Z, right +X, the root scaled by look.height.
+        //   V23.motion.sample(agentId, clip, t, root) poses a show or body root directly (bones, nodes, hand shapes, glow).
 
         // ---- AGENT_RIG: the EA_SHADER_POSE skeleton (same ids and pivots) ------------------------------------------------
         // V2.3: bot kits use these pivots exactly (EA_SHADER_POSE); the show and world LODs keep the same ids, parents and
@@ -25071,10 +25177,12 @@
                 }
                 return { p: new Float32Array(P), n: new Float32Array(N), i: I };
             }
-            function _gSph(rx, ry, rz, ws, hs) {
-                const P = [], N = [], I = [];
+            // V2.3: an ellipsoid; thMax < PI leaves it open below (a dome: rows from the top down to thMax)
+            function _gSph(rx, ry, rz, ws, hs, thMax) {
+                const P = [], N = [], I = [], dome = thMax < Math.PI - 1e-6;
+                thMax = thMax || Math.PI;
                 for (let iy = 0; iy <= hs; iy++) {
-                    const v = iy / hs, th = v * Math.PI;
+                    const v = iy / hs, th = v * thMax;
                     for (let ix = 0; ix <= ws; ix++) {
                         const u = ix / ws, ph = u * Math.PI * 2;
                         const x = -Math.cos(ph) * Math.sin(th), y = Math.cos(th), z = Math.sin(ph) * Math.sin(th);
@@ -25086,7 +25194,7 @@
                 for (let iy = 0; iy < hs; iy++) for (let ix = 0; ix < ws; ix++) {
                     const a = iy * (ws + 1) + ix + 1, b = iy * (ws + 1) + ix, c = (iy + 1) * (ws + 1) + ix, d = (iy + 1) * (ws + 1) + ix + 1;
                     if (iy !== 0) I.push(a, b, d);
-                    if (iy !== hs - 1) I.push(b, c, d);
+                    if (iy !== hs - 1 || dome) I.push(b, c, d);
                 }
                 return { p: new Float32Array(P), n: new Float32Array(N), i: I };
             }
@@ -25143,7 +25251,7 @@
             // V2.3: one primitive's raw arrays (shared, read-only), from the cache when the same shape was made before
             function _primData(s) {
                 const z = s.size || [0.1, 0.1, 0.1];
-                const key = s.prim + '|' + z.map(_r3).join(',') + '|' + _r3(s.r || 0) + '|' + (s.seg || '') + '|' + (s.arc ? _r3(s.arc) : '') + '|' + (s.pts ? s.pts.map((q) => _r3(q[0]) + ':' + _r3(q[1])).join(';') : '') + (s.open ? '|o' : '');
+                const key = s.prim + '|' + z.map(_r3).join(',') + '|' + _r3(s.r || 0) + '|' + (s.seg || '') + '|' + (s.arc ? _r3(s.arc) : '') + '|' + (s.pts ? s.pts.map((q) => _r3(q[0]) + ':' + _r3(q[1])).join(';') : '') + (s.open ? '|o' : '') + (s.hemi ? '|h' + _r3(s.hemi) : '');
                 let g = _primCache.get(key);
                 if (g) return g;
                 switch (s.prim) {
@@ -25151,7 +25259,7 @@
                     case 'rbox': g = _gRBox(z[0], z[1], z[2], s.r === undefined ? Math.min(z[0], z[1], z[2]) * 0.3 : s.r, s.seg || 1); break;
                     case 'cyl': g = _gCyl(z[0], z[1], z[2], s.seg || 10, !!s.open); break;
                     case 'cone': g = _gCyl(0, z[0], z[1], s.seg || 10, !!s.open); break;
-                    case 'sph': g = _gSph(z[0], z[1], z[2], (s.seg && s.seg[0]) || 10, (s.seg && s.seg[1]) || 7); break;
+                    case 'sph': g = _gSph(z[0], z[1], z[2], (s.seg && s.seg[0]) || 10, (s.seg && s.seg[1]) || 7, s.hemi ? Math.PI * s.hemi : Math.PI); break;
                     case 'octa': g = _gOcta(z[0], z[1], z[2]); break;
                     case 'torus': g = _gTorus(z[0], z[1], (s.seg && s.seg[0]) || 6, (s.seg && s.seg[1]) || 14, s.arc || Math.PI * 2); break;
                     case 'lathe': g = _gLathe(s.pts, s.seg || 10); break;
@@ -25249,22 +25357,45 @@
                 // torso and pelvis (the under layer): two lathed shells with an elliptical section (depth / width), hips on the
                 // pelvis, waist to shoulders on the spine, so the body reads as one smooth form
                 const ez = [1, 1, D.chestD / D.chestW];
+                // V2.3: where they overlap (0.98-1.06 m) the spine shell runs inside the pelvis shell, at least 7 mm in (they
+                // were within a millimetre at the waist's sides: a comb); the pelvis's rim turns inward under the spine shell,
+                // so it reads as a waist seam rather than an open edge
                 _add(cx, 'lathe', null, [0, 0, 0], null, 0, un, { scl: [1, 1, D.chestD * 0.92 / D.hipW], seg: _segs(cx, 14, 8),
-                    pts: [[0.0, 0.8], [D.hipW * 0.42, 0.81], [D.hipW * 0.5, 0.88], [D.hipW * 0.5, 0.97], [D.waistW * 0.48, 1.05]] });
+                    pts: [[0.0, 0.8], [D.hipW * 0.42, 0.81], [D.hipW * 0.5, 0.88], [D.hipW * 0.5, 0.97], [D.waistW * 0.5, 1.06], [D.waistW * 0.44, 1.066]] });
                 _add(cx, 'lathe', null, [0, 0, 0], null, 1, un, { scl: ez, seg: _segs(cx, 14, 8),
-                    pts: [[D.waistW * 0.47, 0.98], [D.waistW * 0.5, 1.08], [D.chestW * 0.47, 1.28], [D.chestW * 0.5, 1.44], [D.chestW * 0.44, 1.56], [D.neck * 1.7, 1.63], [0.0, 1.65]] });
+                    pts: [[D.waistW * 0.43, 0.98], [D.waistW * 0.5, 1.08], [D.chestW * 0.47, 1.28], [D.chestW * 0.5, 1.44], [D.chestW * 0.44, 1.56], [D.neck * 1.7, 1.63], [0.0, 1.65]] });
                 // arms: shoulder ball, upper arm, forearm (sleeve slot set by the torso layer), hands by glove type
                 const R = AGENT_RIG.rest;
                 const sleeve = F.sleeveSlot || un, fore = F.foreSlot || sleeve;
                 for (const side of ['R', 'L']) {
                     const s = _mir(side), up = side === 'R' ? 3 : 5, fo = side === 'R' ? 4 : 6;
                     const sh = [s * 0.41, 1.52, 0], el = side === 'R' ? R.elbowR : R.elbowL, wr = side === 'R' ? R.wristR : R.wristL;
-                    _SP(cx, D.arm * 1.3, [s * 0.4, 1.5, 0], null, up, sleeve, _segs(cx, [8, 6], [6, 4]));
-                    _limb(cx, sh, el, D.arm, D.arm * 0.9, up, sleeve, _segs(cx, 10, 7));
+                    // V2.3: the shoulder ball: coarse under a cap (which clears it by about 3 cm), finer when it shows, so the
+                    // sleeve's exit from it reads as a clean line
+                    _SP(cx, D.arm * 1.3, [s * 0.4, 1.5, 0], null, up, sleeve, F['cap' + side] ? _segs(cx, [10, 6], [6, 4]) : _segs(cx, [12, 8], [6, 4]));
+                    _limb(cx, sh, el, D.arm, D.arm * 0.9, up, sleeve, _segs(cx, 12, 7));
+                    if (cx.show) {
+                        // V2.3: a seam ring where the sleeve leaves the shoulder ball: the two cross at a grazing angle, and the
+                        // faceted crossing read as a torn edge; the ring (on the sleeve's axis) covers it
+                        const ex = el[0] - sh[0], ey = el[1] - sh[1], ez2 = el[2] - sh[2], el2 = Math.sqrt(ex * ex + ey * ey + ez2 * ez2);
+                        const a = Math.sqrt(Math.max(0, (D.arm * 1.3) * (D.arm * 1.3) - D.arm * D.arm)) + 0.02;
+                        _q4.setFromUnitVectors(_v4.set(0, 0, 1), new THREE.Vector3(ex / el2, ey / el2, ez2 / el2));
+                        _e4.setFromQuaternion(_q4, 'XYZ');
+                        _TO(cx, D.arm * (1 - 0.1 * a / el2) + 0.003, 0.011, [sh[0] + ex / el2 * a, sh[1] + ey / el2 * a, sh[2] + ez2 / el2 * a], [_e4.x, _e4.y, _e4.z], up, sleeve, [4, 12]);
+                    }
                     _limb(cx, el, wr, D.fore, D.fore * 0.85, fo, fore, _segs(cx, 10, 7));
-                    cx.inHand = true;
-                    _MODULES.hand(cx, side, (L.gloves && L.gloves.type) || 'full', (L.idle && L.idle.hands) || 'open');
-                    cx.inHand = false;
+                    const gt = (L.gloves && L.gloves.type) || 'full';
+                    if (cx.show) {
+                        // V2.3: show LOD: the hand is a node at the wrist (a child of the forearm) whose pose geometry the
+                        // motion swaps by reference (design 3.3 hand-pose slots); the gauntlet's cuff stays on the forearm
+                        _node(cx, 'hand' + side, fo, wr, { hand: side });
+                        if (gt === 'gauntlet') _gauntletCuff(cx, side);
+                    } else {
+                        // world and body LODs: a simplified hand baked on the forearm in the idle pose
+                        cx.inHand = true;
+                        _MODULES.hand(cx, side, gt, (L.idle && L.idle.hands) || 'open');
+                        cx.inHand = false;
+                    }
                 }
                 // legs
                 for (const side of ['R', 'L']) {
@@ -25274,11 +25405,26 @@
                     if (!F.boots) _RB(cx, [0.12, 0.09, 0.26], 0.03, [s * 0.18, 0.045, -0.05], null, sn, 'dark');
                 }
             };
-            // --- hands: 7 glove types, hand pose by name (finger curl) ---
+            // --- hands: 7 glove types; poses by name ---
+            // V2.3: the hand poses: the six cast-hand poses of design 7.1 first, then the two idle-only ones the looks name.
+            // The show LOD prebuilds all eight per glove key (_handSet) and swaps them by reference (pose.hands).
+            const HAND_POSES = Object.freeze(['open', 'cup', 'fist', 'point', 'snap', 'flat', 'clawLow', 'relaxed']);
+            const CAST_POSES = Object.freeze(HAND_POSES.slice(0, 6));
+            // V2.3: per pose: the proximal curl of the index, middle, ring and little finger (rad), the distal joint's angle as
+            // a multiple of it (dI: the index's own), the finger spread, and the thumb's [forward swing, outward roll]
+            const _HAND_SHAPE = {
+                open: { c: [0.1, 0.13, 0.16, 0.2], d: 1.3, sp: 1.2, th: [0.25, 0.8] },
+                cup: { c: [0.55, 0.6, 0.65, 0.7], d: 1.5, sp: 0.95, th: [0.8, 0.3] },
+                fist: { c: [1.45, 1.5, 1.5, 1.45], d: 1.3, sp: 0.9, th: [1.25, -0.15] },
+                point: { c: [0.02, 1.5, 1.5, 1.45], d: 1.3, dI: 0, sp: 0.92, th: [1.05, 0.0] },
+                snap: { c: [0.4, 1.1, 1.45, 1.45], d: 1.2, sp: 0.92, th: [1.0, -0.1] },
+                flat: { c: [0, 0, 0, 0], d: 0, sp: 1.0, th: [0.08, 0.3] },
+                clawLow: { c: [0.4, 0.45, 0.45, 0.4], d: 2.8, sp: 1.12, th: [0.6, 0.55] },
+                relaxed: { c: [0.28, 0.36, 0.44, 0.52], d: 1.4, sp: 1.0, th: [0.4, 0.45] }
+            };
             const _HAND_CURL = { open: 0.15, flat: 0.0, cup: 0.65, fist: 1.5, clawLow: 0.95, point: 1.3, snap: 1.1, relaxed: 0.4 };
+            // V2.3: world and body LODs: a palm and one finger block baked on the forearm, curled by the idle pose
             _MODULES.hand = function (cx, side, type, pose) {
-                // V2.3: authored hanging, palm facing forward (-Z), fingers down; curl folds the fingers forward, so raising the
-                // forearm (cradle, cup) turns the palm up
                 const L = cx.look || {}, s = _mir(side), fo = side === 'R' ? 4 : 6;
                 const W = side === 'R' ? AGENT_RIG.rest.wristR : AGENT_RIG.rest.wristL;
                 const g = (L.gloves && L.gloves.slot) || 'glove', tipsSkin = !L.gloves || L.gloves.tips === 'skin' || type === 'bare' || type === 'fingerless' || type === 'wrap';
@@ -25288,25 +25434,65 @@
                 const px = W[0] + s * 0.002, py = W[1] - 0.062, pz = W[2];
                 _RB(cx, [0.082 * bulk, 0.1, 0.042 * bulk], 0.018, [px, py, pz], null, fo, palmSlot);
                 const cl = Math.cos(curl), sl = Math.sin(curl);
-                if (cx.world) { _RB(cx, [0.076, 0.07, 0.04], 0.015, [px, py - 0.07 * cl - 0.02, pz - 0.05 * sl], [curl * 0.6, 0, 0], fo, tipsSkin ? 'skin' : palmSlot); return; }
-                if (type === 'mitt') _RB(cx, [0.088, 0.065, 0.05], 0.02, [px, py - 0.07 * cl - 0.01, pz - 0.05 * sl], [curl * 0.7, 0, 0], fo, g);
-                // four fingers: proximal (glove for every gloved type) and distal (skin when the tips are bare)
-                else for (let i = 0; i < 4; i++) {
-                    const fx = px + (i - 1.5) * 0.021 * s, len = i === 0 || i === 3 ? 0.03 : 0.036;
-                    const proxSlot = type === 'bare' ? 'skin' : g;
-                    const c2 = Math.cos(curl * 1.7), s2 = Math.sin(curl * 1.7);
-                    _B(cx, [0.017, len, 0.017], [fx, py - 0.05 - len / 2 * cl, pz - len / 2 * sl], [curl, 0, 0], fo, proxSlot);
-                    _B(cx, [0.015, 0.028, 0.015], [fx, py - 0.05 - len * cl - 0.014 * c2, pz - len * sl - 0.014 * s2], [curl * 1.7, 0, 0], fo, tipsSkin ? 'skin' : g, { tiny: true });
-                }
-                // thumb on the inner side, a little forward
-                _B(cx, [0.019, 0.046, 0.019], [px - s * 0.046, py - 0.012, pz - 0.018], [0.35 + curl * 0.4, 0, s * 0.45], fo, tipsSkin && type !== 'full' ? 'skin' : g);
-                if (type === 'gauntlet') {
-                    _CY(cx, cx.D.fore * 1.32, cx.D.fore * 1.12, 0.09, [W[0], W[1] + 0.05, W[2] + 0.004], [-0.1, 0, 0], fo, g, 12);
-                    for (let k = 0; k < 3; k++) _RB(cx, [0.07, 0.022, 0.014], 0.006, [px, py + 0.028 - k * 0.026, pz + 0.026], null, fo, g, { tiny: true });
-                }
-                if (type === 'tech') _RB(cx, [0.07, 0.014, 0.012], 0.005, [px, py - 0.045, pz + 0.024], null, fo, 'trim', { tiny: true });
-                if (type === 'wrap') for (let k = 0; k < 3; k++) _CY(cx, 0.047, 0.047, 0.012, [px, py + 0.03 - k * 0.028, pz], [0.15 * k, 0, 0.2], fo, g, 8, { tiny: true });
+                _RB(cx, [0.076, 0.07, 0.04], 0.015, [px, py - 0.07 * cl - 0.02, pz - 0.05 * sl], [curl * 0.6, 0, 0], fo, tipsSkin ? 'skin' : palmSlot);
             };
+            // V2.3: one hand's primitives for the show LOD's pose geometry (right hand, figure space, forearm bone): hanging,
+            // palm forward (-Z), fingers down; curl folds the fingers to the palm side, so a raised forearm (cradle, cup)
+            // turns the palm up. Slots: 'glove' (palm, proximal phalanges, cuffs), 'skin' (bare tips and thumb), 'trim'.
+            function _handPrims(cx, type, tipsSkin, pose) {
+                const s = 1, fo = 4, W = AGENT_RIG.rest.wristR, H = _HAND_SHAPE[pose] || _HAND_SHAPE.open;
+                const palmSlot = type === 'bare' ? 'skin' : 'glove', tip = tipsSkin ? 'skin' : palmSlot;
+                const thumbSlot = tipsSkin && type !== 'full' ? 'skin' : palmSlot;
+                const bulk = type === 'mitt' ? 1.25 : type === 'gauntlet' ? 1.15 : 1;
+                const px = W[0] + s * 0.002, py = W[1] - 0.062, pz = W[2];
+                // the wrist joint bridges the forearm's end and the palm in every pose (a plain box: 24 vertices)
+                _B(cx, [0.058 * bulk, 0.034, 0.04 * bulk], [W[0] + s * 0.001, W[1] - 0.013, pz], null, fo, palmSlot);
+                _RB(cx, [0.082 * bulk, 0.1, 0.042 * bulk], 0.018, [px, py, pz], null, fo, palmSlot);
+                const ky = py - 0.05;
+                if (type === 'mitt') {
+                    const c0 = H.c[1], cl = Math.cos(c0), sl = Math.sin(c0);
+                    _RB(cx, [0.088, 0.065, 0.05], 0.02, [px, ky - 0.032 * cl, pz - 0.032 * sl], [c0, 0, 0], fo, palmSlot);
+                } else for (let i = 0; i < 4; i++) {
+                    // the index (0) sits next to the thumb, the little finger (3) outside
+                    const cu = H.c[i], ca = cu * (i === 0 && H.dI !== undefined ? H.dI : H.d);
+                    const fx = px + (i - 1.5) * 0.021 * s * H.sp, len = i === 3 ? 0.029 : i === 0 ? 0.033 : 0.036;
+                    const cl = Math.cos(cu), sl = Math.sin(cu), c2 = Math.cos(ca), s2 = Math.sin(ca);
+                    _B(cx, [0.017, len, 0.017], [fx, ky - len / 2 * cl, pz - len / 2 * sl], [cu, 0, 0], fo, palmSlot);
+                    _B(cx, [0.015, 0.028, 0.015], [fx, ky - len * cl - 0.014 * c2, pz - len * sl - 0.014 * s2], [ca, 0, 0], fo, tip);
+                }
+                // the thumb on the inner side: swung forward across the palm for a fist, out to the side for an open hand
+                _B(cx, [0.019, 0.046, 0.019], [px - s * (0.046 - 0.008 * H.th[0]), py - 0.012 - 0.006 * H.th[0], pz - 0.016 - 0.012 * H.th[0]],
+                    [0.25 + H.th[0] * 0.6, 0, s * (0.15 + H.th[1] * 0.45)], fo, thumbSlot);
+                if (type === 'gauntlet') for (let k = 0; k < 3; k++) _RB(cx, [0.07, 0.022, 0.014], 0.006, [px, py + 0.028 - k * 0.026, pz + 0.028], null, fo, palmSlot);
+                if (type === 'tech') _RB(cx, [0.07, 0.014, 0.012], 0.005, [px, py - 0.045, pz + 0.026], null, fo, 'trim');
+                if (type === 'wrap') for (let k = 0; k < 3; k++) _CY(cx, 0.049, 0.049, 0.012, [px, py + 0.03 - k * 0.028, pz], [0.15 * k, 0, 0.2], fo, palmSlot, 8);
+            }
+            // V2.3: the forearm's axis (wrist to elbow), so cuffs, bands and rings sit coaxial with it at a fixed gap outside
+            // (no coincident or crossing shells): w the wrist, u the unit axis, len, rot the Euler that turns +Y onto u, rW and
+            // rE the forearm's radius at the wrist and at the elbow
+            function _foreAxis(cx, side) {
+                const R = AGENT_RIG.rest, el = side === 'R' ? R.elbowR : R.elbowL, wr = side === 'R' ? R.wristR : R.wristL;
+                const dx = el[0] - wr[0], dy = el[1] - wr[1], dz = el[2] - wr[2], len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                const u = [dx / len, dy / len, dz / len];
+                _q4.setFromUnitVectors(_v4.set(0, 1, 0), new THREE.Vector3(u[0], u[1], u[2]));
+                _e4.setFromQuaternion(_q4, 'XYZ');
+                return { w: wr, u: u, len: len, rot: [_e4.x, _e4.y, _e4.z], rW: cx.D.fore * 0.85, rE: cx.D.fore, gauntlet: !!(cx.look && cx.look.gloves && cx.look.gloves.type === 'gauntlet') };
+            }
+            const _axAt = (ax, a) => [ax.w[0] + ax.u[0] * a, ax.w[1] + ax.u[1] * a, ax.w[2] + ax.u[2] * a];
+            // the forearm's radius a metres up from the wrist, and the gauntlet cuff's (7 mm outside it, flaring 4 mm)
+            const _axR = (ax, a) => ax.rW + (ax.rE - ax.rW) * (a / ax.len);
+            const _cuffR = (ax, a) => _axR(ax, a) + 0.007 + 0.004 * Math.max(0, a) / 0.1;
+            // what a wrist module rests on at a: the gauntlet's cuff, else the forearm
+            const _baseR = (ax, a) => (ax.gauntlet ? _cuffR(ax, a) : _axR(ax, a));
+            // V2.3: the gauntlet's flared cuff, on the forearm (pose-independent; tagged hand so the first-person set keeps
+            // leaving it out, as before)
+            function _gauntletCuff(cx, side) {
+                const ax = _foreAxis(cx, side), fo = side === 'R' ? 4 : 6, g = (cx.look && cx.look.gloves && cx.look.gloves.slot) || 'glove';
+                const was = cx.inHand;
+                cx.inHand = true;
+                _CY(cx, _cuffR(ax, 0.096), _cuffR(ax, -0.004), 0.1, _axAt(ax, 0.046), ax.rot, fo, g, 14);
+                cx.inHand = was;
+            }
 
             // --- torso layers: one coat generator with presets, plus plates, vests and straps ---
             // V2.3: len is the coat length (hem at 1.0 - 0.7 len: 0.72 is knee length), open leaves the front parted (a gap
@@ -25332,9 +25518,13 @@
                 // chest and waist shells (spine): closed, or two front halves parted at the centre
                 if (P.open) {
                     _RB(cx, [D.chestW + 2 * t, 0.44, D.chestD * 0.62], 0.08, [0, 1.39, dz * 0.42], null, 1, slot);
-                    for (const s of [-1, 1]) _RB(cx, [D.chestW * 0.4, 0.44, D.chestD * 0.5], 0.06, [s * D.chestW * 0.3, 1.39, -dz * 0.48], [0, s * 0.1, 0], 1, slot);
+                    // V2.3: the front halves: their front faces 18 mm ahead of the torso's deepest point and their edges only
+                    // 15 mm round (a wide rounding pulled the inner edge back into the torso: a torn, z-fighting seam), a
+                    // light outward turn, and 1 cm shorter than the back shell so no top or bottom face shares its plane
+                    const fF = -dz - 0.018, fB = 0.003;
+                    for (const s of [-1, 1]) _RB(cx, [D.chestW * 0.4, 0.42, fB - fF], 0.015, [s * D.chestW * 0.3, 1.39, (fF + fB) / 2], [0, s * 0.05, 0], 1, slot);
                     _RB(cx, [D.waistW + 2 * t, 0.26, D.chestD * 0.6], 0.06, [0, 1.12, dz * 0.4], null, 1, slot);
-                    for (const s of [-1, 1]) _RB(cx, [D.waistW * 0.36, 0.26, D.chestD * 0.5], 0.05, [s * D.waistW * 0.33, 1.12, -dz * 0.45], [0, s * 0.08, 0], 1, slot);
+                    for (const s of [-1, 1]) _RB(cx, [D.waistW * 0.36, 0.245, D.chestD * 0.5], 0.015, [s * D.waistW * 0.33, 1.12, -dz * 0.45 - 0.006], [0, s * 0.04, 0], 1, slot);
                 } else {
                     _RB(cx, [D.chestW + 2 * t, 0.44, D.chestD + 2 * t], 0.09, [0, 1.39, 0], null, 1, slot, { seg: _segs(cx, 2, 1) });
                     _RB(cx, [D.waistW + 2 * t, 0.26, D.chestD * 0.9 + 2 * t], 0.07, [0, 1.12, 0], null, 1, slot);
@@ -25373,11 +25563,16 @@
                 if (P.sleeves === 'full') { F.sleeveSlot = slot; F.foreSlot = slot; }
                 else if (P.sleeves === 'rolled' || P.sleeves === 'short') {
                     F.sleeveSlot = slot; F.foreSlot = 'skin';
+                    // V2.3: a rolled sleeve turns its lining out: the roll below the elbow is the trim slot (so the forearm
+                    // carries trim, skin and glow, and the show LOD keeps its 36-draw cap with the hand nodes)
+                    const lining = P.sleeves === 'rolled' ? 'trim' : slot;
                     for (const side of ['R', 'L']) {
                         const s = _mir(side), fo = side === 'R' ? 4 : 6, el = side === 'R' ? AGENT_RIG.rest.elbowR : AGENT_RIG.rest.elbowL;
                         if (P.sleeves === 'rolled') {
-                            _limb(cx, el, [el[0] + s * 0.004, el[1] - 0.11, el[2] - 0.016], D.fore * 1.14, D.fore * 1.1, fo, slot, _segs(cx, 12, 7));
-                            _TO(cx, D.fore * 1.12, 0.017, [el[0] + s * 0.005, el[1] - 0.115, el[2] - 0.017], [Math.PI / 2 + 0.15, 0, 0], fo, slot, [5, 14]);
+                            // the roll sheathes the elbow: its top stands 8 mm or more outside the upper sleeve's end (they
+                            // nearly coincided at the joint)
+                            _limb(cx, el, [el[0] + s * 0.004, el[1] - 0.11, el[2] - 0.016], Math.max(D.fore * 1.14, D.arm * 0.9 + 0.008), D.fore * 1.1, fo, lining, _segs(cx, 12, 7));
+                            _TO(cx, D.fore * 1.12, 0.017, [el[0] + s * 0.005, el[1] - 0.115, el[2] - 0.017], [Math.PI / 2 + 0.15, 0, 0], fo, lining, [5, 14]);
                         } else _TO(cx, D.arm * 0.98, 0.016, [s * 0.435, 1.27, 0.012], [Math.PI / 2, 0, 0], side === 'R' ? 3 : 5, slot, [5, 14]);
                     }
                 } else if (P.sleeves === 'none') { F.sleeveSlot = F.sleeveSlot || 'under'; }
@@ -25450,9 +25645,13 @@
             _MODULES.shawlCollar = function (cx, p, slot) { _TO(cx, 0.17, 0.055, [0, 1.6, 0], [Math.PI / 2, 0, 0], 1, slot, [6, 16]); };
             // --- shoulders ---
             _MODULES.capRound = function (cx, p, slot, at, side) {
-                const s = _mir(side);
-                _SP(cx, [0.085, 0.062, 0.1], [s * 0.425, 1.565, 0], [0, 0, -s * 0.3], side === 'R' ? 3 : 5, slot, [10, 6]);
-                _B(cx, [0.015, 0.015, 0.015], [s * 0.505, 1.535, 0], null, side === 'R' ? 3 : 5, 'trim', { tiny: true });
+                // V2.3: a rounded cap: an open dome over the shoulder, about 3 cm clear of the shoulder ball under it (the old
+                // closed cap nearly coincided with the ball and the sleeve crossed both at a grazing angle: torn edges); the
+                // sleeve leaves through its open rim, so no surface crosses the cap
+                const s = _mir(side), bone = side === 'R' ? 3 : 5;
+                cx.flags['cap' + side] = true;
+                _SP(cx, [0.1, 0.084, 0.114], [s * 0.41, 1.53, 0], [0, 0, -s * 0.3], bone, slot, _segs(cx, [16, 8], [10, 5]), { hemi: 0.7 });
+                _B(cx, [0.015, 0.015, 0.015], [s * 0.505, 1.5, 0], null, bone, 'trim', { tiny: true });
             };
             _MODULES.pauldronStack = function (cx, p, slot, at, side) {
                 const s = _mir(side), n = (p && p.plates) || 3, bone = side === 'R' ? 3 : 5;
@@ -25472,12 +25671,17 @@
             _MODULES.medCase = function (cx, p, slot) {
                 const D = cx.D, z = D.chestD / 2 + 0.065;
                 _RB(cx, [0.3, 0.38, 0.12], 0.04, [0, 1.36, z], null, 1, slot);
-                for (const s of [-1, 1]) _RB(cx, [0.05, 0.07, D.chestD * 0.5], 0.015, [s * 0.15, 1.55, D.chestD * 0.2], null, 1, slot);
+                for (const s of [-1, 1]) _B(cx, [0.05, 0.07, D.chestD * 0.5], [s * 0.15, 1.55, D.chestD * 0.2], null, 1, slot);
                 if (p && p.window) {
+                    // V2.3: the window: a dark recessed panel with a row of four jade vials in it, capped in trim (a row of
+                    // vials, never a grid that could read as a glyph or an emblem)
                     const zz = z + 0.062;
-                    _B(cx, [0.2, 0.24, 0.006], [0, 1.37, zz - 0.002], null, 1, 'dark');
-                    for (let k = 0; k < 3; k++) _B(cx, [0.18, 0.012, 0.01], [0, 1.29 + k * 0.08, zz], null, 1, 'glow');
-                    for (const s of [-1, 1]) _B(cx, [0.012, 0.2, 0.01], [s * 0.05, 1.37, zz], null, 1, 'glow');
+                    _B(cx, [0.21, 0.15, 0.006], [0, 1.37, zz], null, 1, 'dark');
+                    for (let k = 0; k < 4; k++) {
+                        const x = -0.072 + k * 0.048;
+                        _CY(cx, 0.013, 0.013, 0.09, [x, 1.362, zz + 0.019], null, 1, 'glow', 6);
+                        _B(cx, [0.03, 0.016, 0.03], [x, 1.415, zz + 0.019], null, 1, 'trim', { tiny: true });
+                    }
                 }
             };
             _MODULES.tanksPair = function (cx, p, slot) { const z = cx.D.chestD / 2 + 0.065; for (const s of [-1, 1]) { _CY(cx, 0.055, 0.055, 0.36, [s * 0.09, 1.3, z], null, 1, slot, 12); _SP(cx, 0.055, [s * 0.09, 1.48, z], null, 1, slot, [10, 5]); } };
@@ -25514,7 +25718,8 @@
                 for (const s of [-1, 1]) {
                     const bone = s > 0 ? 10 : 12;
                     for (let k = 0; k < 3; k++) _CY(cx, D.shin * (1.02 - k * 0.04) + 0.006, D.shin * (1.0 - k * 0.04) + 0.006, 0.032, [s * (0.172 + 0.002 * k), 0.43 - k * 0.085, 0], [0.12 * (k % 2 ? 1 : -1), 0, 0], bone, slot, 10, { tiny: true });
-                    if (p && p.gaiters) _CY(cx, D.shin * 0.95 + 0.012, D.shin * 0.86 + 0.012, 0.13, [s * 0.18, 0.17, 0], null, bone, slot, 10);
+                    // V2.3: gaiters cover the boot's shaft, which _expand then drops (the two shells were 1 mm apart: a comb)
+                    if (p && p.gaiters) { cx.flags.gaiters = true; _CY(cx, D.shin * 0.95 + 0.012, D.shin * 0.86 + 0.012, 0.13, [s * 0.18, 0.17, 0], null, bone, slot, 10); }
                 }
             };
             _MODULES.medSatchel = function (cx, p, slot, at, side) { const s = _mir(side || 'R'), D = cx.D; _RB(cx, [0.11, 0.15, 0.19], 0.03, [s * (D.hipW / 2 + 0.055), 0.88, 0.02], null, 0, slot); _RB(cx, [0.115, 0.05, 0.195], 0.02, [s * (D.hipW / 2 + 0.056), 0.945, 0.02], null, 0, 'trim'); };
@@ -25545,8 +25750,13 @@
                 for (const s of [-1, 1]) {
                     const bone = s > 0 ? 10 : 12;
                     _RB(cx, [B[0], B[1], B[2]], B[3], [s * 0.18, B[1] / 2, -0.05], null, bone, slot);
-                    if (B[4] > 0.09) _CY(cx, cx.D.shin * 0.9 + 0.014, cx.D.shin * 0.82 + 0.014, B[4], [s * 0.18, B[1] + B[4] / 2 - 0.02, 0], null, bone, slot, 12);
-                    if (variant === 'plate') { _RB(cx, [0.12, 0.05, 0.12], 0.015, [s * 0.18, 0.1, -0.13], [0.4, 0, 0], bone, 'trim'); _RB(cx, [0.1, 0.03, 0.2], 0.01, [s * 0.18, 0.012, -0.05], null, bone, 'trim'); }
+                    if (B[4] > 0.09) _CY(cx, cx.D.shin * 0.9 + 0.014, cx.D.shin * 0.82 + 0.014, B[4], [s * 0.18, B[1] + B[4] / 2 - 0.02, 0], null, bone, slot, 12, { shaft: true });
+                    // V2.3: plated boots: a toe cap on top and a toe plate in front, each 4 mm clear of the boot's faces (the
+                    // tilted plate grazed the rounded toe: a comb)
+                    if (variant === 'plate') {
+                        _RB(cx, [B[0] - 0.02, 0.018, 0.1], 0.006, [s * 0.18, B[1] + 0.013, -0.14], null, bone, 'trim');
+                        _RB(cx, [B[0] - 0.02, B[1] * 0.6, 0.018], 0.006, [s * 0.18, B[1] * 0.42, -0.05 - B[2] / 2 - 0.013], null, bone, 'trim');
+                    }
                     if (variant === 'runner') _B(cx, [0.125, 0.02, 0.285], [s * 0.18, 0.012, -0.05], null, bone, 'trim', { tiny: true });
                 }
             };
@@ -25608,38 +25818,67 @@
             _MODULES.visorSlats = function (cx) { if (!cx.flags.sealedHead) _MODULES.segVisor(cx, null, 'visor', null, null, null, 5); };
             _MODULES.cheekPlates = function (cx, p, slot) { for (const s of [-1, 1]) _RB(cx, [0.05, 0.06, 0.08], 0.015, [s * 0.12, 1.83, -0.11], [0, s * 0.4, 0], 2, slot || 'trim'); };
             // --- wrists (both arms) ---
+            // V2.3: every wrist part is coaxial with the forearm (_foreAxis) and sits a fixed gap outside what it rests on:
+            // the forearm, or the gauntlet's cuff (Omen's plate rings were 1 mm off the cuff and tilted against it: a comb)
             function _wrist(cx, name, n, slotAcc, slotBand) {
                 for (const side of ['R', 'L']) {
-                    const s = _mir(side), fo = side === 'R' ? 4 : 6, W = side === 'R' ? AGENT_RIG.rest.wristR : AGENT_RIG.rest.wristL;
-                    const r = cx.D.fore * 0.92, y = W[1] + 0.03, x = W[0], z = W[2] + 0.004;
+                    const s = _mir(side), fo = side === 'R' ? 4 : 6, ax = _foreAxis(cx, side);
+                    const a = 0.03, c = _axAt(ax, a), r = _baseR(ax, a) + 0.007;
                     if (name === 'band' || name === 'ampouleCuff' || name === 'cableCuff' || name === 'tapeWrap' || name === 'capacitor')
-                        _CY(cx, r + 0.008, r + 0.008, name === 'tapeWrap' ? 0.06 : 0.028, [x, y, z], [-0.15, 0, 0], fo, slotBand, _segs(cx, 12, 7));
+                        _CY(cx, r + 0.0008, r, name === 'tapeWrap' ? 0.06 : 0.028, c, ax.rot, fo, slotBand, _segs(cx, 12, 7));
                     if (name === 'ampouleCuff') for (let k = 0; k < (n || 3); k++) {
-                        const a = (k - ((n || 3) - 1) / 2) * 0.9 + (s > 0 ? Math.PI / 2 : -Math.PI / 2);
-                        _CY(cx, 0.012, 0.012, 0.05, [x + Math.sin(a) * (r + 0.02), y + 0.01, z - Math.cos(a) * (r + 0.02)], [-0.15, 0, 0], fo, slotAcc, _segs(cx, 6, 5));
+                        const an = (k - ((n || 3) - 1) / 2) * 0.9 + (s > 0 ? Math.PI / 2 : -Math.PI / 2), R2 = r + 0.017;
+                        _CY(cx, 0.012, 0.012, 0.05, [c[0] + Math.sin(an) * R2, c[1] + 0.01, c[2] - Math.cos(an) * R2], ax.rot, fo, slotAcc, _segs(cx, 6, 5));
                     }
-                    if (name === 'plateRing') for (let k = 0; k < (n || 2); k++) _CY(cx, r + 0.014 - k * 0.002, r + 0.016 - k * 0.002, 0.022, [x, y + k * 0.034, z], [-0.15, 0, 0], fo, slotBand, _segs(cx, 12, 7));
-                    if (name === 'coilBand') for (let k = 0; k < 4; k++) _TO(cx, r + 0.006, 0.005, [x, y - 0.015 + k * 0.012, z], [Math.PI / 2 - 0.15, 0, 0], fo, slotBand, [4, 12]);
-                    if (name === 'capacitor') _RB(cx, [0.03, 0.05, 0.03], 0.01, [x + s * (r + 0.01), y, z], null, fo, slotAcc);
-                    if (name === 'beadString') for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; _SP(cx, 0.008, [x + Math.sin(a) * (r + 0.008), y, z + Math.cos(a) * (r + 0.008)], null, fo, slotAcc, [6, 4], { tiny: true }); }
-                    if (name === 'cableCuff') _limb(cx, [x + s * (r + 0.004), y, z], [x + s * (r + 0.012), y + 0.14, z + 0.02], 0.006, 0.006, fo, slotAcc, 6);
-                    if (name === 'compassDial' && side === 'L') _CY(cx, 0.024, 0.024, 0.014, [x, y, z - r - 0.006], [Math.PI / 2, 0, 0], fo, slotAcc, 12);
-                    if (name === 'toolBracer') _RB(cx, [r * 2.2, 0.1, r * 2.2], 0.02, [x, y + 0.04, z], [-0.15, 0, 0], fo, slotBand);
+                    if (name === 'plateRing') for (let k = 0; k < (n || 2); k++) {
+                        const ak = a + k * 0.034, rk = _baseR(ax, ak) + 0.006 + 0.0011;
+                        _CY(cx, rk + 0.0011, rk, 0.022, _axAt(ax, ak), ax.rot, fo, slotBand, _segs(cx, 12, 7));
+                    }
+                    if (name === 'coilBand') for (let k = 0; k < 4; k++) _TO(cx, r, 0.005, _axAt(ax, a - 0.015 + k * 0.012), [ax.rot[0] + Math.PI / 2, ax.rot[1], ax.rot[2]], fo, slotBand, [4, 12]);
+                    if (name === 'capacitor') _RB(cx, [0.03, 0.05, 0.03], 0.01, [c[0] + s * (r + 0.016), c[1], c[2]], ax.rot, fo, slotAcc);
+                    if (name === 'beadString') for (let k = 0; k < 6; k++) { const an = k / 6 * Math.PI * 2; _SP(cx, 0.008, [c[0] + Math.sin(an) * (r + 0.002), c[1], c[2] + Math.cos(an) * (r + 0.002)], null, fo, slotAcc, [6, 4], { tiny: true }); }
+                    if (name === 'cableCuff') _limb(cx, [c[0] + s * (r + 0.006), c[1], c[2]], [c[0] + s * (r + 0.014), c[1] + 0.14, c[2] + 0.02], 0.006, 0.006, fo, slotAcc, 6);
+                    if (name === 'compassDial' && side === 'L') _CY(cx, 0.024, 0.024, 0.014, [c[0], c[1], c[2] - (_baseR(ax, a) + 0.013)], [Math.PI / 2, 0, 0], fo, slotAcc, 12);
+                    if (name === 'toolBracer') { const rb = _baseR(ax, a + 0.01) + 0.01; _RB(cx, [rb * 2, 0.1, rb * 2], 0.02, _axAt(ax, a + 0.01), ax.rot, fo, slotBand); }
                 }
             }
             for (const w of ['band', 'ampouleCuff', 'plateRing', 'coilBand', 'capacitor', 'beadString', 'cableCuff', 'tapeWrap', 'compassDial', 'toolBracer'])
                 _MODULES[w] = function (cx, p, slot, at, side, variant, n) { _wrist(cx, w, n || (p && p.n), slot || 'glow', 'trim'); };
             // --- props (each an extra node so it can float, orbit or be held) ---
             const _PROP_AT = { float: [0, 1.17, -0.32], handL: [-0.45, 0.85, -0.06], handR: [0.45, 0.85, -0.06], orbitR: [0.6, 1.02, -0.1], hip: [0.3, 0.88, 0.05], back: [0, 1.4, 0.3], stage: [0.45, 0.06, -0.35] };
+            // V2.3: where a look's prop sits (figure space). A floating prop carried in the cradle hovers 7.5 cm above the
+            // midpoint of the two palms in the look's own stance (forward kinematics of its stance pose: Sage's crystal sits
+            // between and above her cupped hands, not under them); other holds use the fixed points above. Cached per look.
+            const _propCache = new WeakMap();
+            function _propAt(look, hold) {
+                if (hold !== 'float' || !look || !look.stance || look.stance.carry !== 'cradle') return _PROP_AT[hold] || _PROP_AT.float;
+                let a = _propCache.get(look);
+                if (a) return a;
+                const pose = _sample(look, look.id, 'stance', 0, null), W = _poseMatrices(pose), v = new THREE.Vector3();
+                a = [0, 0, 0];
+                for (const side of ['R', 'L']) {
+                    const wr = side === 'R' ? AGENT_RIG.rest.wristR : AGENT_RIG.rest.wristL;
+                    // the palm's centre: 7.5 cm down the hanging hand from the wrist, on its palm face
+                    v.set(wr[0], wr[1] - 0.075, wr[2] - 0.022).applyMatrix4(W[side === 'R' ? 4 : 6]);
+                    a[0] += v.x / 2; a[1] += v.y / 2; a[2] += v.z / 2;
+                }
+                a[1] += 0.075;
+                // into the spine's rest frame (the prop node rides the spine), so the stance puts it back at that point
+                v.set(a[0], a[1], a[2]).applyMatrix4(new THREE.Matrix4().copy(W[1]).invert());
+                a = Object.freeze([v.x, v.y, v.z]);
+                _propCache.set(look, a);
+                return a;
+            }
             function _propNode(cx, hold) {
-                const at = _PROP_AT[hold] || _PROP_AT.float;
-                const parent = hold === 'handL' ? 6 : (hold === 'handR' ? 4 : 0);
+                const at = _propAt(cx.look, hold);
+                // a floating prop rides the spine, like the arms that carry it
+                const parent = hold === 'handL' ? 6 : (hold === 'handR' ? 4 : hold === 'float' ? 1 : 0);
                 return cx.show ? _node(cx, 'prop', parent, at, { hold: hold }) : null;
             }
-            // V2.3: Sage's crystal: six shards that lock into an octahedral lattice floating between the cupped hands (never
-            // held like a ball); each shard is its own node so the intro can fly it in from its orbit
+            // V2.3: Sage's crystal: six shards that lock into an octahedral lattice floating between and above the cupped
+            // hands (never held like a ball); each shard is its own node so the intro can fly it in from its orbit
             _MODULES.crystalLattice = function (cx, p, slot) {
-                const hold = (cx.look && cx.look.prop && cx.look.prop.hold) || 'float', c = _PROP_AT[hold] || _PROP_AT.float;
+                const hold = (cx.look && cx.look.prop && cx.look.prop.hold) || 'float', c = _propAt(cx.look, hold);
                 const prop = _propNode(cx, hold);
                 const dirs = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
                 for (let k = 0; k < 6; k++) {
@@ -25648,7 +25887,7 @@
                     const node = cx.show ? _node(cx, 'shard' + k, 'prop', at, { shard: k }) : null;
                     _OC(cx, [0.022, 0.06, 0.022], at, rot, node || prop ? undefined : 0, slot || 'glow', node ? { node: node } : (prop ? { node: prop } : null));
                 }
-                if (!cx.show) _OC(cx, [0.03, 0.03, 0.03], c, [0, 0.7, 0], 0, slot || 'glow');
+                if (!cx.show) _OC(cx, [0.03, 0.03, 0.03], c, [0, 0.7, 0], 1, slot || 'glow');
             };
             // V2.3: Omen's rift key: a 0.3 m jagged slit frame with an emissive inner edge, orbiting the right hand
             _MODULES.riftKey = function (cx, p, slot) {
@@ -25683,7 +25922,7 @@
                 { id: 5, name: 'boomMic', bone: 2, rows: [['box', [0.05, 0.1, 0.1], [0.29, 1.86, 0], null, 2], ['box', [0.025, 0.025, 0.26], [0.24, 1.78, -0.17], [0, 0.5, 0], 1]] },
                 { id: 6, name: 'tallHat', bone: 2, rows: [['box', [0.36, 0.12, 0.36], [0, 2.155, 0], null, 0], ['box', [0.5, 0.02, 0.5], [0, 2.09, 0], null, 1]] },
                 { id: 7, name: 'crestRidge', bone: 2, rows: [['box', [0.06, 0.06, 0.52], [0, 2.18, 0], null, 1]] },
-                { id: 8, name: 'haloArc', bone: 2, rows: [['box', [0.14, 0.022, 0.03], [0, 2.2, 0.03], null, 1], ['box', [0.14, 0.022, 0.03], [0.19, 2.12, 0.03], [0, 0, -0.785], 1], ['box', [0.14, 0.022, 0.03], [-0.19, 2.12, 0.03], [0, 0, 0.785], 1]] },
+                { id: 8, name: 'haloArc', bone: 2, rows: [['torus', [0.2, 0.014], [0, 2.0, 0.03], null, 1]] },
                 { id: 9, name: 'visorBand', bone: 2, rows: [['box', [0.52, 0.06, 0.05], [0, 1.95, -0.27], null, 1], ['box', [0.56, 0.04, 0.48], [0, 1.95, 0.02], null, 2]] },
                 { id: 10, name: 'collarFunnel', bone: 1, rows: [['box', [0.36, 0.13, 0.04], [0, 1.66, -0.17], null, 0], ['box', [0.42, 0.13, 0.3], [0, 1.66, 0.02], null, 2]] },
                 { id: 11, name: 'bandolier', bone: 1, rows: [['box', [0.08, 0.72, 0.035], [0, 1.3, -0.295], [0, 0, 0.62], 2], ['box', [0.07, 0.07, 0.04], [0.09, 1.42, -0.3], [0, 0, 0.62], 1]] },
@@ -25700,32 +25939,93 @@
                 { id: 22, name: 'backDisc', bone: 1, rows: [['cyl', [0.2, 0.2, 0.03], [0, 1.35, 0.305], [Math.PI / 2, 0, 0], 0]] },
                 { id: 23, name: 'orbHand', bone: 4, rows: [['octa', [0.05, 0.05, 0.05], [0.56, 1.12, -0.1], null, 1]] }
             ];
-            // V2.3: the Low tier keeps 12 modules (the ones most kits use, and the silhouette pieces); the rest draw nothing
-            const _KIT_LOW = [0, 3, 9, 11, 12, 13, 15, 16, 19, 20, 21, 23];
+            // V2.3: the Low tier keeps 12 modules: the ones most kits use, the silhouette pieces, and the head modules the pool
+            // kits name (1 segVisor, Omen's; 2 earGuard, Sage's), so each pilot keeps its head at combat distance. brimCap (3)
+            // and tanksPair (20) make room: every agent that had a Low module keeps one (design 3.5 gives no Low list)
+            const _KIT_LOW = [0, 1, 2, 9, 11, 12, 13, 15, 16, 19, 21, 23];
             const _KIT_ROUND_HIGH = { 0: 1, 3: 1, 6: 1, 12: 1, 13: 2, 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 2 };
 
             // ---- the object pool (no uuid draws after it is made; see the block header) -------------------------------------
-            const _pool = { made: false, groups: [], meshes: [], vm: [], world: [], geoms: [], placeholder: null, madeDraws: 0 };
-            const _stats = { poolMisses: 0, builds: 0, lastMs: 0, ms: [] };
+            const _pool = { made: false, groups: [], meshes: [], vm: [], world: [], geoms: [], placeholder: null, madeMs: 0, size: null };
+            const _stats = { poolMisses: 0, builds: 0, lastMs: 0, lastUnits: 0, ms: [], released: 0, handSets: 0 };
+            // V2.3: the pool's size comes from the roster itself, after the LOOKS blocks loaded: a dry show-tier expansion of
+            // each agent counts its meshes (11 bones plus its nodes: prop, plates, shards and the two hands) and its hand key.
+            // Then: every agent's show and world LOD, two body LODs, the four kit tiers, an arm set per agent and the eight
+            // pose geometries per hand key, plus an eighth and 8 of each as margin. A role batch that adds nodes resizes it.
+            function _poolNeeds() {
+                const n = AGENT_ORDER.length, keys = new Set();
+                let showMeshes = 0;
+                for (const id of AGENT_ORDER) {
+                    const look = V23.core.resolve(id);
+                    showMeshes += _SHOW_BONES.length + _expand(look, 'show').nodes.length;
+                    keys.add(_handKey(look));
+                }
+                const m = (x) => Math.ceil(x * 1.125) + 8;
+                return { groups: m(n * 2 + 2), meshes: m(showMeshes + n + 2 * _SHOW_BONES.length), geoms: m(4 + n * 2 + keys.size * HAND_POSES.length),
+                    vm: m(n * _SLOTS.length), world: m((n + 2) * _WORLD_GROUPS.length), handKeys: keys.size, showMeshes: showMeshes };
+            }
             function _ensurePool() {
                 if (_pool.made) return;
                 const t0 = performance.now();
                 _pool.made = true;
-                const n = (typeof AGENT_ORDER !== 'undefined' ? AGENT_ORDER.length : 29);
                 _pool.placeholder = V23.mat.vm({ c: 0x808080 });
-                // V2.3: sized for every agent's show LOD (11 bones and up to ~20 nodes), a world LOD each, two body LODs, the four
-                // kit tiers and 29 arm sets; a build past it still works and counts poolMisses
-                for (let i = 0; i < n * 2 + 8; i++) _pool.groups.push(new THREE.Group());
-                for (let i = 0; i < n * 20 + n + 40; i++) _pool.meshes.push(new THREE.Mesh(new THREE.BufferGeometry(), _pool.placeholder));
-                for (let i = 0; i < 8 + n * 2; i++) _pool.geoms.push(new THREE.BufferGeometry());
-                for (let i = 0; i < n * 9 + 9; i++) _pool.vm.push(V23.mat.vm({ c: 0xffffff }));
-                for (let i = 0; i < (n + 2) * 6 + 12; i++) _pool.world.push(V23.mat.world({ c: 0xffffff }));
+                const tn = performance.now();
+                const N = _pool.size = _poolNeeds();
+                _pool.needsMs = performance.now() - tn;
+                for (let i = 0; i < N.groups; i++) _pool.groups.push(new THREE.Group());
+                for (let i = 0; i < N.meshes; i++) _pool.meshes.push(new THREE.Mesh(new THREE.BufferGeometry(), _pool.placeholder));
+                for (let i = 0; i < N.geoms; i++) _pool.geoms.push(new THREE.BufferGeometry());
+                for (let i = 0; i < N.vm; i++) _pool.vm.push(V23.mat.vm({ c: 0xffffff }));
+                for (let i = 0; i < N.world; i++) _pool.world.push(V23.mat.world({ c: 0xffffff }));
                 _pool.madeMs = performance.now() - t0;
             }
-            const _take = (list, make) => { if (list.length) return list.pop(); _stats.poolMisses++; return make(); };
+            // V2.3: a miss still builds (its new object draws uuids from Math.random), counts in stats.poolMisses and warns on
+            // the console (the first miss, then every 50th)
+            const _take = (list, make) => {
+                if (list.length) return list.pop();
+                _stats.poolMisses++;
+                if (_stats.poolMisses === 1 || _stats.poolMisses % 50 === 0) console.warn('V2.3: the part pool ran out (' + _stats.poolMisses + ' misses); a new object was made');
+                return make();
+            };
             const _takeGroup = () => _take(_pool.groups, () => new THREE.Group());
             const _takeMesh = () => _take(_pool.meshes, () => new THREE.Mesh(new THREE.BufferGeometry(), _pool.placeholder));
             const _takeGeom = () => _take(_pool.geoms, () => new THREE.BufferGeometry());
+            // V2.3: empty a pooled geometry: its GPU buffers freed (dispose), its attributes, index and groups dropped
+            function _clearGeom(g) {
+                g.dispose();
+                for (const k of Object.keys(g.attributes)) g.deleteAttribute(k);
+                g.setIndex(null);
+                g.clearGroups();
+                g.boundingSphere = null; g.boundingBox = null;
+            }
+            // V2.3: return a figure (or a job's partial figure) to the pool: its meshes (geometries emptied; a hand mesh gets a
+            // pool geometry back, since its pose geometry is shared), its materials (never disposed: a material's program is
+            // shared with the game's, and disposing it could release a program in use) and its root group
+            function _releaseInfo(root, info) {
+                if (!info || info.released) return false;
+                info.released = true;
+                if (root && root.parent) root.parent.remove(root);
+                for (const m of info.meshList) {
+                    if (m.parent) m.parent.remove(m);
+                    if (m.userData.v23Hand) { m.geometry = _takeGeom(); m.userData.v23Hand = false; }
+                    else _clearGeom(m.geometry);
+                    m.material = _pool.placeholder; m.name = ''; m.visible = true; m.castShadow = false; m.receiveShadow = false; m.frustumCulled = true;
+                    m.position.set(0, 0, 0); m.rotation.set(0, 0, 0); m.scale.set(1, 1, 1);
+                    _pool.meshes.push(m);
+                }
+                info.meshList.length = 0;
+                const ml = info.tier === 'show' ? _pool.vm : _pool.world;
+                for (const mat of info.materials) ml.push(mat);
+                if (root) {
+                    while (root.children.length) root.remove(root.children[0]);
+                    root.userData = {}; root.name = ''; root.visible = true;
+                    root.position.set(0, 0, 0); root.rotation.set(0, 0, 0); root.scale.set(1, 1, 1);
+                    _pool.groups.push(root);
+                }
+                _stats.released++;
+                return true;
+            }
+            const _release = (root) => _releaseInfo(root, root && root.userData && root.userData.v23);
             // V2.3: a pooled material set to a palette entry (runtime colour writes: setHex(h).convertSRGBToLinear())
             function _setMat(m, e) {
                 e = e || { c: 0x808080 };
@@ -25832,6 +26132,8 @@
                 if (L.gloves && L.gloves.wrist && L.gloves.wrist.m) _runModule(cx, L.gloves.wrist.m, { n: L.gloves.wrist.n }, 'glow');
                 if (L.prop && L.prop.m && tier !== 'body') _runModule(cx, L.prop.m, null, L.prop.slot);
                 _MODULES.body(cx);
+                // V2.3: gaiters cover a boot's shaft whatever the outfit's order: drop it (no coincident shells)
+                if (cx.flags.gaiters) cx.out = cx.out.filter((s) => !s.shaft);
                 return cx;
             }
             const _nodeKey = (s) => (s.node !== undefined && s.node !== null ? 'n:' + s.node : 'b' + (s.bone === undefined ? 0 : s.bone));
@@ -25865,90 +26167,209 @@
                 return { map: map, colOf: colOf };
             }
             const _DRAW_CAP = 36;
-            function _fitDraws(byKey, M) {
-                const slotsOf = (list) => { const m = new Map(); for (const s of list) { const k = s._slot || M.map[s.slot] || s.slot; if (!m.has(k)) m.set(k, []); m.get(k).push(s); } return m; };
-                let total = 0;
-                for (const list of byKey.values()) total += slotsOf(list).size;
+            // V2.3: fit a show figure's draws (extra: the hand nodes' draws, which are fixed by the hand key) to the cap
+            function _fitDraws(byKey, M, extra) {
+                const keyOf = (s) => s._slot || M.map[s.slot] || s.slot;
+                const slotsOf = (list) => { const m = new Map(); for (const s of list) { const k = keyOf(s); if (!m.has(k)) m.set(k, []); m.get(k).push(s); } return m; };
+                const count = () => { let n = extra || 0; for (const list of byKey.values()) n += slotsOf(list).size; return n; };
+                const solid = (k) => k !== 'glow' && k !== 'visor' && !_emissive(M.colOf(k));
+                let total = count();
                 if (total <= _DRAW_CAP) return total;
+                // tiny details first: a slot group made only of them takes the nearest-coloured slot already on its node
                 for (const list of byKey.values()) {
                     if (total <= _DRAW_CAP) break;
                     const g = slotsOf(list);
                     for (const [k, prims] of g) {
                         if (total <= _DRAW_CAP) break;
-                        if (k === 'glow' || k === 'visor' || !prims.every((s) => s.tiny) || g.size < 2) continue;
+                        if (!solid(k) || !prims.every((s) => s.tiny) || g.size < 2) continue;
                         let best = null, bd = 1e9;
-                        for (const k2 of g.keys()) { if (k2 === k || k2 === 'glow' || k2 === 'visor') continue; const d = _dE(M.colOf(k).c, M.colOf(k2).c); if (d < bd) { bd = d; best = k2; } }
+                        for (const k2 of g.keys()) { if (k2 === k || !solid(k2)) continue; const d = _dE(M.colOf(k).c, M.colOf(k2).c); if (d < bd) { bd = d; best = k2; } }
                         if (best) { for (const s of prims) s._slot = best; total--; g.delete(k); }
                     }
+                }
+                // V2.3: still over (a role batch with many colours): the closest pair of solid slots that share a node merges
+                // across the whole figure (the same pair everywhere, so both sides of the figure stay alike); the slot with
+                // fewer primitives takes the other's material
+                for (let guard = 0; total > _DRAW_CAP && guard < 8; guard++) {
+                    let best = null, bd = 1e9;
+                    for (const list of byKey.values()) {
+                        const ks = [...slotsOf(list).keys()].filter(solid);
+                        for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) { const d = _dE(M.colOf(ks[i]).c, M.colOf(ks[j]).c); if (d < bd) { bd = d; best = [ks[i], ks[j]]; } }
+                    }
+                    if (!best) break;
+                    const n = { [best[0]]: 0, [best[1]]: 0 };
+                    for (const list of byKey.values()) for (const s of list) { const k = keyOf(s); if (k in n) n[k]++; }
+                    const from = n[best[0]] <= n[best[1]] ? best[0] : best[1], to = from === best[0] ? best[1] : best[0];
+                    for (const list of byKey.values()) for (const s of list) if (keyOf(s) === from) s._slot = to;
+                    total = count();
                 }
                 return total;
             }
 
+            // ---- the shared hand pose geometries (show LOD) ------------------------------------------------------------------
+            // V2.3: a look's hand key: its glove type, and whether bare tips draw apart from the glove ('tips': a skin colour
+            // that does not merge with the glove's in the slot map) or not ('one')
+            function _handKey(look) {
+                const G = (look && look.gloves) || {}, type = G.type || 'full';
+                const tipsSkin = !look || !look.gloves || G.tips === 'skin' || type === 'fingerless' || type === 'wrap';
+                const M = _slotMap(look), gSlot = G.slot || 'glove';
+                return type + (type !== 'bare' && tipsSkin && M.map.skin !== (M.map[gSlot] || gSlot) ? '|tips' : '|one');
+            }
+            // V2.3: the eight pose geometries of a hand key (HAND_POSES), shared by every figure with that key and swapped by
+            // reference: pooled BufferGeometries of the right hand in the hand node's space (the wrist pivot at the origin),
+            // groups 0 glove, 1 bare tips (skin), 2 trim; the left hand is the same geometry mirrored by its node (scale.x -1).
+            // Built one pose per call (a staged-builder unit); hs.uploaded is set once CORE's upload pass drew them all.
+            const _handSets = {};
+            function _handSet(key) {
+                let hs = _handSets[key];
+                if (!hs) {
+                    const q = key.split('|');
+                    hs = _handSets[key] = { key: key, type: q[0], tips: q[1] === 'tips', geoms: {}, built: 0, vertices: 0, draws: 0, uploaded: false };
+                    _stats.handSets++;
+                }
+                return hs;
+            }
+            const _handGroups = (hs) => 1 + (hs.tips && hs.type !== 'bare' ? 1 : 0) + (hs.type === 'tech' ? 1 : 0);
+            function _handPose(hs, pose) {
+                if (hs.geoms[pose]) return hs.geoms[pose];
+                const cx = { out: [], world: false, show: true, inHand: false };
+                _handPrims(cx, hs.type, hs.tips || hs.type === 'bare', pose);
+                const g = _takeGeom();
+                const r = _fill(g, cx.out, (s) => (s.slot === 'skin' ? 1 : s.slot === 'trim' ? 2 : 0), AGENT_RIG.rest.wristR, null);
+                g.name = 'v23:hand:' + hs.key + ':' + pose;
+                hs.geoms[pose] = g;
+                hs.built++;
+                hs.vertices = r.v; hs.draws = r.groups;
+                return g;
+            }
+
             // ---- the figure builders: show (posable, rounded), world (baked stance, <= 6 meshes), body (posable, world detail)
-            function _build(look, tier, agentId) {
-                const t0 = performance.now();
-                _ensurePool();
+            // V2.3: a build is a job run unit by unit, so the staged builder can spread a figure over frames within its
+            // per-frame budget (design 2.5) while _build (the synchronous build on demand) runs it to the end at once. Units:
+            //   'expand' (the look's primitives, slot map, draw fit, root group and materials); then one per hand pose still
+            //   missing from the look's hand key, one per bone or node mesh (show, body) or per slice of 64 primitives (world);
+            //   then 'assemble' (parents, rest positions, the hand nodes, stats). _jobStep runs one unit and returns true when
+            //   job.root is complete; _jobAbort returns what an unfinished job took to the pool.
+            function _job(look, tier, agentId) {
                 tier = tier === 'world' || tier === 'body' ? tier : 'show';
-                const cx = _expand(look, tier === 'show' ? 'show' : (tier === 'body' ? 'body' : 'world'));
-                const prims = cx.out;
+                return { look: look, tier: tier, id: agentId || (look && look.id) || null, phase: 0, k: 0, units: 0, ms: 0, maxUnitMs: 0, root: null, info: null, done: false };
+            }
+            function _jobStep(J) {
+                if (J.done) return true;
+                const t0 = performance.now();
+                if (J.phase === 0) _jobExpand(J); else if (J.phase === 1) _jobFill(J); else _jobAssemble(J);
+                const ms = performance.now() - t0;
+                J.units++; J.ms += ms; if (ms > J.maxUnitMs) J.maxUnitMs = ms;
+                if (J.done) {
+                    _stats.builds++; _stats.lastMs = J.ms; _stats.lastUnits = J.units;
+                    _stats.ms.push(J.ms);
+                    if (_stats.ms.length > 256) _stats.ms.shift();
+                }
+                return J.done;
+            }
+            function _jobAbort(J) {
+                if (!J || J.done) return false;
+                J.done = true;
+                return J.info ? _releaseInfo(J.root, J.info) : false;
+            }
+            function _build(look, tier, agentId) {
+                const J = _job(look, tier, agentId);
+                while (!_jobStep(J));
+                return J.root;
+            }
+            function _jobExpand(J) {
+                _ensurePool();
+                const look = J.look, tier = J.tier;
+                const cx = _expand(look, tier);
                 const root = _takeGroup();
-                root.name = 'v23:' + (agentId || 'agent') + ':' + tier;
+                root.name = 'v23:' + (J.id || 'agent') + ':' + tier;
                 root.position.set(0, 0, 0); root.rotation.set(0, 0, 0); root.scale.setScalar((look && look.height) || 1); root.visible = true;
                 const mats = _takeMats(look, tier !== 'show');
-                const info = { agentId: agentId || null, tier: tier, bones: new Array(13).fill(null), nodes: {}, rest: {}, stats: { vertices: 0, triangles: 0, draws: 0, meshes: 0 },
-                    hash: 2166136261, slots: tier === 'show' ? _SLOTS.slice() : _WORLD_GROUPS.map((g) => g[0]), materials: mats, nodeList: [] };
                 const M = _slotMap(look);
-                const slotIndex = (s) => (tier === 'show' ? _SLOTS.indexOf(s._slot || M.map[s.slot] || s.slot)
+                const info = { agentId: J.id, tier: tier, bones: new Array(13).fill(null), nodes: {}, rest: {}, stats: { vertices: 0, triangles: 0, draws: 0, meshes: 0 },
+                    hash: 2166136261, slots: tier === 'show' ? _SLOTS.slice() : _WORLD_GROUPS.map((g) => g[0]), materials: mats, nodeList: [], nodeMirror: [], meshList: [], hands: null };
+                J.root = root; J.info = info; J.M = M;
+                J.slotIndex = (s) => (tier === 'show' ? _SLOTS.indexOf(s._slot || M.map[s.slot] || s.slot)
                     : tier === 'body' ? _WORLD_OF[M.map[s.slot] || s.slot] : (_WORLD_OF[s.slot] === undefined ? 0 : _WORLD_OF[s.slot]));
                 if (tier === 'world') {
                     // baked in the look's stance pose (motion's base pose), one mesh with a group per world slot
-                    const pose = _sample(look, agentId, 'stance', 0, null);
-                    const W = _poseMatrices(pose);
-                    const mesh = _takeMesh(), geom = mesh.geometry;
-                    const byBone = (s) => (s.node ? 0 : (s.bone === undefined ? 0 : s.bone));
-                    const res = { v: 0, t: 0, groups: 0 };
-                    // bake bone by bone into one buffer: group the primitives per bone pose, then fill once per slot
-                    const posed = prims.map((s) => Object.assign({}, s, { _pre: W[byBone(s)] }));
-                    const r = _fillPosed(geom, posed, slotIndex);
-                    Object.assign(res, r);
-                    mesh.material = mats; mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = true;
-                    mesh.position.set(0, 0, 0); mesh.rotation.set(0, 0, 0); mesh.scale.set(1, 1, 1); mesh.visible = true; mesh.name = 'v23:world';
-                    root.add(mesh);
-                    info.stats = { vertices: res.v, triangles: res.t, draws: res.groups, meshes: 1 };
-                    info.hash = _fnv(info.hash, r.P, r.I);
-                    info.mesh = mesh;
+                    const W = _poseMatrices(_sample(look, J.id, 'stance', 0, null));
+                    J.mesh = _takeMesh();
+                    info.meshList.push(J.mesh);
+                    J.fill = _fillBegin(cx.out.map((s) => Object.assign({}, s, { _pre: W[s.node ? 0 : (s.bone === undefined ? 0 : s.bone)] })), J.slotIndex);
                 } else {
                     // posable: one mesh per bone and per extra node, vertices relative to the node's pivot
-                    const piv = AGENT_RIG.showPivots;
                     const byKey = new Map();
-                    for (const s of prims) {
-                        let k = _nodeKey(s);
+                    for (const s of cx.out) {
+                        const k = _nodeKey(s);
                         if (tier === 'body' && k.startsWith('n:')) continue;
                         if (!byKey.has(k)) byKey.set(k, []);
                         byKey.get(k).push(s);
                     }
                     const nodeDefs = tier === 'show' ? cx.nodes : [];
-                    if (tier === 'show') _fitDraws(byKey, M);
-                    const pivotOf = (key) => {
-                        if (key.startsWith('b')) return piv[+key.slice(1)];
-                        const nd = nodeDefs.find((n) => 'n:' + n.name === key);
-                        return nd ? nd.pivot : [0, 0, 0];
-                    };
-                    const objOf = {};
-                    const make = (key) => {
-                        const mesh = _takeMesh(), list = byKey.get(key) || [];
-                        const pv = pivotOf(key);
-                        const r = _fill(mesh.geometry, list, slotIndex, pv, null);
-                        mesh.material = mats; mesh.castShadow = tier === 'body'; mesh.receiveShadow = tier === 'body'; mesh.frustumCulled = false;
-                        mesh.rotation.set(0, 0, 0); mesh.scale.set(1, 1, 1); mesh.visible = true;
-                        info.stats.vertices += r.v; info.stats.triangles += r.t; info.stats.draws += r.groups; if (r.groups) info.stats.meshes++;
+                    let handDraws = 0;
+                    if (nodeDefs.some((n) => n.hand)) {
+                        J.hs = _handSet(_handKey(look));
+                        handDraws = nodeDefs.filter((n) => n.hand).length * _handGroups(J.hs);
+                        // the hand meshes' materials: [glove, tips, trim] from the figure's own (the slot map's merges apply)
+                        const G = (look && look.gloves) || {}, gSlot = G.type === 'bare' ? 'skin' : (G.slot || 'glove');
+                        const mi = (s) => mats[_SLOTS.indexOf(M.map[s] || s)];
+                        J.handMats = [mi(gSlot), mi('skin'), mi('trim')];
+                    }
+                    if (tier === 'show') _fitDraws(byKey, M, handDraws);
+                    J.byKey = byKey; J.nodeDefs = nodeDefs; J.objOf = {};
+                    J.keys = [];
+                    if (J.hs) for (const p of HAND_POSES) if (!J.hs.geoms[p]) J.keys.push('h:' + p);
+                    for (const b of _SHOW_BONES) J.keys.push('b' + b);
+                    for (const nd of nodeDefs) if (!nd.hand) J.keys.push('n:' + nd.name);
+                }
+                J.phase = 1; J.k = 0;
+            }
+            const _jobPivot = (J, key) => {
+                if (key.charCodeAt(0) === 98) return AGENT_RIG.showPivots[+key.slice(1)];   // 'b<bone>'
+                const nd = J.nodeDefs.find((n) => 'n:' + n.name === key);
+                return nd ? nd.pivot : [0, 0, 0];
+            };
+            function _jobFill(J) {
+                const info = J.info;
+                if (J.tier === 'world') {
+                    if (_fillSome(J.fill, 64)) {
+                        const r = _fillEnd(J.mesh.geometry, J.fill);
+                        info.stats = { vertices: r.v, triangles: r.t, draws: r.groups, meshes: 1 };
                         info.hash = _fnv(info.hash, r.P, r.I);
-                        objOf[key] = mesh;
-                        return mesh;
-                    };
+                        J.fill = null;
+                        J.phase = 2;
+                    }
+                    return;
+                }
+                const key = J.keys[J.k++];
+                if (key.charCodeAt(0) === 104) _handPose(J.hs, key.slice(2));   // 'h:<pose>'
+                else {
+                    const mesh = _takeMesh(), list = J.byKey.get(key) || [];
+                    info.meshList.push(mesh);
+                    const r = _fill(mesh.geometry, list, J.slotIndex, _jobPivot(J, key), null);
+                    mesh.material = info.materials; mesh.castShadow = J.tier === 'body'; mesh.receiveShadow = J.tier === 'body'; mesh.frustumCulled = false;
+                    mesh.position.set(0, 0, 0); mesh.rotation.set(0, 0, 0); mesh.scale.set(1, 1, 1); mesh.visible = true;
+                    info.stats.vertices += r.v; info.stats.triangles += r.t; info.stats.draws += r.groups; if (r.groups) info.stats.meshes++;
+                    info.hash = _fnv(info.hash, r.P, r.I);
+                    J.objOf[key] = mesh;
+                }
+                if (J.k >= J.keys.length) J.phase = 2;
+            }
+            function _jobAssemble(J) {
+                const info = J.info, root = J.root, look = J.look;
+                if (J.tier === 'world') {
+                    const mesh = J.mesh;
+                    mesh.material = info.materials; mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = true;
+                    mesh.position.set(0, 0, 0); mesh.rotation.set(0, 0, 0); mesh.scale.set(1, 1, 1); mesh.visible = true; mesh.name = 'v23:world';
+                    root.add(mesh);
+                    info.mesh = mesh;
+                } else {
+                    const piv = AGENT_RIG.showPivots, objOf = J.objOf;
+                    const pivotOf = (key) => _jobPivot(J, key);
                     // bones in rig order, parented by AGENT_RIG.parents (7 and 8 have no show parts)
                     for (const b of _SHOW_BONES) {
-                        const m = make('b' + b);
+                        const m = objOf['b' + b];
                         m.name = 'v23:' + AGENT_RIG.ids[b];
                         const par = AGENT_RIG.parents[b];
                         const pp = par >= 0 ? piv[par] : [0, 0, 0];
@@ -25957,24 +26378,39 @@
                         info.bones[b] = m;
                         info.rest[AGENT_RIG.ids[b]] = [m.position.x, m.position.y, m.position.z];
                     }
-                    for (const nd of nodeDefs) {
-                        const m = make('n:' + nd.name);
+                    const idle = (look && look.idle && HAND_POSES.indexOf(look.idle.hands) >= 0) ? look.idle.hands : 'open';
+                    for (const nd of J.nodeDefs) {
+                        let m;
+                        if (nd.hand) {
+                            // V2.3: a hand node: a pooled mesh whose own geometry goes back to the pool while it shows the
+                            // shared pose geometry of the look's hand key, with [glove, tips, trim] from the figure's materials
+                            m = _takeMesh();
+                            _pool.geoms.push(m.geometry);
+                            const g = J.hs.geoms[idle];
+                            m.geometry = g;
+                            m.userData.v23Hand = true;
+                            m.material = J.handMats;
+                            m.castShadow = false; m.receiveShadow = false; m.frustumCulled = false; m.visible = true;
+                            m.rotation.set(0, 0, 0);
+                            info.meshList.push(m);
+                            info.stats.vertices += J.hs.vertices; info.stats.triangles += g.index.count / 3; info.stats.draws += g.groups.length; info.stats.meshes++;
+                            info.hash = _fnv(info.hash, g.attributes.position.array, g.index.array);
+                        } else m = objOf['n:' + nd.name];
                         m.name = 'v23:' + nd.name;
                         const parKey = typeof nd.parent === 'number' ? 'b' + nd.parent : 'n:' + nd.parent;
                         const pp = pivotOf(parKey);
                         m.position.set(nd.pivot[0] - pp[0], nd.pivot[1] - pp[1], nd.pivot[2] - pp[2]);
+                        m.scale.set(nd.hand === 'L' ? -1 : 1, 1, 1);
                         (objOf[parKey] || root).add(m);
                         info.nodes[nd.name] = m;
                         info.rest[nd.name] = [m.position.x, m.position.y, m.position.z];
                         info.nodeList.push(nd.name);
+                        info.nodeMirror.push(nd.hand === 'L' ? -1 : 1);
                     }
+                    if (J.hs) info.hands = { R: info.nodes.handR || null, L: info.nodes.handL || null, set: J.hs, idle: idle };
                 }
                 root.userData.v23 = info;
-                _stats.builds++;
-                _stats.lastMs = performance.now() - t0;
-                _stats.ms.push(_stats.lastMs);
-                if (_stats.ms.length > 256) _stats.ms.shift();
-                return root;
+                J.done = true;
             }
             // V2.3: world matrices of the 13 bones for a sampled pose (the show pivots), for baking the world LOD
             const _pm = [];
@@ -25994,29 +26430,41 @@
                 // a primitive authored in figure space goes through (posed bone) x (rest pivot)^-1
                 return _pm.map((m, b) => new THREE.Matrix4().makeTranslation(-piv[b][0], -piv[b][1], -piv[b][2]).premultiply(m));
             }
-            function _fillPosed(geom, prims, matOf) {
-                // _fill with a per-primitive pre matrix (the bone pose)
+            // V2.3: a fill with a per-primitive pre matrix (s._pre: a bone pose or a frame change), in three steps so a world
+            // LOD can bake across several builder units: begin (sizes, arrays, material order), some (the next count
+            // primitives), end (attributes, index, groups)
+            function _fillBegin(prims, matOf) {
                 const order = [], byMat = new Map();
                 for (const s of prims) { const mi = matOf(s); if (!byMat.has(mi)) { byMat.set(mi, []); order.push(mi); } byMat.get(mi).push(s); }
                 order.sort((a, b) => a - b);
                 let nv = 0, ni = 0;
                 for (const s of prims) { const g = _primData(s); nv += g.v; ni += g.i.length; }
-                const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
-                let o = 0, io = 0;
-                const groups = [];
-                for (const mi of order) {
-                    const start = io;
-                    for (const s of byMat.get(mi)) { const [v, c] = _bake(s, P, N, I, o, io, null, s._pre); o += v; io += c; }
-                    groups.push([start, io - start, mi]);
-                }
-                geom.setAttribute('position', new THREE.BufferAttribute(P, 3));
-                geom.setAttribute('normal', new THREE.BufferAttribute(N, 3));
-                geom.setIndex(new THREE.BufferAttribute(I, 1));
-                geom.clearGroups();
-                for (const [s, c, mi] of groups) geom.addGroup(s, c, mi);
-                geom.computeBoundingSphere();
-                return { v: nv, t: ni / 3, groups: groups.length, P: P, I: I };
+                const seq = [];
+                for (const mi of order) for (const s of byMat.get(mi)) seq.push([s, mi]);
+                return { seq: seq, k: 0, P: new Float32Array(nv * 3), N: new Float32Array(nv * 3), I: nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni),
+                    o: 0, io: 0, groups: [], gStart: 0, gMat: -1, nv: nv, ni: ni };
             }
+            function _fillSome(F, count) {
+                const end = Math.min(F.seq.length, F.k + count);
+                for (; F.k < end; F.k++) {
+                    const s = F.seq[F.k][0], mi = F.seq[F.k][1];
+                    if (mi !== F.gMat) { if (F.gMat >= 0) F.groups.push([F.gStart, F.io - F.gStart, F.gMat]); F.gMat = mi; F.gStart = F.io; }
+                    const vc = _bake(s, F.P, F.N, F.I, F.o, F.io, null, s._pre);
+                    F.o += vc[0]; F.io += vc[1];
+                }
+                return F.k >= F.seq.length;
+            }
+            function _fillEnd(geom, F) {
+                if (F.gMat >= 0) { F.groups.push([F.gStart, F.io - F.gStart, F.gMat]); F.gMat = -1; }
+                geom.setAttribute('position', new THREE.BufferAttribute(F.P, 3));
+                geom.setAttribute('normal', new THREE.BufferAttribute(F.N, 3));
+                geom.setIndex(new THREE.BufferAttribute(F.I, 1));
+                geom.clearGroups();
+                for (const [s, c, mi] of F.groups) geom.addGroup(s, c, mi);
+                if (F.nv) geom.computeBoundingSphere(); else geom.boundingSphere = null;
+                return { v: F.nv, t: F.ni / 3, groups: F.groups.length, P: F.P, I: F.I };
+            }
+            function _fillPosed(geom, prims, matOf) { const F = _fillBegin(prims, matOf); _fillSome(F, F.seq.length); return _fillEnd(geom, F); }
             // ---- the kit superset per content tier ('low', 'medium', 'high', 'ultra') --------------------------------------
             const _kitCache = {};
             function _kitPrims(tier) {
@@ -26029,6 +26477,9 @@
                         const s = { prim: r[0], size: r[1].slice(), at: r[2].slice(), rot: r[3] ? r[3].slice() : null, bone: m.bone, kitId: m.id, zone: r[4] };
                         if (round && s.prim === 'box') { s.prim = 'rbox'; s.r = Math.min(0.03, Math.min(s.size[0], s.size[1], s.size[2]) * 0.3); s.seg = 1; }
                         if (s.prim === 'cyl') s.seg = tier === 'ultra' ? 16 : tier === 'high' ? 12 : 8;
+                        // V2.3: the halo arc: a half torus, 3 x 6 segments (28 vertices) on Low and Medium (design 3.4: kit
+                        // modules at most 48 vertices)
+                        if (s.prim === 'torus') { s.arc = Math.PI; s.seg = tier === 'low' || tier === 'medium' ? [3, 6] : [4, 10]; }
                         if (s.prim === 'octa' && tier === 'ultra') { s.prim = 'sph'; s.seg = [10, 7]; }
                         prims.push(s);
                     });
@@ -26106,30 +26557,73 @@
                     space: 'hand space at handZ 0: wrists (+-0.08, -0.09, 0), forearms toward (0, -0.75, 0.66), x0.75' };
             }
             const _fpFrameR = _fpFrame('R'), _fpFrameL = _fpFrame('L');
+            // V2.3: one arm set per agent, cached: WP4 may ask on every agent change without draining the pool. A redefined
+            // look (a new resolved object) rebuilds it and returns the old pair's geometries to the pool.
+            const _fpCache = {};
+            function _fpArmsCached(look) {
+                const id = look && look.id;
+                if (!id) return _fpArms(look);
+                const c = _fpCache[id];
+                if (c && c.look === look) return c.res;
+                if (c) for (const g of [c.res.sleeve, c.res.detail]) { _clearGeom(g); _pool.geoms.push(g); }
+                const res = _fpArms(look);
+                _fpCache[id] = { look: look, res: res };
+                return res;
+            }
 
             // ---- motion: poses, gestures, idles, intros, lock-in, MVP clips ------------------------------------------------------
-            // V2.3: a pose is { bones: Float32Array(13 x 3) Euler angles (order YXZ) per AGENT_RIG id, root: [x, y, z, yaw],
-            //   nodes: { name: [dx, dy, dz, rx, ry, rz, scale, visible] } offsets from each node's rest, glow (multiplier for the
-            //   glow slot, 1 = the palette's), fx: { rift: { open, x, y, z, w, h } } (stage cards), events: [{ t, kind }] }.
+            // V2.3: a pose is { bones: Float32Array(13 x 3) Euler angles (order YXZ) per AGENT_RIG id, root: Float32Array [x, y,
+            //   z, yaw], scale, nodes: { name: Float32Array [dx, dy, dz, rx, ry, rz, scale, visible] } offsets from each node's
+            //   rest, hands: { L, R } hand-pose names (HAND_POSES: the show LOD swaps its hand geometry to them), glow (the glow
+            //   slot's multiplier, 1 = the palette's), fx: { rift: { open, x, y, z, w, h } } (stage cards; open 0 = closed),
+            //   events: [{ t, kind, plate }] (cues inside this sample's window: t is the clip progress 0..1 for slot clips and
+            //   seconds for intros; plate is -1 but for a plate's clack) }.
             //   Conventions (figure faces -Z, right +X): rx > 0 swings a hanging limb forward and tilts the spine or head back;
             //   for a raised forearm ry > 0 yaws it toward -X; rz > 0 swings the right arm out (the left arm takes -rz).
+            //   V2.3: sampling into a pose from an earlier call allocates nothing (design 15: no per-frame allocation in V23
+            //   update paths): fixed arrays, scalar arm helpers, event objects from the pose's own pool, idle schedules and
+            //   plate offsets cached per look and agent.
             const _EASE = (u, snap) => { u = Math.max(0, Math.min(1, u)); const sm = u * u * (3 - 2 * u); const pw = 1 - Math.pow(1 - u, 1 + 3 * snap); return sm + (pw - sm) * snap; };
             const _smooth = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
             const _BONE = { pelvis: 0, spine: 1, head: 2, upR: 3, foR: 4, upL: 5, foL: 6, thR: 9, shR: 10, thL: 11, shL: 12 };
+            const _M_DEF = Object.freeze({ tempo: 1, snap: 0.5, sway: 0.5, asym: 0.2 });
+            const _NO_LOOK = Object.freeze({});
+            const _STANCE_DEF = Object.freeze({ kind: 'square', weight: 'centre', carry: 'low' });
+            const _PLATE_N = Object.freeze(['plate0', 'plate1', 'plate2', 'plate3', 'plate4', 'plate5', 'plate6', 'plate7', 'plate8', 'plate9']);
+            const _SHARD_N = Object.freeze(['shard0', 'shard1', 'shard2', 'shard3', 'shard4', 'shard5']);
             function _newPose(out) {
-                const o = out && out.bones ? out : { bones: new Float32Array(39), root: new Float32Array(4), nodes: {}, glow: 1, fx: {}, events: [] };
-                o.bones.fill(0); o.root.fill(0); o.glow = 1; o.fx = {}; o.events = [];
-                for (const k in o.nodes) o.nodes[k].fill(0), (o.nodes[k][6] = 1), (o.nodes[k][7] = 1);
+                const o = out && out.bones ? out : { bones: new Float32Array(39) };
+                if (!o.root) o.root = new Float32Array(4);
+                if (!o.nodes) o.nodes = {};
+                if (!o._keys) o._keys = Object.keys(o.nodes);
+                if (!o.hands) o.hands = { L: 'open', R: 'open' };
+                if (!o.fx || !o.fx.rift) o.fx = { rift: { open: 0, x: 0, y: 0, z: 0, w: 0, h: 0 } };
+                if (!o.events) o.events = [];
+                if (!o._ev) o._ev = [];
+                o.bones.fill(0); o.root.fill(0); o.scale = 1; o.glow = 1; o.fx.rift.open = 0; o._evN = 0;
+                const ev = o.events;
+                while (ev.length) ev.pop();
+                const K = o._keys;
+                for (let i = 0; i < K.length; i++) { const n = o.nodes[K[i]]; n.fill(0); n[6] = 1; n[7] = 1; }
                 return o;
             }
-            const _add3 = (o, b, x, y, z) => { o.bones[b * 3] += x; o.bones[b * 3 + 1] += y; o.bones[b * 3 + 2] += z; };
-            const _nodeOf = (o, name) => { let n = o.nodes[name]; if (!n) { n = new Float32Array(8); n[6] = 1; n[7] = 1; o.nodes[name] = n; } return n; };
-            // arm: side 'R' | 'L', [upper rx, upper rz (out), fore rx, fore ry (inward)], weight w
-            function _arm(o, side, a, w) {
-                const s = side === 'R' ? 1 : -1, up = side === 'R' ? 3 : 5, fo = side === 'R' ? 4 : 6;
-                _add3(o, up, a[0] * w, 0, s * a[1] * w);
-                _add3(o, fo, a[2] * w, s * a[3] * w, 0);
+            // a cue for this sample, from the pose's own pool of event objects (nothing allocated once it has grown)
+            function _event(o, t, kind, plate) {
+                let e = o._ev[o._evN];
+                if (!e) { e = { t: 0, kind: '', plate: -1 }; o._ev.push(e); }
+                o._evN++;
+                e.t = t; e.kind = kind; e.plate = plate === undefined ? -1 : plate;
+                o.events.push(e);
             }
+            const _add3 = (o, b, x, y, z) => { o.bones[b * 3] += x; o.bones[b * 3 + 1] += y; o.bones[b * 3 + 2] += z; };
+            const _nodeOf = (o, name) => { let n = o.nodes[name]; if (!n) { n = new Float32Array(8); n[6] = 1; n[7] = 1; o.nodes[name] = n; o._keys.push(name); } return n; };
+            // arm: side 'R' | 'L', upper rx, upper rz (out), fore rx, fore ry (inward), weight w (scalars: no array per call)
+            function _arm(o, side, a0, a1, a2, a3, w) {
+                const s = side === 'R' ? 1 : -1, up = side === 'R' ? 3 : 5, fo = up + 1;
+                o.bones[up * 3] += a0 * w; o.bones[up * 3 + 2] += s * a1 * w;
+                o.bones[fo * 3] += a2 * w; o.bones[fo * 3 + 1] += s * a3 * w;
+            }
+            const _armA = (o, side, a, w) => _arm(o, side, a[0], a[1], a[2], a[3], w);
             // V2.3: carry styles (both arms at rest) and stance kinds
             const _CARRY = {
                 cradle: { R: [0.3, -0.06, 1.2, 0.85], L: [0.3, -0.06, 1.2, 0.85] },
@@ -26139,9 +26633,9 @@
                 hip: { R: [-0.15, 0.55, 1.55, -1.3], L: [0.08, 0.08, 0.2, 0] }
             };
             function _stance(o, look) {
-                const st = (look && look.stance) || { kind: 'square', weight: 'centre', carry: 'low' };
+                const st = (look && look.stance) || _STANCE_DEF;
                 const c = _CARRY[st.carry] || _CARRY.low;
-                _arm(o, 'R', c.R, 1); _arm(o, 'L', c.L, 1);
+                _armA(o, 'R', c.R, 1); _armA(o, 'L', c.L, 1);
                 const B = _BONE;
                 if (st.kind === 'bladed') { o.root[3] += 0.38; _add3(o, B.thL, 0.16, 0, 0); _add3(o, B.shL, -0.08, 0, 0); _add3(o, B.thR, -0.12, 0, 0.03); _add3(o, B.spine, 0, -0.18, 0); _add3(o, B.head, 0, -0.22, 0); }
                 else if (st.kind === 'wide') { _add3(o, B.thR, 0, 0, 0.1); _add3(o, B.thL, 0, 0, -0.1); _add3(o, B.shR, 0, 0, -0.1); _add3(o, B.shL, 0, 0, 0.1); }
@@ -26154,68 +26648,85 @@
             }
             // V2.3: a per-agent stream for idle schedules (weight shifts, tics, head looks): the same every time for an agent
             const _seedOf = (id) => { let h = 2166136261; const s = String(id || 'agent'); for (let k = 0; k < s.length; k++) { h ^= s.charCodeAt(k); h = Math.imul(h, 16777619) >>> 0; } return h; };
-            const _schedCache = {};
+            // a seeded schedule of 48 event times and values in [-1, 1], looping after its last one
             function _sched(id, key, lo, hi) {
-                const k = id + '|' + key + '|' + lo + '|' + hi;
-                let s = _schedCache[k];
-                if (s) return s;
-                const r = V23.rand(_seedOf(k)), t = [], v = [];
+                const r = V23.rand(_seedOf(id + '|' + key + '|' + lo + '|' + hi)), t = [], v = [];
                 let at = lo + r() * (hi - lo) * 0.5;
                 for (let i = 0; i < 48; i++) { t.push(at); v.push(r() * 2 - 1); at += lo + r() * (hi - lo); }
-                s = _schedCache[k] = { t: t, v: v, period: at };
-                return s;
+                return { t: t, v: v, period: at };
             }
-            // the event index at time x (looping) and the time since it
-            function _schedAt(s, x) {
-                const xx = x % s.period;
+            // V2.3: a look's three schedules (weight shift, head look, tic), made at its first sample and cached on the look
+            // object (a WeakMap: a redefined look resolves to a new object and gets its own)
+            const _schCache = new WeakMap();
+            function _schOf(look, id) {
+                const key = look || _NO_LOOK;
+                let S = _schCache.get(key);
+                if (S) return S;
+                const I = (look && look.idle) || _NO_LOOK, sh = I.shift || [6, 9], ev = (I.tic && I.tic.every) || [8, 12];
+                S = { shift: _sched(id, 'shift', sh[0], sh[1]), look: _sched(id, 'look', 4, 6), tic: _sched(id, 'tic', ev[0], ev[1]) };
+                _schCache.set(key, S);
+                return S;
+            }
+            // the event index at time x (looping), the time since it and its value and the one before, written into r
+            const _SA = [{ i: 0, dt: 0, v: 0, prev: 0 }, { i: 0, dt: 0, v: 0, prev: 0 }, { i: 0, dt: 0, v: 0, prev: 0 }];
+            function _schedAt(s, x, r) {
+                const xx = x % s.period, n = s.t.length;
                 let i = -1;
-                for (let k = 0; k < s.t.length; k++) { if (s.t[k] <= xx) i = k; else break; }
-                return i < 0 ? { i: s.t.length - 1, dt: xx + s.period - s.t[s.t.length - 1], v: s.v[s.t.length - 1], prev: s.v[s.t.length - 2] } : { i: i, dt: xx - s.t[i], v: s.v[i], prev: s.v[i > 0 ? i - 1 : s.v.length - 1] };
+                for (let k = 0; k < n; k++) { if (s.t[k] <= xx) i = k; else break; }
+                if (i < 0) { r.i = n - 1; r.dt = xx + s.period - s.t[n - 1]; r.v = s.v[n - 1]; r.prev = s.v[n - 2]; }
+                else { r.i = i; r.dt = xx - s.t[i]; r.v = s.v[i]; r.prev = s.v[i > 0 ? i - 1 : n - 1]; }
+                return r;
             }
             // V2.3: IDLES, 8 styles; each adds breath, weight shift, head look, hand drift and its own signature motion
             const IDLES = {
-                deliberate: { breathMul: 1.0, lookHz: 0.09, shift: 0.012, sig: (o, t, m) => { _arm(o, 'R', [0, 0, 0.03 * Math.sin(t * 0.7), 0], 1); _arm(o, 'L', [0, 0, 0.03 * Math.sin(t * 0.7 + 1), 0], 1); } },
+                deliberate: { breathMul: 1.0, lookHz: 0.09, shift: 0.012, sig: (o, t) => { _arm(o, 'R', 0, 0, 0.03 * Math.sin(t * 0.7), 0, 1); _arm(o, 'L', 0, 0, 0.03 * Math.sin(t * 0.7 + 1), 0, 1); } },
                 coiled: { breathMul: 0.6, lookHz: 0, shift: 0.004, snapLook: true, sig: (o, t) => { const f = Math.max(0, Math.sin(t * 1.9)); _add3(o, _BONE.foR, 0.04 * f * f * f, 0, 0); } },
                 bouncy: { breathMul: 0.8, lookHz: 0.25, shift: 0.008, sig: (o, t, m) => { const b = Math.abs(Math.sin(t * Math.PI * 1.6 * m.tempo)); o.root[1] += 0.012 * b; _add3(o, _BONE.thR, 0.05 * b, 0, 0); _add3(o, _BONE.shR, -0.09 * b, 0, 0); _add3(o, _BONE.thL, 0.05 * b, 0, 0); _add3(o, _BONE.shL, -0.09 * b, 0, 0); } },
                 heavy: { breathMul: 1.4, lookHz: 0.06, shift: 0.02, sig: (o, t) => { o.root[0] += 0.015 * Math.sin(t * 1.2); _add3(o, _BONE.spine, 0, 0, -0.02 * Math.sin(t * 1.2)); } },
-                floaty: { breathMul: 0.9, lookHz: 0.07, shift: 0.006, sig: (o, t) => { o.root[1] += 0.008 * Math.sin(t * 1.9); _arm(o, 'R', [0.03 * Math.sin(t * 0.8), 0.04 + 0.03 * Math.sin(t * 0.6), 0, 0], 1); _arm(o, 'L', [0.03 * Math.sin(t * 0.8 + 2), 0.04 + 0.03 * Math.sin(t * 0.6 + 1), 0, 0], 1); } },
+                floaty: { breathMul: 0.9, lookHz: 0.07, shift: 0.006, sig: (o, t) => { o.root[1] += 0.008 * Math.sin(t * 1.9); _arm(o, 'R', 0.03 * Math.sin(t * 0.8), 0.04 + 0.03 * Math.sin(t * 0.6), 0, 0, 1); _arm(o, 'L', 0.03 * Math.sin(t * 0.8 + 2), 0.04 + 0.03 * Math.sin(t * 0.6 + 1), 0, 0, 1); } },
                 restless: { breathMul: 1.1, lookHz: 0.35, shift: 0.014, sig: (o, t, m) => { const b = Math.max(0, Math.sin(t * Math.PI * 2.2 * m.tempo)); o.root[1] += 0.006 * b; _add3(o, _BONE.shR, -0.05 * b, 0, 0); _add3(o, _BONE.shL, -0.05 * (1 - b), 0, 0); } },
                 poised: { breathMul: 0.8, lookHz: 0.05, shift: 0.006, sig: (o, t) => { const c = _smooth(0.7, 0.95, Math.sin(t * 0.55)); _add3(o, _BONE.head, 0.07 * c, 0, 0); } },
                 rhythmic: { breathMul: 0.9, lookHz: 0.12, shift: 0.008, sig: (o, t, m) => { const beat = Math.sin(t * Math.PI * 2 * 1.8 * m.tempo); _add3(o, _BONE.head, 0.045 * beat, 0, 0); _add3(o, _BONE.upR, 0, 0, 0.02 * beat); _add3(o, _BONE.upL, 0, 0, -0.02 * beat); } }
             };
-            // V2.3: TICS (short idle clips, seconds): fn(o, u) with u 0..1 over the clip
+            // V2.3: TICS (short idle clips, seconds): fn(o, u, motion, v) with u 0..1 over the clip and v the schedule's value
             const TICS = {
-                checkAmpoule: { dur: 1.3, fn: (o, u) => { const w = _smooth(0, 0.25, u) * (1 - _smooth(0.75, 1, u)); _arm(o, 'L', [0.25, -0.25, 0.55, 0.9], w); _arm(o, 'R', [0.05, -0.05, 0.25, 0.2], w); _add3(o, _BONE.head, -0.28 * w, -0.3 * w, 0); } },
+                checkAmpoule: { dur: 1.3, fn: (o, u) => { const w = _smooth(0, 0.25, u) * (1 - _smooth(0.75, 1, u)); _arm(o, 'L', 0.25, -0.25, 0.55, 0.9, w); _arm(o, 'R', 0.05, -0.05, 0.25, 0.2, w); _add3(o, _BONE.head, -0.28 * w, -0.3 * w, 0); if (w > 0.5) o.hands.R = 'point'; } },
                 headSnap: { dur: 0.7, fn: (o, u, m, v) => { const w = _smooth(0, 0.13, u) * (1 - _smooth(0.7, 1, u)); _add3(o, _BONE.head, 0, (v >= 0 ? 0.55 : -0.55) * w, 0); } },
-                shakeOut: { dur: 0.8, fn: (o, u) => { const w = Math.sin(u * Math.PI); _add3(o, _BONE.foR, 0, 0.5 * w * Math.sin(u * 40), 0); _add3(o, _BONE.foL, 0, 0.5 * w * Math.sin(u * 40 + 1), 0); } },
-                adjustGear: { dur: 1.1, fn: (o, u) => { const w = _smooth(0, 0.3, u) * (1 - _smooth(0.7, 1, u)); _arm(o, 'R', [1.7, 0.25, 1.9, 0.4], w); _add3(o, _BONE.head, 0, 0.12 * w, 0.08 * w); } },
+                shakeOut: { dur: 0.8, fn: (o, u) => { const w = Math.sin(u * Math.PI); _add3(o, _BONE.foR, 0, 0.5 * w * Math.sin(u * 40), 0); _add3(o, _BONE.foL, 0, 0.5 * w * Math.sin(u * 40 + 1), 0); if (w > 0.3) { o.hands.L = 'open'; o.hands.R = 'open'; } } },
+                adjustGear: { dur: 1.1, fn: (o, u) => { const w = _smooth(0, 0.3, u) * (1 - _smooth(0.7, 1, u)); _arm(o, 'R', 1.7, 0.25, 1.9, 0.4, w); _add3(o, _BONE.head, 0, 0.12 * w, 0.08 * w); if (w > 0.5) o.hands.R = 'cup'; } },
                 wristRoll: { dur: 0.9, fn: (o, u) => { const w = Math.sin(u * Math.PI); _add3(o, _BONE.foR, 0, 0.6 * w, 0); } },
                 glanceBack: { dur: 1.0, fn: (o, u, m, v) => { const w = _smooth(0, 0.2, u) * (1 - _smooth(0.7, 1, u)); _add3(o, _BONE.head, 0, (v >= 0 ? 0.85 : -0.85) * w, 0); _add3(o, _BONE.spine, 0, (v >= 0 ? 0.2 : -0.2) * w, 0); } }
             };
             function _idle(o, look, t, id) {
-                const L = look || {}, I = L.idle || {}, M = L.motion || { tempo: 1, snap: 0.5, sway: 0.5, asym: 0.2 };
+                const I = (look && look.idle) || _NO_LOOK, M = (look && look.motion) || _M_DEF;
                 const st = IDLES[I.style] || IDLES.deliberate, tm = M.tempo || 1;
-                const br = I.breath || [0.008, 4], amp = br[0] * st.breathMul, per = br[1] / tm;
+                // V2.3: the breath: idle.breath is [amp, period in seconds], an authored period (Sage 5 s, Omen 3.3 s); tempo
+                // sets it only for an entry that gives none
+                const br = I.breath, amp = (br ? br[0] : 0.008) * st.breathMul, per = br && br[1] > 0 ? br[1] : 4 / tm;
                 const b = Math.sin(t * Math.PI * 2 / per);
                 _add3(o, _BONE.spine, -amp * 2.2 * b, 0, 0);
                 _add3(o, _BONE.upR, 0, 0, amp * 1.5 * b); _add3(o, _BONE.upL, 0, 0, -amp * 1.5 * b);
+                const S = _schOf(look, id);
                 // seeded weight shifts every shift [min, max] s, a 1 s ease between sides
-                const sh = I.shift || [6, 9], ss = _schedAt(_sched(id, 'shift', sh[0], sh[1]), t);
+                const ss = _schedAt(S.shift, t, _SA[0]);
                 const side = ss.prev + (ss.v - ss.prev) * _smooth(0, 1.0, ss.dt);
-                o.root[0] += st.shift * side * (0.6 + 0.4 * (M.sway || 0.5));
+                o.root[0] += st.shift * side * (0.6 + 0.4 * (M.sway === undefined ? 0.5 : M.sway));
                 _add3(o, _BONE.pelvis, 0, 0, 0.025 * side); _add3(o, _BONE.spine, 0, 0, -0.03 * side);
                 _add3(o, _BONE.thR, 0, 0, -0.02 * side); _add3(o, _BONE.thL, 0, 0, -0.02 * side);
-                // head look: slow sweeps, or sharp seeded snaps for coiled figures
+                // head look: slow sweeps, or sharp seeded snaps to a new heading for coiled figures. V2.3: when the tic is
+                // itself a head snap, the tic's schedule drives that snap and its clip is not played on top (one schedule:
+                // Omen's head turns sharply every tic.every [4, 6] s, design 4.2)
+                const tic = I.tic && TICS[I.tic.clip] ? I.tic : null, ticLook = !!(st.snapLook && tic && tic.clip === 'headSnap');
                 const look2 = I.look === undefined ? 0.3 : I.look;
                 if (st.snapLook) {
-                    const hs = _schedAt(_sched(id, 'look', 4, 6), t);
+                    const hs = _schedAt(ticLook ? S.tic : S.look, t, _SA[1]);
                     const k = _EASE(hs.dt / 0.09, 0.9);
-                    _add3(o, _BONE.head, 0, look2 * 0.5 * (hs.prev + (hs.v - hs.prev) * k), 0);
+                    _add3(o, _BONE.head, 0, look2 * (ticLook ? 0.7 : 0.5) * (hs.prev + (hs.v - hs.prev) * k), 0);
                 } else _add3(o, _BONE.head, 0.02 * Math.sin(t * 0.37), look2 * Math.sin(t * Math.PI * 2 * st.lookHz * tm) * 0.75, 0);
                 st.sig(o, t, M);
                 // the tic: one clip every tic.every [a, b] s
-                if (I.tic && TICS[I.tic.clip]) {
-                    const tc = TICS[I.tic.clip], ev = I.tic.every || [8, 12], ts = _schedAt(_sched(id, 'tic', ev[0], ev[1]), t);
+                if (tic && !ticLook) {
+                    const tc = TICS[tic.clip], ts = _schedAt(S.tic, t, _SA[2]);
                     if (ts.dt < tc.dur) tc.fn(o, ts.dt / tc.dur, M, ts.v);
                 }
                 // asymmetric bodies carry one shoulder lower
@@ -26234,9 +26745,10 @@
             // ---- GESTURES (18 families with variants): stage keys, first-person keys, bot code -----------------------------------
             // V2.3: stage keys [p, upper rx, upper rz, fore rx, fore ry, spine rx, spine ry] for the off (left) arm, mirrored to
             //   the right arm for two-hand gestures; first-person keys [p, x, y, z, rx, ry, rz, pose, hand2, aside] in castFX's
-            //   group space (REST -0.22, -0.66, -0.36). Every gesture starts wound up and reaches its visual release at p
-            //   release (0.10-0.16), so a cast's effect, spawned at t 0, reads as thrown. Bot codes: throw family 7, channel 8,
-            //   snap / tap / point 9, place / push / slam / press / pull 10.
+            //   group space (REST -0.22, -0.66, -0.36); a key's pose is one of the six cast-hand poses (CAST_POSES, design 7.1;
+            //   validate() checks it). Every gesture starts wound up and reaches its visual release at p release (0.10-0.16),
+            //   so a cast's effect, spawned at t 0, reads as thrown. Bot codes: throw family 7, channel 8, snap / tap / point
+            //   9, place / push / slam / press / pull 10.
             const _REST_FP = [-0.22, -0.66, -0.36];
             const _G = (code, hands, release, stage, fp, extra) => Object.assign({ code: code, hands: hands, release: release, stage: stage, fp: fp }, extra || {});
             const GESTURES = {
@@ -26258,8 +26770,9 @@
                     { variants: { low: { dy: -0.12, up: -0.35 }, chest: { dy: 0.02 }, raise: { dy: 0.14, up: 0.7 }, down: { dy: -0.18, up: -0.3, st: -0.15 }, aim: { dz: -0.1, up: 0.5, pose: 'point' }, brace: { dx: -0.06, st: -0.1 }, handset: { dx: -0.06, dy: 0.18, dz: 0.12, up: 0.9, pose: 'cup' } } }),
                 twoHandRaise: _G(8, 2, 0.14, [[0, 0.2, 0.05, 0.6, 0.4, 0, 0], [0.14, 1.4, 0.1, 0.5, 0.3, 0.05, 0], [0.6, 1.9, 0.15, 0.4, 0.3, 0.08, 0], [1, 0, 0, 0, 0, 0, 0]],
                     [[0, -0.13, -0.45, -0.4, -0.3, 0, 0, 'flat', 1, 1.3], [0.14, -0.12, -0.2, -0.45, 0.2, 0, 0, 'flat', 1, 1.4], [0.6, -0.12, -0.1, -0.45, 0.4, 0, 0, 'flat', 1, 1.4]]),
+                // V2.3: the tear grips the rift's edges in two fists and pulls them apart (the cast-hand poses: no claw)
                 twoHandTear: _G(8, 2, 0.12, [[0, 1.2, -0.35, 0.8, 0.9, 0, 0], [0.12, 1.15, 0.6, 0.35, -0.2, -0.04, 0], [0.5, 1.05, 0.7, 0.35, -0.3, -0.03, 0], [1, 0, 0, 0, 0, 0, 0]],
-                    [[0, -0.05, -0.25, -0.45, 0, 0, 0.3, 'clawLow', 1, 1.3], [0.12, -0.26, -0.24, -0.46, 0, 0, -0.4, 'clawLow', 1, 1.5], [0.5, -0.28, -0.26, -0.45, 0, 0, -0.4, 'open', 1, 1.4]]),
+                    [[0, -0.05, -0.25, -0.45, 0, 0, 0.3, 'fist', 1, 1.3], [0.12, -0.26, -0.24, -0.46, 0, 0, -0.4, 'fist', 1, 1.5], [0.5, -0.28, -0.26, -0.45, 0, 0, -0.4, 'open', 1, 1.4]]),
                 twoHandPart: _G(8, 2, 0.15, [[0, 1.1, -0.25, 0.7, 0.8, 0, 0], [0.15, 1.1, 0.45, 0.4, 0, 0, 0], [0.6, 1.1, 0.55, 0.4, -0.1, 0, 0], [1, 0, 0, 0, 0, 0, 0]],
                     [[0, -0.08, -0.24, -0.46, 0, 0, 0.4, 'flat', 1, 1.3], [0.15, -0.22, -0.24, -0.47, 0, 0, -0.3, 'flat', 1, 1.4], [0.6, -0.25, -0.25, -0.46, 0, 0, -0.3, 'flat', 1, 1.4]]),
                 fingerSnap: _G(9, 1, 0.1, [[0, 1.0, 0.05, 1.3, 0.3, 0, 0], [0.1, 1.05, 0.05, 1.25, 0.6, 0, 0], [0.4, 0.9, 0.05, 1.2, 0.5, 0, 0], [1, 0, 0, 0, 0, 0, 0]],
@@ -26282,16 +26795,15 @@
                     [[0, -0.2, -0.25, -0.4, 0, 0, 0.6, 'flat', 0, 0.9], [0.15, -0.02, -0.22, -0.5, 0, 0, -0.4, 'open', 0, 1], [0.5, 0.0, -0.22, -0.5, 0, 0, -0.45, 'open', 0, 1]], { variants: { wide: { dx: 0.06, up: 0.2 } } })
             };
             // V2.3: 'name.variant' -> the base gesture with the variant's offsets (dx, dy, dz on the first-person path; up on the
-            // stage arm; st spine lean; pose; hands; crouch)
+            // stage arm; st spine lean; pose; hands; crouch); cached by name, unknown names too (null)
             const _gestCache = {};
             function _gesture(name) {
                 if (!name) return null;
-                if (_gestCache[name]) return _gestCache[name];
-                const [base, variant] = String(name).split('.');
+                if (name in _gestCache) return _gestCache[name];
+                const q = String(name).split('.'), base = q[0], variant = q[1];
                 const g = GESTURES[base];
-                if (!g) return null;
-                const v = (variant && g.variants && g.variants[variant]) || null;
-                if (variant && !v) return null;
+                const v = g && variant ? ((g.variants && g.variants[variant]) || null) : null;
+                if (!g || q.length > 2 || (variant && !v)) { _gestCache[name] = null; return null; }
                 const V = v || {};
                 const hands = V.hands || g.hands;
                 const fp = g.fp.map((k, i) => {
@@ -26308,25 +26820,49 @@
                 _gestCache[name] = out;
                 return out;
             }
+            // V2.3: motion.tempo inside the fixed clip (design 7.3): the windup (to the release key) and the recovery (from the
+            // last hold key) play at tempo, the hold between them takes what is left. Omen (1.25) releases his finger snap at
+            // 0.10 / 1.25 of the 1.1 s clip, 88 ms (the 90 ms flick of design 4.2); Sage (0.78) presses her palm in 0.14 /
+            // 0.78 of it, 197 ms, and settles slowly. Returns the gesture's own progress q for clip progress p; _WARP.p holds
+            // the clip progress of the release.
+            const _WARP = { p: 0 };
+            function _warp(g, p, tempo) {
+                const K = g.stage, r = K[1][0], h = K[K.length - 2][0];
+                const r2 = Math.min(0.45, r / tempo), h2 = Math.min(0.97, Math.max(r2 + 0.05, 1 - (1 - h) / tempo));
+                _WARP.p = r2;
+                if (p <= r2) return p / r2 * r;
+                if (p < h2) return r + (p - r2) / (h2 - r2) * (h - r);
+                return Math.min(1, h + (p - h2) / (1 - h2) * (1 - h));
+            }
+            // the gesture replaces the carry pose of an arm it uses (weight w)
+            function _gestArm(o, side, a1, a2, a3, a4, w) {
+                const up = side === 'R' ? 3 : 5, fo = up + 1;
+                for (let d = 0; d < 3; d++) { o.bones[up * 3 + d] *= (1 - w); o.bones[fo * 3 + d] *= (1 - w); }
+                _arm(o, side, a1, a2, a3, a4, w);
+            }
             function _gestureStage(o, g, p, look) {
-                const M = (look && look.motion) || { tempo: 1, snap: 0.5 };
-                const K = g.stage;
+                const M = (look && look.motion) || _M_DEF, K = g.stage;
+                const q = _warp(g, p, M.tempo || 1);
                 let i = 0;
-                while (i < K.length - 2 && p > K[i + 1][0]) i++;
-                const a = K[i], b = K[i + 1], u = _EASE((p - a[0]) / Math.max(1e-6, b[0] - a[0]), i === 0 ? M.snap : M.snap * 0.5);
-                const L = (j) => a[j] + (b[j] - a[j]) * u;
-                // the gesture replaces the carry pose of the arms it uses (blended in over the first 6 % and out over the last)
-                const w = _smooth(0, 0.06, p) * (1 - _smooth(0.8, 1, p));
-                const armA = [L(1), L(2), L(3), L(4)];
-                for (const side of (g.hands > 1 ? ['L', 'R'] : ['L'])) {
-                    const up = side === 'R' ? 3 : 5, fo = side === 'R' ? 4 : 6;
-                    for (const k of [up, fo]) for (let d = 0; d < 3; d++) o.bones[k * 3 + d] *= (1 - w);
-                    _arm(o, side, armA, w);
-                }
-                _add3(o, _BONE.spine, L(5) * w, L(6) * w, 0);
+                while (i < K.length - 2 && q > K[i + 1][0]) i++;
+                const a = K[i], b = K[i + 1], u = _EASE((q - a[0]) / Math.max(1e-6, b[0] - a[0]), i === 0 ? M.snap : M.snap * 0.5);
+                // blended in over the gesture's first 6 % and out over its last 20 %
+                const w = _smooth(0, 0.06, q) * (1 - _smooth(0.8, 1, q));
+                const a1 = a[1] + (b[1] - a[1]) * u, a2 = a[2] + (b[2] - a[2]) * u, a3 = a[3] + (b[3] - a[3]) * u, a4 = a[4] + (b[4] - a[4]) * u;
+                _gestArm(o, 'L', a1, a2, a3, a4, w);
+                if (g.hands > 1) _gestArm(o, 'R', a1, a2, a3, a4, w);
+                _add3(o, _BONE.spine, (a[5] + (b[5] - a[5]) * u) * w, (a[6] + (b[6] - a[6]) * u) * w, 0);
                 const crouch = (a[7] === 'crouch' || b[7] === 'crouch') ? w : (a[7] === 'crouch0' ? w * (1 - u) * 0.3 : 0);
                 if (crouch) { o.root[1] -= 0.16 * crouch; _add3(o, _BONE.thR, 0.55 * crouch, 0, 0); _add3(o, _BONE.thL, 0.4 * crouch, 0, 0); _add3(o, _BONE.shR, -0.9 * crouch, 0, 0); _add3(o, _BONE.shL, -0.7 * crouch, 0, 0); _add3(o, _BONE.spine, -0.15 * crouch, 0, 0); }
-                if (p >= g.release && p - g.release < 0.05) o.events.push({ t: g.release, kind: 'release' });
+                // V2.3: the gesturing hands take the first-person key's hand pose (one table: the stage and first person agree)
+                if (w > 0.2) {
+                    const F = g.fp;
+                    let j = 0;
+                    while (j < F.length - 1 && q >= F[j + 1][0]) j++;
+                    o.hands.L = F[j][7];
+                    if (g.hands > 1) o.hands.R = F[j][7];
+                }
+                if (q >= g.release && q - g.release < 0.05) _event(o, _WARP.p, 'release');
                 return o;
             }
             // ---- INTROS (at most 1.4 s), LOCKIN (at most 0.4 s), MVP (2.5 s) -----------------------------------------------------
@@ -26335,51 +26871,67 @@
             // damped spring from 1 to 0 (zeta 0.55): the plates' settle
             const _spring = (x, w, z) => (x <= 0 ? 1 : Math.exp(-z * w * x) * Math.cos(w * Math.sqrt(1 - z * z) * x));
             const _SHARD_DIR = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-            function _settlePlates(o, id, t0, t, gap) {
+            // V2.3: each plate's seeded start offset (4-8 cm out) and turn (6-12 degrees), drawn once per agent from its own
+            // stream (the same values every time) and cached, so a settle allocates nothing
+            const _plateCache = {};
+            function _plateOffsets(id) {
+                const key = id || 'agent';
+                let P = _plateCache[key];
+                if (P) return P;
                 const r = V23.rand(_seedOf(id + '|plates'));
+                P = new Float32Array(20);
+                for (let k = 0; k < 10; k++) { P[k * 2] = 0.04 + 0.04 * r(); P[k * 2 + 1] = (6 + 6 * r()) * Math.PI / 180; }
+                _plateCache[key] = P;
+                return P;
+            }
+            function _settlePlates(o, id, t0, t, gap) {
+                const P = _plateOffsets(id);
                 for (let k = 0; k < 10; k++) {
-                    const dist = 0.04 + 0.04 * r(), ang = (6 + 6 * r()) * Math.PI / 180, start = t0 + k * gap;
+                    const dist = P[k * 2], ang = P[k * 2 + 1], start = t0 + k * gap;
                     const f = t < start ? 1 : _spring(t - start, 38, 0.55);
-                    const d = _PLATE_OUT[k], n = _nodeOf(o, 'plate' + k), l = Math.hypot(d[0], d[1], d[2]) || 1;
+                    const d = _PLATE_OUT[k], n = _nodeOf(o, _PLATE_N[k]), l = Math.hypot(d[0], d[1], d[2]) || 1;
                     n[0] += d[0] / l * dist * f; n[1] += d[1] / l * dist * f; n[2] += d[2] / l * dist * f;
                     n[5] += (k % 2 ? 1 : -1) * ang * f; n[3] += ang * 0.5 * f;
-                    if (t >= start && t - start < 0.05) o.events.push({ t: start, kind: 'clack', plate: k });
+                    if (t >= start && t - start < 0.05) _event(o, start, 'clack', k);
                 }
             }
             const INTROS = {
-                // V2.3: Sage: six jade shards orbit the chest (r 0.45), converge over 900 ms between the cupped hands while the
-                // glow rises from 0 to 0.9, lock into the lattice at 1.0 s with a glass chime, settle for 200 ms
+                // V2.3: Sage: six jade shards orbit the chest (r 0.45), converge over 900 ms between and above the cupped hands
+                // (the look's prop point) while the glow rises from 0 to 0.9, lock into the lattice at 1.0 s with a glass chime,
+                // settle for 200 ms
                 assembleCrystal: { ms: 1200, fn: (o, look, t) => {
                     const cup = _smooth(0, 0.35, t);
-                    for (const b of [3, 4, 5, 6]) for (let d = 0; d < 3; d++) o.bones[b * 3 + d] *= 0.35 + 0.65 * cup;
-                    const c = _PROP_AT.float;
+                    for (let b = 3; b <= 6; b++) for (let d = 0; d < 3; d++) o.bones[b * 3 + d] *= 0.35 + 0.65 * cup;
+                    o.hands.L = 'cup'; o.hands.R = 'cup';
+                    const c = _propAt(look, 'float');
                     const conv = t < 0.9 ? 0.88 * _EASE(t / 0.9, 0.35) : 0.88 + 0.12 * _smooth(0.9, 1.0, t);
+                    const lock = t >= 1.0 ? 1 + 0.08 * _spring(t - 1.0, 30, 0.45) : 1;
                     for (let k = 0; k < 6; k++) {
                         const a = k * Math.PI / 3 + t * 3.4 * (1 - 0.6 * conv), dir = _SHARD_DIR[k];
-                        const orbit = [0.45 * Math.cos(a), 1.35 + 0.07 * Math.sin(2 * a + k), 0.45 * Math.sin(a)];
-                        const rest = [c[0] + dir[0] * 0.075, c[1] + dir[1] * 0.075, c[2] + dir[2] * 0.075];
-                        const n = _nodeOf(o, 'shard' + k);
-                        n[0] += (orbit[0] - rest[0]) * (1 - conv); n[1] += (orbit[1] - rest[1]) * (1 - conv); n[2] += (orbit[2] - rest[2]) * (1 - conv);
+                        const ox = 0.45 * Math.cos(a), oy = 1.35 + 0.07 * Math.sin(2 * a + k), oz = 0.45 * Math.sin(a);
+                        const rx = c[0] + dir[0] * 0.075, ry = c[1] + dir[1] * 0.075, rz = c[2] + dir[2] * 0.075;
+                        const n = _nodeOf(o, _SHARD_N[k]);
+                        n[0] += (ox - rx) * (1 - conv); n[1] += (oy - ry) * (1 - conv); n[2] += (oz - rz) * (1 - conv);
                         n[4] += (1 - conv) * a * 2;
-                        const lock = t >= 1.0 ? 1 + 0.08 * _spring(t - 1.0, 30, 0.45) : 1;
                         n[6] = lock;
                     }
                     const pn = _nodeOf(o, 'prop'); pn[4] = 0; pn[1] = 0;
                     o.glow = t < 1.0 ? Math.min(1, t / 1.0) : 1 + 0.25 * _spring(t - 1.0, 25, 0.6) * (t < 1.2 ? 1 : 0);
-                    if (t >= 1.0 && t < 1.05) o.events.push({ t: 1.0, kind: 'chime' });
+                    if (t >= 1.0 && t < 1.05) _event(o, 1.0, 'chime');
                 } },
                 // V2.3: Omen: a narrow rift (0.18 x 2.0 m) opens 0.6 m behind in 220 ms, the figure steps through in two steps
                 // (z 0.6 -> 0, 500 ms), the rift closes in 180 ms, then 10 plates settle 60 ms apart on a damped spring
                 riftStep: { ms: 1400, fn: (o, look, t, id) => {
                     const open = t < 0.22 ? _smooth(0, 0.22, t) : t < 0.72 ? 1 : 1 - _smooth(0.72, 0.9, t);
-                    o.fx.rift = { open: open, x: 0, y: 1.0, z: 0.6, w: 0.18, h: 2.0 };
+                    const R = o.fx.rift;
+                    R.open = open; R.x = 0; R.y = 1.0; R.z = 0.6; R.w = 0.18; R.h = 2.0;
                     const s1 = _EASE((t - 0.22) / 0.25, 0.6), s2 = _EASE((t - 0.47) / 0.25, 0.6);
                     o.root[2] += 0.6 * (1 - 0.5 * s1 - 0.5 * s2);
                     const sw1 = Math.sin(Math.PI * Math.max(0, Math.min(1, (t - 0.22) / 0.25))), sw2 = Math.sin(Math.PI * Math.max(0, Math.min(1, (t - 0.47) / 0.25)));
                     _add3(o, _BONE.thR, 0.45 * sw1, 0, 0); _add3(o, _BONE.shR, -0.6 * sw1, 0, 0);
                     _add3(o, _BONE.thL, 0.45 * sw2, 0, 0); _add3(o, _BONE.shL, -0.6 * sw2, 0, 0);
                     _add3(o, _BONE.spine, -0.08 * (sw1 + sw2) * 0.5, 0, 0);
-                    if (t >= 0.22 && t < 0.27) o.events.push({ t: 0.22, kind: 'riftOpen' });
+                    if (t >= 0.22 && t < 0.27) _event(o, 0.22, 'riftOpen');
                     _settlePlates(o, id, 0.76, t, 0.06);
                 } },
                 assemble: { ms: 1000, fn: (o, look, t) => { o.scale = 0.92 + 0.08 * _EASE(t / 0.8, 0.4); o.glow = _smooth(0, 0.9, t); } },
@@ -26387,41 +26939,47 @@
                 platesSettle: { ms: 900, fn: (o, look, t, id) => { _settlePlates(o, id, 0.1, t, 0.06); } },
                 dropIn: { ms: 900, fn: (o, look, t) => { const f = Math.min(1, t / 0.4); o.root[1] += 0.4 * (1 - f * f); const land = Math.sin(Math.PI * Math.max(0, Math.min(1, (t - 0.4) / 0.4))); o.root[1] -= 0.07 * land; _add3(o, _BONE.thR, 0.35 * land, 0, 0); _add3(o, _BONE.thL, 0.35 * land, 0, 0); _add3(o, _BONE.shR, -0.6 * land, 0, 0); _add3(o, _BONE.shL, -0.6 * land, 0, 0); _add3(o, _BONE.spine, -0.15 * land, 0, 0); } },
                 spinUp: { ms: 1000, fn: (o, look, t) => { o.root[3] -= Math.PI * 2 * (1 - _EASE(t / 0.9, 0.7)); } },
-                unfold: { ms: 1000, fn: (o, look, t) => { const f = _EASE(t / 0.8, 0.4); const c = _CARRY.folded; for (const b of [3, 4, 5, 6]) for (let d = 0; d < 3; d++) o.bones[b * 3 + d] *= f; _arm(o, 'R', c.R, 1 - f); _arm(o, 'L', c.L, 1 - f); } },
+                unfold: { ms: 1000, fn: (o, look, t) => { const f = _EASE(t / 0.8, 0.4); const c = _CARRY.folded; for (let b = 3; b <= 6; b++) for (let d = 0; d < 3; d++) o.bones[b * 3 + d] *= f; _armA(o, 'R', c.R, 1 - f); _armA(o, 'L', c.L, 1 - f); } },
                 materialize: { ms: 1100, fn: (o, look, t) => { o.glow = t < 0.6 ? 1.8 * _smooth(0, 0.6, t) : 1.8 - 0.8 * _smooth(0.6, 1.1, t); o.scale = 0.96 + 0.04 * _smooth(0, 1.0, t); } }
             };
+            // V2.3: lock-in flourishes (at most 0.4 s), each with its hand shapes
             const LOCKIN = {
-                palmBless: { ms: 380, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _arm(o, 'R', [0.15, 0.05, 0.35, -0.2], w); _arm(o, 'L', [0.15, 0.05, 0.35, -0.2], w); _add3(o, _BONE.head, -0.12 * w, 0, 0); o.glow = 1 + 0.3 * w; } },
-                snapFade: { ms: 300, fn: (o, look, u) => { const w = u < 0.3 ? _EASE(u / 0.3, 0.9) : 1 - _smooth(0.3, 1, u); _add3(o, _BONE.foR, 0.55 * w, 0.4 * w, 0); _add3(o, _BONE.head, 0, 0.15 * w, 0); o.glow = 1 + 0.6 * _smooth(0.2, 0.45, u) * (1 - _smooth(0.5, 1, u)); } },
-                fistTap: { ms: 350, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _arm(o, 'R', [0.5, -0.25, 1.5, 1.0], w); } },
-                pointOut: { ms: 350, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _arm(o, 'L', [1.4, 0, 0.05, 0.1], w); } },
-                palmOpen: { ms: 380, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _arm(o, 'R', [0.3, 0.4, 0.3, -0.3], w); _arm(o, 'L', [0.3, 0.4, 0.3, -0.3], w); } },
+                palmBless: { ms: 380, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _arm(o, 'R', 0.15, 0.05, 0.35, -0.2, w); _arm(o, 'L', 0.15, 0.05, 0.35, -0.2, w); _add3(o, _BONE.head, -0.12 * w, 0, 0); o.glow = 1 + 0.3 * w; if (w > 0.3) { o.hands.L = 'flat'; o.hands.R = 'flat'; } } },
+                snapFade: { ms: 300, fn: (o, look, u) => { const w = u < 0.3 ? _EASE(u / 0.3, 0.9) : 1 - _smooth(0.3, 1, u); _add3(o, _BONE.foR, 0.55 * w, 0.4 * w, 0); _add3(o, _BONE.head, 0, 0.15 * w, 0); o.glow = 1 + 0.6 * _smooth(0.2, 0.45, u) * (1 - _smooth(0.5, 1, u)); if (w > 0.2) o.hands.R = u < 0.3 ? 'snap' : 'open'; } },
+                fistTap: { ms: 350, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _arm(o, 'R', 0.5, -0.25, 1.5, 1.0, w); if (w > 0.2) o.hands.R = 'fist'; } },
+                pointOut: { ms: 350, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _arm(o, 'L', 1.4, 0, 0.05, 0.1, w); if (w > 0.2) o.hands.L = 'point'; } },
+                palmOpen: { ms: 380, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _arm(o, 'R', 0.3, 0.4, 0.3, -0.3, w); _arm(o, 'L', 0.3, 0.4, 0.3, -0.3, w); if (w > 0.3) { o.hands.L = 'open'; o.hands.R = 'open'; } } },
                 nodSquare: { ms: 300, fn: (o, look, u) => { const w = Math.sin(Math.PI * u); _add3(o, _BONE.head, -0.18 * w, 0, 0); _add3(o, _BONE.spine, 0.04 * w, 0, 0); } }
             };
+            // V2.3: MVP poses (2.5 s)
             const MVP = {
-                crystalOffer: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.7, t) * (1 - _smooth(2.2, 2.5, t)); _arm(o, 'R', [0.55, 0, -0.35, 0], w); _arm(o, 'L', [0.55, 0, -0.35, 0], w); const n = _nodeOf(o, 'prop'); n[1] += 0.14 * w; n[2] -= 0.22 * w; o.glow = 1 + 0.4 * w; _add3(o, _BONE.head, -0.1 * w, 0, 0.06 * w); } },
-                riftEmerge: { ms: 2500, fn: (o, look, t) => { const f = _EASE(t / 0.7, 0.7); o.root[1] -= 0.3 * (1 - f); _add3(o, _BONE.thR, 0.7 * (1 - f), 0, 0); _add3(o, _BONE.thL, 0.7 * (1 - f), 0, 0); _add3(o, _BONE.shR, -1.2 * (1 - f), 0, 0); _add3(o, _BONE.shL, -1.2 * (1 - f), 0, 0); const sw = _smooth(0.6, 1.2, t) * (1 - _smooth(2.1, 2.5, t)); _arm(o, 'R', [0.6, 0.6, 0.3, 0], sw); o.glow = 1 + 0.5 * sw; } },
-                heroStance: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.6, t) * (1 - _smooth(2.2, 2.5, t)); _arm(o, 'R', [-0.1, 0.5, 1.5, -1.2], w); _arm(o, 'L', [-0.1, 0.5, 1.5, -1.2], w); _add3(o, _BONE.head, 0.08 * w, 0, 0); } },
-                scanHorizon: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.5, t) * (1 - _smooth(2.2, 2.5, t)); _arm(o, 'R', [1.9, 0.3, 2.0, 0.5], w); _add3(o, _BONE.head, 0, 0.5 * Math.sin(t * 1.6) * w, 0); } },
-                gatherHands: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.8, t) * (1 - _smooth(2.2, 2.5, t)); _arm(o, 'R', [0.7, -0.1, 1.0, 0.8], w); _arm(o, 'L', [0.7, -0.1, 1.0, 0.8], w); o.glow = 1 + 0.5 * w; } },
-                guardPlant: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.6, t) * (1 - _smooth(2.2, 2.5, t)); _add3(o, _BONE.thR, 0, 0, 0.12 * w); _add3(o, _BONE.thL, 0, 0, -0.12 * w); _arm(o, 'R', [0.6, -0.15, 1.5, 0.9], w); _arm(o, 'L', [0.6, -0.15, 1.4, 0.9], w); } }
+                crystalOffer: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.7, t) * (1 - _smooth(2.2, 2.5, t)); _arm(o, 'R', 0.55, 0, -0.35, 0, w); _arm(o, 'L', 0.55, 0, -0.35, 0, w); const n = _nodeOf(o, 'prop'); n[1] += 0.14 * w; n[2] -= 0.22 * w; o.glow = 1 + 0.4 * w; _add3(o, _BONE.head, -0.1 * w, 0, 0.06 * w); o.hands.L = 'cup'; o.hands.R = 'cup'; } },
+                riftEmerge: { ms: 2500, fn: (o, look, t) => { const f = _EASE(t / 0.7, 0.7); o.root[1] -= 0.3 * (1 - f); _add3(o, _BONE.thR, 0.7 * (1 - f), 0, 0); _add3(o, _BONE.thL, 0.7 * (1 - f), 0, 0); _add3(o, _BONE.shR, -1.2 * (1 - f), 0, 0); _add3(o, _BONE.shL, -1.2 * (1 - f), 0, 0); const sw = _smooth(0.6, 1.2, t) * (1 - _smooth(2.1, 2.5, t)); _arm(o, 'R', 0.6, 0.6, 0.3, 0, sw); o.glow = 1 + 0.5 * sw; if (sw > 0.3) o.hands.R = 'open'; } },
+                heroStance: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.6, t) * (1 - _smooth(2.2, 2.5, t)); _arm(o, 'R', -0.1, 0.5, 1.5, -1.2, w); _arm(o, 'L', -0.1, 0.5, 1.5, -1.2, w); _add3(o, _BONE.head, 0.08 * w, 0, 0); if (w > 0.3) { o.hands.L = 'fist'; o.hands.R = 'fist'; } } },
+                scanHorizon: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.5, t) * (1 - _smooth(2.2, 2.5, t)); _arm(o, 'R', 1.9, 0.3, 2.0, 0.5, w); _add3(o, _BONE.head, 0, 0.5 * Math.sin(t * 1.6) * w, 0); if (w > 0.3) o.hands.R = 'flat'; } },
+                gatherHands: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.8, t) * (1 - _smooth(2.2, 2.5, t)); _arm(o, 'R', 0.7, -0.1, 1.0, 0.8, w); _arm(o, 'L', 0.7, -0.1, 1.0, 0.8, w); o.glow = 1 + 0.5 * w; if (w > 0.3) { o.hands.L = 'cup'; o.hands.R = 'cup'; } } },
+                guardPlant: { ms: 2500, fn: (o, look, t) => { const w = _smooth(0, 0.6, t) * (1 - _smooth(2.2, 2.5, t)); _add3(o, _BONE.thR, 0, 0, 0.12 * w); _add3(o, _BONE.thL, 0, 0, -0.12 * w); _arm(o, 'R', 0.6, -0.15, 1.5, 0.9, w); _arm(o, 'L', 0.6, -0.15, 1.4, 0.9, w); if (w > 0.3) { o.hands.L = 'fist'; o.hands.R = 'fist'; } } }
             };
-            // V2.3: the clip's length in seconds for a look (gestures scale with motion.tempo inside their fixed 1.1 s / 1.6 s)
+            // V2.3: the clip's length in seconds for a look: slot clips are a fixed 1.1 s (the ultimate's 1.6 s), tempo warps
+            // the gesture inside it (_warp); intros, lock-ins and MVP poses have their own lengths
             function _clipDur(look, clip) {
-                const L = look || {};
+                const L = look || _NO_LOOK;
                 if (clip === 'intro') { const I = INTROS[L.showroom && L.showroom.intro]; return Math.min(1.4, ((L.showroom && L.showroom.introMs) || (I ? I.ms : 1000)) / 1000); }
                 if (clip === 'lockIn') { const K = LOCKIN[L.showroom && L.showroom.lockIn]; return K ? K.ms / 1000 : 0.35; }
                 if (clip === 'mvp') { const K = MVP[L.mvp]; return K ? K.ms / 1000 : 2.5; }
-                return clip === 'x' || /\.x$/.test(clip) ? 1.6 : 1.1;
+                const n = typeof clip === 'string' ? clip.length : 0;
+                return clip === 'x' || (n > 2 && clip.charCodeAt(n - 1) === 120 && clip.charCodeAt(n - 2) === 46) ? 1.6 : 1.1;
             }
             // V2.3: sample a clip for a look at t seconds into it: 'stance', 'idle', 'intro', 'lockIn', 'mvp', 'tic:<name>', a
             // slot ('c', 'q', 'e', 'x', 'c2', ...) or a gesture id ('overhandThrow.high')
+            const _ticClip = {};
             function _sample(look, id, clip, t, out) {
                 const o = _newPose(out);
-                o.scale = 1;
+                const L = look || _NO_LOOK;
+                const ih = (L.idle && L.idle.hands) || 'open';
+                o.hands.L = ih; o.hands.R = ih;
                 _stance(o, look);
                 if (clip === 'stance') return o;
-                const L = look || {};
                 _idle(o, look, Math.max(0, t), id);
                 if (clip === 'idle') return o;
                 if (clip === 'intro') {
@@ -26433,9 +26991,10 @@
                 } else if (clip === 'mvp') {
                     const K = MVP[L.mvp] || MVP.heroStance;
                     K.fn(o, look, Math.min(t, K.ms / 1000));
-                } else if (typeof clip === 'string' && clip.indexOf('tic:') === 0) {
-                    const tc = TICS[clip.slice(4)];
-                    if (tc) tc.fn(o, Math.max(0, Math.min(1, t / tc.dur)), L.motion || {}, 1);
+                } else if (typeof clip === 'string' && clip.charCodeAt(0) === 116 && clip.indexOf('tic:') === 0) {
+                    let tc = _ticClip[clip];
+                    if (tc === undefined) tc = _ticClip[clip] = TICS[clip.slice(4)] || null;
+                    if (tc) tc.fn(o, Math.max(0, Math.min(1, t / tc.dur)), L.motion || _M_DEF, 1);
                 } else {
                     const name = (L.gestures && L.gestures[clip]) || clip;
                     const g = _gesture(name);
@@ -26443,10 +27002,10 @@
                 }
                 return o;
             }
-            // V2.3: put a pose on a show or body root built here (bones, nodes, glow)
+            // V2.3: put a pose on a show or body root built here (bones, nodes, hand shapes, glow); allocates nothing
             function _applyPose(root, o) {
                 const info = root && root.userData && root.userData.v23;
-                if (!info) return;
+                if (!info || info.released) return;
                 for (let b = 0; b < 13; b++) {
                     const n = info.bones[b];
                     if (!n) continue;
@@ -26459,11 +27018,19 @@
                     pel.rotation.y += o.root[3];
                     pel.scale.setScalar(o.scale || 1);
                 }
-                for (const name of info.nodeList || []) {
-                    const node = info.nodes[name], r = info.rest[name], v = o.nodes[name];
+                const nl = info.nodeList, mir = info.nodeMirror;
+                for (let i = 0; i < nl.length; i++) {
+                    const name = nl[i], node = info.nodes[name], r = info.rest[name], v = o.nodes[name], sx = mir ? mir[i] : 1;
                     if (!node) continue;
-                    if (v) { node.position.set(r[0] + v[0], r[1] + v[1], r[2] + v[2]); node.rotation.set(v[3], v[4], v[5]); node.scale.setScalar(v[6]); node.visible = v[7] > 0.5; }
-                    else { node.position.set(r[0], r[1], r[2]); node.rotation.set(0, 0, 0); node.scale.setScalar(1); node.visible = true; }
+                    if (v) { node.position.set(r[0] + v[0], r[1] + v[1], r[2] + v[2]); node.rotation.set(v[3], v[4], v[5]); node.scale.set(sx * v[6], v[6], v[6]); node.visible = v[7] > 0.5; }
+                    else { node.position.set(r[0], r[1], r[2]); node.rotation.set(0, 0, 0); node.scale.set(sx, 1, 1); node.visible = true; }
+                }
+                // V2.3: the hand nodes show the pose's hand shapes: the hand key's shared pose geometry, swapped by reference
+                const H = info.hands;
+                if (H && o.hands) {
+                    const G = H.set.geoms, gR = G[o.hands.R] || G[H.idle], gL = G[o.hands.L] || G[H.idle];
+                    if (H.R && gR && H.R.geometry !== gR) H.R.geometry = gR;
+                    if (H.L && gL && H.L.geometry !== gL) H.L.geometry = gL;
                 }
                 const gi = info.slots.indexOf('glow'), gm = gi >= 0 ? info.materials[gi] : null;
                 if (gm) { if (info.glowBase === undefined) info.glowBase = gm.emissiveIntensity; gm.emissiveIntensity = info.glowBase * (o.glow === undefined ? 1 : o.glow); }
@@ -26486,10 +27053,18 @@
                     _CUSTOM[name] = fn;
                     return true;
                 },
+                // V2.3: a figure built now (uncached: CORE's build() caches; give it back with _release when done with it)
                 figure: function (look, tier) { return _build(look, tier, look && look.id); },
-                fpArms: function (look) { return _fpArms(look); },
+                // V2.3: the agent's first-person arm set, cached per agent (one sleeve and one detail geometry)
+                fpArms: function (look) { return _fpArmsCached(look); },
                 kitSuperset: function (tier) { return _kitSuperset(tier); },
                 rig: function () { return AGENT_RIG; },
+                // V2.3 (private, WP2's CORE and the tests): return a figure's objects to the pool; a build job run unit by
+                // unit (the staged builder's per-frame budget); abort one
+                _release: function (root) { return _release(root); },
+                _job: function (look, tier, agentId) { return _job(look, tier, agentId); },
+                _jobStep: function (job) { return _jobStep(job); },
+                _jobAbort: function (job) { return _jobAbort(job); },
                 // data (not functions): the module names, kit table, build statistics
                 modules: Object.keys(_MODULES).filter((k) => k !== 'body' && k !== 'hand'),
                 kit: _KIT,
@@ -26497,9 +27072,12 @@
                 stats: _stats,
                 // the module library (built-in and custom families), read by CORE's validator
                 library: { builtIn: _MODULES, custom: _CUSTOM },
-                // the pool's free counts (the test checks a build takes from it)
+                // the shared hand pose geometries by hand key (read by CORE's upload pass and the tests)
+                handSets: _handSets,
+                // the pool's free counts and its size (the test checks a build takes from it and a release gives back)
                 pool: { get made() { return _pool.made; }, get groups() { return _pool.groups.length; }, get meshes() { return _pool.meshes.length; },
-                    get geoms() { return _pool.geoms.length; }, get vm() { return _pool.vm.length; }, get world() { return _pool.world.length; }, get madeMs() { return _pool.madeMs || 0; } }
+                    get geoms() { return _pool.geoms.length; }, get vm() { return _pool.vm.length; }, get world() { return _pool.world.length; }, get madeMs() { return _pool.madeMs || 0; },
+                    get needsMs() { return _pool.needsMs || 0; }, get size() { return _pool.size; } }
             };
             V23.motion = {
                 // V2.3: sample(agentId, clip, t, out): out may be a pose from an earlier call (reused, nothing allocated) or a
@@ -26520,8 +27098,8 @@
                     return { style: I.style, params: IDLES[I.style] ? { breathMul: IDLES[I.style].breathMul, lookHz: IDLES[I.style].lookHz, shift: IDLES[I.style].shift } : null,
                         breath: I.breath, shift: I.shift, look: I.look, hands: I.hands, tic: I.tic, tempo: look.motion.tempo, snap: look.motion.snap, introMs: Math.round(_clipDur(look, 'intro') * 1000) };
                 },
-                // data: the libraries and clip lengths
-                GESTURES: GESTURES, IDLES: IDLES, INTROS: INTROS, LOCKIN: LOCKIN, MVP: MVP, TICS: TICS
+                // data: the libraries, the hand poses (HAND_POSES; CAST_POSES the six first-person cast poses of design 7.1)
+                GESTURES: GESTURES, IDLES: IDLES, INTROS: INTROS, LOCKIN: LOCKIN, MVP: MVP, TICS: TICS, HAND_POSES: HAND_POSES, CAST_POSES: CAST_POSES
             };
             return { GESTURES: GESTURES, IDLES: IDLES, INTROS: INTROS, LOCKIN: LOCKIN, MVP_CLIPS: MVP, TICS: TICS };
         })();
@@ -26622,7 +27200,7 @@
             motion: { tempo: 1.25, snap: 0.85, sway: 0.25, asym: 0.6 },
             idle: { style: 'coiled', breath: [0.006, 3.3], shift: [9, 12], look: 0.6, hands: 'clawLow', tic: { clip: 'headSnap', every: [4, 6] } },
             showroom: { intro: 'riftStep', introMs: 1400, lockIn: 'snapFade', detail: ['face', 'shoulderL'] },
-            gestures: { c: 'fingerSnap', q: 'overhandFlick', e: 'palmPush', x: 'twoHandTear', x2: 'fingerSnap' },
+            gestures: { c: 'fingerSnap', q: 'overhandFlick', e: 'palmPush', x: 'twoHandTear' },
             previews: { c: { recipe: 'riftBlink' }, q: { recipe: 'shadowWave' }, x: { recipe: 'shardReform' } },
             fp: { sleeve: 'under', cuff: 'trim', glove: 'glove', wrist: 'plateRing', overlay: 'basePlatesL' },
             sound: { family: 'void', wave: 'sawtooth', base: 110, intervals: [0, 6, 13], noise: { type: 'lowpass', f: 700, q: 1.2 },

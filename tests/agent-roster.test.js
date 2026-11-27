@@ -1,16 +1,24 @@
 'use strict';
-// V2.3 agent roster (design 17.1, WP2): one boot with the start screen open (the sim is paused), data-driven by
-// AGENT_ORDER (ROLE=<role> narrows the per-agent rows). Checks:
+// V2.3 agent roster (design 17.1, WP2): one boot of the V2.3 build with the start screen open (the sim is paused), data-
+// driven by AGENT_ORDER (ROLE=<role> narrows the per-agent rows), after one baseline boot of '(V2.2) valorant-fps.html'
+// (same quality and menu) that gives the program count and watermark V2.3 must match (design 15: programs +0). Checks:
 //  - the roster sets are equal: AGENT_ORDER, AGENT_DEFS and AGENT_LOOKS hold the same 29 ids;
-//  - every entry resolves; the full entries (Sage and Omen at M1) pass the whole lint and the validator reports nothing;
-//    the stubs are flagged; deliberately broken entries are rejected and leave the registry as it was;
+//  - every entry resolves; Sage and Omen are full entries, every other entry is flagged a stub (role batches add full
+//    entries without touching this file); full entries pass the whole lint and the validator reports nothing;
+//    deliberately broken entries are rejected and leave the registry as it was;
 //  - builds are deterministic (the geometry hash of a second, fresh build equals the first) and make no Math.random call
-//    once the object pool exists (a counting wrapper around Math.random);
-//  - show LODs within 7,000 vertices and 36 draws, world LODs within 6 meshes;
-//  - every kit module of every tier inside the union hit volume +0.03 m at every archetype scale;
-//  - the staged builder never steps in unpaused combat, and steps in the menu;
-//  - after building and upload-drawing every LOD of every agent and drawing each with its own materials where it is
-//    drawn in the game (show: the stage's light set; world and body: the game scene): programs == watermark, 0 stalls;
+//    once the object pool exists (a counting wrapper around Math.random); every build takes from the pool (no misses);
+//  - show LODs within 7,000 vertices and 36 draws, world LODs within 6 meshes, body LODs within 36 draws; the pilots'
+//    own build times next to the median;
+//  - the show LOD's hand nodes (children of the forearms at the wrist) swap the hand key's shared pose geometry by
+//    reference as the motion samples, and V23.motion.sample allocates nothing on the JS heap once warm;
+//  - every kit module of every tier inside the union hit volume +0.03 m at every archetype scale; Medium modules at most
+//    48 vertices each (design 3.4);
+//  - the staged builder never steps in unpaused combat; in the menu it spreads a figure over frames, starting a unit only
+//    while the frame is under its budget; define() gives the old LODs back to the pool and queues show and world;
+//  - after building and upload-drawing every LOD of every agent (show, world and body) and drawing each with its own
+//    materials where it is drawn in the game (show: the stage's light set, every hand pose; world and body: the game
+//    scene): programs == watermark == V2.2's, 0 stalls;
 //  - silhouettes (64 x 64 masks, front and 3/4) and idle feature vectors between full entries; palette pairs;
 //  - V23MATRIX rows for the coverage matrix (tests/tools/matrix.js reads them).
 const { test, after } = require('node:test');
@@ -44,10 +52,19 @@ function hitBoxes() {
     return { detailed, low };
 }
 
-test('agent roster: registry, lint, builds, budgets, hit volume, staged builder, programs', { timeout: 420000 }, async () => {
+test('agent roster: registry, lint, builds, budgets, hit volume, staged builder, programs', { timeout: 900000 }, async () => {
     const boxes = hitBoxes();
     assert.equal(boxes.detailed.length, 7, 'detailed hit boxes: body, two arms, two legs, weapon, head');
     assert.equal(boxes.low.length, 4, 'low hit boxes: body, arms block, legs, head');
+
+    // ---- the baseline: V2.2's own program count and watermark, booted the same way (menu, Medium) -----------------------
+    // (programs == watermark inside V2.3 alone cannot catch a program V2.3's boot adds: its warm-up folds it into the
+    // watermark; V2.2's numbers can)
+    const base = await boot({ file: '(V2.2) valorant-fps.html', menu: true });
+    await base.frames(10);
+    const v22 = await programState(base.page);
+    assert.deepEqual(base.errors, [], 'V2.2 boots cleanly');
+    console.log('# V2.2 baseline: programs', v22[0], 'watermark', v22[1], 'stalls', v22[2]);
 
     const { page, errors, frames, evaluate } = await boot({
         menu: true,
@@ -59,6 +76,12 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         }
     });
     await frames(10);
+    // V2.3's boot, identity on (the default): the same program count and watermark as V2.2's
+    const atBoot = await programState(page);
+    console.log('# V2.3 boot: programs', atBoot[0], 'watermark', atBoot[1], 'stalls', atBoot[2]);
+    assert.equal(atBoot[1], v22[1], 'V2.3 boot watermark == V2.2 boot watermark (design 15: programs +0)');
+    assert.equal(atBoot[0], v22[0], 'V2.3 program count at the menu == V2.2\'s');
+    assert.equal(atBoot[2], 0, 'no first-use stalls at boot');
 
     // ---- roster sets, resolve, stubs ---------------------------------------------------------------------------------
     const reg = await evaluate(() => {
@@ -66,7 +89,7 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         const res = {};
         for (const id of AGENT_ORDER) {
             const L = V23.core.resolve(id);
-            res[id] = L ? { stub: L.stub, role: L.role, frozen: Object.isFrozen(L) && Object.isFrozen(L.palette) && Object.isFrozen(L.previews.c), same: V23.core.resolve(id) === L,
+            res[id] = L ? { stub: L.stub, entryStub: !!(AGENT_LOOKS[id] && AGENT_LOOKS[id].stub), role: L.role, frozen: Object.isFrozen(L) && Object.isFrozen(L.palette) && Object.isFrozen(L.previews.c), same: V23.core.resolve(id) === L,
                 gestures: ['c', 'q', 'e', 'x'].map((s) => L.gestures[s]), recipes: ['c', 'q', 'e', 'x'].map((s) => L.previews[s].recipe), sounds: ['c', 'q', 'e', 'x'].map((s) => (L.previews[s].sound.calls || []).length),
                 introMs: V23.motion.idle(id).introMs, intro: L.showroom.intro, pool: L.bot.pool, kit: L.bot.kit.slice(), codename: L.codename, avoid: L.avoid.length } : null;
         }
@@ -77,8 +100,11 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
     assert.deepEqual([...reg.keysLooks].sort(), [...reg.order].sort(), 'AGENT_LOOKS holds exactly AGENT_ORDER');
     assert.deepEqual(reg.validate, [], 'V23.core.validate() reports nothing for the roster');
     assert.ok(reg.menuOpen && reg.paused, 'the start screen is open and the sim paused');
+    // data-driven: Sage and Omen are full entries (more arrive with each role batch); every other entry is flagged a stub
     const full = reg.order.filter((id) => !reg.res[id].stub);
-    assert.deepEqual(full.sort(), ['omen', 'sage'], 'Sage and Omen are full entries; the other 27 are flagged stubs');
+    assert.ok(full.includes('sage') && full.includes('omen'), 'Sage and Omen are full entries');
+    for (const id of reg.order) assert.equal(reg.res[id].stub, reg.res[id].entryStub, id + ': resolve(id).stub matches its entry (' + (reg.res[id].stub ? 'stub' : 'full') + ')');
+    console.log('# full entries:', full.join(', '), '| stubs:', reg.order.length - full.length);
     const agents = reg.order.filter((id) => !ROLE || reg.res[id].role === ROLE.toUpperCase());
     for (const id of reg.order) {
         const r = reg.res[id];
@@ -103,7 +129,8 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
             out[id] = { fields: ['codename', 'concept', 'avoid', 'rig', 'height', 'shoulderScale', 'hips', 'stance', 'palette', 'head', 'outfit', 'shoulders', 'back', 'equipment',
                 'gloves', 'prop', 'motion', 'idle', 'showroom', 'gestures', 'previews', 'fp', 'sound', 'bot', 'mvp'].filter((f) => e[f] === undefined),
                 avoid: L.avoid.slice(), tempo: L.motion.tempo, snap: L.motion.snap, intro: L.showroom.intro, x: L.gestures.x, pool: L.bot.pool, kit: L.bot.kit.slice(),
-                hair: L.head.hair, gear: L.head.gear.slice(), outfit: L.outfit.map((o) => o.m), glove: L.gloves.type, tips: L.gloves.tips, prop: L.prop.m, hold: L.prop.hold };
+                hair: L.head.hair, gear: L.head.gear.slice(), outfit: L.outfit.map((o) => o.m), glove: L.gloves.type, tips: L.gloves.tips, prop: L.prop.m, hold: L.prop.hold,
+                gestureKeys: Object.keys(L.gestures).sort(), idle: L.idle.hands, breath: L.idle.breath.slice() };
         }
         const tryDef = (id, mut) => {
             const before = JSON.stringify(AGENT_LOOKS[id]), resolved = V23.core.resolve(id);
@@ -121,7 +148,9 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
             tryDef('sage', (d) => { d.palette.base.c = 'white'; }),
             tryDef('omen', (d) => { d.bot.pool = 'healer'; }),
             tryDef('sage', (d) => { d.stance.carry = 'juggle'; }),
-            tryDef('omen', (d) => { d.motion.tempo = 2; })
+            tryDef('omen', (d) => { d.motion.tempo = 2; }),
+            // design 3.1: second presses are c2, q2 and e2 only
+            tryDef('omen', (d) => { d.gestures.x2 = 'fingerSnap'; })
         ];
         let unknown = null;
         try { V23.core.define('notAnAgent', JSON.parse(JSON.stringify(AGENT_LOOKS.sage))); } catch (e) { unknown = e.message; }
@@ -136,6 +165,7 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
     // hood, cloak or robe module for Omen, gauntlets (no wraps), a slatted visor on a sealed helm (no eye marks)
     assert.ok(!/knot|bun/i.test(lint.sage.hair) && lint.sage.outfit.indexOf('collarFunnel') < 0 && lint.sage.hold === 'float' && lint.sage.outfit.indexOf('gownCoat') < 0);
     assert.ok(lint.omen.hair === null && !lint.omen.outfit.some((m) => /robe|cloak|hood/i.test(m)) && lint.omen.glove === 'gauntlet' && lint.omen.gear.indexOf('helmSealed') === 0);
+    assert.deepEqual(lint.omen.gestureKeys, ['c', 'c2', 'e', 'e2', 'q', 'q2', 'x'], 'second presses c2, q2, e2 (no x2: design 3.1)');
     assert.equal(lint.sage.intro, 'assembleCrystal');
     assert.equal(lint.omen.intro, 'riftStep');
     assert.deepEqual([lint.sage.pool, lint.sage.kit, lint.omen.pool, lint.omen.kit], ['armored', [2, 11, 13], 'standard', [1, 15, 12]]);
@@ -155,6 +185,7 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         const out = { show: {}, world: {}, ms: [] };
         for (const id of AGENT_ORDER) {
             for (const tier of ['show', 'world']) {
+                const had = (V23.core.stats.built[id] || []).indexOf(tier) >= 0, b0 = V23.parts.stats.builds;
                 const t0 = performance.now();
                 const root = V23.core.build(id, tier);
                 const ms = performance.now() - t0;
@@ -162,7 +193,8 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
                 let meshes = 0;
                 root.traverse((o) => { if (o.isMesh && o.geometry.groups.length) meshes++; });
                 out[tier][id] = Object.assign({ hash: v.hash, objMeshes: meshes, nodes: v.nodeList.length }, v.stats);
-                out.ms.push({ id, tier, ms });
+                // build: the figure itself (V23.parts' job time); total: with core.build's upload draw
+                if (!had && V23.parts.stats.builds === b0 + 1) out.ms.push({ id, tier, ms: V23.parts.stats.lastMs, total: ms, units: V23.parts.stats.lastUnits });
             }
         }
         // motion sampling on a built root draws nothing either
@@ -171,12 +203,23 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         window.__rand.on = false;
         out.pool = pool0;
         out.misses = V23.parts.stats.poolMisses - miss0;
-        // a second, fresh build of every show LOD (V23.parts.figure) has the same hash
+        // a second, fresh build of every show LOD (V23.parts.figure) has the same hash; each goes back to the pool after
+        const free0 = [V23.parts.pool.meshes, V23.parts.pool.groups, V23.parts.pool.vm];
         out.again = {};
-        for (const id of AGENT_ORDER) out.again[id] = V23.parts.figure(V23.core.resolve(id), 'show').userData.v23.hash;
-        out.kit = ['low', 'medium', 'high', 'ultra'].map((t) => { const g = V23.parts.kitSuperset(t); return { tier: t, v: g.userData.kit.vertices, hash: g.userData.kit.hash, again: V23.parts.kitSuperset(t) === g }; });
-        // the first-person arm sets WP4 attaches: a sleeve and a detail geometry in hand space, slots from the look's fp
+        for (const id of AGENT_ORDER) { const r = V23.parts.figure(V23.core.resolve(id), 'show'); out.again[id] = r.userData.v23.hash; out.released = V23.parts._release(r); }
+        out.poolBack = [V23.parts.pool.meshes, V23.parts.pool.groups, V23.parts.pool.vm].join() === free0.join();
+        out.missesAll = V23.parts.stats.poolMisses - miss0;
+        out.poolSize = V23.parts.pool.size;
+        out.poolNeedsMs = V23.parts.pool.needsMs;
+        out.kit = ['low', 'medium', 'high', 'ultra'].map((t) => { const g = V23.parts.kitSuperset(t); return { tier: t, v: g.userData.kit.vertices, hash: g.userData.kit.hash, again: V23.parts.kitSuperset(t) === g, modules: g.userData.kit.modules.map((m) => [m.name, m.vertices]) }; });
+        // the first-person arm sets WP4 attaches: a sleeve and a detail geometry in hand space, slots from the look's fp;
+        // cached per agent (a second call returns the same set and takes nothing from the pool)
         out.fp = {};
+        const g0 = V23.parts.pool.geoms;
+        for (const id of AGENT_ORDER) V23.parts.fpArms(V23.core.resolve(id));
+        const g1 = V23.parts.pool.geoms;
+        out.fpCached = AGENT_ORDER.every((id) => V23.parts.fpArms(V23.core.resolve(id)) === V23.parts.fpArms(V23.core.resolve(id))) && V23.parts.pool.geoms === g1;
+        out.fpTaken = g0 - g1;
         for (const id of ['sage', 'omen']) {
             const a = V23.parts.fpArms(V23.core.resolve(id));
             a.sleeve.computeBoundingBox();
@@ -197,12 +240,21 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
     assert.equal(builds.rand, 0, 'no Math.random call while every agent\'s show and world LOD builds and while motion samples');
     assert.ok(builds.pool.made, 'the object pool exists');
     assert.equal(builds.misses, 0, 'every build took its objects from the pool');
-    const msList = builds.ms.map((b) => b.ms).sort((a, b) => a - b);
-    const showMs = builds.ms.filter((b) => b.tier === 'show').map((b) => b.ms).sort((a, b) => a - b);
-    const median = (a) => a[a.length >> 1];
-    console.log('# median build ms per figure (show + world, 58 builds):', median(msList).toFixed(2), '| show only:', median(showMs).toFixed(2), '| max', msList[msList.length - 1].toFixed(2), '| pool made in', builds.pool.madeMs.toFixed(1), 'ms');
-    for (const id of ['sage', 'omen']) console.log('#', id, 'show', JSON.stringify(builds.show[id]), 'world', JSON.stringify(builds.world[id]),
-        'ms', builds.ms.filter((b) => b.id === id).map((b) => b.tier + ' ' + b.ms.toFixed(2)).join(', '));
+    assert.equal(builds.missesAll, 0, 'and so did 29 fresh builds, each released after');
+    assert.ok(builds.released && builds.poolBack, 'V23.parts._release gave every fresh build\'s meshes, group and materials back');
+    assert.ok(builds.fpCached, 'fpArms is cached per agent');
+    assert.ok(builds.fpTaken <= 2 * 29, 'one arm set (2 geometries) per agent at most: ' + builds.fpTaken);
+    console.log('# pool', JSON.stringify(builds.poolSize), 'sized in', builds.poolNeedsMs.toFixed(1), 'ms, made in', builds.pool.madeMs.toFixed(1), 'ms');
+    const median = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+    const fresh = builds.ms;
+    const allMs = fresh.map((b) => b.ms), showMs = fresh.filter((b) => b.tier === 'show').map((b) => b.ms);
+    console.log('# build ms per figure (V23.parts job time; ' + fresh.length + ' figures built here): median', allMs.length ? median(allMs).toFixed(2) : '-',
+        '| show median', showMs.length ? median(showMs).toFixed(2) : '-', '| max', allMs.length ? Math.max(...allMs).toFixed(2) : '-');
+    for (const id of ['sage', 'omen']) {
+        const own = fresh.filter((b) => b.id === id);
+        console.log('#', id, 'build ms', own.map((b) => b.tier + ' ' + b.ms.toFixed(2) + ' (' + b.units + ' units; with the upload draw ' + b.total.toFixed(2) + ')').join(', ') || '(built at boot)',
+            '| show', JSON.stringify(builds.show[id]), 'world', JSON.stringify(builds.world[id]));
+    }
     for (const id of reg.order) {
         const s = builds.show[id], w = builds.world[id];
         assert.ok(s.vertices <= 7000, `${id} show LOD ${s.vertices} vertices <= 7,000`);
@@ -210,15 +262,123 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
         assert.ok(w.meshes <= 6 && w.draws <= 6, `${id} world LOD ${w.draws} draws in ${w.meshes} mesh(es) <= 6`);
         assert.equal(builds.again[id], s.hash, `${id}: a fresh build has the same geometry hash`);
     }
-    assert.equal(builds.show.sage.nodes, 7, 'Sage: the prop and its six shards are nodes');
-    assert.equal(builds.show.omen.nodes, 11, 'Omen: the rift key and ten plates are nodes');
+    assert.equal(builds.show.sage.nodes, 9, 'Sage: the prop, its six shards and the two hands are nodes');
+    assert.equal(builds.show.omen.nodes, 13, 'Omen: the rift key, ten plates and the two hands are nodes');
     for (const id of agents) matrix(id, 'show LOD within budget (<= 7k vertices, <= 36 meshes)', builds.show[id].vertices <= 7000 && builds.show[id].draws <= 36,
         `${builds.show[id].vertices} v, ${builds.show[id].draws} draws; world ${builds.world[id].draws} draws`);
+    // ---- hand nodes: the show LOD's hands swap their key's shared pose geometry by reference ----------------------------
+    const hands = await evaluate(() => {
+        const out = {};
+        for (const id of AGENT_ORDER) {
+            const root = V23.core.build(id, 'show'), v = root.userData.v23, H = v.hands;
+            const set = H && H.set;
+            const r = { key: set && set.key, idle: H && H.idle, poses: set ? Object.keys(set.geoms).sort() : [], uploaded: !!(set && set.uploaded),
+                parents: H ? [H.R.parent === v.bones[4], H.L.parent === v.bones[6]] : [], mirror: H ? [H.R.scale.x, H.L.scale.x] : [],
+                groups: set ? Object.values(set.geoms).map((g) => g.groups.length) : [], shared: true, seen: {} };
+            // a few clips: the hands take the poses the clip names, and the geometry is the set's own object (by reference)
+            for (const clip of ['idle', 'c', 'q', 'e', 'x', 'lockIn', 'mvp']) for (let t = 0; t < 1.6; t += 0.02) {
+                const pose = V23.motion.sample(id, clip, t, root);
+                for (const side of ['R', 'L']) {
+                    const m = H[side], want = set.geoms[pose.hands[side]];
+                    if (m.geometry !== want) r.shared = false;
+                    r.seen[pose.hands[side]] = 1;
+                }
+            }
+            r.seen = Object.keys(r.seen).sort();
+            V23.motion.sample(id, 'idle', 0, root);
+            out[id] = r;
+        }
+        // the six cast-hand poses (design 7.1) lead the list
+        out.poses = V23.motion.HAND_POSES.slice();
+        out.casts = V23.motion.CAST_POSES.slice();
+        // Omen's finger snap: the flick releases at 90 ms of the 1.1 s clip (tempo 1.25), Sage's palm press at about 200 ms
+        const rel = (id, slot) => { for (let t = 0; t < 0.6; t += 0.002) { const p = V23.motion.sample(id, slot, t, null); if (p.events.some((e) => e.kind === 'release')) return Math.round(p.events.find((e) => e.kind === 'release').t * 1100); } return null; };
+        out.release = { omenC: rel('omen', 'c'), sageE: rel('sage', 'e') };
+        // breath periods as authored: the spine's breath term repeats every breath[1] seconds
+        out.breath = {};
+        for (const id of ['sage', 'omen']) {
+            const L = V23.core.resolve(id), per = L.idle.breath[1];
+            const a = V23.motion.sample(id, 'idle', 0.3, null).bones[3 * 1], b = V23.motion.sample(id, 'idle', 0.3 + per, null).bones[3 * 1];
+            out.breath[id] = { per, same: Math.abs(a - b) };
+        }
+        return out;
+    });
+    assert.deepEqual(hands.casts, ['open', 'cup', 'fist', 'point', 'snap', 'flat'], 'the six cast-hand poses');
+    for (const id of reg.order) {
+        const h = hands[id];
+        assert.ok(h.key, id + ': a hand key');
+        assert.deepEqual(h.poses, hands.poses.slice().sort(), id + ': its hand key holds all eight pose geometries');
+        assert.ok(h.uploaded, id + ': the pose geometries were upload-drawn');
+        assert.deepEqual(h.parents, [true, true], id + ': the hand nodes are children of the forearms');
+        assert.deepEqual(h.mirror, [1, -1], id + ': the left hand mirrors the shared geometry');
+        assert.ok(h.shared, id + ': each sampled pose swapped the shared geometry in by reference');
+        assert.ok(new Set(h.groups).size === 1 && h.groups[0] >= 1 && h.groups[0] <= 3, id + ': every pose has the same groups ([glove, tips, trim])');
+    }
+    assert.deepEqual([hands.sage.key, hands.omen.key], ['fingerless|tips', 'gauntlet|one'], 'Sage: bare tips apart from the glove; Omen: one gauntlet draw');
+    assert.ok(hands.omen.seen.includes('snap') && hands.omen.seen.includes('clawLow') && hands.sage.seen.includes('flat') && hands.sage.seen.includes('cup'),
+        'the clips change the hand shapes: ' + JSON.stringify([hands.sage.seen, hands.omen.seen]));
+    console.log('# hand poses seen: sage', hands.sage.seen.join(' '), '| omen', hands.omen.seen.join(' '), '| release ms', JSON.stringify(hands.release));
+    assert.ok(hands.release.omenC >= 80 && hands.release.omenC <= 100, 'Omen\'s finger snap releases near 90 ms (tempo 1.25): ' + hands.release.omenC);
+    assert.ok(hands.release.sageE >= 180 && hands.release.sageE <= 220, 'Sage\'s palm press releases near 200 ms (tempo 0.78): ' + hands.release.sageE);
+    for (const id of ['sage', 'omen']) assert.ok(hands.breath[id].same < 1e-4, id + ': the breath repeats every ' + hands.breath[id].per + ' s (authored period)');
+    for (const id of agents) matrix(id, 'show LOD hand nodes swap pose geometry by reference', hands[id].shared, hands[id].key + ', idle ' + hands[id].idle);
+
+    // ---- V23.motion.sample allocates nothing once warm (design 15: no per-frame allocation in V23 update paths) ----------
+    // The sampling heap profiler (64-byte interval, collected objects kept) attributes every JS heap allocation to its call
+    // stack. A control run (a fresh pose per call) shows the probe sees allocations under V23.motion.sample; then 9,000
+    // samples of idles, intros, gestures, lock-ins, tics and MVP poses into reused poses must allocate less than a byte
+    // per 2 samples there (one 16-byte object per call would be 8 bytes per sample; what remains is one-time JIT data).
+    const cdp = await page.context().newCDPSession(page);
+    const sampleBatch = (n, reuse) => evaluate(([n, reuse]) => {
+        const ids = ['sage', 'omen', 'jett', 'killjoy'], clips = ['idle', 'intro', 'c', 'q', 'e', 'x', 'lockIn', 'mvp', 'tic:checkAmpoule'];
+        const roots = ids.map((id) => V23.core.build(id, 'show'));
+        let k = 0;
+        for (let i = 0; i < n; i++) for (let a = 0; a < ids.length; a++) { V23.motion.sample(ids[a], clips[i % clips.length], (i % 97) * 0.017, reuse ? roots[a] : null); k++; }
+        return k;
+    }, [n, reuse]);
+    // V23.motion.sample by its line in the page (perfTelemetry has a 'sample' too); profile lines are 0-based
+    const srcLines = fs.readFileSync(GAME_FILE, 'utf8').split('\n');
+    const sampleLine = srcLines.findIndex((l) => /^\s*sample: function \(agentId, clip, t, out\) \{/.test(l));
+    assert.ok(sampleLine > 0, 'V23.motion.sample found in the source');
+    const profiled = async (n, reuse) => {
+        await cdp.send('HeapProfiler.enable');
+        await cdp.send('HeapProfiler.startSampling', { samplingInterval: 64, includeObjectsCollectedByMinorGC: true, includeObjectsCollectedByMajorGC: true });
+        const count = await sampleBatch(n, reuse);
+        const { profile } = await cdp.send('HeapProfiler.stopSampling');
+        await cdp.send('HeapProfiler.disable');
+        let under = 0, total = 0;
+        const sites = {};
+        const walk = (node, inSample) => {
+            const here = inSample || (node.callFrame.functionName === 'sample' && node.callFrame.lineNumber === sampleLine);
+            const bytes = node.selfSize || 0;
+            total += bytes;
+            if (here && bytes) { under += bytes; const k = node.callFrame.functionName + ':' + (node.callFrame.lineNumber + 1); sites[k] = (sites[k] || 0) + bytes; }
+            for (const c of node.children || []) walk(c, here);
+        };
+        walk(profile.head, false);
+        return { count, under, total, sites };
+    };
+    // the control first: a fresh pose per call allocates under sample, and the profile sees it (the probe can fail)
+    await sampleBatch(300, false);
+    const control = await profiled(300, false);
+    // then warm the reuse path again (ending a profiler session drops optimized code, and unoptimized frames box their
+    // doubles: VM allocations that optimized code does not make), and measure
+    await sampleBatch(5000, true);
+    const steady = await profiled(2250, true);
+    console.log('# heap: control (new pose each call)', control.count, 'samples,', control.under, 'bytes under V23.motion.sample | reused poses', steady.count, 'samples,',
+        steady.under, 'bytes', JSON.stringify(steady.sites), '(all sampled allocations', steady.total, 'bytes)');
+    assert.ok(control.under > 50 * control.count, 'the heap probe attributes a fresh pose\'s allocations to V23.motion.sample: ' + control.under + ' bytes');
+    assert.ok(steady.under < 0.5 * steady.count, 'V23.motion.sample allocates nothing per call once warm: ' + steady.under + ' bytes over ' + steady.count + ' samples ' + JSON.stringify(steady.sites));
+
     const kitBudget = { low: 600, medium: 1100, high: 2400, ultra: 3000 };
     for (const k of builds.kit) {
         assert.ok(k.v <= kitBudget[k.tier], `kit superset ${k.tier}: ${k.v} vertices <= ${kitBudget[k.tier]}`);
         assert.ok(k.again, `kit superset ${k.tier} is cached`);
     }
+    // design 3.4: kit modules at most 48 vertices each (the Medium tier, boxes and the halo's half torus)
+    const medium = builds.kit.find((k) => k.tier === 'medium');
+    assert.deepEqual(medium.modules.filter(([, v]) => v > 48), [], 'every Medium kit module has at most 48 vertices');
+    console.log('# Medium kit module vertices:', medium.modules.map(([n, v]) => n + ' ' + v).join(', '));
 
     // ---- kit modules inside the union hit volume +0.03 m at every archetype scale --------------------------------------
     const kitData = await evaluate(() => ['low', 'medium', 'high', 'ultra'].map((t) => {
@@ -280,65 +440,112 @@ test('agent roster: registry, lint, builds, budgets, hit volume, staged builder,
     assert.ok(!staged.combat.open && !staged.combat.picker && !staged.combat.paused && !staged.combat.allowed, 'live combat: no menu, no picker, not paused');
     assert.ok(!staged.combatStepped, 'the staged builder never steps in unpaused combat');
     assert.ok(staged.queueKept, 'and leaves its queue alone');
-    // an agent change in combat queues its LODs (nothing builds now); the menu then builds them
+    // a look redefined after it was built (in combat): its old LODs go back to the pool, show and world are queued, nothing
+    // builds there; the menu then builds them
     const staged2 = await evaluate(() => {
         const out = {};
-        // a look redefined after it was built goes back on the queue (the same entry: the registry is unchanged)
+        const old = { show: V23.core.build('miks', 'show'), world: V23.core.build('miks', 'world') };
+        const oldInfo = old.show.userData.v23;
+        const released0 = V23.parts.stats.released;
         V23.core.define('miks', JSON.parse(JSON.stringify(AGENT_LOOKS.miks)));
-        out.queued = V23.core.stats.queue.indexOf('miks|show') >= 0;
+        out.queued = ['miks|show', 'miks|world'].map((k) => V23.core.stats.queue.indexOf(k) >= 0);
+        out.released = V23.parts.stats.released - released0;
+        out.oldGone = !old.show.userData.v23 && !old.world.userData.v23;
         out.combat = V23.core.stagedStep(3);
         mainMenu.show('pause');
         out.allowed = V23.core.stats.allowed;
         let n = 0;
-        for (let i = 0; i < 50 && V23.core.stats.queue.length; i++) if (V23.core.stagedStep(3)) n++;
+        for (let i = 0; i < 400 && (V23.core.stats.queue.length || V23.core.stats.job); i++) if (V23.core.stagedStep(3)) n++;
         out.steps = n;
         out.left = V23.core.stats.queue.length;
-        out.built = (V23.core.stats.built.miks || []).indexOf('show') >= 0;
+        out.built = V23.core.stats.built.miks || [];
+        // (the pool may hand the same Group back: a fresh build has a fresh figure record)
+        out.fresh = V23.core.build('miks', 'show').userData.v23 !== oldInfo;
         return out;
     });
-    assert.ok(staged2.queued && !staged2.combat, 'queued in combat, not built there');
-    assert.ok(staged2.allowed && staged2.steps >= 1 && staged2.built && staged2.left === 0, 'the menu runs the staged builder through its queue');
+    assert.deepEqual(staged2.queued, [true, true], 'define() after a build queues both the show and the world LOD');
+    assert.equal(staged2.released, 2, 'and gives both old LODs back to the pool');
+    assert.ok(staged2.oldGone, 'the old roots are emptied');
+    assert.ok(!staged2.combat, 'nothing builds in combat');
+    assert.ok(staged2.allowed && staged2.steps >= 1 && staged2.left === 0, 'the menu runs the staged builder through its queue');
+    assert.ok(staged2.built.includes('show') && staged2.built.includes('world') && staged2.fresh, 'miks has fresh show and world LODs');
+
+    // the per-frame budget (design 2.5): a figure is built as units over several frames, and a frame starts a unit only
+    // while its spend is under the budget (so it overruns by at most its last unit); a tight budget makes it visible
+    const staged3 = await evaluate(() => {
+        for (const id of ['sage', 'omen']) V23.core.define(id, JSON.parse(JSON.stringify(AGENT_LOOKS[id])));
+        const q0 = V23.core.stats.queue.slice();
+        const log = [];
+        const BUDGET = 0.5;
+        for (let i = 0; i < 2000 && (V23.core.stats.queue.length || V23.core.stats.job); i++) { V23.core.stagedStep(BUDGET); log.push(Object.assign({}, V23.core.stats.lastStep)); }
+        const perKey = {};
+        for (const l of log) perKey[l.key] = (perKey[l.key] || 0) + 1;
+        return { q0, budget: BUDGET, steps: log.length, perKey, maxMs: Math.max(...log.map((l) => l.ms)), maxUnit: Math.max(...log.map((l) => l.maxUnitMs)),
+            lateStarts: log.filter((l) => l.units > 1 && l.beforeLast >= l.budget).length, empty: log.filter((l) => l.units < 1).length,
+            left: V23.core.stats.queue.length, job: V23.core.stats.job, built: ['sage', 'omen'].map((id) => (V23.core.stats.built[id] || []).slice().sort().join()) };
+    });
+    console.log('# staged builder at', staged3.budget, 'ms per frame:', staged3.steps, 'frames for', JSON.stringify(staged3.perKey), '| longest frame', staged3.maxMs.toFixed(2), 'ms, longest unit', staged3.maxUnit.toFixed(2), 'ms');
+    assert.deepEqual(staged3.q0.slice().sort(), ['omen|show', 'omen|world', 'sage|show', 'sage|world'], 'redefining Sage and Omen queued both tiers of each');
+    assert.equal(staged3.lateStarts, 0, 'no frame starts a unit once its budget is spent');
+    assert.equal(staged3.empty, 0, 'every frame makes progress');
+    assert.ok(staged3.perKey['sage|show'] >= 3 && staged3.perKey['omen|show'] >= 3, 'each show LOD is spread over several frames: ' + JSON.stringify(staged3.perKey));
+    assert.ok(staged3.maxMs <= staged3.budget + staged3.maxUnit + 0.5, 'a frame spends at most its budget plus one unit');
+    assert.ok(staged3.left === 0 && !staged3.job && staged3.built.every((b) => b === 'show,world'), 'Sage and Omen rebuilt');
 
     // ---- programs: upload-draw every LOD, then draw each with its own materials where the game draws it ----------------
+    // show (the stage: the viewmodel's light set) in every hand pose; world and body (the killcam ghost, the prototypes:
+    // the game scene). The body LOD of every agent is built with V23.parts.figure, drawn and given back to the pool.
     const prog = await evaluate(() => {
         const before = [renderer.info.programs.length, perfTelemetry.programWatermark, perfTelemetry.firstUseStalls];
         const tgt = new THREE.WebGLRenderTarget(64, 64);
         tgt.texture.encoding = THREE.sRGBEncoding;
         const prev = renderer.getRenderTarget();
-        let uploads = 0;
+        let uploads = 0, poseDraws = 0;
+        const body = {};
         camera.updateMatrixWorld();
         const ahead = new THREE.Vector3(0, 0, -4).applyMatrix4(camera.matrixWorld);
+        const inScene = (root) => { scene.add(root); root.position.copy(ahead); renderer.render(scene, camera); scene.remove(root); root.position.set(0, 0, 0); };
+        const m0 = V23.parts.stats.poolMisses;
         for (const id of AGENT_ORDER) for (const tier of ['show', 'world', 'body']) {
-            if (tier === 'body' && id !== 'sage' && id !== 'omen' && id !== game.activeAgent) continue;
-            const root = V23.core.build(id, tier);
+            const root = tier === 'body' ? V23.parts.figure(V23.core.resolve(id), 'body') : V23.core.build(id, tier);
             if (V23.core.uploadDraw(root)) uploads++;
             renderer.setRenderTarget(tgt);
             if (tier === 'show') {
-                // the stage: exactly the viewmodel's light set and environment
+                // the stage: exactly the viewmodel's light set and environment, once per hand pose
+                const H = root.userData.v23.hands;
                 viewmodelScene.add(root);
-                renderer.render(viewmodelScene, viewmodelCamera);
+                for (const pose of V23.motion.HAND_POSES) { H.R.geometry = H.set.geoms[pose]; H.L.geometry = H.set.geoms[pose]; renderer.render(viewmodelScene, viewmodelCamera); poseDraws++; }
                 viewmodelScene.remove(root);
-            } else {
-                // the killcam ghost and the prototypes: the game scene
-                scene.add(root);
-                root.position.copy(ahead);
-                renderer.render(scene, camera);
-                scene.remove(root);
-                root.position.set(0, 0, 0);
-            }
+                V23.motion.sample(id, 'idle', 0, root);
+            } else inScene(root);
             renderer.setRenderTarget(prev);
+            if (tier === 'body') {
+                const v = root.userData.v23;
+                let meshes = 0;
+                root.traverse((o) => { if (o.isMesh && o.geometry.groups.length) meshes++; });
+                body[id] = { draws: v.stats.draws, meshes: meshes, vertices: v.stats.vertices, released: V23.parts._release(root) };
+            }
         }
         tgt.dispose();
-        return { before, uploads, after: [renderer.info.programs.length, perfTelemetry.programWatermark, perfTelemetry.firstUseStalls] };
+        return { before, uploads, poseDraws, body, misses: V23.parts.stats.poolMisses - m0, after: [renderer.info.programs.length, perfTelemetry.programWatermark, perfTelemetry.firstUseStalls] };
     });
     await frames(10);
     const [programs, watermark, stalls] = await programState(page);
-    console.log('# programs before', prog.before.join('/'), 'after', prog.after.join('/'), 'uploads', prog.uploads);
-    assert.ok(prog.uploads >= 58, 'every LOD was upload-drawn');
-    assert.equal(prog.after[0], prog.before[0], 'drawing every LOD made no program');
+    console.log('# programs before', prog.before.join('/'), 'after', prog.after.join('/'), 'uploads', prog.uploads, 'hand-pose draws', prog.poseDraws, '| V2.2', v22.join('/'));
+    console.log('# body LODs (draws/meshes/vertices): sage', JSON.stringify(prog.body.sage), 'omen', JSON.stringify(prog.body.omen));
+    assert.equal(prog.uploads, 3 * reg.order.length, 'every LOD of every agent (show, world, body) was upload-drawn');
+    for (const id of reg.order) {
+        const b = prog.body[id];
+        assert.ok(b.draws <= 36 && b.meshes <= 36, `${id} body LOD ${b.draws} draws, ${b.meshes} meshes <= 36`);
+        assert.ok(b.released, `${id} body LOD released`);
+    }
+    assert.equal(prog.misses, 0, 'the body LODs came from the pool and went back');
+    assert.equal(prog.after[0], prog.before[0], 'drawing every LOD in every hand pose made no program');
     assert.equal(programs, watermark, 'programs == watermark');
+    assert.equal(watermark, v22[1], 'the watermark is V2.2\'s');
+    assert.equal(programs, v22[0], 'and so is the program count after every LOD was drawn');
     assert.equal(stalls, 0, 'no first-use stalls');
-    for (const id of agents) matrix(id, 'programs == watermark, 0 stalls', programs === watermark && stalls === 0, `${programs}/${watermark}, stalls ${stalls}`);
+    for (const id of agents) matrix(id, 'programs == watermark == V2.2, 0 stalls', programs === watermark && watermark === v22[1] && stalls === 0, `${programs}/${watermark} (V2.2 ${v22[1]}), stalls ${stalls}`);
 
     // ---- silhouettes (64 x 64 masks, front and 3/4) and idle vectors between full entries; info for the rest -----------
     const sil = await evaluate((ids) => {
