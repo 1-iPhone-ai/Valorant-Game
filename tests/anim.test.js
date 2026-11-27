@@ -508,6 +508,11 @@ test('kill cam with Enhanced Animations on plays back the recorded values (a rel
     await onPill(evaluate, true);
     await evaluate(() => {
         window.updateEnemies = () => {};
+        // V2.2 final check: no wingmen and no bot abilities. Both run on the real clock: on a loaded machine, where the
+        // reload's first 0.6 s of game time take seconds, a wingman shot the test bot dead 0.47 s into its reload
+        // (and a cast's gesture would replace the reload)
+        if (tacticalEnhancements.wingmanEnabled) tacticalEnhancements.toggleWingmanAI(false);
+        game.botAbilityAI = false;
         const e = enemyObjects.find((x) => x.isActive && !x.hit);
         window.__k = e;
         const p = characterController.position;
