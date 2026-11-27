@@ -8708,9 +8708,9 @@
             
             setManual: function(quality) {
                 // V1.8: Ultra Realism needs WebGL 2; without it, Cinematic (and say so)
+                // V2.2: no fellBack flag (nothing read it: this notice and the panel's status, from isSupported(), say so)
                 if (quality === 'ultraRealism' && !ultraRealism.isSupported()) {
                     quality = 'cinematic';
-                    ultraRealism.fellBack = true;
                     showNotification(`ULTRA REALISM needs ${ultraRealism.reason}, which this browser does not have: using CINEMATIC`, 4000);
                 }
                 this.restoreShadowHz();
@@ -43919,8 +43919,7 @@
             supportChecked: false,
             supported: false,
             reason: '',
-            forceUnsupported: false, // test hook: behave as if WebGL 2 were missing
-            fellBack: false,
+            forceUnsupported: false, // test hook: behave as if WebGL 2 were missing (V2.2: the unread fellBack flag is gone)
             baseExposure: 1.5,
             lightingLook: null,
 
