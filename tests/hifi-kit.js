@@ -356,8 +356,11 @@ async function photo(g, path, from, to, options = {}) {
  * draw call), peak = the most it drew in one frame since the last clear() (instrument() counts every
  * frame: short pops included), classicHidden = Classic meshes it stopped drawing, update = the median
  * ms of abilityLook.update over `frames` frames. Cheap enough for every ability of a role.
+ * 20 frames: on any machine a few updates run long (garbage collection, an effect's first frames: Omen's
+ * portals take 0.2-1.2 ms for about 13 frames as they open, then 0.1), and on a fast one the first frames
+ * after the cast are the ones measured; the median of 6 then read 0.4-0.7 ms where the steady cost is 0.1.
  */
-async function hfCost(g, frames = 6) {
+async function hfCost(g, frames = 20) {
     await g.evaluate(() => {
         window.__kitUpd = [];
         if (abilityLook.__kitUpdate) return;
