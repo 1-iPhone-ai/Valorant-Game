@@ -25420,8 +25420,8 @@
                     // sleeve's roll sheathes the elbow instead.
                     if (!F.rolled) {
                         const rJ = Math.max(D.arm * 0.9, D.fore) + 0.01;
-                        _SP(cx, rJ, el, _axisRot(sh, el, Math.PI / 2, 0), up, sleeve, [segU, _segs(cx, 6, 3)], { hemi: 0.5 });
-                        _SP(cx, rJ - 0.002, el, _axisRot(el, wr, Math.PI / 2, 0), fo, fore, [segU, _segs(cx, 12, 6)]);
+                        _SP(cx, rJ, el, _axisRot(sh, el, Math.PI / 2, 0), up, sleeve, [segU, _segs(cx, 6, 3)], { hemi: 0.5, joint: true });
+                        _SP(cx, rJ - 0.002, el, _axisRot(el, wr, Math.PI / 2, 0), fo, fore, [segU, _segs(cx, 12, 6)], { joint: true });
                     }
                     _limb(cx, el, wr, D.fore, D.fore * 0.85, fo, fore, _segs(cx, 12, 7));
                     const gt = (L.gloves && L.gloves.type) || 'full';
@@ -26669,7 +26669,8 @@
                 const L = look || {}, fp = L.fp || { sleeve: 'under', cuff: 'trim', glove: 'glove', wrist: 'band' };
                 const cx = _expand(look, 'show');
                 const accent = (s) => s.slot === 'glow' || s.slot === 'visor';
-                const forearm = cx.out.filter((s) => (s.bone === 4 || s.bone === 6) && !s.hand && s.node === undefined);
+                // V2.3: the elbow joint's shells (joint) stay out: the elbow sits at the view's lower edge, under the sleeve
+                const forearm = cx.out.filter((s) => (s.bone === 4 || s.bone === 6) && !s.hand && !s.joint && s.node === undefined);
                 const sl = [], dt = [];
                 for (const s of forearm) {
                     const side = s.bone === 4 ? 'R' : 'L', pre = side === 'R' ? _fpFrameR : _fpFrameL;
