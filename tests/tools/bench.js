@@ -1317,7 +1317,7 @@ function printTable(report) {
     }
     for (const f of report.failures) console.log(`${pad(f.index, 4)} ${pad(f.build, 6)} ${lpad(f.pair, 4)}  FAILED: ${f.error.split('\n')[0].slice(0, 160)}`);
     if (report.runs.some((r) => r.discarded)) console.log('(* discarded: the first pair)');
-    if (report.contaminatedRuns.length) console.log(`(! other browsers or test jobs were running: runs ${report.contaminatedRuns.join(', ')}; their figures are not comparable)`);
+    if (report.contaminatedRuns.length) console.log(`(! other browsers or test jobs were running before, during or after: runs ${report.contaminatedRuns.join(', ')}; their figures are not comparable)`);
     console.log('(load: 1-min load average before the run; wm b/s: watermark at boot / at measuring start; prog/wm: programs / watermark at the end; upB/f: bytes to GL a frame; heapMB: after GC; 1stFrm: page ms to the game loop\'s first frame)');
     for (const b of Object.keys(report.builds)) {
         const s = report.builds[b];
@@ -1373,6 +1373,13 @@ async function main() {
         say(`run ${i + 1}/${order.length}: ${o.build} (pair ${o.pair})`);
         const fn = args.mode === 'D' ? runD : runR;
         const before = await waitIdle(args, say);
+        // other jobs are also sampled during the run (one that starts and ends inside it shows only here)
+        const during = { samples: 0, busy: 0, maxLoad1: 0, jobs: [] };
+        const sampler = setInterval(() => {
+            const L = foreignLoad();
+            during.samples++; during.maxLoad1 = Math.max(during.maxLoad1, L.loadavg[0]);
+            if (L.busy) { during.busy++; for (const j of L.jobs) if (during.jobs.length < 20 && !during.jobs.includes(j)) during.jobs.push(j); }
+        }, 15000);
         let r = null;
         try {
             if (before.refused) throw new Error(`refused: other jobs still running after ${before.waitedS} s (${describeLoad(before.load)}); --allow-load runs anyway`);
@@ -1381,15 +1388,16 @@ async function main() {
             r = await fn(args, o.build, b, b.opts, b.pre);
         } catch (e) {
             await closeAll();
-            const f = { index: i, build: o.build, pair: o.pair, error: String(e && e.message || e), stack: String(e && e.stack || '').split('\n').slice(0, 6).join('\n'), load: before.load };
+            const f = { index: i, build: o.build, pair: o.pair, error: String(e && e.message || e), stack: String(e && e.stack || '').split('\n').slice(0, 6).join('\n'), load: before.load, loadDuring: during };
             failures.push(f);
             say(`  ${o.build} FAILED: ${f.error.split('\n')[0]}`);
         }
+        clearInterval(sampler);
         const after = foreignLoad();
         if (r) {
             r.index = i; r.pair = o.pair; r.discarded = discardFirst && o.pair === 0;
-            r.load = { before: before.load, after, waitedS: before.waitedS };
-            r.contaminated = !!(before.load.busy || after.busy);
+            r.load = { before: before.load, during, after, waitedS: before.waitedS };
+            r.contaminated = !!(before.load.busy || during.busy || after.busy);
             runs.push(r);
             say(`  ${o.build}: ${fmt(r.avgFps)} FPS, 1% low ${fmt(r.low1Fps)}, median ${fmt(r.medianMs)} ms, max ${fmt(r.maxMs)} ms @${r.maxFrame}, ` +
                 `spikes ${r.spikes.over2xMedian.count}/${r.spikes.over50ms.count}/${r.spikes.over2xMedianAnd50ms.count}, draws ${fmt(r.drawCalls, 0)}, programs ${r.endPrograms.programs}/${r.endPrograms.watermark} (boot wm ${r.bootPrograms.watermark}), stalls ${r.stalls}, ` +
