@@ -34916,7 +34916,7 @@
                         soundFX.gekkoMosh();
                         abilityLook.tag = 'gekko.c';   // V2.2: Gekko's Mosh Pit eruption (High Fidelity draws it)
                         this.spawnFlashBurst(mp.position.x, 0.9, mp.position.z, 0xa3e635, mp.radius * 0.95, 360, now);
-                        this.spawnWindRing(mp.position.x, 0.35, mp.position.z, 0xa3e635, mp.radius * 1.05, 340, now);
+                        this.spawnWindRing(mp.position.x, 0.35, mp.position.z, 0xa3e635, mp.radius * 1.05, now);   // V2.2: no duration argument (340 went in as now: the ring had ended before it was drawn)
                         abilityLook.tag = null;
                         let hits = 0;
                         for (let j = 0; j < enemyObjects.length; j++) {
@@ -35188,7 +35188,7 @@
                         soundFX.deadlockSensor();
                         abilityLook.tag = 'deadlock.q';   // V2.2: Sonic Sensor's concussion (High Fidelity)
                         this.spawnFlashBurst(ds.position.x, 0.9, ds.position.z, 0x38bdf8, 6.8, 340, now);
-                        this.spawnWindRing(ds.position.x, 0.3, ds.position.z, 0x38bdf8, 6.8, 320, now);
+                        this.spawnWindRing(ds.position.x, 0.3, ds.position.z, 0x38bdf8, 6.8, now);   // V2.2: no duration argument (320 went in as now: the ring had ended before it was drawn)
                         abilityLook.tag = null;
                         const blastRSq = AGENT_TUNING.deadlock.q.blastRadiusM * AGENT_TUNING.deadlock.q.blastRadiusM;
                         let stunned = 0;
@@ -35266,7 +35266,7 @@
                         soundFX.deadlockCocoon();
                         abilityLook.tag = 'deadlock.x';   // V2.2: Annihilation's execution (High Fidelity)
                         this.spawnFlashBurst(dc.position.x, 1.15, dc.position.z, 0x38bdf8, 5.5, 380, now);
-                        this.spawnWindRing(dc.position.x, 0.35, dc.position.z, 0x38bdf8, 5.8, 360, now);
+                        this.spawnWindRing(dc.position.x, 0.35, dc.position.z, 0x38bdf8, 5.8, now);   // V2.2: no duration argument (360 went in as now: the ring had ended before it was drawn)
                         abilityLook.tag = null;
                         if (tEnemy && tEnemy.isActive && !tEnemy.hit) {
                             damageEnemyActor(tEnemy, AGENT_TUNING.deadlock.x.damage, now, nowMs, "Annihilation Execution", false);
