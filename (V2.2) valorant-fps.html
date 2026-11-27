@@ -29686,9 +29686,12 @@
                     }
                 }
 
-                const ax = Math.max(-38, Math.min(38, characterController.position.x + fwdX * AGENT_TUNING.iso.x.arenaAheadM));
-                const az = Math.max(-38, Math.min(38, characterController.position.z + fwdZ * AGENT_TUNING.iso.x.arenaAheadM));
-                const floorY = this.findSupportFloorY(ax, characterController.position.y + 1.0, az);
+                // V2.2: the arena goes where you aim it, inside the map's bounds as the aim point is (±45 m: ±38 moved its
+                // centre up to 6 m, into walls), on the floor under it at your feet's level: a step counts, a wall's or
+                // a crate's top does not (looked up from 1 m over your eyes, a 3 m wall's top was taken for the floor)
+                const ax = Math.max(-45, Math.min(45, characterController.position.x + fwdX * AGENT_TUNING.iso.x.arenaAheadM));
+                const az = Math.max(-45, Math.min(45, characterController.position.z + fwdZ * AGENT_TUNING.iso.x.arenaAheadM));
+                const floorY = this.findSupportFloorY(ax, characterController.position.y - characterController.height + 0.1, az);
 
                 kc.active = true;
                 kc.position.set(ax, floorY, az);
