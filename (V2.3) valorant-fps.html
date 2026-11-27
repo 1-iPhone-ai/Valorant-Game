@@ -41884,7 +41884,7 @@
                         detonateAt: 0,
                         endTime: 0,
                         detonated: false,
-                        lastTickAt: 0,
+                        lastTickAt: 0,     // V2.3: a comma now, for the three fields below (V2.2: the last field)
                         owner: null,       // V2.3: the bot that cast it (V23.util.onCast; gameplay never reads these three)
                         abilityId: null,   // V2.3: 'bot.flash' | 'bot.sonar' | 'bot.mortar' | 'bot.smoke'
                         caster: null       // V2.3: {enemy, slot, generation, agentId, archetype} at the cast (the recap's caster)
@@ -42188,24 +42188,30 @@
         //    'bot.sonar', 'bot.mortar' or 'bot.smoke') and hz.caster {enemy, slot, generation, agentId, archetype} (a fresh
         //    record per cast, so a respawned slot never renames an old hazard); the mortar's tick passes {label, caster} to
         //    takeDamage (no source.enemy: no kill cam, as in V2.2). abilityLook.botDash is given gameNow(). None of these
-        //    fields is read by gameplay.
-        //  - Classic with Agent Identity on (identity 'off' is V2.2's picture exactly: none of this runs):
+        //    fields is read by gameplay. (The 4 entries past V2.2's 6 are 28 more THREE objects at boot, and r128's
+        //    generateUUID draws Math.random 4 times for each: 112 more draws at boot than V2.2, before any seeded play.)
+        //  - Classic with Agent Identity on (identity 'off' is V2.2's picture exactly: none of this runs, and switching it
+        //    off ends a windup and lands an orb in flight at once):
         //    step() reads V2.2's decision state only (nextAbilityAt, the 2600 ms global gap, the archetype's range with a
         //    0.5 m margin, sight, health, nextTpAt) and starts a windup when the cast will be possible within 350 ms; the
         //    windup ends at the cast (the release), or is cancelled 650 ms after it started without one, when another bot's
-        //    cast moves the gap past the window, when the bot dies or respawns, or when Bot Ability AI, identity or the mode
-        //    turns it off. On the cast tick the arm releases (throw, wrist tap, two-hand channel or underhand lob) and a
-        //    flash or smoke hazard's orb child flies from the bot's right hand to V2.2's hazard point in 220 ms (only
-        //    orbMesh's local offset, and the lob's scale, are animated; the hazard's x/y/z, times and group are V2.2's).
-        //    A caster whose look is built (not a stub) tints the orb with its palette glow.
-        //  - Outbound protocols (other blocks implement them; both are called guarded and inside V23.seeded with a
-        //    per-event V23.rand stream, so whatever they draw never touches Math.random):
+        //    cast moves the gap past the window, when the bot dies or respawns, when the last sim tick did not step it
+        //    (blinded, out of the near tier, moved by botMechanics, bots frozen: it cannot cast then), or when Bot Ability
+        //    AI, identity or the mode turns it off. On the cast tick the arm releases (throw, wrist tap, two-hand channel
+        //    or underhand lob) and a flash or smoke hazard's orb child flies from the bot's right hand to V2.2's hazard
+        //    point in 220 ms (only orbMesh's local offset, and the lob's scale, are animated; the hazard's x/y/z, times
+        //    and group are V2.2's). A caster whose look is built (not a stub) tints the orb with its palette glow.
+        //  - Outbound protocols (other blocks implement them; every call is guarded and made inside V23.seeded, so
+        //    whatever they draw through a V23.CONTRACT.seededSafe helper never touches Math.random: a windup's calls on
+        //    the stream made at its start, every other event on its own V23.rand stream):
         //    V23.bots.windup(enemy, code, t): code 7-10 is the gesture (contract v0: 7 throw, 8 channel, 9 snap/tap,
         //      10 place/slam; V23.motion.botCode(name) answers first when it knows the gesture), t the windup's progress:
         //      0 at the start, then every sim tick in [0, 0.95] toward the predicted cast, 1 on the cast tick (the release);
         //      code 0 ends it (the pose goes back to rest).
         //    V23.audio.botCue(enemy, kind): 'windup.<k>' at the windup start (the positional warning sting, design 12.3)
-        //      and 'cast.<k>' on the cast tick, k one of flash, sonar, mortar, smoke, teleport.
+        //      and 'cast.<k>' on the cast tick, k one of flash, sonar, mortar, smoke, teleport; 'arm.mortar' when a
+        //      mortar arms (detonateAt, 850 ms after the cast; design 12.3 and open decision 7), from its caster while
+        //      the caster is the life that cast it.
         //  - Ranked: rankedPin(true) makes the mode 'classic' for the match without writing game.userSettings (so the
         //    pinned value is never saved); rankedPin(false) gives the player's setting back.
         V23.util = {
@@ -42216,14 +42222,16 @@
                 flash: ['overhandThrow', 7], smoke: ['underhandLob', 7], mortar: ['twoHandChannel', 8],
                 sonar: ['wristTap', 9], teleport: ['fingerSnap', 9]
             },
-            _w: [],            // per bot slot: the classic windup {on, enemy, kind, code, t0, open, gen, block}
+            // per bot slot: the classic windup {on, enemy, kind, code, t0, open, gen, block, seenAt, rng, pc, pt, fn}
+            // (made once per slot by _rec; rng is the windup's stream, fn its pose call, so a tick allocates nothing)
+            _w: [],
             _fl: [],           // per hazard pool index: the orb flight {on, t0, stamp, ox, oy, oz, lob, s0, s1}
             _live: 0,          // windups on
             _pinned: false,    // Ranked: 'classic' for the match
             _seq: 0,           // events so far (the per-event stream's seed)
             _hand: { x: 0, y: 0, z: 0 },
             // V2.3: counters and the last 64 events, for the tests (never read by the game)
-            _stats: { windups: 0, released: 0, cancelled: 0, casts: 0, castsLed: 0, minLead: Infinity, flights: 0, landed: 0, detonations: 0, log: [] },
+            _stats: { windups: 0, released: 0, cancelled: 0, casts: 0, castsLed: 0, minLead: Infinity, flights: 0, landed: 0, detonations: 0, arms: 0, log: [] },
 
             onActivate: function (actor) {                                                     // H21.2
                 // V2.3: a new life: a windup left from the old one ends (its pose goes back to rest)
@@ -42234,6 +42242,7 @@
             step: function (enemy, gNow, dist, nx, nz, perpX, perpZ) {                         // H29.1
                 // V2.3: classic, read-only: V2.2's decision state in, the windup pose out; nothing a decision reads is written
                 const w = this._w[enemy.slot];
+                if (w) w.seenAt = gNow;   // V2.3: stepped on this sim tick (_frame ends a windup whose bot was not)
                 if (!game.botAbilityAI || game.gameMode === 'range' || !this._identity()) {
                     if (w && w.on) this._cancel(w, game.botAbilityAI ? 'off' : 'botAI');
                     return null;
@@ -42245,7 +42254,8 @@
                     else if (open - gNow > this._LEAD) this._cancel(w, 'gap');   // another bot's cast moved the gap on
                     else {
                         w.open = open;
-                        this._pose(enemy, w.code, Math.min(0.95, Math.max(0, (gNow - w.t0) / Math.max(1, open - w.t0))));
+                        // V2.3: the progress toward the predicted cast, on the windup's own stream
+                        this._poseW(w, w.code, Math.min(0.95, Math.max(0, (gNow - w.t0) / Math.max(1, open - w.t0))));
                     }
                     return null;
                 }
@@ -42261,16 +42271,22 @@
                     hz.abilityId = 'bot.' + kind;
                     hz.caster = { enemy: enemy, slot: enemy.slot, generation: enemy.generation, agentId: enemy.agentId || null, archetype: enemy.archetype || null };
                 }
-                const S = this._stats, w = this._w[enemy.slot];
-                const led = !!(w && w.on && w.gen === enemy.generation);
+                const S = this._stats, w = this._w[enemy.slot], idOn = this._identity();
+                const led = !!(idOn && w && w.on && w.gen === enemy.generation);
                 const lead = led ? now - w.t0 : 0;
-                if (w && w.on) { w.on = false; this._live--; }
+                if (w && w.on) {
+                    // V2.3: the release below ends a windup of this life; otherwise (identity switched off on the cast
+                    // tick itself, or a windup left from an old life) the pose goes back to rest here, as no release follows
+                    // for it
+                    if (led) { w.on = false; this._live--; }
+                    else this._cancel(w, idOn ? 'respawn' : 'off');
+                }
                 S.casts++;
                 if (led) { S.castsLed++; S.released++; if (lead < S.minLead) S.minLead = lead; }
                 this._log(['cast', enemy.slot, kind, now, lead, hz ? tacticalDirector.botHazardsPool.indexOf(hz) : -1]);
-                if (!this._identity()) return null;
+                if (!idOn) return null;
                 // V2.3: the release on the cast tick, then the orb's flight and the caster's tint
-                this._emit(enemy, this._code(kind), 1, 'cast.' + kind);
+                this._emit(enemy, this._code(kind), 1, 'cast.' + kind, this._stream(enemy));
                 if (hz) {
                     this._tint(hz, kind, enemy);
                     this._fly(hz, kind, enemy, now);
@@ -42278,9 +42294,16 @@
                 return null;
             },
             onDetonate: function (hz, gNow) {                                                  // H29.3 (WP8 region)
-                // V2.3: classic only counts it; agent mode's push syncs here in M2
+                // V2.3: classic counts it; agent mode's push syncs here in M2
                 this._stats.detonations++;
                 this._log(['pop', hz.owner ? hz.owner.slot : -1, hz.type, gNow, 0, tacticalDirector.botHazardsPool.indexOf(hz)]);
+                // V2.3: the mortar arming is the armored bot's heaviest utility: its positional warning sting (design 12.3,
+                // open decision 7), from the caster while it is still the life that cast it (a respawned slot is elsewhere)
+                const o = hz.owner, c = hz.caster;
+                if (hz.type === 'mortar' && o && c && o.generation === c.generation && this._identity()) {
+                    this._stats.arms++;
+                    this._emit(o, -1, 0, 'arm.mortar', this._stream(o));
+                }
                 return null;
             },
             poolLimit: function () { return this._mode() === 'agent' ? this._POOL : this._CLASSIC; },   // H29.4 (WP8 region)
@@ -42322,25 +42345,38 @@
                 if (arch === 'standard') return ((!enemy.hasSight || enemy.health < enemy.maxHealth) && dist <= 20.0 - m) ? 'smoke' : null;
                 return null;
             },
+            // V2.3: the windup record of a bot slot, made once (its pose call fn is bound to it, so a tick allocates nothing)
+            _rec: function (slot) {
+                let w = this._w[slot];
+                if (w) return w;
+                const self = this;
+                w = this._w[slot] = { on: false, enemy: null, kind: null, code: 0, t0: 0, open: 0, gen: 0, block: -1, seenAt: -1, rng: null, pc: 0, pt: 0, fn: null };
+                w.fn = function () { self._pose(w.enemy, w.pc, w.pt); };
+                return w;
+            },
             _start: function (enemy, kind, gNow, open) {
-                let w = this._w[enemy.slot];
-                if (!w) w = this._w[enemy.slot] = { on: false, enemy: null, kind: null, code: 0, t0: 0, open: 0, gen: 0, block: -1 };
+                const w = this._rec(enemy.slot);
                 w.on = true; w.enemy = enemy; w.kind = kind; w.code = this._code(kind); w.t0 = gNow; w.open = open; w.gen = enemy.generation;
                 w.block = -1;
+                w.seenAt = gNow;
+                // V2.3: the windup's stream: its start, its progress ticks and its end all draw from it
+                w.rng = this._stream(enemy);
                 this._live++;
                 this._stats.windups++;
                 this._log(['windup', enemy.slot, kind, gNow, open - gNow, -1]);
-                this._emit(enemy, w.code, 0, 'windup.' + kind);
+                this._emit(enemy, w.code, 0, 'windup.' + kind, w.rng);
             },
             _cancel: function (w, why) {
                 w.on = false;
                 this._live--;
-                // V2.3: a windup that ran out, or was cancelled outright, stays down until the bot's next cast time (no
-                // restart on the same prediction); the cast itself still comes when V2.2's does, with its release only
-                if (why === 'timeout' || why === 'cancel') w.block = w.open;
+                // V2.3: a windup that ran out, was cancelled outright, or lost its bot's sim step stays down until the bot's
+                // next cast time (no restart on the same prediction, so a bot moved by botMechanics or blinded for a tick
+                // never flickers its pose or repeats its cue); the cast itself still comes when V2.2's does, with its
+                // release only
+                if (why === 'timeout' || why === 'cancel' || why === 'unseen' || why === 'blind') w.block = w.open;
                 this._stats.cancelled++;
                 this._log(['cancel', w.enemy.slot, why, gameNow(), 0, -1]);
-                this._pose(w.enemy, 0, 0);
+                this._poseW(w, 0, 0);
             },
             _log: function (ev) {
                 const L = this._stats.log;
@@ -42358,13 +42394,21 @@
             _pose: function (enemy, code, t) {
                 if (V23.bots && V23.bots.windup) V23.bots.windup(enemy, code, t);
             },
-            // V2.3: a windup start or a release: the pose and the positional cue, on a stream per bot slot, generation and event
-            _emit: function (enemy, code, t, cue) {
+            // V2.3: a windup's progress or end, inside V23.seeded on the windup's own stream (made at its start)
+            _poseW: function (w, code, t) {
+                w.pc = code; w.pt = t;
+                V23.seeded(w.fn, w.rng);
+            },
+            // V2.3: a fresh stream per bot slot, generation and event
+            _stream: function (enemy) {
                 this._seq = (this._seq + 1) >>> 0;
+                return V23.rand(((enemy.slot + 1) * 73856093) ^ ((enemy.generation + 1) * 19349663) ^ (this._seq * 83492791));
+            },
+            // V2.3: a windup start, a release or a mortar arming: the pose (code -1: none) and the positional cue, on rng
+            _emit: function (enemy, code, t, cue, rng) {
                 const self = this;
-                const rng = V23.rand(((enemy.slot + 1) * 73856093) ^ ((enemy.generation + 1) * 19349663) ^ (this._seq * 83492791));
                 V23.seeded(function () {
-                    self._pose(enemy, code, t);
+                    if (code >= 0) self._pose(enemy, code, t);
                     if (V23.audio && V23.audio.botCue) V23.audio.botCue(enemy, cue);
                 }, rng);
             },
@@ -42424,6 +42468,11 @@
                         const e = w.enemy;
                         if (stop) this._cancel(w, game.botAbilityAI ? 'off' : 'botAI');
                         else if (e.hit || !e.isActive || e.generation !== w.gen) this._cancel(w, 'dead');
+                        // V2.3: read-only checks: the last sim tick (gameClock, the time of the last step) did not reach
+                        // H29.1 for this bot (blinded, out of the near tier, moved by botMechanics, bots frozen), so it
+                        // cannot cast and its pose must not hold; or it is blinded now (a blind landed between ticks)
+                        else if (w.seenAt !== gameClock) this._cancel(w, 'unseen');
+                        else if (e.blindedUntil > now) this._cancel(w, 'blind');
                         else if (now - w.t0 >= this._CANCEL) this._cancel(w, 'timeout');
                     }
                 }
@@ -42438,6 +42487,7 @@
                         if (hz) hz.orbMesh.position.set(0, 0, 0);
                         continue;
                     }
+                    // V2.3: identity switched off mid-flight lands the orb on V2.2's point (and scale) at once
                     const s = idOn ? (now - f.t0) / this._ORB : 1;
                     if (s >= 1) {
                         f.on = false;

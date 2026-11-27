@@ -13,6 +13,7 @@ after(closeBrowser);
 // (gameClock / gameTime, which V2.2's bot abilities run on) with performance.now, Date.now and Math.random fixed for the
 // run, calling updateEnemies, updateEnemyAnimation and tacticalDirector.updateBotAbilities, nothing drawn. The same
 // scenarios run in the V2.2 build (booted with the harness 'file' option) and in V2.3, and their traces must be equal.
+// The V2.3 build is booted once; the second test goes on in the same page.
 
 const V22 = '(V2.2) valorant-fps.html';
 const TICK = 1000 / 60;
@@ -48,7 +49,9 @@ const HELPERS = () => {
             updateEnemyAnimation(1 / 60);
             tacticalDirector.updateBotAbilities(1 / 60, gameNow());
         };
-        try { return fn(tick, T0, () => draws); } finally {
+        // the game time of the next tick, computed exactly as tick() computes it
+        const next = () => T0 + (el + 1000 / 60);
+        try { return fn(tick, T0, () => draws, next); } finally {
             performance.now = realPerf; Date.now = realDate; Math.random = realRandom; renderer.render = realRender;
             window.__simT = T0 + el;
         }
@@ -127,14 +130,17 @@ const HELPERS = () => {
         };
         return r;
     };
-    // V2.3 only: what V23.util sends out (the windup pose calls and the cues), with the tick they came on, and the orb
-    // offsets of the hazards in flight. Nothing here draws a random number or changes the game.
+    // V2.3 only: what V23.util sends out (the windup pose calls [k, slot, code, t, generation, seeded] and the cues
+    // [k, slot, kind, seeded]), with the tick they came on, and the orb offsets of the hazards in flight. Each spy call
+    // takes one number the way a seededSafe helper would (fxKit._rng, else Math.random), as a WP7 pose or WP10 sting
+    // may: inside V23.seeded that is the V2.3 stream, so the Math.random count stays V2.2's; outside it, it would not.
     window.__spy = () => {
         const s = { k: -1, W: [], C: [], orbs: [], restore: () => {} };
         if (typeof V23 === 'undefined') return s;
         const ow = V23.bots.windup, oc = V23.audio.botCue;
-        V23.bots.windup = function (e, code, t) { s.W.push([s.k, e.slot, code, t]); return ow.apply(this, arguments); };
-        V23.audio.botCue = function (e, kind) { s.C.push([s.k, e.slot, kind]); return oc.apply(this, arguments); };
+        const draw = () => { const seeded = typeof fxKit._rng === 'function'; (seeded ? fxKit._rng : Math.random)(); return seeded ? 1 : 0; };
+        V23.bots.windup = function (e, code, t) { s.W.push([s.k, e.slot, code, t, e.generation, draw()]); return ow.apply(this, arguments); };
+        V23.audio.botCue = function (e, kind) { s.C.push([s.k, e.slot, kind, draw()]); return oc.apply(this, arguments); };
         s.restore = () => { V23.bots.windup = ow; V23.audio.botCue = oc; };
         s.orb = (k) => {
             const pool = tacticalDirector.botHazardsPool;
@@ -151,9 +157,12 @@ const HELPERS = () => {
             W: s.W, C: s.C, orbs: s.orbs, stats: st ? { windups: st.windups, cancelled: st.cancelled, casts: st.casts, castsLed: st.castsLed, flights: st.flights, landed: st.landed } : null }, extra || {});
     };
 
-    // A: one rusher held 12 m from you for 40 s (V2.2's casts every 7.8-10 s, each with a windup in V2.3)
-    window.__scenRusher = (t0) => __det((tick, T0, draws) => {
+    // A: one rusher held 12 m from you for 40 s (V2.2's casts every 7.8-10 s, each with a windup in V2.3). With
+    // id 'off' (V2.3 only), the same run with Agent Identity off
+    window.__scenRusher = (t0, id) => __det((tick, T0, draws) => {
         __setup(4);
+        const V = typeof V23 !== 'undefined';
+        if (V && id === 'off') game.userSettings.agentIdentity = 'off';
         const sp = __spot(12);
         const e = __bot(0, sp[0], sp[1], 'rusher');
         const hy = e.mesh.position.y;
@@ -165,7 +174,7 @@ const HELPERS = () => {
                 tick();
                 r.sample(k); if (s.orb) s.orb(k);
             }
-        } finally { s.restore(); }
+        } finally { s.restore(); if (V) game.userSettings.agentIdentity = 'on'; }
         return __out(r, s, draws, { spot: sp, arch: e.archetype, slot: e.slot });
     }, t0);
 
@@ -189,15 +198,22 @@ const HELPERS = () => {
         return __out(r, s, draws);
     }, t0);
 
-    // C: the rusher is in range when its cast comes within 300 ms, then held 5 m away (no cast there) for 1.5 s, then
-    // back at 12 m (it casts at once). D: Bot Ability AI off for 15 s. E: F5 when the cast comes within 300 ms, F5
-    // again 2 s later. F: V23.util.cancelWindups() at the same moment (V2.3 only)
-    window.__scenSwitch = (t0, what) => __det((tick, T0, draws) => {
+    // C: the rusher is in range when its cast comes within 300 ms (its windup is on), then held 5 m away (no cast
+    // there) for 1.5 s, then back at 12 m (it casts at once). D: Bot Ability AI off for 15 s. E: F5 when the cast comes
+    // within 300 ms, F5 again 2 s later. F: V23.util.cancelWindups() at the same moment (V2.3 only).
+    // At the same moment (V2.3's settings only where they exist; the rest in both builds): 'idoff' Agent Identity off
+    // for 2 s; 'death' the bot is hit (killed); 'respawn' activateEnemy on its slot, in place; 'blind' it is blinded
+    // for 1.5 s; 'far' it is held 24 m away (past the near tier) for 1.5 s, then back at 12 m. 'idcast': Agent
+    // Identity off on the cast tick itself (the windup still on), for 2 s
+    window.__scenSwitch = (t0, what) => __det((tick, T0, draws, next) => {
         __setup(4);
         const far = __spot(12);
         const e = __bot(0, far[0], far[1], 'rusher');
         const hy = e.mesh.position.y, p = characterController.position;
         const near = [p.x + (far[0] - p.x) * 5 / 12, p.z + (far[1] - p.z) * 5 / 12];
+        const out24 = [p.x + (far[0] - p.x) * 2, p.z + (far[1] - p.z) * 2];
+        const V = typeof V23 !== 'undefined';
+        const idSet = (v) => { if (V) game.userSettings.agentIdentity = v; };
         if (what === 'off') game.botAbilityAI = false;
         const r = __rec(T0), s = __spy();
         let at = -1, spot = far;
@@ -205,19 +221,28 @@ const HELPERS = () => {
         try {
             for (let k = 0; k < (what === 'off' ? 15 : 8) * 60; k++) {
                 s.k = k;
-                if (at < 0 && e.nextAbilityAt && e.nextAbilityAt - (gameNow() + 1000 / 60) <= 300) {
+                const due = what === 'idcast'
+                    ? (e.nextAbilityAt && e.nextAbilityAt <= next())                       // the cast is on this tick
+                    : (e.nextAbilityAt && e.nextAbilityAt - (gameNow() + 1000 / 60) <= 300);  // the cast within 300 ms
+                if (at < 0 && due) {
                     at = k;
                     if (what === 'away') spot = near;
+                    else if (what === 'far') spot = out24;
                     else if (what === 'f5') key();
-                    else if (what === 'cancel' && typeof V23 !== 'undefined') V23.util.cancelWindups();
+                    else if (what === 'cancel' && V) V23.util.cancelWindups();
+                    else if (what === 'idoff' || what === 'idcast') idSet('off');
+                    else if (what === 'death') e.hit = true;
+                    else if (what === 'respawn') __bot(0, far[0], far[1], 'rusher');
+                    else if (what === 'blind') e.blindedUntil = gameNow() + 1500;
                 }
-                if (at >= 0 && k === at + 90 && what === 'away') spot = far;
+                if (at >= 0 && k === at + 90 && (what === 'away' || what === 'far')) spot = far;
                 if (at >= 0 && k === at + 120 && what === 'f5') key();
-                e.mesh.position.set(spot[0], hy, spot[1]); e.poseDirty = true; syncEnemyBroadphase(e);
+                if (at >= 0 && k === at + 120 && (what === 'idoff' || what === 'idcast')) idSet('on');
+                if (!e.hit) { e.mesh.position.set(spot[0], hy, spot[1]); e.poseDirty = true; syncEnemyBroadphase(e); }
                 tick();
                 r.sample(k); if (s.orb) s.orb(k);
             }
-        } finally { s.restore(); }
+        } finally { s.restore(); idSet('on'); }
         game.botAbilityAI = true;
         return __out(r, s, draws, { at, ai: game.botAbilityAI });
     }, t0);
@@ -255,15 +280,33 @@ const SCENARIOS = [
     ['mixed', (t0) => __scenMixed(t0), 7e6],
     ['away', (t0) => __scenSwitch(t0, 'away'), 8e6],
     ['off', (t0) => __scenSwitch(t0, 'off'), 9e6],
-    ['f5', (t0) => __scenSwitch(t0, 'f5'), 10e6]
+    ['f5', (t0) => __scenSwitch(t0, 'f5'), 10e6],
+    ['rusherOff', (t0) => __scenRusher(t0, 'off'), 13e6],
+    ['idoff', (t0) => __scenSwitch(t0, 'idoff'), 14e6],
+    ['idcast', (t0) => __scenSwitch(t0, 'idcast'), 15e6],
+    ['death', (t0) => __scenSwitch(t0, 'death'), 16e6],
+    ['respawn', (t0) => __scenSwitch(t0, 'respawn'), 17e6],
+    ['blind', (t0) => __scenSwitch(t0, 'blind'), 18e6],
+    ['far', (t0) => __scenSwitch(t0, 'far'), 19e6]
 ];
 
+// The V2.3 page, booted once for the file (design 17.1); the second test goes on in it. boot() closes the page before,
+// so the V2.2 reference is booted first
+let V23PAGE = null;
+async function bootBuild(file) {
+    const b = await boot(file ? { quality: 'low', file } : { quality: 'low' });
+    await b.evaluate(HELPERS);
+    if (!file) V23PAGE = b;
+    return b;
+}
+async function v23Page() { return V23PAGE || bootBuild(null); }
+
 async function runAll(file) {
-    const { evaluate, errors, page, frames } = await boot(file ? { quality: 'low', file } : { quality: 'low' });
-    await evaluate(HELPERS);
+    const b = await bootBuild(file);
+    const { evaluate, errors, page, frames } = b;
     const out = { errors };
     for (const [name, fn, t0] of SCENARIOS) out[name] = await evaluate(`(${fn.toString()})(${t0})`);
-    out.steal = await evaluate(() => __scenSteal(12e6));
+    out.steal = await evaluate(() => __scenSteal(20e6));
     // then real frames: the game draws on from where the runs left it
     await frames(20);
     out.programs = await programState(page);
@@ -305,6 +348,12 @@ test('classic: the same casts, hazards, pool entries, timers, gaps and Math.rand
     assert.deepEqual(V22OUT.steal.got, [0]);
     assert.deepEqual(v23.steal.got, [0, 6, 0], 'pool full: classic steals entry 0 as V2.2 does; agent mode takes entry 6');
     assert.equal(v23.steal.draws, V22OUT.steal.draws, 'the same draws for the classic steal');
+    // every pose call and cue (start, progress, end, release, arming) came inside V23.seeded
+    for (const [name] of SCENARIOS) {
+        const y = v23[name];
+        assert.deepEqual(y.W.filter((w) => w[5] !== 1), [], `${name}: every V23.bots.windup call inside V23.seeded`);
+        assert.deepEqual(y.C.filter((c) => c[3] !== 1), [], `${name}: every V23.audio.botCue call inside V23.seeded`);
+    }
     for (const [name] of SCENARIOS) {
         const x = V22OUT[name], y = v23[name];
         for (const k of GAMEPLAY) assert.deepEqual(y[k], x[k], `${name}: ${k} equal to V2.2`);
@@ -370,6 +419,11 @@ test('classic: the same casts, hazards, pool entries, timers, gaps and Math.rand
     }
     console.log(`# mixed: ${led} of ${all} casts had a windup of 250 ms or more (the rest came as the bot entered range)`);
     assert.ok(led >= 1, 'windups lead casts in free play too');
+    // each mortar arming (its pop) plays the armored bot's warning sting on that tick, and nothing else does
+    const mortarPops = B.pops.filter((q) => q[2] === 'mortar');
+    assert.ok(mortarPops.length >= 2, `${mortarPops.length} mortars armed`);
+    const arms = B.C.filter((q) => q[2] === 'arm.mortar');
+    assert.deepEqual(arms.map((q) => [q[0], q[1]]), mortarPops.map((q) => [q[0], 2]), 'the arming sting on each mortar\'s arming tick, from its caster');
 
     // C: in range at the windup, out of range at the cast time: no cast, the windup cancelled 650 ms after it
     // started, no restart on the same prediction; back in range, it casts at once (V2.2) with only the release
@@ -396,11 +450,76 @@ test('classic: the same casts, hazards, pool entries, timers, gaps and Math.rand
     assert.ok(!E.casts.some((c) => c[0] < E.at + 120), 'no cast while Bot Ability AI is off');
     assert.ok(E.casts.some((c) => c[0] === E.at + 120), 'F5 again: the cast at once');
     assert.equal(E.ai, true);
+
+    // What a slot's spy log holds in ticks [a, b): pose calls with a gesture, and cues
+    const busy = (Y, a, b) => [Y.W.filter((w) => w[1] === 0 && w[0] >= a && w[0] < b && w[2] > 0), Y.C.filter((q) => q[1] === 0 && q[0] >= a && q[0] < b)];
+    const endsAt = (Y, k) => Y.W.some((w) => w[0] === k && w[1] === 0 && w[2] === 0);
+
+    // G: Agent Identity off for the whole rusher run: V2.2's picture (no pose call, no cue, every orb on V2.2's point)
+    // and V2.2's play (the gameplay trace above)
+    const G = v23.rusherOff;
+    assert.ok(G.casts.length >= 4 && G.orbs.length > 0, `${G.casts.length} casts with identity off`);
+    assert.deepEqual([G.W.length, G.C.length], [0, 0], 'identity off: no windup pose call and no cue');
+    assert.deepEqual(G.orbs.filter((o) => o[2] !== 0 || o[3] !== 0 || o[4] !== 0), [], 'identity off: every orb at V2.2\'s point');
+
+    // H: identity switched off mid-windup: the pose back to rest on that tick, then nothing while it is off (the cast
+    // has no release and its orb no flight)
+    const H = v23.idoff;
+    const wh = windups(H.W, 0);
+    assert.equal(wh[0].how, 'cancel', 'identity off cancels the windup');
+    assert.equal(wh[0].end, H.at, 'on the tick it went off (a code-0 call)');
+    assert.deepEqual(busy(H, H.at, H.at + 120), [[], []], 'nothing sent while identity is off');
+    const hc = H.casts.filter((c) => c[0] > H.at && c[0] < H.at + 120);
+    assert.equal(hc.length, 1, 'the cast came while identity was off');
+    assert.deepEqual(H.orbs.filter((o) => o[0] >= hc[0][0] && o[0] < H.at + 120 && (o[2] || o[3] || o[4])), [], 'its orb on V2.2\'s point');
+
+    // I: identity switched off on the cast tick itself: the pose back to rest on that tick, no release, no cue
+    const I = v23.idcast;
+    assert.ok(I.casts.some((c) => c[0] === I.at), 'the cast is on the tick identity went off');
+    assert.ok(endsAt(I, I.at), 'a code-0 call on the cast tick');
+    assert.deepEqual(busy(I, I.at, I.at + 120), [[], []], 'no release and no cue while identity is off');
+    assert.deepEqual(I.orbs.filter((o) => o[0] >= I.at && o[0] < I.at + 120 && (o[2] || o[3] || o[4])), [], 'no flight');
+
+    // J: the bot killed mid-windup: the pose back to rest on that tick, nothing after (it never casts again)
+    const J = v23.death;
+    const wj = windups(J.W, 0);
+    assert.deepEqual([wj.length, wj[0].how, wj[0].end], [1, 'cancel', J.at], 'death cancels the windup on that tick');
+    assert.deepEqual(busy(J, J.at, 1e9), [[], []], 'no release after the death');
+    assert.ok(!J.casts.some((c) => c[0] >= J.at), 'no cast after the death');
+
+    // K: the slot respawned mid-windup: the old life's windup ends on that tick and is never released; the new life
+    // winds up afresh for V2.2's cast (activateEnemy keeps nextAbilityAt in V2.2) and releases that one
+    const K = v23.respawn;
+    const wk = windups(K.W, 0);
+    assert.equal(wk[0].how, 'cancel', 'respawn cancels the windup');
+    assert.equal(wk[0].end, K.at, 'on the tick of the respawn');
+    const g0 = K.W.find((w) => w[1] === 0 && w[2] > 0 && w[3] === 0)[4];
+    assert.ok(K.W.filter((w) => w[1] === 0 && w[3] === 1).every((w) => w[4] > g0), 'no release for the old life');
+    assert.ok(wk.length >= 2 && wk[1].how === 'cast' && wk[1].start >= K.at && wk[1].code === 7, 'the new life winds up and throws');
+    assert.ok(K.casts.some((c) => c[0] === wk[1].end), 'released on V2.2\'s cast tick');
+
+    // L: blinded mid-windup: the bot is not stepped (V2.2 skips a blinded bot), so the windup ends on that tick, not
+    // 650 ms later; nothing while blind; the cast when the blind ends has its release only
+    const Lb = v23.blind;
+    const wl = windups(Lb.W, 0);
+    assert.deepEqual([wl[0].how, wl[0].end], ['cancel', Lb.at], 'blind cancels the windup on that tick');
+    const lc = Lb.casts.filter((c) => c[0] >= Lb.at);
+    assert.ok(lc.length >= 1 && lc[0][0] >= Lb.at + 85, 'no cast while blind');
+    assert.deepEqual(busy(Lb, Lb.at + 1, lc[0][0]), [[], []], 'nothing sent while blind');
+    assert.ok(wl[1].how === 'cast' && wl[1].start === wl[1].end && wl[1].end === lc[0][0], 'then the cast with its release only');
+
+    // M: out of the near tier mid-windup (24 m): not stepped, so the windup ends on that tick; back at 12 m the cast
+    // comes at once with its release only
+    const M = v23.far;
+    const wm = windups(M.W, 0);
+    assert.deepEqual([wm[0].how, wm[0].end], ['cancel', M.at], 'leaving the near tier cancels the windup on that tick');
+    assert.deepEqual(busy(M, M.at + 1, M.at + 90), [[], []], 'nothing sent while out of the near tier');
+    assert.ok(!M.casts.some((c) => c[0] < M.at + 90), 'no cast at 24 m');
+    assert.ok(wm[1] && wm[1].how === 'cast' && wm[1].start === wm[1].end, 'back in range: the cast with its release only');
 });
 
 test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, palette tints, identity off, the Ranked pin, and no new programs', { timeout: 600000 }, async () => {
-    const { evaluate, errors, page, frames } = await boot({ quality: 'low' });
-    await evaluate(HELPERS);
+    const { evaluate, errors, page, frames } = await v23Page();
 
     // cancelWindups() at the windup ends it at once
     const F = await evaluate(() => __scenSwitch(11e6, 'cancel'));
@@ -450,8 +569,14 @@ test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, p
             // the lob lands at V2.2's scale
             for (let k = 0; k < 20; k++) tacticalDirector.updateBotAbilities(1 / 60, gameNow() + (k + 1) * 1000 / 60);
             out.smokeLanded = [hz.orbMesh.position.length(), hz.orbMesh.scale.x];
-            // identity off: V2.2's picture: no flight, V2.2's colour, no windup or cue calls
+            // identity switched off with a flash orb in flight: it lands on V2.2's point on the next update
+            e.agentId = undefined;
+            hz = cast(e);
+            const flying = hz.orbMesh.position.length();
             game.userSettings.agentIdentity = 'off';
+            tacticalDirector.updateBotAbilities(1 / 60, gameNow());
+            out.offFlight = [flying > 1, hz.orbMesh.position.length()];
+            // identity off: V2.2's picture: no flight, V2.2's colour, no windup or cue calls
             const calls = [];
             const ow = V23.bots.windup;
             V23.bots.windup = function () { calls.push([...arguments].slice(1)); };
@@ -464,15 +589,33 @@ test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, p
             game.userSettings.agentIdentity = 'on';
             e.agentId = undefined;
         }
-        // the mortar: the caster on the hazard and on the tick's source, never source.enemy
+        // the mortar: the caster on the hazard and on the tick's source, never source.enemy; the arming sting from the
+        // caster (inside V23.seeded), none once the caster's slot has respawned, none with identity off
         const m = __bot(2, sp[0], sp[1], 'armored');
-        hz = cast(m, 10);
-        const src = [], realTake = window.takeDamage;
+        const src = [], realTake = window.takeDamage, cues = [], realCue = V23.audio.botCue;
         window.takeDamage = function (amount, pos, source) { src.push(source); };
+        V23.audio.botCue = function (en, kind) { cues.push([en.slot, kind, typeof fxKit._rng === 'function' ? 1 : 0]); };
         // the first update arms it, the second ticks (450 ms after arming) with you inside
-        try { for (let k = 0; k < 2; k++) tacticalDirector.updateBotAbilities(1 / 60, hz.detonateAt + 500); } finally { window.takeDamage = realTake; }
-        out.mortar = [hz.type, hz.owner === m, hz.abilityId, hz.caster.enemy === m, hz.caster.archetype, src.length,
-            src[0] && src[0].label, src[0] && src[0].caster === hz.caster, src[0] && ('enemy' in src[0])];
+        const arm = (h) => { for (let k = 0; k < 2; k++) tacticalDirector.updateBotAbilities(1 / 60, h.detonateAt + 500); };
+        try {
+            hz = cast(m, 10);
+            arm(hz);
+            out.mortar = [hz.type, hz.owner === m, hz.abilityId, hz.caster.enemy === m, hz.caster.archetype, src.length,
+                src[0] && src[0].label, src[0] && src[0].caster === hz.caster, src[0] && ('enemy' in src[0])];
+            out.armOn = cues.splice(0);
+            hz = cast(m, 10);
+            __bot(2, sp[0], sp[1], 'armored');
+            arm(hz);
+            out.armRespawn = cues.splice(0).map((c) => c[1]);
+            game.userSettings.agentIdentity = 'off';
+            hz = cast(m, 10);
+            arm(hz);
+            out.armOff = [hz.detonated, cues.splice(0).length];
+        } finally {
+            window.takeDamage = realTake;
+            V23.audio.botCue = realCue;
+            game.userSettings.agentIdentity = 'on';
+        }
         // the Ranked pin: 'classic' for the match without touching the saved setting
         const u = game.userSettings, diff = u.botDifficulty;
         u.botUtility = 'agent';
@@ -494,8 +637,12 @@ test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, p
     assert.equal(r.stubTint, true, 'a stub look keeps V2.2\'s colour');
     assert.deepEqual(r.smoke, ['smoke', true, true, 0.38], 'the smoke: half the caster\'s glow, lobbed from the hand, small at first');
     assert.deepEqual(r.smokeLanded, [0, 3.4], 'the lob lands at V2.2\'s point and scale');
+    assert.deepEqual(r.offFlight, [true, 0], 'identity off mid-flight: the orb lands on V2.2\'s point at once');
     assert.deepEqual(r.off, [0, true, 0], 'identity off: no flight, V2.2\'s colour, no windup calls');
     assert.deepEqual(r.mortar, ['mortar', true, 'bot.mortar', true, 'armored', 1, 'Incendiary Mortar', true, false], 'the mortar tick names its caster, never source.enemy');
+    assert.deepEqual(r.armOn, [[2, 'cast.mortar', 1], [2, 'arm.mortar', 1]], 'the cast cue, then the arming sting from the caster, both seeded');
+    assert.deepEqual(r.armRespawn, ['cast.mortar'], 'no arming sting from a slot that has respawned');
+    assert.deepEqual(r.armOff, [true, 0], 'identity off: the mortar arms with no cue');
     assert.deepEqual(r.pin, [10, 6, 'agent', 10, true, 6], 'Ranked pins classic for the match; the setting itself is untouched');
 
     // the orb flies over real frames with no new program and no stall
