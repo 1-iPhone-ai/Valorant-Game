@@ -36187,9 +36187,11 @@
                         this.isoKillContract.active = false;
                         this.isoKillContract.group.visible = false;
                     }
+                    // V2.2: Thrash bursts when it runs out, as its own step and Wingman do. This frame's game time runs
+                    // ahead of the last step's by what waits to be simulated, so the ultimate's end (the same moment as
+                    // Thrash's) was often seen here first, and Thrash vanished with no burst or globule
                     if (game.ultAgent === 'gekko' && this.gekkoThrash && this.gekkoThrash.active) {
-                        this.gekkoThrash.active = false;
-                        this.gekkoThrash.group.visible = false;
+                        this.detonateGekkoThrash(now, Date.now());
                     }
                     if (game.ultAgent === 'deadlock' && this.deadlockCocoon && this.deadlockCocoon.active) {
                         this.deadlockCocoon.active = false;
