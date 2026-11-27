@@ -210,6 +210,9 @@ async function clear(g) {
             if (!it || typeof it !== 'object' || it.isObject3D) return;
             if ('expireAt' in it) it.expireAt = 1;
             if ('endTime' in it) it.endTime = 1;
+            // Annihilation's cocoon ends at executeAt; while it lives it holds its captive on its path every step
+            // (past a later recipe's 'away', by an Arc Rose's spot)
+            if ('executeAt' in it) it.executeAt = 1;
         };
         // every pooled list and single object of agentSystem, and the bots' hazards
         const A = agentSystem;
