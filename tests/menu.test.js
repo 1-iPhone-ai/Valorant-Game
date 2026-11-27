@@ -98,12 +98,18 @@ test('controller drives the menu (Start pauses, D-pad and A select, B backs out)
     // D-pad to MODES, then A (start screen: PLAY, MODES, SETTINGS, CONTROLS; AGENT SELECT is hidden).
     // Steer from either side: a held D-pad auto-repeats, so a slow frame can move twice.
     const focusAct = () => evaluate(() => gamepadController.navFocus && gamepadController.navFocus.dataset.act);
-    const order = ['play', 'modes', 'settings', 'controls'];
+    // V2.3: the column as it is on screen, top to bottom. A fixed list (play, modes, settings, controls) predated MAP,
+    // RANKED, CAREER and WORKSHOP: once a slow frame's repeat overshot MODES onto one of them, it was not in the list
+    // and the steering pressed down, away from MODES, until it gave up.
+    const order = await evaluate(() => Array.from(document.querySelectorAll('#main-menu .mm-view[data-view="main"] [data-act]'))
+        .filter((b) => b.offsetParent !== null).map((b) => b.dataset.act));
+    const target = order.indexOf('modes');
+    assert.ok(target > 0, `MODES is in the start screen's column (${order.join(', ')})`);
     await press(13);
     for (let i = 0; i < 10; i++) {
         const at = order.indexOf(await focusAct());
-        if (at === 1) break;
-        await press(at > 1 ? 12 : 13);
+        if (at === target) break;
+        await press(at > target ? 12 : 13);
     }
     assert.equal(await focusAct(), 'modes', 'D-pad moves the focus');
     await press(0);
