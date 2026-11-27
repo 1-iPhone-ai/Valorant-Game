@@ -20285,6 +20285,10 @@
                 out[6] = a[9] + (b[9] - a[9]) * u;
                 return q >= b[0] - 1e-9 ? b[7] : a[7];
             }
+            // V2.3: the in-view floor for a key: its palm centre no lower than NDC y -0.85 at its depth (the low palm keys,
+            // e.g. palmPress at y -0.34, z -0.26, sat wholly under the view); applied to the key before the blend from rest,
+            // so the hand still rises from below and returns there
+            function _floor(y, z, Pm) { const zz = Math.max(0.05, -z), yMin = -0.85 * zz / Pm[5]; return y < yMin ? yMin : y; }
             // V2.3: keep a card's centre at least minR (NDC) off the screen centre, at its depth (weaponGroup space is the
             // viewmodel camera's view space)
             function _push(pos, minR) {
@@ -20378,6 +20382,8 @@
                     const fol = M.sway * _bump(p, pr + 0.07, 0.07);
                     _k[2] -= 0.022 * fol; _k[3] -= 0.12 * fol; _k[1] -= 0.006 * fol;
                     _k[0] -= 0.018 * M.asym;
+                    const Pm = viewmodelCamera.projectionMatrix.elements;
+                    _k[1] = _floor(_k[1], _k[2], Pm);
                     let charge, flare, hold = 0, tremble = 0;
                     if (kind === 'ult') {
                         charge = _seg(p, 0.05, 0.62);
@@ -20391,7 +20397,6 @@
                     const R = fx.REST;
                     let X = (R.x + (_k[0] - R.x) * up) * hand + Math.sin(now * 0.09) * 0.0035 * tremble;
                     const Y = R.y + (_k[1] - R.y) * up + Math.cos(now * 0.11) * 0.0035 * tremble, Z = R.z + (_k[2] - R.z) * up;
-                    const Pm = viewmodelCamera.projectionMatrix.elements;
                     if (kind === 'ult') {
                         // V2.3: an ultimate keeps both hands 0.3 NDC off the vertical centre line after p 0.2 (the crosshair)
                         const w = _sm(0.18, 0.25, p), zz = Math.max(0.05, -Z), xn = Pm[0] * X / zz;
@@ -20415,6 +20420,7 @@
                             const pose2 = _keyAt(K, q2, M.snap, _k2);
                             _k2[2] -= 0.022 * fol; _k2[3] -= 0.12 * fol; _k2[1] -= 0.006 * fol + 0.012 * M.asym;
                             _k2[0] -= 0.018 * M.asym;
+                            _k2[1] = _floor(_k2[1], _k2[2], Pm);
                             let X2 = (R.x + (_k2[0] - R.x) * up) * hand;
                             const Y2 = R.y + (_k2[1] - R.y) * up, Z2 = R.z + (_k2[2] - R.z) * up;
                             if (kind === 'ult') {

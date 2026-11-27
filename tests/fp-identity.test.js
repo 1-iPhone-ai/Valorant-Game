@@ -247,8 +247,10 @@ test('first-person identity: arms, gloves, wrists, gestures, ultimate cue, rende
                         // the frame on the release key itself
                         vmAnim.begin(model); vmAnim.end(model, tRel);
                         const gp = castFX.group.position, gr = castFX.group.rotation, e = cur.energy;
+                        // the release key, with the FP block's in-view floor (palm centre at NDC y >= -0.85 at the key's depth)
+                        const keyY = Math.max(key[2], -0.85 * Math.max(0.05, -key[3]) / viewmodelCamera.projectionMatrix.elements[5]);
                         atRelease = {
-                            pos: Math.hypot(gp.x - (key[1] - 0.018 * M.asym) * hand, gp.y - key[2], gp.z - key[3]),
+                            pos: Math.hypot(gp.x - (key[1] - 0.018 * M.asym) * hand, gp.y - keyY, gp.z - key[3]),
                             rot: Math.abs(gr.x - key[4]) + Math.abs(gr.y - key[5] * hand) + Math.abs(gr.z - key[6] * hand),
                             core: castFX.core.position.distanceTo(e), toHand: e.distanceTo(gp), visible: castFX.group.visible, released: cur.released
                         };
