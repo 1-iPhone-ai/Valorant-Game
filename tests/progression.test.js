@@ -63,6 +63,10 @@ test('progression: XP for round wins, plants, defuses and finished matches', { t
     const { errors, evaluate } = await boot({ quality: 'medium' });
     const r = await evaluate(() => {
         window.updateEnemies = () => {};
+        // V2.2: today's daily challenges are finished first, so they pay nothing here: they are picked by the
+        // date, and on a day whose three include 'Finish a Match' the first match end paid its 700 XP too
+        progression.ensureDaily();
+        for (const c of progression.daily.list) c.done = true;
         const out = {};
         const gain = (fn) => { const before = progression.totalXp; fn(); return progression.totalXp - before; };
         out.plant = gain(() => tacticalDirector.completeSpikePlant(performance.now(), 'A'));

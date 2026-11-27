@@ -241,7 +241,7 @@ const SIM = () => {
                     for (const e of enemyObjects) {
                         if (!e.isActive || e.hit) continue;
                         if (!log.has(e)) log.set(e, []);
-                        log.get(e).push([e.mesh.position.x, e.mesh.position.z, e.hasSight ? 1 : 0]);
+                        log.get(e).push([e.mesh.position.x, e.mesh.position.z, e.hasSight ? 1 : 0, e.aiState, e.navGoalX, e.navGoalZ]);   // V2.2: its AI state and goal
                     }
                     if (done()) break;
                 }
@@ -337,9 +337,14 @@ test('Ascent bots: a bot hunting a player it cannot see goes round the lane wall
         const log = __sim(60, near);
         const tr = log.get(e) || [];
         const out = { blocked, secs: tr.length, reached: near(), sight: tr.some((p) => p[2]), walls: tr.filter((p) => __inWall(p[0], p[1])).length, stuck: null, path: tr.filter((p, i) => i % 5 === 0).map((p) => [+p[0].toFixed(1), +p[1].toFixed(1)]) };
+        // V2.2: a bot holding cover or peeking an angle stands still on purpose: near the corner of A Main it may take
+        // cover 13 m out and peek it before it sees you (peek, back to the cover a few metres off, cover, peek), which is
+        // not stuck (it still finds you). Moving to a cover further off, engaging or flanking, standing still is.
         for (let i = 3; i < tr.length; i++) {
             const far = Math.hypot(tr[i][0] + 30, tr[i][1] + 37) > 10;
-            if (far && !tr[i][2] && Math.hypot(tr[i][0] - tr[i - 3][0], tr[i][1] - tr[i - 3][1]) < 1) { out.stuck = [i, tr[i][0], tr[i][1]]; break; }
+            const st = tr[i][3];
+            const holding = st === 'peek' || st === 'cover' || (st === 'toCover' && Math.hypot(tr[i][0] - tr[i][4], tr[i][1] - tr[i][5]) < 3);
+            if (far && !tr[i][2] && !holding && Math.hypot(tr[i][0] - tr[i - 3][0], tr[i][1] - tr[i - 3][1]) < 1) { out.stuck = [i, tr[i][0], tr[i][1], tr[i][3]]; break; }
         }
         // It went round by the attacker spawn (west of mid), not through the wall
         out.wentWest = tr.some((p) => p[0] < -38);

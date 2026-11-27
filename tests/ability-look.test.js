@@ -208,7 +208,8 @@ test('Classic builds and compiles nothing; High Fidelity draws the ten proof abi
     });
     assert.deepEqual(r, { hiddenWhileBound: true, wallProxyIntact: true });
 
-    // Abilities that are not converted yet keep their Classic look in High Fidelity, without errors
+    // Six more abilities cast in High Fidelity without errors, and nothing compiles (V2.2: all six were still
+    // Classic in V2.0 and have their own High Fidelity look since; the role files check each look)
     for (const [agent, slot] of [['viper', 'e'], ['harbor', 'e'], ['neon', 'c'], ['astra', 'q'], ['cypher', 'c'], ['brimstone', 'e']]) {
         assert.equal(await cast(evaluate, agent, slot), null, `${agent}.${slot} casts in High Fidelity`);
         await frames(3);
