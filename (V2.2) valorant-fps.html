@@ -22620,6 +22620,8 @@
         const _abilityOrigin = new THREE.Vector3();
         const _abilityTempVec = new THREE.Vector3();
         const _abilityRay = new THREE.Ray();
+        // V2.2: Fast Lane's two walls for its damage tick (step 2R), reused: the tick built a new array of them each time
+        const _fastLaneWalls = [{ s: null, e: null }, { s: null, e: null }];
 
         // =============================================
         // V1.9.1: AGENT_TUNING, one table for agent ability numbers (it replaces ABILITY_TUNING).
@@ -27591,18 +27593,14 @@
                 mbqGroup.add(mbqEqArchMesh);
                 scene.add(mbqGroup);
                 this.warmupMeshes.push(mbqGroup);
+                // V2.2: without the fields nothing read or updated (originX/Y/Z, dirX/Z, rightX/Z, yaw, wavesDone,
+                // maxWaves): origin, dir and wavesFired below are the ones the spawn, the step, the radar and High Fidelity use
                 this.miksBassquake = {
                     active: false,
-                    originX: 0, originY: 0, originZ: 0,
-                    dirX: 0, dirZ: -1,
-                    rightX: 1, rightZ: 0,
-                    yaw: 0,
                     length: 30.0,
                     halfWidth: 6.0,
                     startAt: 0,
                     expireAt: 0,
-                    wavesDone: 0,
-                    maxWaves: AGENT_TUNING.miks.x.waveCount,
                     nextWaveAt: 0,
                     group: mbqGroup,
                     laneMesh: mbqLaneMesh,
@@ -34177,10 +34175,10 @@
                     }
                     if (now >= fl.nextTickAt) {
                         fl.nextTickAt = now + AGENT_TUNING.neon.c.tickMs; // 5 ticks/sec * 7 dmg = 35 DPS
-                        const walls = [
-                            { s: fl.leftStart, e: fl.leftEnd },
-                            { s: fl.rightStart, e: fl.rightEnd }
-                        ];
+                        // V2.2: the walls go in one reused array (it was a new array of two new objects each tick)
+                        const walls = _fastLaneWalls;
+                        walls[0].s = fl.leftStart; walls[0].e = fl.leftEnd;
+                        walls[1].s = fl.rightStart; walls[1].e = fl.rightEnd;
                         for (let wIdx = 0; wIdx < walls.length; wIdx++) {
                             const w = walls[wIdx];
                             const abX = w.e.x - w.s.x;
