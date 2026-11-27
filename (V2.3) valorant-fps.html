@@ -20021,11 +20021,12 @@
                 add(_rb(0.017, 0.02, 0.018, 0.0075), tj.clone().multiply(_T0(0, 0.01, 0)), 1);
                 return out;
             }
-            // V2.3: which V2.2 hands geometry a model's hands want now (the game's own tier state), and its kind
+            // V2.3: which V2.2 hands geometry a model's hands want now (the game's own tier state) and its kind, into E.kind
+            // and E.src (no allocation: this runs on every agent change)
             function _v22Hands(E) {
-                if (typeof ultraGuns !== 'undefined' && ultraGuns.on && ultraGuns.built) for (const h of ultraGuns.hands) if (h.mesh === E.hands) return ['ultra', h.ultra];
-                if (typeof characterDetail !== 'undefined' && characterDetail.enabled) for (const s of characterDetail.gunSwaps) if (s.mesh === E.hands) return ['detailed', s.detailed];
-                return ['simple', E.simple];
+                E.kind = 'simple'; E.src = E.simple;
+                if (typeof ultraGuns !== 'undefined' && ultraGuns.on && ultraGuns.built) for (const h of ultraGuns.hands) if (h.mesh === E.hands) { E.kind = 'ultra'; E.src = h.ultra; return; }
+                if (typeof characterDetail !== 'undefined' && characterDetail.enabled) for (const s of characterDetail.gunSwaps) if (s.mesh === E.hands) { E.kind = 'detailed'; E.src = s.detailed; return; }
             }
             // V2.3: the grouped variant of a V2.2 hands geometry, built the first time a tier needs it (a tier swap or the
             // identity build, never per frame) and kept, so a tier round trip returns the same geometry (ultra.test)
@@ -20196,10 +20197,10 @@
                 return A;
             }
             function _applyModel(E, on, A) {
-                const [kind, src] = _v22Hands(E);
+                _v22Hands(E);
                 let g;
                 if (on) {
-                    g = _groupedOf(E, kind, src);
+                    g = _groupedOf(E, E.kind, E.src);
                     E.hands.material = S.two ? S.handArr : S.mats.glove;
                     if (E.arm) {
                         E.arm.visible = true;
@@ -20207,7 +20208,7 @@
                         if (E.detail.geometry !== A.res.detail) E.detail.geometry = A.res.detail;
                     }
                 } else {
-                    g = src;
+                    g = E.src;
                     E.hands.material = E.v22Mat;
                     if (E.arm) E.arm.visible = false;
                 }
@@ -20314,7 +20315,7 @@
                         if (c.userData && c.userData.isHands && c.userData.handZ === handZ) { hands = c; break; }
                     }
                     if (!hands) return null;
-                    S.models.push({ model: model, slot: slot, handZ: handZ, hands: hands, v22Mat: hands.material, simple: hands.geometry, arm: null, sleeve: null, detail: null, offHidden: false });
+                    S.models.push({ model: model, slot: slot, handZ: handZ, hands: hands, v22Mat: hands.material, simple: hands.geometry, kind: 'simple', src: hands.geometry, arm: null, sleeve: null, detail: null, offHidden: false });
                     return null;
                 },
                 // V2.3 (hook H15) (after characterDetail's and ultraGuns' hands swaps), H6 (V23.core.onAgentChanged) and the identity
