@@ -29234,7 +29234,10 @@
                 abilityLook.tag = 'veto.c';   // V2.2: the teleport's rings and burst (High Fidelity)
                 this.spawnWindRing(oldX, oldY + 0.15, oldZ, 0x10b981, 5.0, now);
                 abilityLook.tag = null;
-                characterController.position.set(targetX, targetY, targetZ);
+                // V2.2: the anchor is on the floor and the controller's position is the eye: stand on it (as Rendezvous
+                // does). At the floor's height the feet were under it: on a raised floor you were pushed off its side
+                characterController.position.set(targetX, targetY + characterController.height, targetZ);
+                characterController.prevSimPosition.copy(characterController.position);
                 characterController.velocity.set(0, 0, 0);
                 camera.position.set(targetX, targetY + characterController.height, targetZ);
 
