@@ -271,6 +271,76 @@ const HELPERS = () => {
         for (const h of pool) { h.inUse = false; h.group.visible = false; }
         return { got, draws: first, size: pool.length, build: typeof V23 };
     }, t0);
+
+    // N (V2.3 only): what _frame itself does between sim ticks (updateBotAbilities with no tick, as animate's frames
+    // without a step run it). Each case: a rusher 12 m away ticked until its windup is on, then one change and one
+    // updateBotAbilities with no tick. 'reset': animate's timing reset on a resume (gameTime = gameClock plus the
+    // accumulator's fraction, then gameClock = gameTime, no step that frame); the windup must stay on and lead the
+    // cast. 'botAI', 'idoff', 'blind', 'mode': Bot Ability AI off, identity off, a blind, the mode changed. 'unseen':
+    // with a second bot (a rusher held 5 m away, too close to cast), a tick that steps it but not the blinded first.
+    window.__scenFrame = (t0) => __det((tick, T0) => {
+        const U = V23.util, out = {};
+        const last = () => U._stats.log[U._stats.log.length - 1];
+        for (const what of ['reset', 'botAI', 'idoff', 'blind', 'mode', 'unseen']) {
+            __setup(4);
+            const sp = __spot(12);
+            const e = __bot(0, sp[0], sp[1], 'rusher');
+            const hy = e.mesh.position.y, p = characterController.position;
+            let f = null;
+            if (what === 'unseen') {
+                f = __bot(1, p.x + (sp[0] - p.x) * 5 / 12, p.z + (sp[1] - p.z) * 5 / 12, 'rusher');
+            }
+            const fy = f ? f.mesh.position.y : 0, fp = f ? [f.mesh.position.x, f.mesh.position.z] : null;
+            const hold = () => {
+                e.mesh.position.set(sp[0], hy, sp[1]); e.poseDirty = true; syncEnemyBroadphase(e);
+                if (f) { f.mesh.position.set(fp[0], fy, fp[1]); f.poseDirty = true; syncEnemyBroadphase(f); }
+            };
+            let k = 0;
+            while (k < 600 && !(U._w[0] && U._w[0].on)) { hold(); tick(); k++; }
+            const r = { started: !!(U._w[0] && U._w[0].on), at: k }, tStart = gameNow();
+            try {
+                if (what === 'reset') {
+                    gameTime = gameClock + 8.3;
+                    gameClock = gameTime;
+                    tacticalDirector.updateBotAbilities(0, gameNow());
+                    r.on = U._w[0].on;
+                    // then the ticks go on: the windup leads V2.2's cast, released on the cast tick
+                    let c = 0;
+                    while (c < 60 && !U._stats.log.some((q) => q[0] === 'cast' && q[3] >= tStart)) { hold(); tick(); c++; }
+                    r.cast = U._stats.log.filter((q) => q[0] === 'cast').pop();
+                    r.cancels = U._stats.log.filter((q) => q[0] === 'cancel' && q[1] === 0 && q[3] >= tStart).map((q) => q[2]);
+                } else if (what === 'unseen') {
+                    e.blindedUntil = gameNow() + 1500;
+                    hold(); tick();
+                    r.on = U._w[0].on;
+                    r.last = last();
+                    r.stepped = U._stepAt === gameNow() && U._w[0].seenAt < U._stepAt;   // the second bot was stepped on it
+                } else {
+                    if (what === 'botAI') game.botAbilityAI = false;
+                    else if (what === 'idoff') game.userSettings.agentIdentity = 'off';
+                    else if (what === 'blind') e.blindedUntil = gameNow() + 1500;
+                    else if (what === 'mode') game.userSettings.botUtility = 'agent';
+                    tacticalDirector.updateBotAbilities(0, gameNow());
+                    r.on = U._w[0].on;
+                    r.last = last();
+                    if (what === 'mode') {
+                        // back to classic, ticks on to the cast: no new windup on the same prediction, the release only
+                        game.userSettings.botUtility = 'classic';
+                        const n0 = U._stats.windups;
+                        let c = 0;
+                        while (c < 60 && !U._stats.log.some((q) => q[0] === 'cast' && q[3] >= r.last[3])) { hold(); tick(); c++; }
+                        r.cast = U._stats.log.filter((q) => q[0] === 'cast').pop();
+                        r.rewound = U._stats.windups - n0;
+                    }
+                }
+            } finally {
+                game.botAbilityAI = true; game.userSettings.agentIdentity = 'on'; game.userSettings.botUtility = 'classic';
+                e.blindedUntil = 0;
+            }
+            out[what] = r;
+        }
+        return out;
+    }, t0);
 };
 
 // The parts of a trace both builds must give exactly
@@ -307,6 +377,7 @@ async function runAll(file) {
     const out = { errors };
     for (const [name, fn, t0] of SCENARIOS) out[name] = await evaluate(`(${fn.toString()})(${t0})`);
     out.steal = await evaluate(() => __scenSteal(20e6));
+    if (!file) out.frame = await evaluate(() => __scenFrame(21e6));
     // then real frames: the game draws on from where the runs left it
     await frames(20);
     out.programs = await programState(page);
@@ -418,7 +489,7 @@ test('classic: the same casts, hazards, pool entries, timers, gaps and Math.rand
         }
     }
     console.log(`# mixed: ${led} of ${all} casts had a windup of 250 ms or more (the rest came as the bot entered range)`);
-    assert.ok(led >= 1, 'windups lead casts in free play too');
+    assert.ok(all >= 6 && led >= all - 2, `windups lead casts in free play too (${led} of ${all})`);
     // each mortar arming (its pop) plays the armored bot's warning sting on that tick, and nothing else does
     const mortarPops = B.pops.filter((q) => q[2] === 'mortar');
     assert.ok(mortarPops.length >= 2, `${mortarPops.length} mortars armed`);
@@ -446,7 +517,7 @@ test('classic: the same casts, hazards, pool entries, timers, gaps and Math.rand
     const E = v23.f5;
     const we = windups(E.W, 0);
     assert.equal(we[0].how, 'cancel', 'F5 cancels the windup');
-    assert.ok(we[0].end - E.at <= 1, `on the tick after F5 (${we[0].end - E.at})`);
+    assert.equal(we[0].end, E.at, 'on the F5 tick itself');
     assert.ok(!E.casts.some((c) => c[0] < E.at + 120), 'no cast while Bot Ability AI is off');
     assert.ok(E.casts.some((c) => c[0] === E.at + 120), 'F5 again: the cast at once');
     assert.equal(E.ai, true);
@@ -516,6 +587,22 @@ test('classic: the same casts, hazards, pool entries, timers, gaps and Math.rand
     assert.deepEqual(busy(M, M.at + 1, M.at + 90), [[], []], 'nothing sent while out of the near tier');
     assert.ok(!M.casts.some((c) => c[0] < M.at + 90), 'no cast at 24 m');
     assert.ok(wm[1] && wm[1].how === 'cast' && wm[1].start === wm[1].end, 'back in range: the cast with its release only');
+
+    // N: _frame between ticks. A timing reset (a resume) keeps the windup, which then leads the cast; Bot Ability AI
+    // off, identity off, a blind and a mode change each end it there, with no tick; a tick that steps another bot but
+    // not the windup's ends it ('unseen'); after a mode change the cast comes with its release only
+    const N = v23.frame;
+    for (const k of Object.keys(N)) assert.ok(N[k].started, `${k}: the windup started`);
+    assert.equal(N.reset.on, true, 'reset: the windup is still on after the timing reset');
+    assert.deepEqual(N.reset.cancels, [], 'reset: no cancel');
+    assert.ok(N.reset.cast && N.reset.cast[4] >= 250, `reset: the cast is led by the windup (${N.reset.cast && N.reset.cast[4]} ms)`);
+    assert.deepEqual([N.botAI.on, N.botAI.last[0], N.botAI.last[2]], [false, 'cancel', 'botAI'], 'Bot Ability AI off between ticks: _frame ends it');
+    assert.deepEqual([N.idoff.on, N.idoff.last[0], N.idoff.last[2]], [false, 'cancel', 'off'], 'identity off between ticks: _frame ends it');
+    assert.deepEqual([N.blind.on, N.blind.last[0], N.blind.last[2]], [false, 'cancel', 'blind'], 'a blind between ticks: _frame ends it');
+    assert.deepEqual([N.mode.on, N.mode.last[0], N.mode.last[2]], [false, 'cancel', 'mode'], 'a mode change: _frame ends it');
+    assert.equal(N.mode.rewound, 0, 'no new windup on the same prediction after the mode change');
+    assert.ok(N.mode.cast && N.mode.cast[4] === 0, 'then the cast with its release only');
+    assert.deepEqual([N.unseen.on, N.unseen.last[0], N.unseen.last[2], N.unseen.stepped], [false, 'cancel', 'unseen', true], 'a tick that steps another bot but not this one ends it');
 });
 
 test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, palette tints, identity off, the Ranked pin, and no new programs', { timeout: 600000 }, async () => {
@@ -566,8 +653,11 @@ test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, p
             hz = cast(s, 10);
             const mix = V23.util._mix(0x2dd4bf, 0x991b1b, 0.5);
             out.smoke = [hz.type, JSON.stringify(col(hz)) === JSON.stringify(lin(mix)), hz.orbMesh.position.length() > 1, +hz.orbMesh.scale.x.toFixed(3)];
-            // the lob lands at V2.2's scale
-            for (let k = 0; k < 20; k++) tacticalDirector.updateBotAbilities(1 / 60, gameNow() + (k + 1) * 1000 / 60);
+            // the lob flies at V2.2's scale (only the offset moves, design 10) and lands on V2.2's point
+            for (let k = 0; k < 20; k++) {
+                tacticalDirector.updateBotAbilities(1 / 60, gameNow() + (k + 1) * 1000 / 60);
+                if (k === 5) out.smokeMid = [hz.orbMesh.position.length() > 0.1, hz.orbMesh.scale.x];
+            }
             out.smokeLanded = [hz.orbMesh.position.length(), hz.orbMesh.scale.x];
             // identity switched off with a flash orb in flight: it lands on V2.2's point on the next update
             e.agentId = undefined;
@@ -584,6 +674,42 @@ test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, p
             hz = cast(e);
             V23.bots.windup = ow;
             out.off = [hz.orbMesh.position.length(), JSON.stringify(col(hz)) === JSON.stringify(lin(0xfbbf24)), calls.length];
+            // identity switched off with a tinted orb live: V2.2's colour back on the next update (design 16), for a smoke
+            // and for a flash before its pop
+            const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+            game.userSettings.agentIdentity = 'on';
+            const s3 = __bot(3, sp[0], sp[1], 'standard');
+            s3.agentId = 'sage'; s3.hasSight = false;
+            hz = cast(s3, 10);
+            const tintedSmoke = eq(col(hz), lin(mix));
+            game.userSettings.agentIdentity = 'off';
+            tacticalDirector.updateBotAbilities(1 / 60, gameNow());
+            out.smokeOff = [tintedSmoke, eq(col(hz), lin(0x991b1b)), hz.inUse, V23.util._tinted];
+            game.userSettings.agentIdentity = 'on';
+            e.agentId = 'sage';
+            hz = cast(e);
+            const tintedFlash = eq(col(hz), lin(0x2dd4bf));
+            game.userSettings.agentIdentity = 'off';
+            tacticalDirector.updateBotAbilities(1 / 60, gameNow());
+            out.flashOff = [tintedFlash, eq(col(hz), lin(0xfbbf24)), hz.detonated, V23.util._tinted];
+            game.userSettings.agentIdentity = 'on';
+            // a tinted flash pops V2.2's white, and its tint ends there
+            hz = cast(e);
+            tacticalDirector.updateBotAbilities(1 / 60, hz.detonateAt);
+            out.flashPop = [hz.detonated, eq(col(hz), lin(0xffffff)), V23.util._tinted];
+            // a tinted smoke's entry ends: V2.2's crimson back on it
+            hz = cast(s3, 10);
+            tacticalDirector.updateBotAbilities(1 / 60, hz.endTime);
+            out.smokeEnd = [hz.inUse, eq(col(hz), lin(0x991b1b)), V23.util._tinted];
+            // a tinted smoke's entry taken back by a mortar (V2.2's 6 in use): the colour V2.2 left on that orb
+            hz = cast(s3, 10);
+            const pool = tacticalDirector.botHazardsPool, idx = pool.indexOf(hz);
+            for (let i = 1; i < 6; i++) { pool[i].inUse = true; pool[i].endTime = gameNow() + 1e6; pool[i].startTime = gameNow() - i; }
+            const a = __bot(2, sp[0], sp[1], 'armored');
+            a.nextAbilityAt = 1; tacticalDirector.lastBotAbilityCastAt = -1e9;
+            tacticalDirector.tryCastBotAbility(a, gameNow(), 10, 0, 1, 1, 0);
+            out.smokeSteal = [idx, hz.type, eq(col(hz), lin(0x991b1b)), V23.util._tinted];
+            for (const h of pool) { h.inUse = false; h.group.visible = false; }
         } finally {
             V23.core.resolve = realResolve;
             game.userSettings.agentIdentity = 'on';
@@ -594,7 +720,7 @@ test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, p
         const m = __bot(2, sp[0], sp[1], 'armored');
         const src = [], realTake = window.takeDamage, cues = [], realCue = V23.audio.botCue;
         window.takeDamage = function (amount, pos, source) { src.push(source); };
-        V23.audio.botCue = function (en, kind) { cues.push([en.slot, kind, typeof fxKit._rng === 'function' ? 1 : 0]); };
+        V23.audio.botCue = function (en, kind, h) { cues.push([en.slot, kind, typeof fxKit._rng === 'function' ? 1 : 0, arguments.length > 2 ? (h === hz ? 'hz' : 'other') : null]); };
         // the first update arms it, the second ticks (450 ms after arming) with you inside
         const arm = (h) => { for (let k = 0; k < 2; k++) tacticalDirector.updateBotAbilities(1 / 60, h.detonateAt + 500); };
         try {
@@ -607,6 +733,12 @@ test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, p
             __bot(2, sp[0], sp[1], 'armored');
             arm(hz);
             out.armRespawn = cues.splice(0).map((c) => c[1]);
+            // the caster killed before its mortar arms: no sting (it would come from a corpse)
+            hz = cast(m, 10);
+            m.hit = true;
+            arm(hz);
+            out.armDead = [hz.detonated, cues.splice(0).map((c) => c[1])];
+            __bot(2, sp[0], sp[1], 'armored');
             game.userSettings.agentIdentity = 'off';
             hz = cast(m, 10);
             arm(hz);
@@ -635,13 +767,20 @@ test('classic: mid-windup cancelWindups, the mortar caster, the botDash clock, p
     assert.deepEqual(r.flash, ['flash', true, 'bot.flash', true, true, true, true, true]);
     assert.equal(r.tint, true, 'a built look tints the flash orb with its glow');
     assert.equal(r.stubTint, true, 'a stub look keeps V2.2\'s colour');
-    assert.deepEqual(r.smoke, ['smoke', true, true, 0.38], 'the smoke: half the caster\'s glow, lobbed from the hand, small at first');
+    assert.deepEqual(r.smoke, ['smoke', true, true, 3.4], 'the smoke: half the caster\'s glow, lobbed from the hand at V2.2\'s scale');
+    assert.deepEqual(r.smokeMid, [true, 3.4], 'in flight only the offset moves (design 10)');
     assert.deepEqual(r.smokeLanded, [0, 3.4], 'the lob lands at V2.2\'s point and scale');
     assert.deepEqual(r.offFlight, [true, 0], 'identity off mid-flight: the orb lands on V2.2\'s point at once');
     assert.deepEqual(r.off, [0, true, 0], 'identity off: no flight, V2.2\'s colour, no windup calls');
+    assert.deepEqual(r.smokeOff, [true, true, true, 0], 'identity off with a tinted smoke live: V2.2\'s crimson back on the next update');
+    assert.deepEqual(r.flashOff, [true, true, false, 0], 'identity off with a tinted flash before its pop: V2.2\'s amber back');
+    assert.deepEqual(r.flashPop, [true, true, 0], 'a tinted flash pops V2.2\'s white; its tint ends');
+    assert.deepEqual(r.smokeEnd, [false, true, 0], 'a tinted smoke\'s entry ends: V2.2\'s crimson back');
+    assert.deepEqual(r.smokeSteal, [0, 'mortar', true, 0], 'a tinted smoke\'s entry taken by a mortar: the colour V2.2 left on that orb');
     assert.deepEqual(r.mortar, ['mortar', true, 'bot.mortar', true, 'armored', 1, 'Incendiary Mortar', true, false], 'the mortar tick names its caster, never source.enemy');
-    assert.deepEqual(r.armOn, [[2, 'cast.mortar', 1], [2, 'arm.mortar', 1]], 'the cast cue, then the arming sting from the caster, both seeded');
+    assert.deepEqual(r.armOn, [[2, 'cast.mortar', 1, null], [2, 'arm.mortar', 1, 'hz']], 'the cast cue, then the arming sting from the caster with its hazard, both seeded');
     assert.deepEqual(r.armRespawn, ['cast.mortar'], 'no arming sting from a slot that has respawned');
+    assert.deepEqual(r.armDead, [true, ['cast.mortar']], 'no arming sting from a dead caster');
     assert.deepEqual(r.armOff, [true, 0], 'identity off: the mortar arms with no cue');
     assert.deepEqual(r.pin, [10, 6, 'agent', 10, true, 6], 'Ranked pins classic for the match; the setting itself is untouched');
 
