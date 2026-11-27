@@ -1,5 +1,5 @@
 'use strict';
-// V2.2: High Fidelity looks, Controllers (their role block in the game file; HIFI-CONTRACT.md). Add each
+// V2.2: High Fidelity looks, Controllers (their role block in the game file; the API is in abilityLook's header). Add each
 // converted ability with the key>renderer pairs it binds; roleTest checks it and the role's budget.
 // key>absorb: a ring the look claims (tagged in the ability's own code, or carried by its detonation)
 require('./hifi-kit').roleTest('Controllers', {

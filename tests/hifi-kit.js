@@ -402,7 +402,7 @@ async function hfCost(g, frames = 20) {
     return { hf, peak: Math.max(peak, hf), classicHidden: hidden, update };
 }
 
-// The relative budget (HIFI-CONTRACT.md), measured from the ten proof abilities on the test machine
+// The relative budget, measured from the ten proof abilities on the test machine
 // (Medium, 480 x 270, SwiftShader): one = the most expensive of the ten alone, ten = the ten out at
 // once. calls: draw calls per frame added over Classic (renderer.info.render.calls, HF - Classic;
 // kit.measure); cpu: frame CPU ms added; hf: High Fidelity meshes drawn at the ability's peak (hfCost's

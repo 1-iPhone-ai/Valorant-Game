@@ -27659,7 +27659,7 @@
                 game.activeAgent = agentId;
                 const def = AGENT_DEFS[agentId];
                 this.refreshAgentTheme();
-                this.syncHud(gameNow(), true);
+                this.syncHud(gameNow(), true);   // V2.2: on game time
                 agentStrip.show(); // V1.9: the agent strip shows for 4 s on an agent change
                 if (typeof tacticalDirector !== 'undefined' && game.agentPickerOpen) {
                     tacticalDirector.renderAgentPickerGrid();
@@ -27677,7 +27677,7 @@
 
             grantFullUltimate: function() {
                 game.ultPoints = game.maxUltPoints;
-                this.syncHud(gameNow(), true);
+                this.syncHud(gameNow(), true);   // V2.2: on game time
                 soundFX.ult();
                 showNotification(`${AGENT_DEFS[game.activeAgent].abilities.x.name} READY! Press X to activate`, 2400);
             },
@@ -31818,7 +31818,7 @@
                 }, 80);
                 if (wall.health <= 0) {
                     abilityLook.tag = 'sage.c';   // V2.0: the Barrier Orb shatters
-                    this.spawnFlashBurst(wall.group.position.x, wall.group.position.y, wall.group.position.z, 0x34d399, 3.2, 280, gameNow());
+                    this.spawnFlashBurst(wall.group.position.x, wall.group.position.y, wall.group.position.z, 0x34d399, 3.2, 280, gameNow());   // V2.2: on game time
                     abilityLook.tag = null;
                     this.deactivateIceWall(wall);
                     soundFX.slowZone();
@@ -32534,7 +32534,7 @@
 
             // Same rules as a kill: no gain while the ult is active, capped at max
             addUltPoint: function(points) {
-                const now = gameNow();
+                const now = gameNow();   // V2.2: on game time (the ult charge it grants is an ability timer)
                 if (this.isUltActive(now) || game.ultPoints >= game.maxUltPoints) return;
                 game.ultPoints = Math.min(game.maxUltPoints, game.ultPoints + (points || 1));
                 if (game.ultPoints === game.maxUltPoints) {
@@ -32931,7 +32931,7 @@
                 item.mesh.scale.set(0.3, 0.3, 0.3);
                 item.mesh.visible = true;
                 item.lookKey = abilityLook.tag;   // V2.0: the ability this burst belongs to (High Fidelity draws its own)
-                if (!abilityLook.claims(item, 'flash')) fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake
+                if (!abilityLook.claims(item, 'flash')) fxKit.burst(x, y, z, colorHex, maxRadius);   // V1.7 sparks, glow flash, smoke, shake (V2.2: unless High Fidelity draws this flash)
                 else abilityLook.bindNow(item, 'flash', now);   // V2.0: from this frame on, even if the pool reuses the item before the next
             },
 
@@ -39363,7 +39363,7 @@
                     const arch = enemy.archetypeDef || ENEMY_ARCHETYPES[enemy.archetype] || ENEMY_ARCHETYPES.standard;
 
                     // Sniper Laser Sight 3D telegraph when Sniper bot has line-of-sight on player
-                    if (enemy.archetype === 'sniper' && enemy.hasSight && enemy.blindedUntil <= gameNow() && game.gameMode !== 'range' && laserVerts < 16 * 2) {
+                    if (enemy.archetype === 'sniper' && enemy.hasSight && enemy.blindedUntil <= gameNow() && game.gameMode !== 'range' && laserVerts < 16 * 2) {   // V2.2: the blind, reveal and slow below are on game time
                         const base = laserVerts * 3;
                         const dirX = playerPos.x - pos.x;
                         const dirZ = playerPos.z - pos.z;
@@ -39379,7 +39379,7 @@
 
                     // Show floating bar if enemy has LoS, was recently hit, is revealed by Recon, or is in Range mode
                     const recentlyDamaged = (now - (enemy.lastDamagedAt || 0)) < 4800;
-                    const isRevealed = enemy.revealedUntil > gameNow();
+                    const isRevealed = enemy.revealedUntil > gameNow();   // V2.2: on game time
                     const showHud = enemy.hasSight || recentlyDamaged || isRevealed || game.gameMode === 'range' || distSq < 18 * 18;
                     if (!showHud || poolIdx >= this.enemyHudPool.length) continue;
 
@@ -39413,7 +39413,7 @@
                     hud.roleEl.style.color = arch.badgeColor;
 
                     // Status tag (BLINDED / LOCKING / RECON / SLOWED)
-                    if (enemy.blindedUntil > gameNow()) {
+                    if (enemy.blindedUntil > gameNow()) {   // V2.2: on game time
                         hud.statusEl.textContent = '★ BLINDED';
                         hud.statusEl.style.color = '#ffe066';
                     } else if (enemy.archetype === 'sniper' && enemy.hasSight && game.gameMode !== 'range') {
@@ -39422,7 +39422,7 @@
                     } else if (isRevealed) {
                         hud.statusEl.textContent = '◈ RECON';
                         hud.statusEl.style.color = '#38f6ff';
-                    } else if (enemy.slowedUntil > gameNow()) {
+                    } else if (enemy.slowedUntil > gameNow()) {   // V2.2: on game time
                         hud.statusEl.textContent = '❄ SLOWED';
                         hud.statusEl.style.color = '#7dd3fc';
                     } else {
@@ -40127,7 +40127,7 @@
                 this.updateVitalsHUD();
                 this.updateBuyMenuUI();
                 if (agentSystem && agentSystem.syncHud) {
-                    agentSystem.syncHud(gameNow(), true);
+                    agentSystem.syncHud(gameNow(), true);   // V2.2: on game time
                 }
             },
 
@@ -40534,7 +40534,7 @@
                     let defusingBot = null;
                     for (let i = 0; i < enemyObjects.length; i++) {
                         const e = enemyObjects[i];
-                        if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;
+                        if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;   // V2.2: the blind is on game time
                         const d = Math.hypot(e.mesh.position.x - sitePos.x, e.mesh.position.z - sitePos.z);
                         if (d <= 4.2) {
                             defusingBot = e;
@@ -42324,7 +42324,7 @@
                         anim.vel = -anim.vel * 0.22;
                         if (Math.abs(anim.vel) < 0.35) anim.lieT = anim.t;
                     }
-                    if (anim.eaAX === undefined) mesh.rotation.z = anim.rotationSpeed * Math.min(1, anim.angle / LIE);
+                    if (anim.eaAX === undefined) mesh.rotation.z = anim.rotationSpeed * Math.min(1, anim.angle / LIE);   // V2.2: Enhanced Animations tips it away from the shot instead (eaAX)
                 } else if (anim.t - anim.lieT > 0.9) {
                     anim.baseY -= 1.4 * dt;
                 }
@@ -43183,7 +43183,7 @@
             
             // 3. Chance to hit player based on distance & archetype accuracy (reduced if enemy is concussed/slowed or player is crouching)
             const distance = length;
-            const concussMult = (enemy.slowedUntil > gNow) ? 0.5 : 1.0;
+            const concussMult = (enemy.slowedUntil > gNow) ? 0.5 : 1.0;   // V2.2: the slow is on game time
             const crouchEvasion = characterController.isCrouching ? 0.82 : 1.0;
             const botDiff = (game.userSettings && game.userSettings.botDifficulty) || 'gold';
             const diffAccMult = botDiff === 'iron' ? 0.58 : (botDiff === 'immortal' ? 1.18 : (botDiff === 'radiant' ? 1.38 : 1.0));
@@ -47204,8 +47204,8 @@
         //    colliders). In High Fidelity only their materials stop drawing (material.visible), and a
         //    High Fidelity visual follows the same transform and state. Gameplay never reads these.
         //  - One renderer per effect type, the look tags of AGENT_TUNING: smoke, wall, groundZone,
-        //    projectile, blast, flash, beam, pulse, deployable, self. Every other ability keeps its
-        //    Classic look.
+        //    projectile, blast, flash, beam, pulse, deployable, self. (V2.2: every ability has a look
+        //    now, registered below; the CONVERTED list of V2.0 is gone.)
         //  - Everything is pooled and pre-built the first time High Fidelity is used, in small steps
         //    (all at once inside the boot warm-up when High Fidelity is on at start). Every shader is
         //    an unlit ShaderMaterial (one program each, whatever the light count) or reuses the
@@ -47229,8 +47229,8 @@
         //    its style on each renderer;
         //  - defineModel(name, { count, mats, groups, parts, custom }): a device built from parts for
         //    the deployable renderer (and models for the projectile renderer).
-        // HIFI-CONTRACT.md (the V2.2 PR 3 notes) documents the API, every renderer's parameters and
-        // styles, the budget and the rules.
+        // Each renderer's parameters and styles are in the comment above its make_ function below; the
+        // budget and the rules every look keeps are in tests/hifi-kit.js (BUDGET, roleTest).
         const abilityLook = {
             mode: 'classic',          // what is drawn now
             wanted: 'classic',        // what the setting asks for (High Fidelity waits for its build)
@@ -47343,7 +47343,7 @@
             //     materials; keep: item fields whose materials stay drawn (a hit flash, a marker).
             //     An array: several renderers draw one item (a beam and its ground zone), each with its
             //     own adapter (all or none are drawn); hide and keep come from the first.
-            //   styles: { renderer: { preset, ... } } (each renderer's parameters, HIFI-CONTRACT.md)
+            //   styles: { renderer: { preset, ... } } (each renderer's parameters: the comment above its make_ function)
             defineLook: function (key, spec) {
                 const look = { key: key, routes: {}, styles: spec.styles || {}, _st: {} };
                 const norm = (r) => typeof r === 'string' ? { renderer: r } : r;
@@ -50562,7 +50562,7 @@
         // ability's visuals, and the bots' hazards. The V2.0 kinds keep their short names (in their old
         // scan order); every other kind is its agentSystem name. Then the owners: which ability each
         // item belongs to, when the item does not carry a tag (lookKey). A role block only defines looks
-        // (and tags its abilities' calls to the shared spawns); HIFI-MAP.md lists every kind's owner.
+        // (and tags its abilities' calls to the shared spawns); the addSource calls above list every kind.
         (function () {
             const L = abilityLook;
             L.addSource('projectile', {
@@ -50724,7 +50724,7 @@
         // =============================================
         // V2.2: High Fidelity looks, DUELISTS (role block: Jett, Phoenix, Reyna, Raze, Yoru, Neon, Iso, Waylay)
         // =============================================
-        // Looks only: defineLook, defineModel, addTimer and adapters (HIFI-CONTRACT.md). Each ability's
+        // Looks only: defineLook, defineModel, addTimer and adapters (abilityLook's header). Each ability's
         // tags go in its own spawn code. Converted here: iso.c, neon.e, raze.x (pilots), then every other
         // Duelist ability (stage 2, after the pilots).
         // ISO Contingency: a moving energy wall (the Classic 5.2 x 2.75 x 0.28 m box, 1.4 m up, turned with its group)
@@ -51388,7 +51388,7 @@
         // =============================================
         // V2.2: High Fidelity looks, CONTROLLERS (role block: Omen, Brimstone, Viper, Clove, Harbor, Astra, Miks)
         // =============================================
-        // Looks only (HIFI-CONTRACT.md). Converted here: all 27 (viper.q and brimstone.x were the pilots).
+        // Looks only (abilityLook's header). Converted here: all 27 (viper.q and brimstone.x were the pilots).
         // VIPER Poison Cloud: a gas canister, then a toxic cloud (castSmokeProjectile; its colour names it)
         abilityLook.defineModel('viper.canister', {
             count: 3,   // V2.2: Poison Cloud's and both Snake Bites' (viper.c uses it too)
@@ -51438,8 +51438,8 @@
         });
         // V2.2: the Controllers' other 25 abilities. Each adapter fills P in place from its Classic item and
         // allocates nothing. Timers that other agents share (reynaDismissUntil, brimStimUntil,
-        // clovePickMeUpUntil) count only while their own agent holds them (HIFI-MAP.md). The buffs use no
-        // screen edge: it hangs from the weapon group, whose turn is off the view's once you look up or down
+        // clovePickMeUpUntil) count only while their own agent holds them. The buffs use no screen edge
+        // (they were made while the edge hung from the weapon group and slid off the view; it is pinned to the camera now)
         (function () {
             const L = abilityLook;
             const sat = function (v) { return v < 0 ? 0 : (v > 1 ? 1 : v); };
@@ -51996,7 +51996,7 @@
         // =============================================
         // V2.2: High Fidelity looks, INITIATORS (role block: Sova, KAY/O, Skye, Fade, Breach, Gekko, Tejo)
         // =============================================
-        // Looks only (HIFI-CONTRACT.md). Converted here: sova.e, kayo.c, breach.q (pilots).
+        // Looks only (abilityLook's header). Converted here: sova.e, kayo.c, breach.q (pilots).
         // SOVA Recon Bolt: the arrow (a cyan tip), then the bolt stuck where it landed (its eye turning) and
         // its sonar pulses (one Classic item, two renderers)
         (function () {
@@ -52813,7 +52813,7 @@
         // =============================================
         // V2.2: High Fidelity looks, SENTINELS (role block: Sage, Killjoy, Cypher, Chamber, Deadlock, Vyse, Veto)
         // =============================================
-        // Looks only (HIFI-CONTRACT.md). Converted here: sage.q, killjoy.q (pilots).
+        // Looks only (abilityLook's header). Converted here: sage.q, killjoy.q (pilots).
         // SAGE Slow Orb: a frost orb, then a field of crystal goo (the shared slow zone pool: its tag says whose)
         abilityLook.defineLook('sage.q', {
             routes: { projectile: 'projectile', slowZones: 'groundZone' },
@@ -54214,7 +54214,7 @@
                         let planter = null;
                         for (let i = 0; i < enemyObjects.length; i++) {
                             const e = enemyObjects[i];
-                            if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;
+                            if (!e.isActive || e.hit || e.blindedUntil > gameNow()) continue;   // V2.2: the blind is on game time
                             if (Math.hypot(e.mesh.position.x - site.x, e.mesh.position.z - site.z) <= 2.8) { planter = e; break; }
                         }
                         if (planter) {
@@ -54575,7 +54575,7 @@
             _duels: function (now) {
                 const pl = characterController.position;
                 for (const e of enemyObjects) {
-                    if (!e.isActive || e.hit || now < (e.dmNextShotAt || 0) || e.blindedUntil > gameNow()) continue;
+                    if (!e.isActive || e.hit || now < (e.dmNextShotAt || 0) || e.blindedUntil > gameNow()) continue;   // V2.2: the blind is on game time
                     e.dmNextShotAt = now + 500 + Math.random() * 600;
                     const ep = e.mesh.position;
                     const dPlayer = Math.hypot(pl.x - ep.x, pl.z - ep.z);
@@ -54661,7 +54661,7 @@
                 this.overlay.classList.add('visible');
                 document.getElementById('dm-again-btn').addEventListener('click', () => { this.overlay.classList.remove('visible'); this.start(); });
                 document.getElementById('dm-exit-btn').addEventListener('click', () => tacticalDirector.setGameMode('wave'));
-                for (const e of enemyObjects) if (e.isActive && !e.hit) e.blindedUntil = gameNow() + 1e9;
+                for (const e of enemyObjects) if (e.isActive && !e.hit) e.blindedUntil = gameNow() + 1e9;   // V2.2: on game time, as blinds are
                 if (document.pointerLockElement) document.exitPointerLock();
                 soundFX.ult();
             }
@@ -54716,7 +54716,7 @@
                 // All abilities full
                 const st = agentSystem.stateByAgent[game.activeAgent];
                 if (st) for (const k of ['c', 'q', 'e']) { st[k].charges = st[k].maxCharges; st[k].rechargeEnd = 0; }
-                agentSystem.syncHud(gameNow(), true);
+                agentSystem.syncHud(gameNow(), true);   // V2.2: on game time
                 game.creds = 0;
                 // Power-up orbs on open floor
                 for (const o of this.orbs) {
@@ -54754,7 +54754,7 @@
                 tacticalDirector.updateVitalsHUD();
                 healthFill.style.width = `${game.health}%`;
                 healthValue.textContent = game.health;
-                agentSystem.syncHud(gameNow(), true);
+                agentSystem.syncHud(gameNow(), true);   // V2.2: on game time
                 abilityLights.flash(o.x, 1, o.z, RUSH_ORBS[o.type].color, 6, 2, 400);
                 soundFX.playTone(660, 1320, 0.18, 'sine', 0.12, 0);
                 showNotification(RUSH_ORBS[o.type].label, 1600);

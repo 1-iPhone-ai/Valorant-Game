@@ -1,5 +1,5 @@
 'use strict';
-// V2.2: High Fidelity looks, Duelists (their role block in the game file; HIFI-CONTRACT.md). Add each
+// V2.2: High Fidelity looks, Duelists (their role block in the game file; the API is in abilityLook's header). Add each
 // converted ability with the key>renderer pairs it binds; roleTest checks it and the role's budget.
 // Phoenix's Run It Back comes last: its anchor ends only with its ultimate, which a cast's reset skips, so
 // it stays out. A kill's soul orb (Reyna's passive, drawn by Devour's look) is dropped for Empress, which
