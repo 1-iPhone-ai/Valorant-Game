@@ -16624,8 +16624,11 @@
         //    the game's Math.random draws, so the stream would shift. Instead, when V2.2's createEnemyPage has made a page
         //    (its draws exactly as V2.2), onPage gives it a reserve page's meshes and kit in place of the ones it just made
         //    (never drawn: they hold no GPU state), so a bot entering a new chunk creates no buffer.
-        //  - Identity off: uIdentity 0 (the shader's identity code does not run), every kit hidden (0 kit draws), wingman
-        //    kits drawn with no triangles; the V2.2 picture exactly. The kits stay built for the next switch-on.
+        //  - Identity off: uIdentity 0 (the shader's identity code does not run), every kit at count 0 (0 kit draws), wingman
+        //    kits drawn with no triangles; the V2.2 picture exactly. The kits stay built for the next switch-on. A kit stays
+        //    in the render list while it is off (count 0 draws nothing), so its onBeforeRender notices a switch made while no
+        //    page is dirty (bots standing still: no hook runs) on the very next frame (only after the warm-up, so nothing
+        //    from here calls into V23 before the first frame).
         //  - Highlight accents (setRim): red 0xff4655, yellow 0xffd166, purple 0xe879f9, cyan 0x67e8f9 for uRim (the kit's
         //    accent zones, the fresnel rim, the dissolve band); uRimBase 0.18, 0.12 on the Low content tier or Low quality.
         //  - Wingmen: wingKit records the agent (from the wingman's name); the build adds a plain Mesh of that agent's kit
@@ -16743,6 +16746,13 @@
                 }
                 if (tg.boundingSphere && kg.boundingSphere !== tg.boundingSphere) { kg.boundingSphere = tg.boundingSphere; kg.boundingBox = tg.boundingBox; }
             }
+            // V2.3: a kit's onBeforeRender: the setting switched with no hook call since (see the header); off, the kit
+            // being drawn takes count 0 at once (the count is read after this callback: no draw)
+            function probe() {
+                if (B.making || !(perfTelemetry.programWatermark > 0)) return;
+                if (wanted() !== B.on) sync();
+            }
+            function kitProbe() { probe(); if (!B.on) this.count = 0; }
             function newSet() {
                 return quiet(() => {   // V2.3: no draw from the game's Math.random stream
                     const geom = new THREE.BufferGeometry();
@@ -16757,8 +16767,8 @@
                     mesh.receiveShadow = true;
                     mesh.frustumCulled = true;
                     mesh.count = 0;
-                    mesh.visible = B.on;
                     mesh.name = 'v23:kit';
+                    mesh.onBeforeRender = kitProbe;
                     freezeStaticTransform(mesh);
                     const st = { mesh: mesh, geom: geom, attr: attr, page: null, dLo: Infinity, dHi: -1 };
                     mesh.userData.v23 = st;
@@ -16780,7 +16790,7 @@
                 for (let p = 0; p < page.meshes.length; p++) page.meshes[p].geometry.setAttribute('instanceKit', st.attr);
                 torso.add(st.mesh);
                 st.mesh.count = 0;
-                st.mesh.visible = B.on;
+                st.mesh.visible = true;   // V2.3: shown and hidden with the torso; identity off draws it at count 0
                 page.kit = st.mesh;
                 page.structureDirty = true;
             }
@@ -16828,7 +16838,7 @@
                 delete kit.userData.v23Warm;
                 kit.frustumCulled = true;
                 kit.count = 0;
-                kit.visible = B.on;
+                kit.visible = true;
                 kit.userData.v23.page = page;
                 page.kit = kit;
                 r.kit = null;
@@ -16863,12 +16873,13 @@
                 rec.geoms[tier] = g;
                 return g;
             }
-            // V2.3: identity off draws no triangle of a wingman kit (Enhanced Animations' switch shows every figure child
-            // but the head again), and Enhanced Animations on hides it (the rig kit draws)
+            // V2.3: identity off draws no triangle of a wingman kit (an empty draw range: it stays in the render list, so its
+            // probe runs, and Enhanced Animations' switch, which shows every figure child but the head again, changes
+            // nothing), and Enhanced Animations on hides it (the rig kit draws)
             function wingShow(rec) {
                 if (!rec.mesh) return;
                 rec.mesh.geometry.setDrawRange(0, B.on ? Infinity : 0);
-                rec.mesh.visible = B.on && !enhancedAnim.on;
+                rec.mesh.visible = !enhancedAnim.on;
             }
             function wingMake(rec) {
                 const fig = figOf(rec.bot);
@@ -16879,6 +16890,7 @@
                 mesh.castShadow = false;
                 mesh.receiveShadow = true;
                 mesh.name = 'v23:wingKit';
+                mesh.onBeforeRender = probe;
                 fig.add(mesh);   // V2.3: the figure's 5th child (children 0-3 and the single Group child unchanged)
                 rec.mesh = mesh;
                 wingShow(rec);
@@ -16912,11 +16924,12 @@
                     kit.receiveShadow = true;
                     kit.frustumCulled = true;
                     kit.name = 'v23:rigKit';
+                    kit.onBeforeRender = function () { probe(); this.count = B.on ? 1 : 0; };   // V2.3: identity off: count 0
                     rec.kit = kit;
                 });
                 for (const m of rec.meshes) m.geometry.setAttribute('instanceKit', rec.attr);
                 rec.rig.add(rec.kit);
-                rec.kit.visible = B.on;
+                rec.kit.count = B.on ? 1 : 0;
                 rigWrite(rec);
                 stats.rigKits++;
             }
@@ -16946,8 +16959,8 @@
             function setOn(on) {
                 B.on = on;
                 enemyAnimUniforms.uIdentity.value = on ? 1 : 0;
-                for (const st of B.sets) st.mesh.visible = on;
-                for (const r of B.rigs) if (r.kit) r.kit.visible = on;
+                for (const st of B.sets) if (!on) st.mesh.count = 0;   // V2.3: on again, flush gives each page its count
+                for (const r of B.rigs) if (r.kit) r.kit.count = on ? 1 : 0;
                 for (const w of B.wing) wingShow(w);
                 // V2.3: every live page repacks (instanceKit and the kit colours are not written while identity is off)
                 for (const chunk of enemyChunks.values()) for (const page of chunk.pages) page.structureDirty = true;
@@ -17042,7 +17055,7 @@
                     const kit = page.kit;
                     if (!kit) return null;
                     const set = kit.userData.v23, torso = page.meshes[0];
-                    kit.count = n;
+                    kit.count = B.on ? n : 0;
                     if (kit.instanceMatrix !== torso.instanceMatrix) kit.instanceMatrix = torso.instanceMatrix;
                     shareTorso(set.geom, torso);
                     if (!B.on || n === 0) { set.dLo = Infinity; set.dHi = -1; return null; }
