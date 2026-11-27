@@ -35141,7 +35141,8 @@
                                 }
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.c.tickSlowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.c.tickRevealMs);
-                                damageEnemyActor(e, AGENT_TUNING.deadlock.c.damagePerTick, now, nowMs, "GravNet Nanowire", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.deadlock.c.damagePerTick, now, nowMs, "GravNet Nanowire", false);
                             }
                         }
                     }
@@ -35230,7 +35231,8 @@
                                 e.transformDirty = true;
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.e.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.e.revealMs);
-                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", true);
+                                // V2.2: body hits on both arms (true here meant 'head': each shock dealt four times its damagePerTick)
+                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", false);
                             } else if (Math.abs(localX) < AGENT_TUNING.deadlock.e.armHalfWidthM) {
                                 const pushX = (localX >= 0 ? AGENT_TUNING.deadlock.e.pushOutM : -AGENT_TUNING.deadlock.e.pushOutM) - localX;
                                 e.mesh.position.x += pushX * cosY;
@@ -35238,7 +35240,7 @@
                                 e.transformDirty = true;
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.deadlock.e.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.deadlock.e.revealMs);
-                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", true);
+                                if (canShock) damageEnemyActor(e, AGENT_TUNING.deadlock.e.damagePerTick, now, nowMs, "Barrier Mesh", false);
                             }
                         }
                     }
@@ -35661,7 +35663,8 @@
                             if (dx * dx + dz * dz <= rSq) {
                                 e.slowedUntil = Math.max(e.slowedUntil, now + AGENT_TUNING.vyse.e.slowMs);
                                 e.revealedUntil = Math.max(e.revealedUntil, now + AGENT_TUNING.vyse.e.revealMs);
-                                damageEnemyActor(e, AGENT_TUNING.vyse.e.damagePerTick, now, nowMs, "Razorvine Thorns", true);
+                                // V2.2: a body hit (true here meant 'head': each tick dealt four times its damagePerTick)
+                                damageEnemyActor(e, AGENT_TUNING.vyse.e.damagePerTick, now, nowMs, "Razorvine Thorns", false);
                             }
                         }
                     }
