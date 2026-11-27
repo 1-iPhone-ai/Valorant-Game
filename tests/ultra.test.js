@@ -113,8 +113,28 @@ test('Ultra Realism draws every feature with no new shader programs, keeps hitbo
         tacticalEnhancements.toggleWingmanAI(false);
         const cc = characterController; cc.position.set(5, 1.7, 11.6); cc.prevSimPosition.copy(cc.position);
         camera.rotation.set(-0.05, 0, 0, 'YXZ');
+        // V2.3: Agent Identity set explicitly (on): the hands draw the FP block's grouped variants of each tier's geometry
+        game.userSettings.agentIdentity = 'on';
+        V23.core.applySettings(game.userSettings, 'agentIdentity');
     });
     await frames(3);
+    // V2.3: the grouped hands follow the tier: each hands mesh draws the grouped variant of the V2.2 geometry its tier wants
+    const groupedOf = () => evaluate(() => {
+        const out = [];
+        for (const k of Object.keys(game.weapons)) {
+            const w = game.weapons[k];
+            if (!w || !w.model) continue;
+            w.model.traverse((o) => {
+                if (!o.isMesh || !o.userData.isHands) return;
+                const g = o.geometry, u = ultraGuns.hands.find((h) => h.mesh === o), s = characterDetail.gunSwaps.find((x) => x.mesh === o);
+                const want = ultraGuns.on && u ? u.ultra : (characterDetail.enabled && s ? s.detailed : null);
+                out.push({ grouped: !!g.userData.v23Src, tier: want ? g.userData.v23Src === want : true, uuid: g.uuid });
+            });
+        }
+        return out;
+    });
+    const handsCine = await groupedOf();
+    assert.ok(handsCine.length === 4 && handsCine.every((h) => h.grouped && h.tier), 'Cinematic: the grouped High Detail hands');
     const luma = () => evaluate(() => {
         if (ultraPost.active) ultraPost.render(performance.now());
         else postFX.render(performance.now());
@@ -146,7 +166,8 @@ test('Ultra Realism draws every feature with no new shader programs, keeps hitbo
         const live = [];
         for (const chunk of enemyChunks.values()) for (const page of chunk.pages) live.push(page);
         let handsUltra = true;
-        for (const h of ultraGuns.hands) if (h.mesh.geometry !== h.ultra) handsUltra = false;
+        // V2.3: with Agent Identity on, the hands draw the FP block's grouped variant of Ultra's hands geometry
+        for (const h of ultraGuns.hands) if (h.mesh.geometry !== h.ultra && h.mesh.geometry.userData.v23Src !== h.ultra) handsUltra = false;
         const w = ultraPost.rt.world;
         return {
             active: ultraRealism.active, features: ULTRA_FEATURES.every((f) => ultraRealism.is(f)),
@@ -222,10 +243,15 @@ test('Ultra Realism draws every feature with no new shader programs, keeps hitbo
     await evaluate(() => photoMode.exit());
     await frames(2);
 
+    // V2.3: the grouped Ultra hands, before going back
+    const handsUltra = await groupedOf();
+    assert.ok(handsUltra.length === 4 && handsUltra.every((h) => h.grouped && h.tier), 'Ultra: the grouped Ultra hands');
     // Back to Cinematic: everything as it was, same picture
     await evaluate(() => setQualitySettings('cinematic'));
     await frames(4);
     assert.deepEqual(await cinematicState(evaluate), cine);
+    // V2.3: the grouped hands round-trip deterministically: the same High Detail variants (uuids) as before Ultra
+    assert.deepEqual((await groupedOf()).map((h) => h.uuid), handsCine.map((h) => h.uuid), 'the grouped hands uuids round-trip');
     const lumaBack = await luma();
     assert.ok(Math.abs(lumaBack - lumaCine) < Math.max(1, lumaCine * 0.02), `Cinematic looks the same afterwards (${lumaCine.toFixed(2)} -> ${lumaBack.toFixed(2)})`);
     assert.deepEqual(await physicsState(evaluate), phys);
