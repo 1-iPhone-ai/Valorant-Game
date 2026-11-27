@@ -28680,9 +28680,11 @@
             },
 
             // V2.2: Vyse's numbers are in AGENT_TUNING.vyse
-            detonateVyseArcRose: function(now) {
-                let targetRose = null;
-                for (let i = 0; i < this.vyseArcRoses.length; i++) {
+            // V2.2: the rose an enemy walked up to pops (step 2CCC passes it; it was ignored and the first live rose
+            // popped); a press pops the live one (with one charge, and Q pressed again detonating, only one is ever live)
+            detonateVyseArcRose: function(now, rose) {
+                let targetRose = (rose && rose.inUse && now < rose.expireAt) ? rose : null;
+                for (let i = 0; i < this.vyseArcRoses.length && !targetRose; i++) {
                     const vr = this.vyseArcRoses[i];
                     if (vr.inUse && now < vr.expireAt) {
                         targetRose = vr;
