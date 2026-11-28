@@ -22899,9 +22899,41 @@
             },
             // V2.3 REGION R10.enemyStep [WP10]: single owner. enemyStep(kind): one noise call (gain 0.16) plus surface and
             // footwear tones; enemyStep() with no kind stays V2.2 exactly
-            enemyStep: function() {
-                this.playNoise(0.07, 0.16, 0, 520);
-                this.playTone(95, 55, 0.08, 'sine', 0.07, 0);
+            enemyStep: function(kind) {
+                // V2.3: no kind (V23.audio.surfAt's null: identity off; undefined: a prop, door or breakable underfoot) or a
+                // kind with no step recipe: V2.2's step exactly (one playNoise: one Math.random once the buffer exists)
+                if (!kind || !kind.noise || !kind.tones) {
+                    this.playNoise(0.07, 0.16, 0, 520);
+                    this.playTone(95, 55, 0.08, 'sine', 0.07, 0);
+                    return;
+                }
+                // V2.3: a surface step: kind is the frozen recipe surfAt returns ({ surf, foot, noise [s, filter, Hz, Q], tones
+                // [[f0, f1, s, wave, gain, delay]], mix }). No context or Master volume 0: nothing, as V2.2's playNoise returns
+                // there before its draw
+                const ctx = this.ensureContext();
+                if (!ctx) return;
+                const mm = (game.userSettings && typeof game.userSettings.masterVolume === 'number') ? game.userSettings.masterVolume / 100 : 1.0;
+                if (Math.min(0.45, Math.max(0, 0.16 * mm)) <= 0.0002) return;
+                // V2.3: one bus for the step's voices: inside soundFX.at it takes the one HRTF panner (and the occlusion
+                // low-pass and reverb send) for all of them, instead of one panner per voice
+                const pos = this._pos, out = this._out;
+                let bus = null;
+                try {
+                    bus = ctx.createGain();
+                    bus.gain.value = kind.mix;
+                    this._route(ctx, bus);
+                } catch (e) { bus = null; }
+                if (bus) { this._pos = null; this._out = bus; }
+                try {
+                    // V2.3: the one noise call, with V2.2's gain argument 0.16 (the same early return) and the surface's filter and
+                    // duration: one Math.random for its buffer offset, as V2.2's step draws (never inside V23.seeded)
+                    const n = kind.noise;
+                    this.noiseLayer(n[0], 0.16, 0, n[1], n[2], n[3]);
+                    // V2.3: the surface and footwear tones (playTone draws nothing); step() is never called, so the player's
+                    // stepsPlayed and lastStep are untouched
+                    const T = kind.tones;
+                    for (let i = 0; i < T.length; i++) this.playTone(T[i][0], T[i][1], T[i][2], T[i][3], T[i][4], T[i][5]);
+                } finally { this._pos = pos; this._out = out; }
             },
             // Hit confirmation for body/leg (tick) and armour (brighter ping)
             hitTick: function(armor) {
@@ -23604,17 +23636,666 @@
         //   single-owner soundFX.enemyStep body).
         // Purpose: palette recipes, motifs at the gesture release, ultimate stings, previews through soundFX._out, one gain and
         //   one panner per positional event (atShared), bot cues, the surface under a bot (surfAt). V2.3 noise always runs
-        //   inside V23.seeded. Stubs only in WP1 (surfAt returns null: the V2.2 enemy step).
-        // Clocks: AudioContext time for palette voices.
-        V23.audio = {
-            surfAt: function (enemy) { return null; },                       // H31.1: null keeps soundFX.enemyStep() exactly V2.2
-            motif: function (agentId, slot) { return null; },
-            ultSting: function (agentId) { return null; },
-            preview: function (agentId, slot) { return null; },
-            atShared: function (x, y, z, fn) { return null; },
-            botCue: function (enemy, kind) { return null; },
-            prebuild: function () { return null; }
-        };
+        //   inside V23.seeded on an explicit V23.rand stream.
+        // Clocks: AudioContext time for palette voices: every event is scheduled from ctx.currentTime at its call (the FP
+        //   release key, the ultimate's activation, WP8's cue on its sim tick, the showroom's call); no other clock is read.
+        //
+        // V2.3 (WP10): how the agent sound works (design 12).
+        //  - The palette is the agent's resolved look sound field (V23.core.resolve(id).sound: family, wave, base Hz,
+        //    intervals, noise {type, f, q}, attack, tail, shimmer, sub, footwear). Sage (glass) and Omen (void) are full looks;
+        //    a stub resolves to its role default ('duelist', 'initiator', 'controller', 'sentinel') until its role batch
+        //    lands. Nothing below names an agent: a look's data alone decides its sound.
+        //  - FAMILIES[sound.family] says which recipes play: 2 voices for the motif, 3 for the ultimate sting, 1 for a bot's
+        //    windup, each [recipe, opts] (opts: mul frequency factor, iv interval offset, wave, glide, len, g, sweep, nf,
+        //    rate), and the family's shape (recipe parameters: glide, sweep, fm, grains, rate, step, vib, detune, taps, lp,
+        //    bellMul, hissDrop, sh). An unknown family plays GENERIC, so a new look needs data only. FAMILIES holds the 29
+        //    design families (design 5 and 4.1/4.2), each with its design agent and its reference palette vector v (what
+        //    the role batch copies into the look's sound field; pairwise distinct, same-role pairs differ in wave or
+        //    interval set), and the 4 role-default families (v null: their numbers are the role defaults in the look).
+        //  - Recipes (10, each one voice: a source, an optional filter, an envelope gain, then soundFX._route): tonal (an
+        //    oscillator of the palette wave with a glide, optional low-pass sweep, vibrato or detuned twin), fmBell (a sine
+        //    carrier with a decaying FM index), noiseSweep (noise through the palette filter swept by shape.sweep), crackle
+        //    (granular noise grains on an envelope curve), pluck (a bright oscillator through a closing low-pass), clickTrain
+        //    (noise clicks at shape.rate, or sample-and-hold steps), arp (an oscillator stepping through the intervals),
+        //    hiss (slow-attack filtered noise), swell (a reverse swell: 70% rise, quick cut), pulse (a tremolo tone, or
+        //    echo-tap pings with shape.taps).
+        //  - Events (design 12.2): motif(agent, slot) at the gesture release key (WP4 calls it): 2 voices at gains 0.05 and
+        //    0.03 (each <= 0.06), under the ability's own soundFX method, which still plays at t 0 unchanged; the root is
+        //    base x 2^(intervals[c 0, q 1, e 2, x 3] / 12). ultSting(agent) at the ultimate's activation: 3 voices, a chord
+        //    on the first three intervals, staggered 60 ms / tempo, gains 0.07 / 0.06 / 0.05. A voice with mul < 1 scales by
+        //    0.4 + sub, one with mul >= 2 by 0.5 + shimmer; lengths follow tail. Player events are 2D (soundFX's normal
+        //    route, with V2.2's shared reverb).
+        //  - Positional events: atShared(x, y, z, fn) gives every voice fn plays one bus, routed once through soundFX.at (one
+        //    HRTF panner, the occlusion low-pass when a wall is between, the reverb send), soundFX._out pointing at the bus
+        //    meanwhile (the _placedOut pattern). botCue(enemy, kind[, hz]) (WP8, inside V23.seeded): 'windup.<k>' one rising
+        //    voice, 'cast.<k>' the cast layer (the motif's 2 voices), and the 300 ms warning sting (3 voices) for a bot's
+        //    heaviest utility (design 12.3, open decision 7): the rusher's flash windup ('windup.flash'), the mortar arming
+        //    ('arm.mortar', placed at the hazard, the third argument) and agent-mode signature casts ('sig.<k>', for WP8's
+        //    M2 agent mode). Cues beyond 50 m are skipped. (The contract lists botCue(enemy, kind); the optional third
+        //    argument is read from arguments, as WP8 sends it.)
+        //  - Previews (design 6.8, 12.2): preview(agent, slot) plays 2D on a bus of its own that feeds soundFX._out (when the
+        //    showroom set one) or the destination, with soundFX._out on that bus during the call (so no reverb): the slot's
+        //    PREVIEW_SOUNDS calls (the cast's own soundFX methods) plus the palette layer, or the look's intro cues (Sage's
+        //    gather and glass chime at 1.0 s; Omen's rift tear, close and 10 plate clacks 60 ms apart), 'lockIn', or one cue
+        //    by name. A new preview, or preview(null), ramps the last preview's bus to 0 in 30 ms.
+        //  - Randomness: every event runs inside V23.seeded on its own V23.rand stream (a bot cue on the stream WP8's
+        //    V23.seeded set, when there is one), and the noise voices take their buffer offsets, grains and clicks from that
+        //    stream; no Math.random. The shared noise and reverb buffers are built by prebuild at the first pointerdown,
+        //    keydown or touchstart (listeners registered here; nothing is built and no AudioContext is made at boot): the
+        //    noise buffer from a V23.rand stream, the reverb by V2.2's _ensureReverb inside V23.core._quiet, so neither takes
+        //    a draw from the game's stream. A voice that finds no noise buffer builds it the same way first.
+        //  - Surface steps (design 12.4): surfAt(e) finds the collisionIndex box under the bot's (x, z) whose top is within
+        //    0.3 m of its feet (the nearest; the higher on a tie): a map piece gives its surf % 10 (concrete, stone, metal,
+        //    wood); a box that is no piece (a prop, door or breakable) gives undefined, so V2.2's step plays; no box gives the
+        //    player's own rule (weather snow, sand or wet, else concrete). The box result is cached per bot per 0.5 m cell
+        //    (and 0.25 m of height, and collisionIndex.revision). It returns a frozen step recipe {surf, foot, noise, tones,
+        //    mix} (one per surface x footwear) that soundFX.enemyStep plays: one noiseLayer with V2.2's gain argument 0.16 (so
+        //    the same early return and one Math.random per step, as V2.2's playNoise), the surface and footwear tones (at
+        //    most 3) through playTone, all on one bus (one panner inside soundFX.at); it never calls step(), so stepsPlayed
+        //    and lastStep stay the player's.
+        //  - Settings (design 12.5): soundEnabled (ensureContext null: no node), masterVolume per voice (V2.2's scale, cap
+        //    and 0.0002 threshold), positionalAudio off (soundFX.at plays straight: no panner; atShared then gives the bus
+        //    the inverse-distance level the panner would have), occlusion (soundFX.at's low-pass on the shared path),
+        //    enemyFootsteps and the 22 m range (enemyAudio, V2.2's), headshotVolume (no V2.3 voice plays on a hit, kill or
+        //    headshot; V2.2's dink and kill sounds are untouched). Palette voices route like every other effect, so the music
+        //    and ambience buses are untouched.
+        //  - Agent Identity off: motif, ultSting and botCue play nothing and surfAt returns null (V2.2's enemy step). The
+        //    showroom is always on, so preview still plays.
+        //  - Data for the tests (read only): V23.audio.state; private helpers start with '_'.
+        V23.audio = (function () {
+            // ---- data --------------------------------------------------------------------------------------------------
+            const RECIPES = Object.freeze(['tonal', 'fmBell', 'noiseSweep', 'crackle', 'pluck', 'clickTrain', 'arp', 'hiss', 'swell', 'pulse']);
+            const _freeze = (v) => { if (v && typeof v === 'object' && !Object.isFrozen(v)) { Object.freeze(v); for (const k of Object.keys(v)) _freeze(v[k]); } return v; };
+            const _items = (list) => list.map((x) => (typeof x === 'string' ? [x, {}] : [x[0], x[1] || {}]));
+            // V2.3: the families. Row: [design agent, wave, base Hz, intervals, noise [type, Hz, Q], attack s, tail s, shimmer,
+            // sub, footwear, motif recipes, sting recipes, windup recipe, shape]
+            const ROWS = {
+                // Duelists
+                breeze: ['jett', 'sine', 880, [0, 5, 12], ['bandpass', 2400, 2.5], 0.01, 0.35, 0.3, 0, 'runner',
+                    ['noiseSweep', 'tonal'], ['noiseSweep', 'tonal', ['tonal', { mul: 2 }]], 'noiseSweep', { sweep: [1, 2.5], glide: 1.5 }],
+                crackle: ['phoenix', 'sawtooth', 98, [0, 7, 10], ['bandpass', 1800, 1.5], 0.003, 0.45, 0.1, 0.4, 'boot',
+                    ['crackle', 'tonal'], ['crackle', 'tonal', ['tonal', { wave: 'sine', mul: 0.5 }]], 'crackle', { grains: 55, glide: 0.8, lp: [2400, 600] }],
+                choir: ['reyna', 'sine', 349, [0, 3, 8], ['lowpass', 1200, 0.8], 0.06, 0.7, 0.25, 0.1, 'boot',
+                    ['swell', ['tonal', { mul: 2 }]], ['swell', 'swell', ['tonal', { mul: 2 }]], 'swell', { vib: [5.5, 0.012], detune: 7 }],
+                clank: ['raze', 'square', 70, [0, 12, 19], ['bandpass', 900, 4], 0.002, 0.3, 0.05, 0.7, 'heavy',
+                    ['fmBell', 'tonal'], ['fmBell', 'tonal', 'noiseSweep'], 'fmBell', { fm: [2.76, 4], bellMul: 8, glide: 0.6, lp: [400, 120] }],
+                glitch: ['yoru', 'square', 523, [0, 1, 6], ['highpass', 3000, 0.7], 0.001, 0.25, 0.15, 0, 'soft',
+                    ['arp', 'clickTrain'], ['arp', 'clickTrain', 'tonal'], 'arp', { step: 0.025, sh: true, rate: 40 }],
+                buzz: ['neon', 'square', 196, [0, 4, 11], ['bandpass', 3500, 1], 0.002, 0.28, 0.2, 0.2, 'runner',
+                    ['tonal', 'noiseSweep'], ['tonal', ['tonal', { mul: 2 }], 'noiseSweep'], 'tonal', { detune: 14, sweep: [1, 0.5], lp: [5000, 1200] }],
+                seal: ['iso', 'triangle', 55, [0, 7, 14], ['bandpass', 5200, 8], 0.002, 0.4, 0.4, 0.8, 'boot',
+                    ['pulse', 'fmBell'], ['pulse', 'fmBell', ['tonal', { wave: 'sine' }]], 'pulse', { rate: 9, fm: [3.5, 1.2], bellMul: 32 }],
+                shimmer: ['waylay', 'sine', 1046, [0, 2, 9], ['highpass', 6000, 0.7], 0.008, 0.4, 0.6, 0, 'runner',
+                    ['pulse', ['tonal', { mul: 2 }]], ['pulse', ['pulse', { iv: 1 }], ['tonal', { mul: 2 }]], 'pulse', { rate: 18 }],
+                // Initiators
+                ping: ['sova', 'sine', 1318, [0, 7, 19], ['bandpass', 2600, 5], 0.002, 0.6, 0.2, 0, 'boot',
+                    ['pulse', 'hiss'], ['pulse', 'pulse', 'tonal'], 'pulse', { taps: [0.11, 3] }],
+                digital: ['kayo', 'square', 440, [0, 3, 7, 10], ['highpass', 4500, 1], 0.001, 0.3, 0.1, 0.1, 'heavy',
+                    ['arp', 'clickTrain'], ['arp', ['arp', { mul: 2 }], 'clickTrain'], 'clickTrain', { step: 0.04, rate: 30 }],
+                flute: ['skye', 'sine', 587, [0, 5, 9], ['bandpass', 1600, 2], 0.05, 0.5, 0.15, 0, 'soft',
+                    ['swell', 'hiss'], ['swell', 'swell', 'hiss'], 'swell', { vib: [5, 0.008], hissDrop: 1.2 }],
+                drone: ['fade', 'triangle', 73, [0, 1, 7], ['lowpass', 400, 2], 0.08, 0.9, 0.05, 0.5, 'soft',
+                    ['swell', 'noiseSweep'], ['swell', ['swell', { mul: 2 }], 'noiseSweep'], 'noiseSweep', { detune: 9, sweep: [0.75, 3] }],
+                hissThump: ['breach', 'sine', 60, [0, 5, 7], ['highpass', 3800, 0.7], 0.003, 0.35, 0, 0.9, 'heavy',
+                    ['hiss', 'tonal'], ['tonal', 'hiss', ['tonal', { mul: 2 }]], 'hiss', { glide: 0.55, hissDrop: 0.6 }],
+                clockwork: ['gekko', 'triangle', 784, [0, 4, 9], ['bandpass', 5000, 6], 0.001, 0.3, 0.1, 0, 'runner',
+                    ['clickTrain', 'tonal'], ['clickTrain', 'tonal', ['tonal', { mul: 2 }]], 'clickTrain', { rate: 16, glide: 1.8 }],
+                radio: ['tejo', 'square', 988, [0, 8, 12], ['bandpass', 1400, 9], 0.002, 0.3, 0, 0, 'boot',
+                    ['noiseSweep', 'pulse'], ['noiseSweep', 'pulse', ['pulse', { mul: 2 }]], 'pulse', { sweep: [1.6, 0.6], rate: 14 }],
+                // Controllers
+                void: ['omen', 'sawtooth', 110, [0, 6, 13], ['lowpass', 700, 1.2], 0.002, 0.8, 0.05, 0.6, 'plated',
+                    ['tonal', 'noiseSweep'], ['tonal', ['tonal', { wave: 'sine', mul: 0.5 }], 'noiseSweep'], 'noiseSweep', { glide: 0.7, lp: [1800, 320], sweep: [2, 0.37] }],
+                brass: ['brimstone', 'sawtooth', 82, [0, 4, 7], ['lowpass', 900, 3], 0.04, 0.55, 0, 0.3, 'heavy',
+                    ['swell', ['tonal', { mul: 2 }]], ['swell', 'swell', ['tonal', { mul: 2 }]], 'swell', { lp: [300, 1400] }],
+                hiss: ['viper', 'sine', 104, [0, 3, 10], ['bandpass', 2800, 1.5], 0.03, 0.6, 0, 0.5, 'boot',
+                    ['hiss', 'tonal'], ['hiss', 'noiseSweep', 'tonal'], 'hiss', { sweep: [0.65, 1.5], hissDrop: 1.4 }],
+                chime: ['clove', 'sine', 1175, [0, 4, 10], ['bandpass', 6000, 3], 0.001, 0.25, 0.5, 0, 'soft',
+                    ['fmBell', ['fmBell', { iv: 1 }]], ['fmBell', 'fmBell', 'fmBell'], 'fmBell', { fm: [2.0, 3] }],
+                swell: ['harbor', 'sine', 65, [0, 5, 12], ['lowpass', 600, 0.7], 0.12, 1.0, 0.05, 0.4, 'heavy',
+                    ['swell', 'hiss'], ['swell', ['swell', { mul: 2 }], 'hiss'], 'swell', {}],
+                bell: ['astra', 'triangle', 392, [0, 2, 7], ['bandpass', 3000, 4], 0.002, 1.2, 0.45, 0.1, 'soft',
+                    ['fmBell', 'tonal'], ['fmBell', ['fmBell', { iv: 1 }], 'tonal'], 'fmBell', { fm: [3.17, 2.2] }],
+                arp: ['miks', 'sawtooth', 262, [0, 4, 7, 12], ['highpass', 2000, 0.8], 0.002, 0.3, 0.2, 0.2, 'runner',
+                    ['arp', 'tonal'], ['arp', ['arp', { mul: 2 }], 'tonal'], 'arp', { step: 0.035, lp: [4000, 900] }],
+                // Sentinels
+                glass: ['sage', 'sine', 660, [0, 7, 12], ['bandpass', 4200, 6], 0.02, 0.5, 0.35, 0, 'soft',
+                    ['fmBell', 'hiss'], ['fmBell', ['tonal', { mul: 2 }], 'hiss'], 'fmBell', { fm: [3.01, 0.9], hissDrop: 1.1 }],
+                gears: ['killjoy', 'triangle', 1568, [0, 5, 10], ['bandpass', 3400, 5], 0.001, 0.3, 0.2, 0, 'boot',
+                    ['clickTrain', 'fmBell'], ['clickTrain', 'fmBell', ['fmBell', { iv: 1 }]], 'clickTrain', { rate: 28, fm: [2.4, 1.5] }],
+                shutter: ['cypher', 'square', 932, [0, 2, 5], ['highpass', 5000, 1.2], 0.001, 0.2, 0, 0, 'soft',
+                    ['clickTrain', ['tonal', { len: 0.4 }]], ['clickTrain', 'clickTrain', 'tonal'], 'clickTrain', { rate: 12, lp: [3000, 800] }],
+                click: ['chamber', 'triangle', 2093, [0, 12, 24], ['highpass', 7000, 2], 0.001, 0.18, 0.3, 0, 'boot',
+                    ['clickTrain', 'tonal'], ['clickTrain', 'tonal', ['tonal', { mul: 0.5 }]], 'clickTrain', { rate: 6 }],
+                wire: ['deadlock', 'sawtooth', 147, [0, 7, 10], ['lowpass', 800, 4], 0.001, 0.6, 0, 0.4, 'heavy',
+                    ['pluck', ['tonal', { wave: 'sine', mul: 0.5 }]], ['pluck', ['pluck', { iv: 1 }], 'swell'], 'pluck', { lp: [600, 200] }],
+                scrape: ['vyse', 'sine', 1760, [0, 1, 13], ['bandpass', 2200, 3], 0.004, 0.4, 0.4, 0, 'plated',
+                    ['noiseSweep', 'fmBell'], ['noiseSweep', 'fmBell', ['fmBell', { iv: 1 }]], 'noiseSweep', { sweep: [0.4, 1.6], fm: [3.5, 1] }],
+                pulse: ['veto', 'sine', 740, [0, 9, 14], ['bandpass', 1500, 2], 0.004, 0.5, 0.1, 0.2, 'boot',
+                    ['pulse', 'noiseSweep'], ['pulse', ['pulse', { iv: 1 }], 'noiseSweep'], 'pulse', { taps: [0.16, 2], sweep: [0.4, 1.6] }]
+            };
+            // V2.3: the role-default families (a stub's sound until its role batch lands; the numbers are the look's)
+            const ROLE_ROWS = {
+                duelist: ['DUELIST', ['tonal', 'noiseSweep'], ['tonal', 'tonal', 'noiseSweep'], 'tonal', {}],
+                initiator: ['INITIATOR', ['tonal', 'hiss'], ['tonal', 'tonal', 'hiss'], 'tonal', {}],
+                controller: ['CONTROLLER', ['swell', 'noiseSweep'], ['swell', 'swell', 'noiseSweep'], 'swell', {}],
+                sentinel: ['SENTINEL', ['tonal', 'clickTrain'], ['tonal', 'tonal', 'clickTrain'], 'tonal', {}]
+            };
+            const FAMILIES = (function () {
+                const out = {};
+                for (const name of Object.keys(ROWS)) {
+                    const r = ROWS[name];
+                    out[name] = {
+                        agent: r[0], roleDefault: null,
+                        v: { family: name, wave: r[1], base: r[2], intervals: r[3], noise: { type: r[4][0], f: r[4][1], q: r[4][2] },
+                            attack: r[5], tail: r[6], shimmer: r[7], sub: r[8], footwear: r[9] },
+                        motif: _items(r[10]), sting: _items(r[11]), cue: _items([r[12]])[0], shape: r[13]
+                    };
+                }
+                for (const name of Object.keys(ROLE_ROWS)) {
+                    const r = ROLE_ROWS[name];
+                    out[name] = { agent: null, roleDefault: r[0], v: null, motif: _items(r[1]), sting: _items(r[2]), cue: _items([r[3]])[0], shape: r[4] };
+                }
+                return _freeze(out);
+            })();
+            // V2.3: a family the table does not know plays this structure from the look's own numbers
+            const GENERIC = _freeze({ agent: null, roleDefault: null, v: null, motif: _items(['tonal', 'noiseSweep']), sting: _items(['tonal', 'tonal', 'noiseSweep']), cue: ['tonal', {}], shape: {} });
+            // V2.3: event slots: the motif root's interval index per ability slot, and per bot cast kind
+            const SLOT_I = { c: 0, q: 1, e: 2, x: 3 };
+            const KIND_I = { smoke: 0, flash: 1, sonar: 1, mortar: 2, teleport: 0 };
+            const MOTIF_G = [0.05, 0.03], STING_G = [0.07, 0.06, 0.05], WARN_G = [0.07, 0.06, 0.05];
+            // V2.3: the showroom cues (palette-shaped recipes; preview(agent, name) plays one, the intros schedule them)
+            const CUES = _freeze({
+                chime: { items: _items([['fmBell', { mul: 2 }], ['tonal', { mul: 3, wave: 'sine', len: 0.8 }]]), gains: [0.06, 0.03], len: 1.6 },
+                gather: { items: _items(['swell']), gains: [0.025], len: 0.9 },
+                tear: { items: _items([['noiseSweep', { sweep: [4, 0.5] }], ['tonal', { mul: 0.5, wave: 'sine', glide: 0.5 }]]), gains: [0.07, 0.04], len: 0.24 },
+                close: { items: _items([['noiseSweep', { sweep: [0.5, 3] }]]), gains: [0.05], len: 0.18 },
+                clack: { items: _items([['clickTrain', { rate: 1, nf: 4 }], ['tonal', { mul: 16, wave: 'triangle' }]]), gains: [0.06, 0.02], len: 0.045 },
+                land: { items: _items([['tonal', { mul: 0.5, wave: 'sine', glide: 0.55 }], 'hiss']), gains: [0.06, 0.03], len: 0.12 }
+            });
+            // V2.3: the intros' sound timelines [s, cue] by look.showroom.intro (design 4.1, 4.2 and the role defaults); any
+            // other intro plays the motif at 60% of its introMs
+            const INTROS = (function () {
+                const rift = [[0, 'tear'], [0.72, 'close']];
+                for (let i = 0; i < 10; i++) rift.push([0.86 + 0.06 * i, 'clack']);   // V2.3: 10 plates settle 60 ms apart, each with a clack
+                return _freeze({
+                    assembleCrystal: [[0.1, 'gather'], [1.0, 'chime']], riftStep: rift,
+                    dropIn: [[0.55, 'land'], [0.6, 'motif']], unfold: [[0.3, 'gather'], [0.8, 'motif']],
+                    materialize: [[0, 'gather'], [0.85, 'motif']], assemble: [[0.7, 'clack'], [0.8, 'motif']]
+                });
+            })();
+            // V2.3: enemy step recipes by surface (the player's step table, soundFX.step) and footwear (design 3.1):
+            // noise [s, filter, Hz, Q] (played with V2.2's gain argument 0.16), tones [f0, f1, s, wave, gain, delay], mix
+            const SURF_STEPS = _freeze({
+                concrete: { noise: [0.05, 'bandpass', 1500, 1.1], tones: [], mix: 0.55 },
+                stone: { noise: [0.045, 'bandpass', 2000, 1.3], tones: [[1900, 1700, 0.025, 'triangle', 0.018, 0]], mix: 0.55 },
+                metal: { noise: [0.035, 'bandpass', 3200, 1.2], tones: [[410, 400, 0.16, 'sine', 0.035, 0], [1130, 1120, 0.12, 'sine', 0.02, 0]], mix: 0.6 },
+                wood: { noise: [0.06, 'lowpass', 900, 0.8], tones: [[150, 90, 0.09, 'sine', 0.08, 0]], mix: 0.6 },
+                wet: { noise: [0.12, 'highpass', 2200, 0.6], tones: [], mix: 0.5 },
+                snow: { noise: [0.09, 'bandpass', 1100, 1.4], tones: [], mix: 0.6 },
+                sand: { noise: [0.1, 'lowpass', 1200, 0.6], tones: [], mix: 0.6 }
+            });
+            const FOOTWEAR = _freeze({
+                soft: [[120, 70, 0.05, 'sine', 0.04, 0]],
+                boot: [[95, 55, 0.07, 'sine', 0.07, 0]],
+                plated: [[95, 55, 0.06, 'sine', 0.06, 0], [2600, 2400, 0.04, 'triangle', 0.02, 0.008]],
+                heavy: [[72, 40, 0.1, 'sine', 0.09, 0]],
+                runner: [[160, 95, 0.04, 'sine', 0.05, 0]]
+            });
+            const SURF_IDS = { 1: 'concrete', 2: 'stone', 3: 'metal', 4: 'wood' };   // MAP_SURF ids (piece.surf % 10)
+            const CUE_RANGE = 50, STEP_TONES = 3;
+
+            // ---- state -------------------------------------------------------------------------------------------------
+            const S = {
+                seq: 0, prebuilt: false, listening: false, pv: null, steps: {}, scratch: [], surf: new WeakMap(), trace: [],
+                stats: { events: 0, voices: 0, motifs: 0, stings: 0, cues: 0, warnings: 0, previews: 0, shared: 0, faded: 0, skipped: 0, surfLookups: 0, surfCached: 0, prebuilds: 0 }
+            };
+
+            // ---- helpers -----------------------------------------------------------------------------------------------
+            const _idOn = () => !!(V23.core && V23.core.enabled && V23.core.enabled());
+            // V2.3: V2.2's Master volume scale (playTone, playNoise and noiseLayer read it the same way)
+            const _master = () => { const u = game.userSettings; return (u && typeof u.masterVolume === 'number') ? u.masterVolume / 100 : 1.0; };
+            const _look = (id) => (id && V23.core && V23.core.resolve ? V23.core.resolve(id) : null);
+            const _fam = (P) => (P && Object.prototype.hasOwnProperty.call(FAMILIES, P.family) ? FAMILIES[P.family] : GENERIC);
+            const _clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+            // V2.3: a fresh stream per event (agent index, event slot, a counter): never Math.random
+            function _stream(a, b) {
+                S.seq = (S.seq + 1) >>> 0;
+                return V23.rand((Math.imul((a | 0) + 1, 0x9E3779B1) ^ Math.imul((b | 0) + 1, 0x85EBCA77) ^ Math.imul(S.seq, 0xC2B2AE3D)) >>> 0);
+            }
+            const _semi = (P, i) => { const iv = P.intervals && P.intervals.length ? P.intervals : [0]; return iv[i % iv.length] + 12 * Math.floor(i / iv.length); };
+            const _hz = (P, i, mul) => P.base * Math.pow(2, _semi(P, i) / 12) * (mul || 1);
+            const _motifLen = (P) => _clamp(0.12 + 0.45 * (P.tail || 0.3), 0.14, 0.6);
+            const _stingLen = (P) => _clamp(0.35 + 0.8 * (P.tail || 0.3), 0.5, 1.4);
+            function _trace(e) { S.trace.push(e); if (S.trace.length > 64) S.trace.shift(); }
+
+            // V2.3: the shared 1 s noise buffer, built when missing from a V23.rand stream (V2.2 fills it from Math.random at
+            // its first noise; its content is white noise either way), so V2.3 takes no draw from the game's stream
+            function _noise(ctx) {
+                const b = soundFX._noiseBuffer;
+                if (b && b.sampleRate === ctx.sampleRate) return b;
+                const len = ctx.sampleRate, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0), r = V23.rand(0x51A7E5 ^ len);
+                for (let i = 0; i < len; i++) d[i] = r() * 2 - 1;
+                soundFX._noiseBuffer = buf;
+                return buf;
+            }
+            // V2.3: envelope curves (0..1 at 400 points a second) for the granular recipes, drawn from the event's stream
+            function _grains(rng, dur, perSec) {
+                const n = Math.max(16, Math.round(dur * 400)), c = new Float32Array(n), k = Math.max(2, Math.round(perSec * dur));
+                for (let i = 0; i < k; i++) { const at = Math.floor(rng() * (n - 2)), a = 0.35 + 0.65 * rng(); c[at] = Math.max(c[at], a); c[at + 1] = Math.max(c[at + 1], a * 0.45); }
+                for (let i = 0; i < n; i++) c[i] *= Math.pow(1 - i / n, 1.4);
+                return c;
+            }
+            function _clicks(rng, dur, rate, hold) {
+                const n = Math.max(16, Math.round(dur * 400)), c = new Float32Array(n), every = Math.max(2, 400 / Math.max(0.5, rate));
+                if (hold) {   // V2.3: sample and hold: a random level held for each step
+                    let lv = 0;
+                    const st = Math.max(1, Math.round(every));
+                    for (let i = 0; i < n; i++) { if (i % st === 0) lv = 0.2 + 0.8 * rng(); c[i] = lv * (1 - i / n); }
+                    return c;
+                }
+                for (let t = 1; t < n - 1; t += every * (0.9 + 0.2 * rng())) { const i = Math.floor(t); c[i] = 1 - 0.5 * (i / n); c[i + 1] = c[i] * 0.35; }
+                return c;
+            }
+            function _taps(dur, taps) {
+                const n = Math.max(16, Math.round(dur * 400)), c = new Float32Array(n), gap = taps[0] * 400;
+                for (let k = 0; k < taps[1]; k++) {
+                    const s = Math.round(k * gap), a = Math.pow(0.5, k);
+                    for (let i = s; i < n && i < s + 40; i++) c[i] = Math.max(c[i], a * Math.exp(-(i - s) / 9));
+                }
+                return c;
+            }
+            // V2.3: an oscillator frequency: f0, then a glide to f1 or the arp's steps
+            const _audible = (f) => _clamp(f, 20, 18000);
+            function _freq(prm, v, t0, dur) {
+                prm.value = _audible(v.f0);
+                prm.setValueAtTime(_audible(v.f0), t0);
+                if (v.steps) { for (let i = 1; i < v.steps.length; i++) prm.setValueAtTime(_audible(v.steps[i]), t0 + i * v.step); }
+                else if (v.f1 && v.f1 !== v.f0) prm.exponentialRampToValueAtTime(_audible(v.f1), t0 + Math.min(dur, v.glideT || dur));
+            }
+            const _lp = (sh, P) => (sh.lp ? { type: 'lowpass', f0: sh.lp[0], f1: sh.lp[1], q: Math.max(0.5, P.noise ? P.noise.q : 0.7) } : null);
+            const _nz = (P) => P.noise || { type: 'lowpass', f: 1200, q: 0.7 };
+            // V2.3: the 10 recipes: (palette, shape, root Hz, gain, length s, opts, rng) -> one voice spec
+            const _RECIPE = {
+                tonal: (P, sh, f, g, len, o) => ({ wave: o.wave || P.wave, f0: f, f1: f * (o.glide || sh.glide || 1), glideT: len * 0.7, dur: len,
+                    att: Math.max(0.002, P.attack || 0.004), gain: g, filter: _lp(sh, P), vib: sh.vib || null, pair: sh.detune || 0 }),
+                fmBell: (P, sh, f, g, len, o) => ({ wave: 'sine', f0: f * (sh.bellMul || 1), f1: 0, dur: Math.max(len, (P.tail || 0.3) * 1.4), att: 0.002, gain: g,
+                    fm: sh.fm || [1.41, 2] }),
+                noiseSweep: (P, sh, f, g, len, o) => { const s = o.sweep || sh.sweep || [1, 1.8], n = _nz(P), nf = o.nf || 1;
+                    return { noise: true, dur: len, att: Math.max(0.004, (P.attack || 0.004) * 2), gain: g, filter: { type: n.type, f0: n.f * nf * s[0], f1: n.f * nf * s[1], q: n.q } }; },
+                crackle: (P, sh, f, g, len, o, rng) => { const n = _nz(P);
+                    return { noise: true, dur: len, gain: g, filter: { type: 'bandpass', f0: n.f * (o.nf || 1), q: Math.max(0.8, n.q) }, curve: _grains(rng, len, sh.grains || 40) }; },
+                pluck: (P, sh, f, g, len, o) => ({ wave: o.wave || (P.wave === 'sine' ? 'triangle' : P.wave), f0: f, f1: 0, dur: len, att: 0.001, gain: g,
+                    filter: { type: 'lowpass', f0: Math.min(12000, f * 12), f1: Math.max(60, f * 1.3), q: Math.max(1, (P.noise ? P.noise.q : 1) * 0.5) } }),
+                clickTrain: (P, sh, f, g, len, o, rng) => { const n = _nz(P);
+                    return { noise: true, dur: len, gain: g, filter: { type: n.type === 'lowpass' ? 'bandpass' : n.type, f0: n.f * (o.nf || 1), q: Math.max(0.7, n.q) },
+                        curve: _clicks(rng, len, o.rate || sh.rate || 20, !!sh.sh) }; },
+                arp: (P, sh, f, g, len, o, rng) => {
+                    const st = sh.step || 0.04, n = Math.max(3, Math.round(len / st)), iv = P.intervals && P.intervals.length ? P.intervals : [0], steps = [];
+                    for (let i = 0; i < n; i++) {
+                        // V2.3: up the intervals, an octave a turn; shape.sh (bit-stepped chirps) picks each step from the stream
+                        const k = sh.sh ? Math.floor(rng() * iv.length) + iv.length * Math.floor(rng() * 2) : i;
+                        steps.push(f * Math.pow(2, (iv[k % iv.length] + 12 * Math.floor(k / iv.length)) / 12));
+                    }
+                    return { wave: o.wave || P.wave, f0: steps[0], steps: steps, step: st, dur: n * st + 0.05, att: 0.002, gain: g, filter: _lp(sh, P) };
+                },
+                hiss: (P, sh, f, g, len, o) => { const n = _nz(P);
+                    return { noise: true, dur: len, att: len * 0.25, gain: g, filter: { type: n.type, f0: n.f * (o.nf || 1), f1: n.f * (o.nf || 1) * (sh.hissDrop || 0.75), q: n.q } }; },
+                swell: (P, sh, f, g, len, o) => ({ wave: o.wave || P.wave, f0: f, f1: f * (o.glide || sh.glide || 1), glideT: len, dur: len, att: len * 0.7, gain: g,
+                    filter: _lp(sh, P), vib: sh.vib || null, pair: sh.detune || 0 }),
+                pulse: (P, sh, f, g, len, o) => (sh.taps
+                    ? { wave: o.wave || 'sine', f0: f, f1: 0, dur: Math.max(len, sh.taps[0] * sh.taps[1] + 0.1), gain: g, curve: _taps(Math.max(len, sh.taps[0] * sh.taps[1] + 0.1), sh.taps) }
+                    : { wave: o.wave || P.wave, f0: f, f1: 0, dur: len, att: 0.004, gain: g, trem: [o.rate || sh.rate || 12, 0.85] })
+            };
+            // V2.3: one voice: source(s) -> [filter] -> envelope -> [tremolo] -> soundFX._route (the bus of a positional event or
+            // a preview, else the destination and V2.2's reverb). Master volume and the threshold as playTone; null when silent
+            function _voice(ctx, rng, v) {
+                const g0 = Math.min(0.45, Math.max(0, v.gain * _master()));
+                if (g0 <= 0.0002) return null;
+                const t0 = ctx.currentTime + Math.max(0, v.at || 0), dur = _clamp(v.dur, 0.02, 3);
+                const srcs = [];
+                try {
+                    let head;
+                    if (v.noise) {
+                        const src = ctx.createBufferSource();
+                        src.buffer = _noise(ctx);
+                        src.loop = true;
+                        srcs.push([src, rng() * 0.5]);   // V2.3: the buffer offset from the event's stream
+                        head = src;
+                    } else {
+                        const osc = ctx.createOscillator();
+                        osc.type = v.wave;
+                        _freq(osc.frequency, v, t0, dur);
+                        srcs.push([osc, 0]);
+                        head = osc;
+                        if (v.pair) {   // V2.3: a detuned twin into one mix (still one voice)
+                            const o2 = ctx.createOscillator(), mix = ctx.createGain();
+                            o2.type = v.wave;
+                            _freq(o2.frequency, v, t0, dur);
+                            o2.detune.value = v.pair;
+                            mix.gain.value = 0.6;
+                            osc.connect(mix); o2.connect(mix);
+                            srcs.push([o2, 0]);
+                            head = mix;
+                        }
+                        if (v.fm) {   // V2.3: FM: a sine modulator whose index decays (a bell)
+                            const mod = ctx.createOscillator(), mg = ctx.createGain(), depth = v.f0 * v.fm[1];
+                            mod.type = 'sine';
+                            mod.frequency.value = _audible(v.f0 * v.fm[0]);
+                            mg.gain.setValueAtTime(depth, t0);
+                            mg.gain.exponentialRampToValueAtTime(Math.max(0.01, depth * 0.02), t0 + dur * 0.7);
+                            mod.connect(mg); mg.connect(osc.frequency);
+                            srcs.push([mod, 0]);
+                        }
+                        if (v.vib) {
+                            const lfo = ctx.createOscillator(), lg = ctx.createGain();
+                            lfo.type = 'sine';
+                            lfo.frequency.value = v.vib[0];
+                            lg.gain.value = v.f0 * v.vib[1];
+                            lfo.connect(lg); lg.connect(osc.frequency);
+                            srcs.push([lfo, 0]);
+                        }
+                    }
+                    if (v.filter) {
+                        const bq = ctx.createBiquadFilter(), F = v.filter;
+                        bq.type = F.type;
+                        bq.Q.value = F.q;
+                        bq.frequency.value = _audible(F.f0);
+                        bq.frequency.setValueAtTime(_audible(F.f0), t0);
+                        if (F.f1 && F.f1 !== F.f0) bq.frequency.exponentialRampToValueAtTime(_audible(F.f1), t0 + dur);
+                        head.connect(bq);
+                        head = bq;
+                    }
+                    const env = ctx.createGain();
+                    if (v.curve) {
+                        const c = new Float32Array(v.curve.length);
+                        for (let i = 0; i < c.length; i++) c[i] = v.curve[i] * g0;
+                        env.gain.value = 0;
+                        env.gain.setValueCurveAtTime(c, t0, dur);
+                    } else {
+                        const att = Math.min(dur * 0.8, Math.max(0.001, v.att || 0.004));
+                        env.gain.setValueAtTime(0.0001, t0);
+                        env.gain.linearRampToValueAtTime(g0, t0 + att);
+                        env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+                    }
+                    head.connect(env);
+                    let out = env;
+                    if (v.trem) {
+                        const tg = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+                        tg.gain.value = 1 - v.trem[1] * 0.5;
+                        lfo.frequency.value = v.trem[0];
+                        lg.gain.value = v.trem[1] * 0.5;
+                        lfo.connect(lg); lg.connect(tg.gain); env.connect(tg);
+                        srcs.push([lfo, 0]);
+                        out = tg;
+                    }
+                    soundFX._route(ctx, out);
+                    for (const s of srcs) {
+                        if (s[1]) s[0].start(t0, s[1]); else s[0].start(t0);
+                        s[0].stop(t0 + dur + 0.03);
+                    }
+                    S.stats.voices++;
+                    return { r: v.r, wave: v.noise ? 'noise' : v.wave, f: v.noise ? null : v.f0, filter: v.filter ? [v.filter.type, v.filter.f0, v.filter.q] : null, gain: g0, dur: dur, at: v.at || 0 };
+                } catch (e) { return null; }
+            }
+            // V2.3: a layer: items [recipe, opts] from a family; opt { si interval index, gains, len, cap, chord (voice i on
+            // interval si + i), stagger s, at0 s, fixed (exactly len), extra opts }
+            function _layer(ctx, rng, P, F, items, opt) {
+                const out = [], sh = F.shape || {};
+                for (let i = 0; i < items.length && i < opt.gains.length; i++) {
+                    const name = items[i][0], o = opt.extra ? Object.assign({}, items[i][1], opt.extra) : items[i][1], mul = o.mul || 1;
+                    let g = opt.gains[i] * (o.g || 1);
+                    if (mul < 1) g *= 0.4 + (P.sub || 0);              // V2.3: a sub voice follows the palette's sub
+                    else if (mul >= 2) g *= 0.5 + (P.shimmer || 0);    // V2.3: an upper partial follows its shimmer
+                    g = Math.min(opt.cap, g);
+                    const len = opt.len * (o.len || 1);
+                    const f = _hz(P, (opt.si || 0) + (opt.chord ? i : 0) + (o.iv || 0), mul);
+                    const v = (_RECIPE[name] || _RECIPE.tonal)(P, sh, f, g, len, o, rng);
+                    v.r = _RECIPE[name] ? name : 'tonal';
+                    if (opt.fixed) v.dur = len;
+                    v.at = (opt.at0 || 0) + (opt.stagger || 0) * i;
+                    const played = _voice(ctx, rng, v);
+                    if (played) out.push(played);
+                }
+                return out;
+            }
+            // V2.3: one event: its voices built inside V23.seeded on the event's stream (every helper draw on it), traced
+            function _event(ev, agent, slot, P, rng, fn, extra) {
+                let voices = [];
+                V23.seeded(function (r) { voices = fn(r) || []; }, rng);
+                S.stats.events++;
+                const e = { ev: ev, agent: agent, slot: slot, family: P.family, known: Object.prototype.hasOwnProperty.call(FAMILIES, P.family), voices: voices };
+                if (extra) Object.assign(e, extra);
+                _trace(e);
+                return voices;
+            }
+            // V2.3: the inverse-distance level of soundFX's panner (refDistance 4, rolloff 1.1), for a bus with no panner
+            function _distGain(x, y, z) {
+                const d = Math.hypot(x - camera.position.x, y - camera.position.y, z - camera.position.z);
+                return 4 / (4 + 1.1 * (Math.max(d, 4) - 4));
+            }
+            // V2.3: the last preview's bus to 0 in 30 ms (design 6.8 interruption)
+            function _fade(ctx) {
+                const bus = S.pv;
+                S.pv = null;
+                if (!bus) return;
+                try {
+                    const t = ctx.currentTime;
+                    bus.gain.cancelScheduledValues(t);
+                    bus.gain.setValueAtTime(bus.gain.value, t);
+                    bus.gain.linearRampToValueAtTime(0, t + 0.03);
+                    S.stats.faded++;
+                } catch (e) {}
+            }
+            // V2.3: the cue timeline of a preview slot (see preview)
+            function _previewVoices(ctx, rng, L, P, F, slot) {
+                const out = [];
+                const cue = (name, at) => {
+                    if (name === 'motif') { for (const v of _layer(ctx, rng, P, F, F.motif, { si: 0, gains: MOTIF_G, len: _motifLen(P), cap: 0.06, at0: at })) out.push(v); return; }
+                    const C = CUES[name];
+                    if (!C) return;
+                    for (const v of _layer(ctx, rng, P, F, C.items, { si: 0, gains: C.gains, len: C.len, cap: 0.08, at0: at })) out.push(v);
+                };
+                if (Object.prototype.hasOwnProperty.call(SLOT_I, slot)) {
+                    const pv = L.previews && L.previews[slot], calls = (pv && pv.sound && pv.sound.calls) || [];
+                    // V2.3: the cast's own soundFX methods (PREVIEW_SOUNDS), on the bus, inside V23.seeded
+                    for (const c of calls) if (typeof soundFX[c[0]] === 'function') soundFX[c[0]].apply(soundFX, c.slice(1));
+                    if (slot === 'x') for (const v of _layer(ctx, rng, P, F, F.sting, { si: 0, gains: STING_G, len: _stingLen(P), cap: 0.08, chord: true, stagger: 0.06 / ((L.motion && L.motion.tempo) || 1), at0: 0.1 })) out.push(v);
+                    else for (const v of _layer(ctx, rng, P, F, F.motif, { si: SLOT_I[slot], gains: MOTIF_G, len: _motifLen(P), cap: 0.06, at0: 0.12 })) out.push(v);
+                } else if (slot === 'intro') {
+                    const intro = L.showroom && L.showroom.intro, T = INTROS[intro] || [[(((L.showroom && L.showroom.introMs) || 1000) * 0.6) / 1000, 'motif']];
+                    for (const t of T) cue(t[1], t[0]);
+                } else if (slot === 'lockIn') cue('motif', 0);
+                else cue(slot, 0);
+                return out;
+            }
+            // V2.3: a step recipe per surface x footwear, made once and frozen (soundFX.enemyStep plays it)
+            function _step(surf, foot) {
+                const key = surf + '|' + foot;
+                let d = S.steps[key];
+                if (d) return d;
+                const s = SURF_STEPS[surf] || SURF_STEPS.concrete, w = FOOTWEAR[foot] || FOOTWEAR.boot;
+                d = S.steps[key] = _freeze({ surf: surf, foot: foot, noise: s.noise.slice(), tones: s.tones.concat(w).slice(0, STEP_TONES).map((t) => t.slice()), mix: s.mix });
+                return d;
+            }
+            // V2.3: the box under (x, z) whose top is within 0.3 m of the feet: 1-4 a map piece's surface, -1 a box that is no
+            // map piece (or a piece of no surface), 0 none (findSupportFloorY's query, nearest top wins, the higher on a tie)
+            function _under(x, y, z) {
+                const near = collisionIndex.query(x, z, x, z, S.scratch);
+                let best = null, bd = 0.3 + 1e-6;
+                for (let i = 0; i < near.length; i++) {
+                    const r = near[i];
+                    if (x < r.minX || x > r.maxX || z < r.minZ || z > r.maxZ) continue;
+                    const d = Math.abs(r.maxY - y);
+                    if (d < bd || (best && d === bd && r.maxY > best.maxY)) { best = r; bd = d; }
+                }
+                near.length = 0;
+                if (!best) return 0;
+                const o = best.owner;
+                if (o && typeof o.surf === 'number' && o.bounds && o.shape) { const id = o.surf % 10; return SURF_IDS[id] ? id : -1; }
+                return -1;
+            }
+            // V2.3: open floor: the player's footsteps rule (footsteps.surface with no support box)
+            function _openFloor() {
+                if (weatherSurf.uSnow.value > 0.4) return 'snow';
+                if (weatherSurf.uSand.value > 0.4) return 'sand';
+                if (weatherSurf.uWet.value > 0.4) return 'wet';
+                return 'concrete';
+            }
+            // V2.3: build the shared buffers at the first user gesture (listeners on window, capture, passive; removed once built)
+            const GESTURES = ['pointerdown', 'keydown', 'touchstart'];
+            const _onGesture = function () { try { if (V23.audio && V23.core) V23.audio.prebuild(); } catch (e) {} };
+            function _listen(on) {
+                if (typeof window === 'undefined' || !window.addEventListener || S.listening === on) return;
+                for (const t of GESTURES) {
+                    if (on) window.addEventListener(t, _onGesture, { capture: true, passive: true });
+                    else window.removeEventListener(t, _onGesture, { capture: true, passive: true });
+                }
+                S.listening = on;
+            }
+
+            // ---- the contract (V23.CONTRACT.api.audio) -----------------------------------------------------------------
+            const A = {
+                surfAt: function (enemy) {
+                    // V2.3 (hook H31.1): the step recipe for the surface under a bot (see the header); null with identity off (V2.2's step),
+                    // undefined on a box that is no map piece (V2.2's step: no guessing)
+                    if (!enemy || !enemy.mesh || !_idOn()) return null;
+                    const p = enemy.mesh.position, cx = Math.floor(p.x * 2), cz = Math.floor(p.z * 2), cy = Math.round(p.y * 4), rev = collisionIndex.revision;
+                    let c = S.surf.get(enemy);
+                    if (!c) { c = { cx: 0, cz: 0, cy: 0, rev: -1, raw: 0 }; S.surf.set(enemy, c); }
+                    if (c.rev !== rev || c.cx !== cx || c.cz !== cz || c.cy !== cy) {
+                        // V2.3: cached per bot per 0.5 m cell (0.25 m of height, the index revision): one query when it changes
+                        c.raw = _under(p.x, p.y, p.z);
+                        c.cx = cx; c.cz = cz; c.cy = cy; c.rev = rev;
+                        S.stats.surfLookups++;
+                    } else S.stats.surfCached++;
+                    if (c.raw < 0) return undefined;
+                    const surf = c.raw > 0 ? SURF_IDS[c.raw] : _openFloor();
+                    const L = _look(enemy.agentId), fw = L && L.sound ? L.sound.footwear : null;
+                    return _step(surf, Object.prototype.hasOwnProperty.call(FOOTWEAR, fw) ? fw : 'boot');
+                },
+                motif: function (agentId, slot) {
+                    // V2.3: the palette layer at the gesture's release key (V23.fp): 2 voices (each <= 0.06), 2D, under the
+                    // ability's own soundFX method (unchanged, at t 0)
+                    if (!_idOn()) return null;
+                    const ctx = soundFX.ensureContext();
+                    if (!ctx) return null;
+                    const L = _look(agentId);
+                    if (!L || !L.sound) return null;
+                    const P = L.sound, F = _fam(P), si = Object.prototype.hasOwnProperty.call(SLOT_I, slot) ? SLOT_I[slot] : 0;
+                    S.stats.motifs++;
+                    _event('motif', agentId, slot, P, _stream(L.lookIdx, si), (rng) => _layer(ctx, rng, P, F, F.motif, { si: si, gains: MOTIF_G, len: _motifLen(P), cap: 0.06 }));
+                    return null;
+                },
+                ultSting: function (agentId) {
+                    // V2.3: the ultimate's activation sting (V23.fp.ultCue): 3 voices, a chord on the first three intervals, 2D
+                    if (!_idOn()) return null;
+                    const ctx = soundFX.ensureContext();
+                    if (!ctx) return null;
+                    const L = _look(agentId);
+                    if (!L || !L.sound) return null;
+                    const P = L.sound, F = _fam(P), tempo = (L.motion && L.motion.tempo) || 1;
+                    S.stats.stings++;
+                    _event('ult', agentId, 'x', P, _stream(L.lookIdx, 4), (rng) => _layer(ctx, rng, P, F, F.sting, { si: 0, gains: STING_G, len: _stingLen(P), cap: 0.08, chord: true, stagger: 0.06 / tempo }));
+                    return null;
+                },
+                preview: function (agentId, slot) {
+                    // V2.3: the showroom's sounds (see the header): 2D, inside V23.seeded, on a bus per preview feeding soundFX._out
+                    // (or the destination); a new preview or preview(null) ramps the last bus to 0 in 30 ms
+                    const ctx = soundFX.ensureContext();
+                    if (!ctx) return null;
+                    _fade(ctx);
+                    if (!agentId) return null;
+                    const L = _look(agentId);
+                    if (!L || !L.sound) return null;
+                    let bus;
+                    try { bus = ctx.createGain(); bus.connect(soundFX._out || ctx.destination); } catch (e) { return null; }
+                    S.pv = bus;
+                    S.stats.previews++;
+                    const P = L.sound, F = _fam(P), prevOut = soundFX._out, prevPos = soundFX._pos;
+                    soundFX._out = bus;   // V2.3: every voice of the preview (the cast's own methods too) onto its bus: no reverb
+                    soundFX._pos = null;
+                    try {
+                        _event('preview', agentId, slot, P, _stream(L.lookIdx, 16 + (SLOT_I[slot] !== undefined ? SLOT_I[slot] : 4)),
+                            (rng) => _previewVoices(ctx, rng, L, P, F, slot), { bus: true });
+                    } finally { soundFX._out = prevOut; soundFX._pos = prevPos; }
+                    return null;
+                },
+                atShared: function (x, y, z, fn) {
+                    // V2.3: one positional event: every voice fn plays goes into one bus, routed once through soundFX.at (one HRTF
+                    // panner, the occlusion low-pass, the reverb send); no context: nothing (no node)
+                    const ctx = soundFX.ensureContext();
+                    if (!ctx || typeof fn !== 'function') return null;
+                    let bus;
+                    try { bus = ctx.createGain(); } catch (e) { return null; }
+                    const cfg = game.userSettings || {}, prevOut = soundFX._out, prevPos = soundFX._pos;
+                    if (cfg.positionalAudio === false) bus.gain.value = _distGain(x, y, z);   // V2.3: no panner: its distance level on the bus
+                    soundFX.at(x, y, z, () => soundFX._route(ctx, bus));
+                    soundFX._out = bus;
+                    soundFX._pos = null;
+                    S.stats.shared++;
+                    try { fn(bus); } finally { soundFX._out = prevOut; soundFX._pos = prevPos; }
+                    return null;
+                },
+                botCue: function (enemy, kind) {
+                    // V2.3: WP8's positional bot layer (see the header); hz, the optional third argument, places 'arm.mortar'
+                    const hz = arguments.length > 2 ? arguments[2] : null;
+                    if (!enemy || typeof kind !== 'string' || !_idOn()) return null;
+                    const ctx = soundFX.ensureContext();
+                    if (!ctx) return null;
+                    const L = _look(enemy.agentId);
+                    if (!L || !L.sound) return null;
+                    const dot = kind.indexOf('.'), ev = dot < 0 ? kind : kind.slice(0, dot), k = dot < 0 ? '' : kind.slice(dot + 1);
+                    // V2.3: the heaviest utility's 300 ms warning sting (design 12.3, open decision 7)
+                    const warn = ev === 'arm' || ev === 'sig' || (ev === 'windup' && k === 'flash');
+                    const src = hz && typeof hz.x === 'number' ? hz : (enemy.mesh ? enemy.mesh.position : null);
+                    if (!src) return null;
+                    const x = src.x, y = src === hz ? (hz.y || 0) + 0.6 : src.y + 1.3, z = src.z;
+                    if (Math.hypot(x - camera.position.x, z - camera.position.z) > CUE_RANGE) { S.stats.skipped++; return null; }
+                    const P = L.sound, F = _fam(P), si = KIND_I[k] || 0;
+                    const rng = typeof soundFX._rand === 'function' ? soundFX._rand : _stream(L.lookIdx, 8 + si);   // V2.3: WP8's stream when it set one
+                    if (warn) S.stats.warnings++; else S.stats.cues++;
+                    A.atShared(x, y, z, () => {
+                        _event(warn ? 'warn' : ev, enemy.agentId, kind, P, rng, (r) => (warn
+                            ? _layer(ctx, r, P, F, F.sting, { si: 0, gains: WARN_G, len: 0.3, cap: 0.08, chord: true, stagger: 0.025, fixed: true, extra: { glide: 1.12 } })
+                            : ev === 'windup'
+                                ? _layer(ctx, r, P, F, [F.cue], { si: si, gains: [0.045], len: 0.35, cap: 0.05, extra: { glide: 1.08 } })
+                                : _layer(ctx, r, P, F, F.motif, { si: si, gains: MOTIF_G, len: _motifLen(P), cap: 0.06 })), { pos: [x, y, z] });
+                    });
+                    return null;
+                },
+                prebuild: function () {
+                    // V2.3: the shared noise and reverb buffers (see the header), at the first user gesture; no context: retried
+                    // at the next gesture
+                    const ctx = soundFX.ensureContext();
+                    if (!ctx) return null;
+                    _noise(ctx);
+                    if (soundFX._reverb === null && V23.core && V23.core._quiet) V23.core._quiet(() => soundFX._ensureReverb(ctx));   // V2.3: its IR's draws on a V23.rand stream
+                    S.prebuilt = true;
+                    S.stats.prebuilds++;
+                    _listen(false);
+                    return null;
+                },
+                // data for the tests and the tools (read only)
+                state: {
+                    get families() { return FAMILIES; }, get recipes() { return RECIPES; }, get cues() { return CUES; }, get intros() { return INTROS; },
+                    get surfSteps() { return SURF_STEPS; }, get footwear() { return FOOTWEAR; }, get stats() { return Object.assign({}, S.stats); },
+                    get trace() { return S.trace.slice(); }, get prebuilt() { return S.prebuilt; }, get listening() { return S.listening; },
+                    get previewBus() { return S.pv; },
+                    // V2.3: an agent's palette as the engine plays it: the resolved sound field, its family and its motif roots
+                    palette: function (agentId) {
+                        const L = _look(agentId);
+                        if (!L || !L.sound) return null;
+                        const P = L.sound, F = _fam(P), roots = {};
+                        for (const s of Object.keys(SLOT_I)) roots[s] = +_hz(P, SLOT_I[s], 1).toFixed(2);
+                        return { agent: agentId, role: L.role, stub: !!L.stub, family: P.family, known: F !== GENERIC, wave: P.wave, base: P.base, intervals: P.intervals.slice(),
+                            noise: Object.assign({}, P.noise), attack: P.attack, tail: P.tail, shimmer: P.shimmer, sub: P.sub, footwear: P.footwear,
+                            motif: F.motif.map((i) => i[0]), sting: F.sting.map((i) => i[0]), cue: F.cue[0], roots: roots };
+                    }
+                }
+            };
+            _listen(true);   // V2.3: registered at boot; nothing is built until a gesture
+            return A;
+        })();
         // ===== END V2.3 BLOCK AUDIO =====
 
         // =============================================
