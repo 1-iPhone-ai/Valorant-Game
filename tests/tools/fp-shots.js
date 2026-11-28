@@ -6,12 +6,13 @@
 // takes a screenshot of each:
 //   pistol-ads     the pistol aimed down the sights (the gun hands sit below the hip-fire view, as in V2.2)
 //   rifle-ads      the rifle aimed down the sights
-//   rifle-raised   the rifle at the hip, raised 22 cm (its hipPos y, for the shot only) so its hands, wrists and sleeves
-//                  are in frame, as the fp-identity crops raise the pistol
-//   rifle-inspect  the rifle's inspect at p 0.45 (--inspect-p), the gun turned with the hands in
+//   rifle-raised   the rifle raised into view, as the fp-identity crops raise the pistol (its hipPos 30 cm up and 6 cm in,
+//                  pitched up 0.25 rad, for the shot only): the rifle's hands sit under the frame at the hip and in ADS
+//                  (V2.2's framing), so this is the rifle view that shows its hands, wrists and sleeves
+//   rifle-inspect  the rifle's inspect at p 0.45 (--inspect-p; not in the default set: the hands stay under the frame)
 //   knife-inspect  the knife's inspect, mid flip (p 0.3)
-//   cast-<slot>    the off-hand cast gesture just after its release key (p 0.3 of the clip)
-//   ult            the ultimate's gesture at p 0.5 (hand2 up, the centre clear)
+//   cast-<slot>    the off-hand cast gesture just after its release key (p 0.3 of the clip; cast-<slot>@p another p)
+//   ult            the ultimate's gesture at p 0.5 (hand2 up, the centre clear; ult@p another p)
 // A pose is frozen by stretching its clip (castFX.active.dur, vmAnim.clip.dur) so its progress stands still while the
 // game keeps rendering. The HUD is hidden so the viewmodel shows in full; bots are frozen. Between views every ability
 // item still out is ended through its own update path (agent-casts' clear), so no earlier cast (a wall, a smoke) is in
@@ -37,7 +38,7 @@ for (let i = 2; i < process.argv.length; i++) {
     else args[a.slice(2)] = true;
 }
 const AGENTS = String(args.agents || 'sage,omen').split(',');
-const VIEWS = String(args.views || 'pistol-ads,rifle-ads,rifle-raised,rifle-inspect,knife-inspect,cast-c,cast-q,cast-e,ult').split(',');
+const VIEWS = String(args.views || 'pistol-ads,rifle-raised,knife-inspect,cast-c,cast-q,cast-e,ult').split(',');
 const INSPECT_P = +(args['inspect-p'] || 0.45);
 const OUT = path.resolve(args.out || path.join(REPO, 'fp-shots'));
 const W = +(args.width || 640), H = +(args.height || 360);
@@ -92,6 +93,7 @@ const W = +(args.width || 640), H = +(args.height || 360);
             if (vmAnim.clip) vmAnim.finishClip(game.weapons[game.activeWeapon]);
             setAdsState(false);
             if (window.__hip) { game.weapons.rifle.hipPos = window.__hip; window.__hip = null; }
+            if (window.__pitch) { game.weapons.rifle.model.rotation.x -= window.__pitch; window.__pitch = 0; }
         });
         await frames(3);
     };
@@ -112,7 +114,9 @@ const W = +(args.width || 640), H = +(args.height || 360);
                 switchWeapon('rifle');
                 const w = game.weapons.rifle, h = w.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
                 window.__hip = w.hipPos;
-                w.hipPos = { x: h.x, y: h.y + 0.22, z: h.z + 0.02 };   // for this shot only (reset puts it back)
+                w.hipPos = { x: h.x - 0.06, y: h.y + 0.3, z: h.z + 0.04 };   // for this shot only (reset puts it back)
+                w.model.rotation.x += 0.25;   // outside vmAnim's offsets, so it stays until reset takes it off
+                window.__pitch = 0.25;
             });
             await frames(40);
         } else if (view === 'rifle-inspect' || view === 'knife-inspect') {
@@ -123,8 +127,10 @@ const W = +(args.width || 640), H = +(args.height || 360);
                 vmAnim.play('inspect', 2400);
                 const c = vmAnim.clip; c.dur = 1e8; c.start = performance.now() - p * 1e8;
             }, w === 'rifle' ? INSPECT_P : 0.3);
-        } else if (view.startsWith('cast-') || view === 'ult') {
-            const slot = view === 'ult' ? 'x' : view.slice(5);
+        } else if (view.startsWith('cast-') || view.startsWith('ult')) {
+            // cast-<slot>[@p], ult[@p]: the clip progress to freeze at (default 0.3, the ultimate 0.5)
+            const [v, at] = view.split('@');
+            const slot = v === 'ult' ? 'x' : v.slice(5), p = at !== undefined ? +at : (v === 'ult' ? 0.5 : 0.3);
             await page.evaluate(() => { switchWeapon('rifle'); });
             await frames(30);
             await page.evaluate(([slot, p]) => {
@@ -132,7 +138,7 @@ const W = +(args.width || 640), H = +(args.height || 360);
                 agentSystem.castAbility(slot);
                 const a = castFX.active;
                 if (a) { a.dur = 1e8; a.start = performance.now() - p * 1e8; }
-            }, [slot, view === 'ult' ? 0.5 : 0.3]);
+            }, [slot, p]);
         }
     };
     for (const agent of AGENTS) {
@@ -144,7 +150,7 @@ const W = +(args.width || 640), H = +(args.height || 360);
             }, [agent, off]);
             for (const view of VIEWS) {
                 await setView(view);
-                await shot(agent + '-' + view + (off ? '-off' : ''));
+                await shot(agent + '-' + view.replace('@', '-p') + (off ? '-off' : ''));
             }
         }
     }
