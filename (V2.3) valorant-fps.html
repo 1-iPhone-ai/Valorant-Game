@@ -21872,7 +21872,10 @@
         //    transform, so the hand and the magazine in it ride the gun exactly), while the gun's own support hand and its
         //    forearm are taken away through WP4's V23.fp.offHand(model, hidden) (the LEFT hand, or the right one left-handed;
         //    it works with Agent Identity off too). A spare magazine (a child of castFX.group) draws the live magazine's
-        //    geometry and material at its kit scale; shell guns carry shells (the slot's accent material). A cast or Enhanced
+        //    geometry and material at its kit scale, taken by its front face (GRIP: the open cast hand's palm side toward the
+        //    camera, the fingertips over its top edge); shell guns carry shells (the slot's accent material). The hand and
+        //    the magazine move on smoothstep keys and the release starts 0.06 of the clip after the slap, so the hand never
+        //    moves more than 0.08 per 16 ms frame (the weapon-anims test checks every gun). A cast or Enhanced
         //    Animations' off hand (plant, defuse, mantle, rope, door) takes the hand: the reload goes on with the gun's own
         //    hand back and the magazine out of sight until the hand is free again.
         //  - magFX: one world InstancedMesh per magazine class (rifle, pistol, sniper, shell) with shellFX's parameters
@@ -21880,8 +21883,10 @@
         //    program); caps 4 on Medium, 8 on High and up, 0 on Low; slots reused round-robin; shellFX's gravity, floor
         //    bounce, friction and settle, a 6 s life with shellFX's fade over its last 0.5 s. Built inside V23.core._quiet
         //    at the boot's first switchWeapon (H20.6), before the warm-up, which draws each mesh once (userData.v23Warm
-        //    'world'; the spare magazines and shells 'vm'), so no program, stall or first-use upload comes later.
-        //    reset() (finishClip, cancelReload) ends the clip's own magFX state: a drop the clip had not reached never comes.
+        //    'world'; the spare magazines and shells 'vm'), so no program, stall or first-use upload comes later. A class's
+        //    instance matrices upload only on a frame where one of its records came, moved, faded or went.
+        //    reset() (finishClip, cancelReload) ends the clip's own magFX state: a drop the clip had not reached never comes;
+        //    magazines already on the floor live out their 6 s (the pool is the world's, like shellFX's casings).
         //  - Draws (H20.1, H20.6): visual only; the 380 / 280 ms clip and the synchronous switchWeapon are V2.2's. Class-shaped:
         //    the rifle rolls in low, the pistol snaps up, the sniper is a heavy lift, the SMG flips, the shotgun pumps, the heavy
         //    heaves, the knife spins in. The gun put away stays visible as a ghost that sinks for the first 30% of the draw;
@@ -21900,18 +21905,22 @@
             const on = () => !(typeof game !== 'undefined' && game.userSettings && game.userSettings.weaponAnims === 'classic');
             const lefty = () => ((game.userSettings && game.userSettings.leftHanded) ? -1 : 1);
             const HALF_PI = Math.PI / 2, TAU = Math.PI * 2;
-            // V2.3: a key track [[t, v1, v2, ...], ...] at p into out, eased between keys (V2.2's _ease.inOut), held outside
-            function _tk(keys, p, out) {
+            // V2.3: a key track [[t, v1, v2, ...], ...] at p into out, eased between keys (V2.2's _ease.inOut, or ease), held
+            // outside
+            function _tk(keys, p, out, ease) {
                 const n = keys.length, a0 = keys[0], z = keys[n - 1];
                 if (p <= a0[0]) { for (let j = 1; j < a0.length; j++) out[j - 1] = a0[j]; return out; }
                 if (p >= z[0]) { for (let j = 1; j < z.length; j++) out[j - 1] = z[j]; return out; }
                 let i = 0;
                 while (i < n - 2 && p > keys[i + 1][0]) i++;
                 const a = keys[i], b = keys[i + 1], span = b[0] - a[0];
-                const t = span > 0 ? _ease.inOut((p - a[0]) / span) : 1;
+                const t = span > 0 ? (ease || _ease.inOut)((p - a[0]) / span) : 1;
                 for (let j = 1; j < a.length; j++) out[j - 1] = a[j] + (b[j] - a[j]) * t;
                 return out;
             }
+            // V2.3: the hand's and the magazine's ease: smoothstep (its peak speed 1.5 times the average, the cubic's 3), so a
+            // long move of the hand never outruns a hand (the weapon-anims test bounds it per frame)
+            const _smooth = (t) => t * t * (3 - 2 * t);
             // V2.3: a gun offset [px, py, pz, rx, ry, rz] (authored right-handed) into o, mirrored as vmAnim._keys mirrors
             const _add6 = (v, o, h, k) => { o.px += v[0] * h * k; o.py += v[1] * k; o.pz += v[2] * k; o.rx += v[3] * k; o.ry += v[4] * h * k; o.rz += v[5] * h * k; };
             const _v6 = [0, 0, 0, 0, 0, 0], _x6 = [0, 0, 0, 0, 0, 0], _v1 = [0];
@@ -21937,7 +21946,7 @@
             // V2.3: the class presets (eaFP.gunClass / def.cls, heavies kept apart): the reload kind ('mag' magazine swap, 'box' box
             // magazine with a belt shake, 'shell' shell pushes, 'break' break-action, 'bolt1' bolt and one round, 'side' side-load),
             // the release after a tactical [0] and an empty [1] reload, the slide lock (visual) and the inspect accent
-            const PRESET = {
+            const _PRESET = {
                 rifle: { r: 'mag', post: [null, 'boltRel'], lock: false, insp: null },
                 smg: { r: 'mag', post: [null, 'boltSlap'], lock: false, insp: null },
                 shotgun: { r: 'shell', post: [null, 'pump'], lock: false, insp: null },
@@ -21947,7 +21956,7 @@
                 knife: { r: null, post: [null, null], lock: false, insp: 'knife' }
             };
             // V2.3: the per-gun overrides on their class preset (design 8's build order: Vandal and Classic first)
-            const GUNS = {
+            const _GUNS = {
                 vandal: { post: [null, 'charge'], insp: 'magCheck' },     // the charging handle after an empty reload; a magazine check
                 classic: { insp: 'pressCheck' },                          // the slide locked back and released; a press check
                 // rifle magazine, bolt release on empty (the rifle preset)
@@ -21978,7 +21987,7 @@
             const _defs = new Map();
             function _def(gun, cls) {
                 let d = _defs.get(gun);
-                if (!d) { d = Object.freeze(Object.assign({}, PRESET[cls] || PRESET.rifle, GUNS[gun] || {})); _defs.set(gun, d); }
+                if (!d) { d = Object.freeze(Object.assign({}, _PRESET[cls] || _PRESET.rifle, _GUNS[gun] || {})); _defs.set(gun, d); }
                 return d;
             }
             // V2.3: each class's reload stance: how far the gun comes up into view, toward the centre and the camera, and how
@@ -22100,7 +22109,7 @@
                         P.meshes[cls] = mesh;
                         P.mats[cls] = mat;
                     }
-                    for (let i = 0; i < CAP; i++) P.recs.push({ alive: false, cls: null, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), s: new THREE.Vector3(1, 1, 1), t: 0, floor: 0, half: 0.02 });
+                    for (let i = 0; i < CAP; i++) P.recs.push({ alive: false, cls: null, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), s: new THREE.Vector3(1, 1, 1), t: 0, floor: 0, half: 0.02, fresh: false });
                     S.pool = P;
                 });
                 S.stats.builds++;
@@ -22124,9 +22133,12 @@
             function _magScript(gun, cls, slot, empty, box) {
                 const G = _def(gun, cls), post = G.post[empty ? 1 : 0];
                 const pistol = slot === 'pistol', sniper = slot === 'sniper';
-                const out = empty ? 0.06 : 0.08, seat = 0.72, ins = seat - 0.06, align = seat - 0.14;
-                const P = post ? (post === 'bolt' ? [0.78, 0.86] : [0.76, 0.85]) : null;
-                const back = post ? P[1] + 0.04 : seat + 0.12;
+                const out = empty ? 0.06 : 0.08, seat = 0.72, ins = seat - 0.06, align = seat - 0.14, slap = seat + 0.02;
+                // V2.3: the release (charging handle, bolt release, bolt slap, slide release) starts 0.06 of the clip after
+                // the slap, so the hand travels there from under the magazine (no pop: the weapon-anims test bounds the
+                // hand's speed); the sniper's bolt keeps V2.2's eject at 0.78
+                const P = post ? (post === 'bolt' ? [0.78, 0.86] : [slap + 0.06, slap + 0.13]) : null;
+                const back = post ? P[1] + (post === 'bolt' ? 0.04 : 0.05) : seat + 0.12;
                 const sc = { gun: null, bumps: [], ea: [], mag: null, ph: null, drop: null, hand: null, hOn: [out, back], slide: null, shells: null, release: -1 };
                 const deep = pistol ? -0.075 : -0.09;                // how far down the magazine comes out (still in view)
                 const meet = [0, 0, 0, 0.02, -0.06, 0.05];           // the gun turns to meet the fresh magazine
@@ -22136,9 +22148,10 @@
                 sc.bumps.push([seat + 0.01, 0.035, 0, 0.022, 0, 0.055, 0, 0]);   // the slap that seats it
                 sc.ea.push([out + 0.03, 0.05, -0.006, -0.01, 0, 0, 0.02, 0.03], [seat + 0.06, 0.06, 0, 0, 0, -0.015, 0, 0.045], [0.1, 0.06, -0.008, 0, 0, 0, 0, 0]);
                 // the visible magazine: out with the hand (tactical) or free (empty), the fresh one up from under the frame
-                const lowM = [-0.1, -0.62, 0.16, 0.6, 0, 0.45], fetchM = [-0.08, -0.58, 0.14, -0.5, 0, -0.25];
+                // (a pistol's pouch is nearer: its clip is the shortest, so the hand has less far to go)
+                const lowM = [-0.1, pistol ? -0.52 : -0.62, 0.16, 0.6, 0, 0.45], fetchM = [-0.08, pistol ? -0.48 : -0.58, 0.14, -0.5, 0, -0.25];
                 if (!empty) {
-                    sc.mag = [Z6(0), Z6(0.18), K(0.21, [0, -0.035, 0, 0.02, 0, 0]), K(0.3, [-0.03, deep, 0.03, 0.3, 0, 0.18]), K(0.4, lowM),
+                    sc.mag = [Z6(0), Z6(0.18), K(0.21, [0, -0.035, 0, 0.02, 0, 0]), K(0.3, [-0.03, deep, 0.03, 0.3, 0, 0.18]), K(0.41, lowM),
                         K(0.46, fetchM), K(align, [0, -0.08, 0.01, -0.3, 0, 0]), K(ins, [0, -0.024, 0, -0.05, 0, 0]), Z6(seat), Z6(1)];
                     sc.ph = [[0, 'G'], [0.18, 'H'], [seat, 'G']];
                 } else {
@@ -22151,7 +22164,7 @@
                 // the hand: from the gun to the magazine (tactical) or under the frame (empty), back via the release
                 const H = [[0, 'G'], [out, 'G']];
                 if (!empty) H.push([0.18, 'M']); else H.push([0.12, 'MR'], [0.26, 'LOW'], [0.32, 'M']);
-                H.push([seat, 'M'], [seat + 0.025, 'SLAP']);
+                H.push([seat, 'M'], [slap, 'SLAP']);
                 if (post === 'charge') H.push([P[0], 'CH'], [P[0] + 0.04, 'CH2'], [P[1], 'CH']);
                 else if (post === 'boltRel') H.push([P[0], 'BR'], [P[0] + 0.03, 'BR2'], [P[1], 'BR']);
                 else if (post === 'boltSlap') H.push([P[0], 'BS'], [P[0] + 0.03, 'BS2'], [P[1], 'BS']);
@@ -22194,17 +22207,22 @@
                 }
                 let end = t0 + n * step;
                 if (empty) {
-                    H.push([0.78, 'PU'], [0.83, 'PU2'], [0.87, 'PU']);
-                    sc.bumps.push([0.83, 0.03, 0, 0, 0.05, -0.04, 0, 0], [0.87, 0.025, 0, 0, -0.03, 0.03, 0, 0]);
-                    end = 0.87;
+                    // V2.3: the pump is at the front of the tube: the hand takes 0.09 of the clip to get back to the grip
+                    H.push([0.76, 'PU'], [0.81, 'PU2'], [0.85, 'PU']);
+                    sc.bumps.push([0.81, 0.03, 0, 0, 0.05, -0.04, 0, 0], [0.85, 0.025, 0, 0, -0.03, 0.03, 0, 0]);
+                    end = 0.85;
                 }
-                H.push([Math.min(0.94, end + 0.05), 'G']);
-                sc.hOn[1] = Math.min(0.94, end + 0.05);
+                const home = Math.min(0.94, end + (empty ? 0.09 : 0.05));
+                H.push([home, 'G']);
+                sc.hOn[1] = home;
                 sc.hand = H;
                 sc.shells = _steps(SH);
                 return sc;
             }
-            // V2.3: Outlaw: the action breaks open (spent shells out), two shells (one after a tactical) in, snapped shut
+            // V2.3: Outlaw: the action breaks open (spent shells out), two shells (one after a tactical) in, snapped shut.
+            // reload() ejects one casing at 0.78 for every sniper-slot gun (V2.2's shellFX.eject: it draws Math.random, so
+            // it stays), so the break drops k - 1 into magFX and V2.2's casing is the last spent shell: two casings after
+            // both barrels, one after one (the count is right; the last one leaves late)
             function _breakScript(gun, cls, slot, empty) {
                 const k = empty ? 2 : 1;
                 // (empty: both barrels fired, the action breaks wider and two shells are pressed in, one after the other)
@@ -22212,7 +22230,7 @@
                 const sc = { gun: [Z6(0), K(0.12, s), K(0.2, open), K(0.68, open), K(0.74, shut), K(0.86, s), Z6(1)],
                     bumps: [[0.2, 0.03, 0, -0.012, 0, -0.06, 0, 0], [0.74, 0.03, 0, 0.018, 0, 0.07, 0, 0]].concat(empty ? [[0.52, 0.02, 0, -0.008, 0, -0.03, 0, 0], [0.56, 0.02, 0, -0.008, 0, -0.03, 0, 0]] : [[0.56, 0.02, 0, -0.008, 0, -0.03, 0, 0]]),
                     ea: [[0.25, 0.06, 0, -0.006, 0, 0, 0, 0.03]],
-                    mag: null, ph: null, drop: { t: 0.24, cls: 'shell', n: k }, hand: [[0, 'G'], [0.1, 'G'], [0.3, 'LOW'], [0.46, 'BRK'], [0.56, 'BRK2'], [0.6, 'BRK'], [0.8, 'G']],
+                    mag: null, ph: null, drop: k > 1 ? { t: 0.24, cls: 'shell', n: k - 1 } : null, hand: [[0, 'G'], [0.1, 'G'], [0.3, 'LOW'], [0.46, 'BRK'], [0.56, 'BRK2'], [0.6, 'BRK'], [0.8, 'G']],
                     hOn: [0.1, 0.8], slide: null, shells: _steps([[0.3, k], [0.56, 0]]), release: -1 };
                 return sc;
             }
@@ -22220,8 +22238,8 @@
             function _bolt1Script(gun, cls, slot, empty) {
                 const open = empty ? 0.1 : 0.22;
                 const sc = { gun: _stanceKeys('sniper', 0.12, 0.88), bumps: [], ea: [[0.6, 0.06, 0, -0.005, 0, 0, 0, 0.03]], mag: null, ph: null, drop: null,
-                    hand: [[0, 'G'], [0.3, 'G'], [0.42, 'LOW'], [0.52, 'TOP'], [0.6, 'TOP2'], [0.64, 'TOP'], [0.74, 'G']], hOn: [0.3, 0.74],
-                    slide: null, shells: _steps([[0.42, 1], [0.6, 0]]), release: -1 };
+                    hand: [[0, 'G'], [0.28, 'G'], [0.4, 'LOW'], [0.53, 'TOP'], [0.6, 'TOP2'], [0.64, 'TOP'], [0.76, 'G']], hOn: [0.28, 0.76],
+                    slide: null, shells: _steps([[0.4, 1], [0.6, 0]]), release: -1 };
                 if (!empty) sc.bumps.push([open - 0.04, 0.04, 0, 0.01, 0, 0, 0, 0.2], [open, 0.03, 0, 0, 0.055, 0, 0, 0]);
                 sc.bumps.push([0.62, 0.025, 0, 0.012, 0, 0.04, 0, 0], [0.78, 0.04, 0, 0, -0.03, 0, 0, 0], [0.82, 0.04, 0, 0.01, 0, 0, 0, -0.18]);
                 return sc;
@@ -22230,7 +22248,7 @@
             // hand presses two rounds at a time in from the side, it swings back with a flick; empty: tipped up first, the brass
             // falls out
             function _sideScript(gun, cls, slot, empty) {
-                const sc = { gun: null, bumps: [], ea: [[0.3, 0.06, 0, -0.006, 0, 0, 0, 0.03]], mag: null, ph: [[0, 'G']], drop: null, hand: null, hOn: [0.3, 0.8],
+                const sc = { gun: null, bumps: [], ea: [[0.3, 0.06, 0, -0.006, 0, 0, 0, 0.03]], mag: null, ph: [[0, 'G']], drop: null, hand: null, hOn: [0.36, 0.82],
                     slide: null, shells: null, release: -1 };
                 const st = STANCE.pistol;
                 const tipped = [st[0], st[1] + 0.02, st[2], 0.75, st[4], st[5]];
@@ -22238,8 +22256,10 @@
                 const outM = [-0.05, 0.01, 0, 0, 0, 0.7];
                 sc.mag = [Z6(0), Z6(0.14), K(0.22, outM), K(0.68, outM), Z6(0.74), Z6(1)];
                 if (empty) sc.drop = { t: 0.28, cls: 'shell', n: 2 };
-                sc.hand = [[0, 'G'], [0.3, 'G'], [0.38, 'LOW'], [0.5, 'SIDE'], [0.56, 'SIDE2'], [0.6, 'SIDE'], [0.8, 'G']];
-                sc.shells = _steps([[0.38, 2], [0.56, 0]]);
+                // V2.3: the hand leaves once the gun is back from the tip (it rides the gun: a hand far under the frame
+                // while the gun turns would be flung), takes two rounds from under the frame and presses them in
+                sc.hand = [[0, 'G'], [0.36, 'G'], [0.46, 'LOW'], [0.58, 'SIDE'], [0.62, 'SIDE2'], [0.66, 'SIDE'], [0.82, 'G']];
+                sc.shells = _steps([[0.46, 2], [0.62, 0]]);
                 sc.bumps.push([0.22, 0.03, 0, 0, 0, 0, 0, -0.06], [0.74, 0.03, 0, 0.012, 0, 0.03, 0, 0.09]);
                 return sc;
             }
@@ -22424,15 +22444,27 @@
             // V2.3: the visible magazine's pose at t (in the gun's space, mirrored by h) into (pos, quat)
             function _magPose(st, t, h, pos, quat) {
                 const R = st.R;
-                _tk(st.scr.mag, t, _x6);
+                _tk(st.scr.mag, t, _x6, _smooth);
                 pos.set(_x6[0] * h, _x6[1], _x6[2]).applyQuaternion(R.restQ).add(R.restP);
                 quat.copy(R.restQ).multiply(_q2.setFromEuler(_e.set(_x6[3], _x6[4] * h, _x6[5] * h)));
             }
-            // V2.3: the grip: where the spare magazine sits in the hand (in front of the palm, a little up), for the live kit scale
+            // V2.3: the grip: where the magazine sits in the reload hand, in castFX.group's space before its 1.3 scale
+            // (right-handed; h mirrors it). A is how far it is set off per unit of the magazine's own size at the live kit
+            // scale (rows x, y, z; columns its width, height, depth), B a fixed offset, r its turn (Euler XYZ).
+            // The cast hand is always open while no cast plays (WP4 opens it each render), so the hand takes the magazine
+            // by its front face: the palm side toward the camera, the magazine in the fingers and in front of them, the
+            // fingertips over its top edge and the thumb along its side (turned half a turn about the hand's long axis)
+            const GRIP = { A: [[0, 0, 0], [0, 0.18, 0], [0, 0, -0.5]], B: [0, 0, -0.012], r: [0, Math.PI, 0] };
+            const _gp = new THREE.Vector3(), _gq = new THREE.Quaternion();
+            function _gripOf(R, h) {
+                const s = R.mag.scale, dx = R.w * s.x, dy = R.h * s.y, dz = R.d * s.z, A = GRIP.A, B = GRIP.B;
+                _gp.set((A[0][0] * dx + A[0][1] * dy + A[0][2] * dz + B[0]) * h, A[1][0] * dx + A[1][1] * dy + A[1][2] * dz + B[1],
+                    A[2][0] * dx + A[2][1] * dy + A[2][2] * dz + B[2]);
+                _gq.setFromEuler(_e.set(GRIP.r[0], GRIP.r[1] * h, GRIP.r[2] * h));
+            }
             function _grip(st, h) {
-                const R = st.R, s = R.mag.scale;
-                const gy = 0.18 * R.h * s.y, gz = -(0.5 * R.w * s.x + 0.012);
-                _T.compose(_p2.set(0, gy, gz), _q2.setFromAxisAngle(_up.set(0, 1, 0), HALF_PI * h), _one);
+                _gripOf(st.R, h);
+                _T.compose(_gp, _gq, _one);
                 _Gi.copy(_T).invert();
             }
             // V2.3: an anchor's hand pose at key time t into (pos, quat): 'M' the grip on the magazine then, 'MR' the grip at
@@ -22506,7 +22538,7 @@
                 let i = 0;
                 while (i < keys.length - 2 && p > keys[i + 1][0]) i++;
                 const a = keys[i], b = keys[i + 1] || a, span = b[0] - a[0];
-                const t = span > 0 ? _ease.inOut(Math.min(1, Math.max(0, (p - a[0]) / span))) : 1;
+                const t = span > 0 ? _smooth(Math.min(1, Math.max(0, (p - a[0]) / span))) : 1;
                 _anchor(st, a[1], a[0], h, _pa, _qa);
                 _anchor(st, b[1], b[0], h, _pb, _qb);
                 H.p.lerpVectors(_pa, _pb, t);
@@ -22547,11 +22579,14 @@
                         Q.shells[0].visible = Q === R && H.shells >= 1;
                         Q.shells[1].visible = Q === R && H.shells >= 2;
                         if (sp) {
+                            // V2.3: the live magazine's geometry and material at its kit scale, in the grip (unmirrored here:
+                            // the group's own scale mirrors it left-handed)
                             const mg = Q.mag, s = mg.scale;
                             if (Q.spare.geometry !== mg.geometry) Q.spare.geometry = mg.geometry;
                             if (Q.spare.material !== mg.material) Q.spare.material = mg.material;
-                            const gy = 0.18 * Q.h * s.y, gz = -(0.5 * Q.w * s.x + 0.012);
-                            Q.spare.position.set(0, gy / 1.3, gz / 1.3);
+                            _gripOf(Q, 1);
+                            Q.spare.position.copy(_gp).multiplyScalar(1 / 1.3);
+                            Q.spare.quaternion.copy(_gq);
                             Q.spare.scale.set(s.x / 1.3, s.y / 1.3, s.z / 1.3);
                         }
                         if (Q === R && H.shells === 1) Q.shells[0].position.x = 0;
@@ -22613,22 +22648,30 @@
                     s.t = 0;
                     s.floor = Math.max(0, characterController.position.y - (characterController.height || 1.7)) + s.half;
                     s.alive = true;
+                    s.fresh = true;   // V2.3: its class's instance matrices upload on the next step
                     S.stats.drops++;
                 }
             }
+            // V2.3: a class's instance matrices upload only when they changed (a record spawned, moved or fading, or the
+            // class's count changed); a settled magazine re-uploads nothing (design 15's steady state)
+            const _dirty = { rifle: false, pistol: false, sniper: false, shell: false };
             function _magStep(dt) {
                 const P = S.pool;
                 if (!P) return;
                 const cap = on() ? _cap() : 0;
-                const n = _n;
+                const n = _n, D = _dirty;
                 n.rifle = n.pistol = n.sniper = n.shell = 0;
+                D.rifle = D.pistol = D.sniper = D.shell = false;
                 for (let i = 0; i < CAP; i++) {
                     const s = P.recs[i];
                     if (!s.alive) continue;
                     if (i >= cap) { s.alive = false; continue; }   // over the tier's cap (or 'classic'): gone
                     s.t += dt;
                     if (s.t > LIFE) { s.alive = false; continue; }
+                    let moved = s.fresh;
+                    s.fresh = false;
                     if (s.p.y > s.floor || s.v.lengthSq() > 0.01) {
+                        moved = true;
                         s.v.y -= 9.8 * dt;
                         s.p.addScaledVector(s.v, dt);
                         s.r.addScaledVector(s.w, dt);
@@ -22642,8 +22685,10 @@
                         }
                     }
                     const fade = s.t > LIFE - 0.5 ? 1 - (s.t - (LIFE - 0.5)) / 0.5 : 1;
+                    if (fade < 1) moved = true;
                     const mesh = P.meshes[s.cls];
                     if (!mesh) continue;
+                    if (moved) D[s.cls] = true;
                     _q.setFromEuler(_e.set(s.r.x, s.r.y, s.r.z));
                     _sc.copy(s.s).multiplyScalar(fade);
                     _M.compose(s.p, _q, _sc);
@@ -22651,9 +22696,10 @@
                 }
                 for (const cls in P.meshes) {
                     const mesh = P.meshes[cls], c = n[cls];
-                    if (mesh.count !== c) mesh.count = c;
+                    // a count change re-packs the class (a record before another died or came): its matrices go up too
+                    if (mesh.count !== c) { mesh.count = c; D[cls] = true; }
                     mesh.visible = c > 0;
-                    if (c) mesh.instanceMatrix.needsUpdate = true;
+                    if (c && D[cls]) mesh.instanceMatrix.needsUpdate = true;
                 }
             }
             // V2.3: the holster ghost: the gun put away sinks for the first 30% of the draw, then hides
@@ -22771,11 +22817,12 @@
                     get meshes() { return S.pool ? S.pool.meshes : null; }, get slots() { return S.slots; }, get stats() { return Object.assign({}, S.stats); },
                     get scripts() { return S.scripts.size; }, get locked() { const w = game.weapons.pistol; return !!(w && w.slide && w.slideRestZ !== undefined && w.slide.position.z > w.slideRestZ + 0.04); }
                 },
-                PRESET: PRESET, GUNS: GUNS, def: function (gun) { const d = GUN_DEFS[gun]; return _def(gun, gun === 'knife' ? 'knife' : (d && d.cls) || 'rifle'); },
+                // V2.3 (private, the tests and tools): the class presets, the per-gun overrides and a gun's merged definition
+                _PRESET: _PRESET, _GUNS: _GUNS, _def: function (gun) { const d = GUN_DEFS[gun]; return _def(gun, gun === 'knife' ? 'knife' : (d && d.cls) || 'rifle'); },
                 // V2.3 (private, the tests and tests/tools/vm-shots.js): the holster ghost's record (its timer can be stretched to freeze it)
                 _ghost: S.ghost,
                 // V2.3 (private, the tools): the tables the clips are built from (clearing _scripts rebuilds them)
-                _tables: { STANCE: STANCE, ANCHOR: ANCHOR, INSPECT: INSPECT, DRAW: DRAW, GHOST: GHOST, ACCENT: ACCENT }, _scripts: S.scripts
+                _tables: { STANCE: STANCE, ANCHOR: ANCHOR, INSPECT: INSPECT, DRAW: DRAW, GHOST: GHOST, ACCENT: ACCENT, GRIP: GRIP }, _scripts: S.scripts
             };
             return api;
         })();
