@@ -23809,7 +23809,7 @@
                 gather: { items: _items(['swell']), gains: [0.025], len: 0.9 },
                 tear: { items: _items([['noiseSweep', { sweep: [4, 0.5] }], ['tonal', { mul: 0.5, wave: 'sine', glide: 0.5 }]]), gains: [0.07, 0.04], len: 0.24 },
                 close: { items: _items([['noiseSweep', { sweep: [0.5, 3] }]]), gains: [0.05], len: 0.18 },
-                clack: { items: _items([['clickTrain', { rate: 1, nf: 4 }], ['tonal', { mul: 16, wave: 'triangle' }]]), gains: [0.06, 0.02], len: 0.045 },
+                clack: { items: _items([['clickTrain', { rate: 1, nf: 4 }], ['tonal', { mul: 16, wave: 'triangle' }]]), gains: [0.08, 0.035], len: 0.05 },
                 land: { items: _items([['tonal', { mul: 0.5, wave: 'sine', glide: 0.55 }], 'hiss']), gains: [0.06, 0.03], len: 0.12 }
             });
             // V2.3: the intros' sound timelines [s, cue] by look.showroom.intro (design 4.1, 4.2 and the role defaults); any
@@ -23824,15 +23824,17 @@
                 });
             })();
             // V2.3: enemy step recipes by surface (the player's step table, soundFX.step) and footwear (design 3.1):
-            // noise [s, filter, Hz, Q] (played with V2.2's gain argument 0.16), tones [f0, f1, s, wave, gain, delay], mix
+            // noise [s, filter, Hz, Q] (played with V2.2's gain argument 0.16), tones [f0, f1, s, wave, gain, delay], and the
+            // step bus's mix, set so a surface step is about as loud as V2.2's enemy step (tests/tools/audio-render.js: RMS
+            // within about 2 dB with a boot; snow, sand and wet a little softer, as the player's own are)
             const SURF_STEPS = _freeze({
-                concrete: { noise: [0.05, 'bandpass', 1500, 1.1], tones: [], mix: 0.55 },
-                stone: { noise: [0.045, 'bandpass', 2000, 1.3], tones: [[1900, 1700, 0.025, 'triangle', 0.018, 0]], mix: 0.55 },
-                metal: { noise: [0.035, 'bandpass', 3200, 1.2], tones: [[410, 400, 0.16, 'sine', 0.035, 0], [1130, 1120, 0.12, 'sine', 0.02, 0]], mix: 0.6 },
-                wood: { noise: [0.06, 'lowpass', 900, 0.8], tones: [[150, 90, 0.09, 'sine', 0.08, 0]], mix: 0.6 },
-                wet: { noise: [0.12, 'highpass', 2200, 0.6], tones: [], mix: 0.5 },
-                snow: { noise: [0.09, 'bandpass', 1100, 1.4], tones: [], mix: 0.6 },
-                sand: { noise: [0.1, 'lowpass', 1200, 0.6], tones: [], mix: 0.6 }
+                concrete: { noise: [0.05, 'bandpass', 1500, 1.1], tones: [], mix: 1.0 },
+                stone: { noise: [0.045, 'bandpass', 2000, 1.3], tones: [[1900, 1700, 0.025, 'triangle', 0.018, 0]], mix: 0.9 },
+                metal: { noise: [0.035, 'bandpass', 3200, 1.2], tones: [[410, 400, 0.16, 'sine', 0.035, 0], [1130, 1120, 0.12, 'sine', 0.02, 0]], mix: 0.9 },
+                wood: { noise: [0.06, 'lowpass', 900, 0.8], tones: [[150, 90, 0.09, 'sine', 0.08, 0]], mix: 0.75 },
+                wet: { noise: [0.12, 'highpass', 2200, 0.6], tones: [], mix: 0.85 },
+                snow: { noise: [0.09, 'bandpass', 1100, 1.4], tones: [], mix: 1.0 },
+                sand: { noise: [0.1, 'lowpass', 1200, 0.6], tones: [], mix: 1.0 }
             });
             const FOOTWEAR = _freeze({
                 soft: [[120, 70, 0.05, 'sine', 0.04, 0]],
