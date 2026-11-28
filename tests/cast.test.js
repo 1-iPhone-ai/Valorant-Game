@@ -78,9 +78,11 @@ test('ability casts: the off-hand comes up in the agent colour, throws, and the 
         castFX.active.start = t + 0.3 * dur + 16;
         step(t + 0.3 * dur + 16, t + 0.3 * dur + 200);
         v.during = [V23.vm.state.offModel, R.spare.visible, vmAnim.clip && vmAnim.clip.kind];
-        step(t + 0.3 * dur + 216, t + 0.3 * dur + 900);
+        // (the cast's 620 ms are over by +636; the hand holds the fresh magazine until it pushes it into the well at
+        // 0.645 of the clip: +700 is p 0.62 of the Vandal's 2.2 s)
+        step(t + 0.3 * dur + 216, t + 0.3 * dur + 700);
         v.after = [castFX.active, V23.vm.state.offModel === model, R.spare.visible, vmAnim.clip && vmAnim.clip.kind];
-        step(t + 0.3 * dur + 916, t + dur + 400);
+        step(t + 0.3 * dur + 716, t + dur + 400);
         v.end = [w.magazine.visible && Math.abs(w.magazine.position.y - w.magRestY) < 1e-9, V23.vm.state.offModel, castFX.group.visible, vmAnim.clip];
         game.reloading = false;
 

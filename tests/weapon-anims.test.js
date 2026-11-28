@@ -2,16 +2,19 @@
 // V2.3 (WP5): weapon animations (design 8; setting weaponAnims 'v23' | 'classic'). One boot. For every gun in GUN_ORDER
 // and the knife: tactical and empty reloads that differ and are deterministic at ammo 1, exact rest (magRestY,
 // slideRestZ, the sniper magazine's matrixAutoUpdate), the magazine out of the gun into the off hand and back, the
-// support hand taken away and given back (WP4's V23.fp.offHand), the reload hand never faster than 0.08 per 16 ms frame;
-// magFX (rises, capped per tier after 20 reloads, round-robin; finishClip and cancelReload end the clip's pending drop,
-// while magazines already on the floor live out their 6 s; a settled one uploads nothing); a cancelled reload never
-// refills and switching is refused mid-reload; the draw stays 380 / 280 ms with a holster ghost a shot snaps away;
-// inspects last 2400 ms, differ per class (and by agent at the flourish) and end on ADS, a cast and a shot; the sway holds
+// support hand taken away and given back (WP4's V23.fp.offHand), the reload hand never faster than 0.08 m and 0.35 rad
+// per 16 ms frame; magFX (rises, capped per tier after 20 reloads, round-robin; finishClip and cancelReload end the
+// clip's pending drop; a reload cancelled past its drop clears the floor pool, one that runs out or is finished leaves
+// its magazines their 6 s; a settled one uploads nothing; a dropped magazine has the shape of the one in the gun, High
+// Detail's rounded one too); a cancelled reload never refills and switching is refused mid-reload; the draw stays
+// 380 / 280 ms with a holster ghost a shot snaps away; inspects last 2400 ms, differ per class (and by agent at the
+// flourish) and end on ADS, a cast and a shot; the sway holds
 // while a V2.3 clip runs (not under 'classic'); the slide stays locked back after the last shot (Classic, Frenzy, Ghost,
 // Bandit; not the Sheriff, not 'classic') until a refill; the spare magazine is the live one (its geometry and material)
 // at its kit scale; ADS positions unchanged; 'classic' equals the V2.2 clips (the hooks with V23.vm absent) and shows
-// none of V2.3's objects; no Math.random inside V23.vm; no first-use upload in play (the boot agent, and an agent picked
-// after boot once WP4's own first use is out of the way); programs == watermark, 0 stalls.
+// none of V2.3's objects; no Math.random inside V23.vm; no first-use upload in play (the boot agent, an agent picked
+// after boot and High Detail turned on after boot, each once WP4's own first use is out of the way); programs ==
+// watermark, 0 stalls.
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { boot, closeBrowser, programState } = require('./harness');
@@ -50,16 +53,19 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     // (a magazine and brass), the spare magazine and the shells in the hand make no new GL buffer (gl.bufferData), because
     // the warm-up drew them all. The same guns and reloads run first under 'classic' (V2.2's own first uses, e.g. a gun kit's
     // parts the first time it is shown, happen there), then under 'v23', which must add none; idle frames are the floor.
-    // Each reload is stretched (its clip made 1e8 ms long) and walked through by hand, a rendered frame at each of 5
-    // points (the hand out; the drops at 0.2 and 0.24; the magazine, the Bucky's shells (0.16-0.28, 0.33-0.45) and the
-    // Outlaw's (0.3-0.56) in the hand; the release), so every part of it is drawn however slow the frames are; then it
-    // runs out.
+    // Each reload is stretched (its clip made 1e8 ms long) and walked through by hand, a rendered frame at each of 3
+    // points (0.25: the hand out and the drops at 0.2 (the Vandal's magazine) and 0.24 (the Outlaw's shell) on the floor,
+    // the Bucky's first shell in the hand (0.16-0.28); 0.35: the Vandal's fresh magazine in the hand (0.35-0.645), the
+    // Bucky's second shell (0.33-0.45) and the Outlaw's two (0.3-0.56); 0.5: the same again), so every V2.3 object of it
+    // is drawn however slow the frames are; then it is ended as it would run out (finishClip). The rendered frames are
+    // nearly all of this test's time (the stepped checks below take well under a second), so it renders no more than
+    // it needs.
     const bufferData = () => evaluate(() => perfTelemetry.glBufferDataCalls);
     await evaluate(() => perfTelemetry.instrumentGL());
     const idle0 = await bufferData();
-    await frames(10);
+    await frames(6);
     const idle = (await bufferData()) - idle0;
-    const walk = async (mode, list, PTS = [0.1, 0.25, 0.35, 0.5, 0.8]) => {
+    const walk = async (mode, list, PTS = [0.25, 0.35, 0.5]) => {
         const seen = { drops: 0, alive: 0, spare: false, shells: false, hand: false };
         const d0 = await evaluate(() => V23.vm.state.stats.drops);
         for (const [gun, ammo] of list) {
@@ -83,10 +89,9 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
                 if (i > 0) { seen.alive = Math.max(seen.alive, st.alive); seen.spare = seen.spare || st.spare; seen.shells = seen.shells || st.shells; seen.hand = seen.hand || st.hand; }
                 if (i < PTS.length) await frames(1);
             }
-            // the clip runs out (its refill timer may have fired already: the clip is the animator's, not the reload's)
-            await evaluate(() => { if (vmAnim.clip === __walk) __walk.start = performance.now() - 1e8; });
-            await frames(2);
-            await evaluate(() => { game.reloading = false; });
+            // the clip ends as it runs out, through finishClip (its refill timer may have fired already: the clip is the
+            // animator's, not the reload's); the next rendered frame gives the hand back
+            await evaluate(() => { if (vmAnim.clip === __walk) vmAnim.finishClip(game.weapons[game.activeWeapon]); game.reloading = false; });
         }
         seen.drops = (await evaluate(() => V23.vm.state.stats.drops)) - d0;
         seen.alive = Math.min(seen.alive, 1);   // (seen alive while drawn; how many at once depends on the frames' pace)
@@ -94,32 +99,56 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     };
     const UPLOAD_SET = [['vandal', 0], ['bucky', 3], ['outlaw', 0]];
     const uploads = {}, seen = {};
+    // ('classic' needs one point per gun: V2.2's clip only tilts the gun, and its first uses are the guns' own parts)
     for (const mode of ['classic', 'v23']) {
         const b0 = await bufferData();
-        seen[mode] = await walk(mode, UPLOAD_SET);
+        seen[mode] = await walk(mode, UPLOAD_SET, mode === 'classic' ? [0.35] : undefined);
         uploads[mode] = (await bufferData()) - b0;
     }
     assert.deepEqual(seen.v23, { drops: 2, alive: 1, spare: true, shells: true, hand: true }, 'the walk drew the drops, the spare magazine, the shells and the hand');
     assert.deepEqual(seen.classic, { drops: 0, alive: 0, spare: false, shells: false, hand: false }, "'classic' draws none of them");
     assert.ok(uploads.v23 <= idle, `no new GL buffer for the drops, the spare magazine and the shells (v23 ${uploads.v23}, classic ${uploads.classic}, idle ${idle})`);
     // an agent picked after boot: its first V2.3 reload draws WP4's geometry of that agent for the first time (WP4's first
-    // use, logged: a gap of WP4's, V23.fp.reapply does not draw them at the agent change): the support-forearm halves
-    // and its cast hand while the reload hand is out, and its full arm pair (576 and 1548 indices) the first time the
-    // gun is raised into view with both hands on it (at rest the arms are under the frame, culled): here the Vandal's
-    // tactical walked through its stance before and after the hand (p 0.05 and 0.9). After that, V2.3's reloads (a drop,
-    // the spare, the shells, the hand) add nothing (the magFX meshes, spare magazines and shells are the same for every
-    // agent)
+    // use, logged: a gap of WP4's, V23.fp.reapply does not draw them at the agent change): its arm pair (two 1512-float
+    // arrays, 1548 indices) the first time the gun is raised into view with both hands on it (p 0.05: at rest the arms
+    // are under the frame, culled), the support-forearm half (1548) once the reload hand is out (p 0.1), its cast hand
+    // (two 648-float arrays, two 288-index halves) once the hand is in view with the magazine (p 0.35) and the other
+    // forearm half (576) after the hand (p 0.9). After that, V2.3's reloads (a drop, the spare, the shells, the hand) add
+    // nothing (the magFX meshes, spare magazines and shells are the same for every agent)
+    const firstUsePts = [0.05, 0.1, 0.35, 0.9];
     const other = await evaluate(() => { const a = game.activeAgent === 'omen' ? 'sage' : 'omen'; agentSystem.selectAgent(a); return a; });
-    await frames(6);
+    await frames(2);
     let b1 = await bufferData();
-    await walk('v23', [['vandal', 1]], [0.05, 0.1, 0.25, 0.35, 0.5, 0.8, 0.9]);
+    await walk('v23', [['vandal', 1]], firstUsePts);
     const wp4First = (await bufferData()) - b1;
     b1 = await bufferData();
     seen.after = await walk('v23', [['vandal', 0], ['bucky', 3]]);
     uploads.afterAgent = (await bufferData()) - b1;
     assert.deepEqual(seen.after, { drops: 1, alive: 1, spare: true, shells: true, hand: true }, 'after the agent change: a drop, the spare, the shells, the hand');
     assert.ok(uploads.afterAgent <= idle, `an agent picked after boot (${other}): no new GL buffer from V2.3's reloads (${uploads.afterAgent}, idle ${idle})`);
-    console.log('V23WP5UPLOADS ' + JSON.stringify({ idle, classic: uploads.classic, v23: uploads.v23, agent: other, wp4FirstUse: wp4First, afterAgent: uploads.afterAgent }));
+    // High Detail on after boot: its rounded magazines go into the guns (characterDetail.gunSwaps, after magFX was built);
+    // the magazine that drops keeps that shape (the class's mesh follows the live geometry) and its drop adds no GL buffer
+    // (the geometry is the one the gun has drawn; the program is the same). High Detail's own first uses (its gun kits,
+    // and WP4's hands at the new geometry: the same first use as an agent change) come first, in a tactical walked as above
+    await evaluate(() => characterDetail.set(true));
+    await frames(1);
+    b1 = await bufferData();
+    await walk('v23', [['vandal', 1]], firstUsePts);
+    const hdFirst = (await bufferData()) - b1;
+    b1 = await bufferData();
+    seen.hd = await walk('v23', [['vandal', 0]], [0.25, 0.35]);
+    uploads.highDetail = (await bufferData()) - b1;
+    const hdGeo = await evaluate(() => {
+        const R = V23.vm.state.slots.rifle, mesh = V23.vm.state.meshes.rifle, sw = characterDetail.gunSwaps.find((s) => s.mesh === R.mag);
+        const on = { follows: mesh.geometry === R.mag.geometry, detailed: !!sw && mesh.geometry === sw.detailed };
+        characterDetail.set(false);
+        V23.vm.step(0.016, performance.now());
+        return { on, off: { follows: mesh.geometry === R.mag.geometry, simple: !!sw && mesh.geometry === sw.simple } };
+    });
+    assert.deepEqual(hdGeo, { on: { follows: true, detailed: true }, off: { follows: true, simple: true } }, 'the dropped magazine has the shape of the one in the gun (High Detail on, then off)');
+    assert.deepEqual(seen.hd, { drops: 1, alive: 1, spare: true, shells: false, hand: true }, 'High Detail: the walk drew the drop, the spare, the hand');
+    assert.ok(uploads.highDetail <= idle, `High Detail: no new GL buffer for the rounded magazine's drop (${uploads.highDetail}, idle ${idle})`);
+    console.log('V23WP5UPLOADS ' + JSON.stringify({ idle, classic: uploads.classic, v23: uploads.v23, agent: other, wp4FirstUse: wp4First, afterAgent: uploads.afterAgent, highDetailFirstUse: hdFirst, highDetail: uploads.highDetail }));
 
     const r = await evaluate(() => {
         window.updateEnemies = () => {};
@@ -156,22 +185,24 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
             const alive0 = V23.vm.state.alive, drops0 = V23.vm.state.stats.drops;
             reload();
             const c = vmAnim.clip;
-            const res = { kind: c && c.kind, empty: c && c.empty, dur: c && c.dur, phases: '', hand: false, spare: false, off: false, magHid: false, handMax: 0, handAt: -1 };
+            const res = { kind: c && c.kind, empty: c && c.empty, dur: c && c.dur, phases: '', hand: false, spare: false, off: false, magHid: false, handMax: 0, handAt: -1, turnMax: 0, turnAt: -1 };
             c.start = T;
             const R = V23.vm.state.slots[slot];
             const path = __path((t) => { const p = (t - T) / c.dur; return p > 0 && p < 1 && Math.round(p * 100) % 10 === 0 ? 1 : null; });
-            let last = '', hp = null;
+            let last = '', hp = null, hq = null;
             __vm(T, T + c.dur + 200, (t, m) => {
                 path.sample(t, m);
                 const ph = V23.vm.state.clip ? V23.vm.state.phase : '-';
                 if (ph !== last) { res.phases += ph; last = ph; }
                 if (V23.vm.state.handOn && castFX.group.visible) res.hand = true;
-                // the reload hand's move this frame (castFX.group in the viewmodel's space)
+                // the reload hand's move and turn this frame (castFX.group in the viewmodel's space)
                 const g = castFX.group;
                 if (V23.vm.state.handOn && g.visible) {
                     if (hp) { const d = Math.hypot(g.position.x - hp[0], g.position.y - hp[1], g.position.z - hp[2]); if (d > res.handMax) { res.handMax = +d.toFixed(4); res.handAt = +((t - T) / c.dur).toFixed(3); } }
+                    if (hq) { const a = g.quaternion.angleTo(hq); if (a > res.turnMax) { res.turnMax = +a.toFixed(4); res.turnAt = +((t - T) / c.dur).toFixed(3); } }
                     hp = [g.position.x, g.position.y, g.position.z];
-                } else hp = null;
+                    hq = (hq || new THREE.Quaternion()).copy(g.quaternion);
+                } else { hp = null; hq = null; }
                 if (R && R.spare.visible) res.spare = true;
                 if (V23.vm.state.offModel === w.model) res.off = true;
                 if (R && R.mag && !R.mag.visible) res.magHid = true;
@@ -359,7 +390,8 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
         draw.byClass = {};
         for (const [cls, gun] of [['rifle', 'vandal'], ['smg', 'spectre'], ['shotgun', 'bucky'], ['pistol', 'classic'], ['sniper', 'operator'], ['heavy', 'odin'], ['knife', 'knife']]) draw.byClass[cls] = drawPath(gun);
         out.draw = draw;
-        // ---- a cancelled reload never refills; switching is refused during a reload; reset ends the clip's drop ---------
+        // ---- a cancelled reload never refills; switching is refused during a reload; reset ends the clip's drop; a reload
+        // cancelled past its drop clears the floor (cancelReload), one that runs out or is finished leaves it (finishClip) --
         take('vandal');
         const wv = game.weapons.rifle;
         wv.ammo = 0; game.reloading = false;
@@ -376,22 +408,42 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
         out.cancel.mag = wv.magazine.visible && Math.abs(wv.magazine.position.y - wv.magRestY) < 1e-9;
         out.cancel.off = V23.vm.state.offModel;
         out.cancel.hand = castFX.group.visible;
-        // finishClip mid-swap: the parts back, the hand released
+        // cancelled past its drop (0.3: the old magazine on the floor, the fresh one in the hand): the floor pool cleared
+        // (with whatever earlier reloads left there), the magazine back in the gun at rest, no refill
+        const meshR = V23.vm.state.meshes.rifle;
+        wv.ammo = 0; game.reloading = false; reload(); vmAnim.clip.start = T;
+        __vm(T, T + 0.3 * vmAnim.clip.dur); T += 0.3 * wv.reloadTime * 1000 + 16;
+        const cleared0 = V23.vm.state.stats.cleared;
+        out.cancelPast = { alive: V23.vm.state.alive, drawn: meshR.count, magHidden: !wv.magazine.visible };
+        cancelReload();
+        out.cancelPast.after = { alive: V23.vm.state.alive, cleared: V23.vm.state.stats.cleared - cleared0, ammo: wv.ammo, reloading: game.reloading,
+            mag: wv.magazine.visible && Math.abs(wv.magazine.position.y - wv.magRestY) < 1e-9 };
+        __vm(T, T + 32); T += 48;
+        out.cancelPast.after.drawn = [meshR.count, meshR.visible];
+        // one that runs out keeps its magazine on the floor (finishClip at its end)
+        wv.ammo = 0; game.reloading = false; reload(); vmAnim.clip.start = T;
+        __vm(T, T + vmAnim.clip.dur + 100); T += wv.reloadTime * 1000 + 116; game.reloading = false;
+        out.runOut = { alive: V23.vm.state.alive, clip: vmAnim.clip ? vmAnim.clip.kind : null };
+        // finishClip mid-swap: the parts back, the hand released, the floor kept
         wv.ammo = 1; game.reloading = false; reload(); vmAnim.clip.start = T;
         __vm(T, T + 0.35 * 2200); T += 0.35 * 2200 + 16;
         out.midSwap = { spare: V23.vm.state.slots.rifle.spare.visible, magHidden: !wv.magazine.visible, off: V23.vm.state.offModel === wv.model };
         vmAnim.finishClip(wv);
         __vm(T, T + 32); T += 48;
-        out.midSwap.after = { spare: V23.vm.state.slots.rifle.spare.visible, mag: wv.magazine.visible && Math.abs(wv.magazine.position.y - wv.magRestY) < 1e-9, off: V23.vm.state.offModel, hand: castFX.group.visible };
+        out.midSwap.after = { spare: V23.vm.state.slots.rifle.spare.visible, mag: wv.magazine.visible && Math.abs(wv.magazine.position.y - wv.magRestY) < 1e-9, off: V23.vm.state.offModel, hand: castFX.group.visible, alive: V23.vm.state.alive };
         game.reloading = false;
         settle();
-        // ---- magFX: 20 empty reloads (each stepped past its drop, then cancelled), capped per tier ------------------------
+        // ---- magFX: 20 empty reloads (each stepped past its drop, then run out: the rest of its clip skipped), capped per
+        // tier --------------------------------------------------------------------------------------------------------------
         const burst = (n) => {
             let maxAlive = 0;
+            const sample = () => { maxAlive = Math.max(maxAlive, V23.vm.state.alive); };
             for (let i = 0; i < n; i++) {
                 wv.ammo = 0; game.reloading = false; reload(); vmAnim.clip.start = T;
-                __vm(T, T + 0.26 * 2200, () => { maxAlive = Math.max(maxAlive, V23.vm.state.alive); }); T += 0.26 * 2200 + 16;
-                cancelReload();
+                __vm(T, T + 0.26 * 2200, sample); T += 0.26 * 2200 + 16;
+                vmAnim.clip.start = T - vmAnim.clip.dur;   // it runs out on the next step (finishClip)
+                __vm(T, T, sample); T += 16;
+                game.reloading = false;
             }
             return maxAlive;
         };
@@ -439,7 +491,7 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
         enhancedAnim.set(false);
         game.userSettings.leftHanded = true;
         take('vandal');
-        let mirrored = false, side = null, lhp = null, lMax = 0;
+        let mirrored = false, side = null, lhp = null, lMax = 0, lhq = null, lTurn = 0;
         const wl = game.weapons.rifle;
         wl.ammo = 1; game.reloading = false; reload(); vmAnim.clip.start = T;
         const lSample = () => {
@@ -447,12 +499,15 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
             if (g.visible && g.scale.x < 0) mirrored = true;
             const e = V23.fp.state.models.find((m) => m.slot === 'rifle');
             if (e && e.offSide) side = e.offSide;
-            if (V23.vm.state.handOn && g.visible) { if (lhp) lMax = Math.max(lMax, g.position.distanceTo(lhp)); lhp = g.position.clone(); } else lhp = null;
+            if (V23.vm.state.handOn && g.visible) {
+                if (lhp) { lMax = Math.max(lMax, g.position.distanceTo(lhp)); lTurn = Math.max(lTurn, g.quaternion.angleTo(lhq)); }
+                lhp = g.position.clone(); lhq = g.quaternion.clone();
+            } else { lhp = null; lhq = null; }
         };
         __vm(T, T + 0.3 * 2200, lSample);
         T += 0.3 * 2200 + 16;
         __vm(T, T + 2200, lSample); T += 2216; game.reloading = false; settle();
-        out.lefty = { mirrored, side, rest: __rest(), handMax: lMax };
+        out.lefty = { mirrored, side, rest: __rest(), handMax: lMax, turnMax: lTurn };
         game.userSettings.leftHanded = false;
         take('vandal');
         // ---- Agent Identity off: the same V2.3 reload with V2.2's hands and cast hand (the off-hand API works either way) -----
@@ -557,6 +612,7 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
                 assert.deepEqual([x.after.off, x.after.hand, x.after.spare], [null, false, false], `${gun} ${k}: the support hand back, the reload hand gone`);
                 assert.ok(x.hand && x.off, `${gun} ${k}: the off hand does the reload (castFX up: ${x.hand}, the gun's support hand away: ${x.off})`);
                 assert.ok(x.handMax < 0.08, `${gun} ${k}: the reload hand moves at most 0.08 per 16 ms frame (${x.handMax} at p ${x.handAt})`);
+                assert.ok(x.turnMax < 0.35, `${gun} ${k}: the reload hand turns at most 0.35 rad per 16 ms frame (${x.turnMax} at p ${x.turnAt})`);
             }
             assert.equal(g.tac.empty, false, `${gun}: ammo 1 is tactical`);
             assert.equal(g.empty.empty, true, `${gun}: ammo 0 is empty`);
@@ -575,7 +631,7 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
             // after both)
             if (gun === 'outlaw') assert.deepEqual([g.tac.drops, g.empty.drops], [0, 1], 'Outlaw: the break drops the spent shells but V2.2\'s own');
             if (gun === 'sheriff') assert.deepEqual([g.tac.drops, g.empty.drops], [0, 2], 'Sheriff: the brass falls out on an empty reload');
-            status.push({ gun, cls: g.cls, kind, tactical: 'ok', empty: 'ok', drops: g.empty.drops, inspect: g.inspect.dur, hand: Math.max(g.tac.handMax, g.empty.handMax) });
+            status.push({ gun, cls: g.cls, kind, tactical: 'ok', empty: 'ok', drops: g.empty.drops, inspect: g.inspect.dur, hand: Math.max(g.tac.handMax, g.empty.handMax), turn: Math.max(g.tac.turnMax, g.empty.turnMax) });
         }
         assert.equal(g.inspect.kind, 'inspect'); assert.equal(g.inspect.dur, 2400, `${gun}: the inspect lasts 2400 ms`);
         assert.equal(g.inspect.after, null); assert.ok(g.inspect.rest < 1e-6, `${gun}: back at rest after the inspect (${g.inspect.rest})`);
@@ -619,7 +675,10 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     for (const [cls, d] of Object.entries(r.draw.byClass)) assert.ok(d.rest < 1e-6, `${cls} draw: back at rest`);
     // cancel and switch
     assert.deepEqual(r.cancel, { refused: true, reloading: true, dropped: 0, ammo: 0, mag: true, off: null, hand: false }, 'a cancelled reload never refills, drops nothing and puts the parts back');
-    assert.deepEqual(r.midSwap, { spare: true, magHidden: true, off: true, after: { spare: false, mag: true, off: null, hand: false } }, 'finishClip mid-swap: everything back');
+    assert.deepEqual(r.cancelPast, { alive: 1, drawn: 1, magHidden: true, after: { alive: 0, cleared: 1, ammo: 0, reloading: false, mag: true, drawn: [0, false] } },
+        'a reload cancelled past its drop: the floor pool cleared, the magazine back in the gun, no refill');
+    assert.deepEqual(r.runOut, { alive: 1, clip: null }, 'a reload that runs out leaves its magazine on the floor');
+    assert.deepEqual(r.midSwap, { spare: true, magHidden: true, off: true, after: { spare: false, mag: true, off: null, hand: false, alive: 1 } }, 'finishClip mid-swap: everything back, the floor kept');
     // magFX
     assert.equal(r.magfx.medium.cap, 4); assert.equal(r.magfx.high.cap, 8); assert.equal(r.magfx.low.cap, 0);
     assert.ok(r.magfx.medium.max === 4 && r.magfx.medium.reused > 0, `Medium: capped at 4, reused round-robin (${JSON.stringify(r.magfx.medium)})`);
@@ -627,7 +686,7 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     assert.deepEqual([r.magfx.low.aliveAfterSwitch, r.magfx.low.max], [0, 0], 'Low: none');
     assert.equal(r.magfx.expired, 0, 'each lives 6 s');
     console.log('V23WP5MAGFX ' + JSON.stringify({ medium: r.magfx.medium, high: r.magfx.high, low: r.magfx.low, landed: r.magfx.landed, uploads: r.magfx.uploads }));
-    console.log('V23WP5FEEL ' + JSON.stringify({ sway: r.sway, lock: r.lock, spare: r.spare, lefty: r.lefty.handMax, ea: [r.ea.off.handMax, r.ea.on.handMax, r.ea.onEmpty.handMax] }));
+    console.log('V23WP5FEEL ' + JSON.stringify({ sway: r.sway, lock: r.lock, spare: r.spare, lefty: [r.lefty.handMax, r.lefty.turnMax], ea: [r.ea.off.handMax, r.ea.on.handMax, r.ea.onEmpty.handMax], eaTurn: [r.ea.off.turnMax, r.ea.on.turnMax, r.ea.onEmpty.turnMax] }));
     for (const m of r.magfx.meshes) assert.deepEqual([m.instanced, m.color, m.mapped, m.toneMapped], [true, null, false, true], `magFX ${m.cls}: instanced, no instanceColor, shellFX's program`);
     assert.ok(r.magfx.landed.count === 1 && r.magfx.landed.visible && r.magfx.landed.y > 0 && r.magfx.landed.y < 0.05, `the dropped magazine lies on the floor (${JSON.stringify(r.magfx.landed)})`);
     assert.equal(r.magfx.uploads.settled, 0, 'a settled magazine uploads nothing');
@@ -644,12 +703,17 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     assert.ok(r.ea.on.hand && r.ea.on.off && r.ea.on.spare, 'EA on: the same off-hand reload');
     assert.deepEqual([r.lefty.mirrored, r.lefty.side], [true, 'R'], 'left-handed: the right hand reloads, mirrored');
     assert.ok(r.lefty.handMax > 0 && r.lefty.handMax < 0.08, `left-handed: the reload hand moves at most 0.08 per 16 ms frame (${r.lefty.handMax})`);
-    for (const k of ['off', 'on', 'onEmpty']) assert.ok(r.ea[k].handMax < 0.08, `EA ${k}: the reload hand moves at most 0.08 per frame (${r.ea[k].handMax})`);
+    assert.ok(r.lefty.turnMax > 0 && r.lefty.turnMax < 0.35, `left-handed: the reload hand turns at most 0.35 rad per 16 ms frame (${r.lefty.turnMax})`);
+    for (const k of ['off', 'on', 'onEmpty']) {
+        assert.ok(r.ea[k].handMax < 0.08, `EA ${k}: the reload hand moves at most 0.08 per frame (${r.ea[k].handMax})`);
+        assert.ok(r.ea[k].turnMax < 0.35, `EA ${k}: the reload hand turns at most 0.35 rad per frame (${r.ea[k].turnMax})`);
+    }
     assert.ok(r.lefty.rest < 1e-6);
     for (const k of ['tac', 'empty']) {
         const x = r.identityOff[k];
         assert.ok(x.hand && x.off && x.spare && x.rest < 1e-6 && x.mag < 1e-9, `identity off, ${k}: the V2.3 reload with V2.2's hands, back at rest`);
         assert.ok(x.handMax < 0.08, `identity off, ${k}: the reload hand moves at most 0.08 per frame (${x.handMax})`);
+        assert.ok(x.turnMax < 0.35, `identity off, ${k}: the reload hand turns at most 0.35 rad per frame (${x.turnMax})`);
         assert.deepEqual([x.after.off, x.after.hand, x.after.spare], [null, false, false]);
     }
     assert.equal(r.identityOff.tac.path, r.guns.vandal.tac.path, 'identity off: the same gun path');

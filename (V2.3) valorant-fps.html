@@ -21874,8 +21874,9 @@
         //    it works with Agent Identity off too). A spare magazine (a child of castFX.group) draws the live magazine's
         //    geometry and material at its kit scale, taken by its front face (GRIP: the open cast hand's palm side toward the
         //    camera, the fingertips over its top edge); shell guns carry shells (the slot's accent material). The hand and
-        //    the magazine move on smoothstep keys and the release starts 0.06 of the clip after the slap, so the hand never
-        //    moves more than 0.08 per 16 ms frame (the weapon-anims test checks every gun). A cast or Enhanced
+        //    the magazine move on smoothstep keys timed for the shortest clip (the Ghost's 1.5 s), and the slap is a strike
+        //    up into the magazine at the seat with the release 0.095 of the clip after it, so the hand never moves more than
+        //    0.08 m nor turns more than 0.35 rad per 16 ms frame (the weapon-anims test checks every gun). A cast or Enhanced
         //    Animations' off hand (plant, defuse, mantle, rope, door) takes the hand: the reload goes on with the gun's own
         //    hand back and the magazine out of sight until the hand is free again.
         //  - magFX: one world InstancedMesh per magazine class (rifle, pistol, sniper, shell) with shellFX's parameters
@@ -21884,9 +21885,15 @@
         //    bounce, friction and settle, a 6 s life with shellFX's fade over its last 0.5 s. Built inside V23.core._quiet
         //    at the boot's first switchWeapon (H20.6), before the warm-up, which draws each mesh once (userData.v23Warm
         //    'world'; the spare magazines and shells 'vm'), so no program, stall or first-use upload comes later. A class's
-        //    instance matrices upload only on a frame where one of its records came, moved, faded or went.
-        //    reset() (finishClip, cancelReload) ends the clip's own magFX state: a drop the clip had not reached never comes;
-        //    magazines already on the floor live out their 6 s (the pool is the world's, like shellFX's casings).
+        //    instance matrices upload only on a frame where one of its records came, moved, faded or went. A class's mesh
+        //    draws its slot's live magazine geometry (High Detail's rounded box swaps it after build(): the mesh follows in
+        //    step(), so a dropped magazine keeps the shape it had in the gun; the geometry is the one the gun has drawn, and
+        //    the program is the same). The colours are the magazines' own (0x444444, 0x38404a: skins never recolour
+        //    children[4]).
+        //    reset() (finishClip, cancelReload) ends the clip's own magFX state (a drop the clip had not reached never
+        //    comes). A reload that runs out (finishClip) leaves the magazines on the floor their 6 s, so the 4 / 8 caps hold
+        //    in play; a reload cancelled before its refill (cancelReload: a buy, a new round, an economy reset; it moves
+        //    game.reloadSeq on before it resets) clears the floor pool as well.
         //  - Draws (H20.1, H20.6): visual only; the 380 / 280 ms clip and the synchronous switchWeapon are V2.2's. Class-shaped:
         //    the rifle rolls in low, the pistol snaps up, the sniper is a heavy lift, the SMG flips, the shotgun pumps, the heavy
         //    heaves, the knife spins in. The gun put away stays visible as a ghost that sinks for the first 30% of the draw;
@@ -22031,7 +22038,8 @@
                 released: { pistol: false },  // a slide released by an empty reload, until the refill (the lock waits for the next 0)
                 scripts: new Map(),
                 rng: null,                    // V2.3: the drop spins: a V23.rand stream (never Math.random), made at the first drop (CORE defines V23.rand after this block)
-                stats: { drops: 0, reused: 0, builds: 0, buildMs: 0 }
+                seq: null,                    // V2.3: the running reload's game.reloadSeq (reload() takes it right after onReload); null when none
+                stats: { drops: 0, reused: 0, cleared: 0, builds: 0, buildMs: 0 }
             };
             // scratch (no uuid: none of these is an Object3D, geometry or material)
             const _M = new THREE.Matrix4(), _H = new THREE.Matrix4(), _Gi = new THREE.Matrix4(), _T = new THREE.Matrix4();
@@ -22133,38 +22141,50 @@
             function _magScript(gun, cls, slot, empty, box) {
                 const G = _def(gun, cls), post = G.post[empty ? 1 : 0];
                 const pistol = slot === 'pistol', sniper = slot === 'sniper';
-                const out = empty ? 0.06 : 0.08, seat = 0.72, ins = seat - 0.06, align = seat - 0.14, slap = seat + 0.02;
-                // V2.3: the release (charging handle, bolt release, bolt slap, slide release) starts 0.06 of the clip after
-                // the slap, so the hand travels there from under the magazine (no pop: the weapon-anims test bounds the
-                // hand's speed); the sniper's bolt keeps V2.2's eject at 0.78
-                const P = post ? (post === 'bolt' ? [0.78, 0.86] : [slap + 0.06, slap + 0.13]) : null;
+                // V2.3: the slap plays forwards: the hand pushes the fresh magazine into the well (ins, still 2.4 cm short)
+                // and lets go of it there, drops down its front turning the palm up toward it (under), then strikes up: the
+                // heel of the hand meets it at hit and drives it home by the seat (slap = seat), and the gun kicks on that
+                // strike. The hand's turn is split over both moves (0.55 rad, then 0.35 more).
+                // V2.3: every hand move is timed for the shortest clip (the Ghost's 1.5 s: 0.0107 of the clip per 16 ms
+                // frame), so the hand turns at most about 0.3 rad and travels at most about 0.07 m per frame on every gun
+                // (the weapon-anims test bounds both): empty, it leaves the gun at 0.03 for the release (mr, its grip turns
+                // half a turn to take the magazine by its front face), reaches the pouch by low and has the fresh magazine at
+                // fetch; tactical, the magazine is stowed (lowM by 0.4) and swapped for the fresh one over 0.07 (fetchM)
+                const out = empty ? 0.03 : 0.08, mr = 0.13, low = 0.24, fetch = 0.35;
+                const seat = 0.72, ins = seat - 0.075, under = seat - 0.035, hit = seat - 0.016, align = seat - 0.14, slap = seat;
+                // V2.3: the release (charging handle, bolt release, bolt slap, slide release) starts 0.095 of the clip after
+                // the slap, so the hand travels and turns there from under the magazine (no pop); the sniper's bolt keeps
+                // V2.2's eject at 0.78
+                const P = post ? (post === 'bolt' ? [0.78, 0.86] : [slap + 0.095, slap + 0.165]) : null;
                 const back = post ? P[1] + (post === 'bolt' ? 0.04 : 0.05) : seat + 0.12;
                 const sc = { gun: null, bumps: [], ea: [], mag: null, ph: null, drop: null, hand: null, hOn: [out, back], slide: null, shells: null, release: -1 };
                 const deep = pistol ? -0.075 : -0.09;                // how far down the magazine comes out (still in view)
                 const meet = [0, 0, 0, 0.02, -0.06, 0.05];           // the gun turns to meet the fresh magazine
                 sc.gun = _stanceKeys(box ? 'heavy' : cls, 0.14, Math.max(back - 0.02, 0.86), align + 0.04, meet);
-                const tug = empty ? 0.12 : 0.2;
+                const tug = empty ? mr : 0.2;
                 sc.bumps.push([tug, 0.04, 0, -0.014, 0, -0.03, 0, 0]);           // the magazine let go / tugged
                 sc.bumps.push([seat + 0.01, 0.035, 0, 0.022, 0, 0.055, 0, 0]);   // the slap that seats it
                 sc.ea.push([out + 0.03, 0.05, -0.006, -0.01, 0, 0, 0.02, 0.03], [seat + 0.06, 0.06, 0, 0, 0, -0.015, 0, 0.045], [0.1, 0.06, -0.008, 0, 0, 0, 0, 0]);
                 // the visible magazine: out with the hand (tactical) or free (empty), the fresh one up from under the frame
                 // (a pistol's pouch is nearer: its clip is the shortest, so the hand has less far to go)
                 const lowM = [-0.1, pistol ? -0.52 : -0.62, 0.16, 0.6, 0, 0.45], fetchM = [-0.08, pistol ? -0.48 : -0.58, 0.14, -0.5, 0, -0.25];
+                // (in the well, 2.4 cm short: the gun holds it there from ins, the hand's push, until the palm's strike)
+                const short = [0, -0.024, 0, -0.05, 0, 0];
                 if (!empty) {
-                    sc.mag = [Z6(0), Z6(0.18), K(0.21, [0, -0.035, 0, 0.02, 0, 0]), K(0.3, [-0.03, deep, 0.03, 0.3, 0, 0.18]), K(0.41, lowM),
-                        K(0.46, fetchM), K(align, [0, -0.08, 0.01, -0.3, 0, 0]), K(ins, [0, -0.024, 0, -0.05, 0, 0]), Z6(seat), Z6(1)];
-                    sc.ph = [[0, 'G'], [0.18, 'H'], [seat, 'G']];
+                    sc.mag = [Z6(0), Z6(0.18), K(0.21, [0, -0.035, 0, 0.02, 0, 0]), K(0.3, [-0.03, deep, 0.03, 0.3, 0, 0.18]), K(0.4, lowM),
+                        K(0.47, fetchM), K(align, [0, -0.08, 0.01, -0.3, 0, 0]), K(ins, short), K(hit, short), Z6(seat), Z6(1)];
+                    sc.ph = [[0, 'G'], [0.18, 'H'], [ins, 'G']];
                 } else {
                     const fall = [0, -0.12, 0.004, 0.06, 0, 0.02];
-                    sc.mag = [Z6(0), Z6(0.12), K(0.2, fall), K(0.201, fetchM), K(0.32, fetchM), K(align, [0, -0.08, 0.01, -0.3, 0, 0]),
-                        K(ins, [0, -0.024, 0, -0.05, 0, 0]), Z6(seat), Z6(1)];
-                    sc.ph = [[0, 'G'], [0.2, 'N'], [0.32, 'H'], [seat, 'G']];
+                    sc.mag = [Z6(0), Z6(mr), K(0.2, fall), K(0.201, fetchM), K(fetch, fetchM), K(align, [0, -0.08, 0.01, -0.3, 0, 0]),
+                        K(ins, short), K(hit, short), Z6(seat), Z6(1)];
+                    sc.ph = [[0, 'G'], [0.2, 'N'], [fetch, 'H'], [ins, 'G']];
                     sc.drop = { t: 0.2, cls: slot, n: 1 };
                 }
                 // the hand: from the gun to the magazine (tactical) or under the frame (empty), back via the release
                 const H = [[0, 'G'], [out, 'G']];
-                if (!empty) H.push([0.18, 'M']); else H.push([0.12, 'MR'], [0.26, 'LOW'], [0.32, 'M']);
-                H.push([seat, 'M'], [slap, 'SLAP']);
+                if (!empty) H.push([0.18, 'M']); else H.push([mr, 'MR'], [low, 'LOW'], [fetch, 'M']);
+                H.push([ins, 'M'], [under, 'SLAPU'], [slap, 'SLAP']);
                 if (post === 'charge') H.push([P[0], 'CH'], [P[0] + 0.04, 'CH2'], [P[1], 'CH']);
                 else if (post === 'boltRel') H.push([P[0], 'BR'], [P[0] + 0.03, 'BR2'], [P[1], 'BR']);
                 else if (post === 'boltSlap') H.push([P[0], 'BS'], [P[0] + 0.03, 'BS2'], [P[1], 'BS']);
@@ -22468,14 +22488,18 @@
                 _Gi.copy(_T).invert();
             }
             // V2.3: an anchor's hand pose at key time t into (pos, quat): 'M' the grip on the magazine then, 'MR' the grip at
-            // the magazine's rest a little up (the release), a named anchor, or 'SLAP' (palm up under the seated magazine)
+            // the magazine's rest a little up (the release), a named anchor, 'SLAP' (the strike's end: 5 cm down the seated
+            // magazine's front from the grip, the palm turned 0.9 rad up toward it, the heel of the hand against it) or
+            // 'SLAPU' (the strike's start: 5.4 cm lower again, 3 cm clear of the magazine left 2.4 cm short, turned the
+            // first 0.55 rad)
             function _anchor(st, a, t, h, pos, quat) {
-                if (a === 'M' || a === 'MR' || a === 'SLAP') {
+                if (a === 'M' || a === 'MR' || a === 'SLAP' || a === 'SLAPU') {
                     _magPose(st, a === 'M' ? t : 0, h, _pc, _qc);
                     _M.compose(_pc, _qc, _one).multiply(_Gi);
                     _M.decompose(pos, quat, _sc);
                     if (a === 'MR') pos.y += 0.035;
                     if (a === 'SLAP') { pos.y -= 0.05; quat.multiply(_q2.setFromEuler(_e.set(0.9, 0, 0))); }
+                    if (a === 'SLAPU') { pos.y -= 0.104; quat.multiply(_q2.setFromEuler(_e.set(0.55, 0, 0))); }
                     return;
                 }
                 const A = ANCHOR[st.slot] || ANCHOR.rifle;
@@ -22658,6 +22682,8 @@
             function _magStep(dt) {
                 const P = S.pool;
                 if (!P) return;
+                // V2.3: each class draws its slot's live magazine geometry (High Detail swaps it in and out after build())
+                for (const cls in P.meshes) { const R = S.slots[cls]; if (R && P.meshes[cls].geometry !== R.mag.geometry) P.meshes[cls].geometry = R.mag.geometry; }
                 const cap = on() ? _cap() : 0;
                 const n = _n, D = _dirty;
                 n.rifle = n.pistol = n.sniper = n.shell = 0;
@@ -22701,6 +22727,13 @@
                     mesh.visible = c > 0;
                     if (c && D[cls]) mesh.instanceMatrix.needsUpdate = true;
                 }
+            }
+            // V2.3: the floor pool emptied (a cancelled reload); the meshes' counts follow on the next step
+            function _clearPool() {
+                const P = S.pool;
+                if (!P) return;
+                for (let i = 0; i < CAP; i++) P.recs[i].alive = false;
+                S.stats.cleared++;
             }
             // V2.3: the holster ghost: the gun put away sinks for the first 30% of the draw, then hides. It leaves on an
             // ease-in (slowly at first, then dropping away), so it is still in view while the new gun rises into it
@@ -22747,8 +22780,10 @@
                     return false;
                 },
                 // V2.3 (H20.4) (vmAnim.finishClip, cancelReload): parts at rest, the hand back, the clip's magFX state ended, and the
-                // holster ghost (it belongs to the draw) put away at once
+                // holster ghost (it belongs to the draw) put away at once. A cancelled reload (cancelReload moved game.reloadSeq on
+                // past the running reload's) also clears the magazines on the floor; one that ran out leaves them
                 reset: function () {
+                    if (S.seq !== null && game.reloadSeq !== S.seq) { S.seq = null; _clearPool(); }
                     if (S.st.clip) _restore();
                     if (S.ghost.model) _endGhost(game.weapons[game.activeWeapon].model !== S.ghost.model);
                     _offHand(null, 1);
@@ -22762,6 +22797,7 @@
                     if (!c || c.kind !== 'reload') return null;
                     c.empty = weapon.ammo === 0;
                     c.missing = Math.max(0, (weapon.maxAmmo || 0) - (weapon.ammo || 0));
+                    S.seq = (game.reloadSeq || 0) + 1;   // V2.3: the sequence number reload() gives this reload next
                     return null;
                 },
                 // V2.3 (H20.6) (switchWeapon, after vmAnim.switched): the holster ghost; the boot's first call builds the pools
