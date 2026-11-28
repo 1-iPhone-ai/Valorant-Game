@@ -5,12 +5,17 @@
 // and for each agent freezes a few first-person poses where the gun hands, gloves, wrists and sleeves are in view, then
 // takes a screenshot of each:
 //   pistol-ads     the pistol aimed down the sights (the gun hands sit below the hip-fire view, as in V2.2)
-//   rifle-inspect  the rifle's inspect, turned to show its left side (p 0.2)
+//   rifle-ads      the rifle aimed down the sights
+//   rifle-raised   the rifle at the hip, raised 22 cm (its hipPos y, for the shot only) so its hands, wrists and sleeves
+//                  are in frame, as the fp-identity crops raise the pistol
+//   rifle-inspect  the rifle's inspect at p 0.45 (--inspect-p), the gun turned with the hands in
 //   knife-inspect  the knife's inspect, mid flip (p 0.3)
 //   cast-<slot>    the off-hand cast gesture just after its release key (p 0.3 of the clip)
 //   ult            the ultimate's gesture at p 0.5 (hand2 up, the centre clear)
 // A pose is frozen by stretching its clip (castFX.active.dur, vmAnim.clip.dur) so its progress stands still while the
-// game keeps rendering. The HUD is hidden so the viewmodel shows in full; bots are frozen.
+// game keeps rendering. The HUD is hidden so the viewmodel shows in full; bots are frozen. Between views every ability
+// item still out is ended through its own update path (agent-casts' clear), so no earlier cast (a wall, a smoke) is in
+// the next agent's frames.
 // Usage (from the repository root, NODE_PATH=tests/node_modules):
 //   node tests/tools/fp-shots.js [--agents sage,omen] [--out <dir>] [--views pistol-ads,rifle-inspect,...] [--off]
 //        [--quality medium] [--width 640 --height 360]
@@ -32,7 +37,8 @@ for (let i = 2; i < process.argv.length; i++) {
     else args[a.slice(2)] = true;
 }
 const AGENTS = String(args.agents || 'sage,omen').split(',');
-const VIEWS = String(args.views || 'pistol-ads,rifle-inspect,knife-inspect,cast-c,cast-q,cast-e,ult').split(',');
+const VIEWS = String(args.views || 'pistol-ads,rifle-ads,rifle-raised,rifle-inspect,knife-inspect,cast-c,cast-q,cast-e,ult').split(',');
+const INSPECT_P = +(args['inspect-p'] || 0.45);
 const OUT = path.resolve(args.out || path.join(REPO, 'fp-shots'));
 const W = +(args.width || 640), H = +(args.height || 360);
 
@@ -68,12 +74,27 @@ const W = +(args.width || 640), H = +(args.height || 360);
     }, args.quality || 'medium');
     await frames(12);
     const shot = async (name) => { await frames(4); await page.screenshot({ path: path.join(OUT, name + '.png') }); console.log('wrote', name + '.png'); };
-    const reset = () => page.evaluate(() => {
-        if (castFX.active) { castFX.active = null; castFX.hide(); }
-        if (vmAnim.clip) vmAnim.finishClip(game.weapons[game.activeWeapon]);
-        setAdsState(false);
-        game.ultActiveUntil = 0; game.ultAgent = null; game.ultChargesLeft = 0;
-    });
+    // every ability item still out ends through its own update path (as agent-casts' __clear does), the clips stop, the
+    // rifle's hip placement is its own again
+    const reset = async () => {
+        await page.evaluate(() => {
+            game.ultActiveUntil = 0; game.ultAgent = null; game.ultChargesLeft = 0;
+            const end = (it) => { if (!it || typeof it !== 'object' || it.isObject3D) return; if ('expireAt' in it) it.expireAt = 1; if ('endTime' in it) it.endTime = 1; if ('executeAt' in it) it.executeAt = 1; };
+            const A = agentSystem;
+            for (const k of Object.keys(A)) {
+                const v = A[k];
+                if (Array.isArray(v)) { for (const it of v) if (it && typeof it === 'object' && ('inUse' in it || 'active' in it)) end(it); }
+                else if (v && typeof v === 'object' && ('inUse' in v || 'active' in v)) end(v);
+            }
+            for (const p of A.projectiles) if (p.inUse) { p.inUse = false; p.mesh.visible = false; }
+            for (const k of ['neonHighGearUntil', 'isoDoubleTapUntil', 'clovePickMeUpUntil', 'waylayLightspeedUntil', 'miksHarmonizeUntil', 'reynaDismissUntil', 'brimStimUntil']) if (typeof A[k] === 'number') A[k] = 0;
+            if (castFX.active) { castFX.active = null; castFX.hide(); }
+            if (vmAnim.clip) vmAnim.finishClip(game.weapons[game.activeWeapon]);
+            setAdsState(false);
+            if (window.__hip) { game.weapons.rifle.hipPos = window.__hip; window.__hip = null; }
+        });
+        await frames(3);
+    };
     const setView = async (view) => {
         await reset();
         if (view === 'pistol-ads') {
@@ -81,6 +102,19 @@ const W = +(args.width || 640), H = +(args.height || 360);
             await frames(30);
             await page.evaluate(() => setAdsState(true));
             await page.waitForFunction(() => game.adsProgress === 1, null, { timeout: 120000, polling: 50 });
+        } else if (view === 'rifle-ads') {
+            await page.evaluate(() => { switchWeapon('rifle'); });
+            await frames(30);
+            await page.evaluate(() => setAdsState(true));
+            await page.waitForFunction(() => game.adsProgress === 1, null, { timeout: 120000, polling: 50 });
+        } else if (view === 'rifle-raised') {
+            await page.evaluate(() => {
+                switchWeapon('rifle');
+                const w = game.weapons.rifle, h = w.hipPos || { x: 0.3, y: -0.3, z: -0.5 };
+                window.__hip = w.hipPos;
+                w.hipPos = { x: h.x, y: h.y + 0.22, z: h.z + 0.02 };   // for this shot only (reset puts it back)
+            });
+            await frames(40);
         } else if (view === 'rifle-inspect' || view === 'knife-inspect') {
             const w = view.split('-')[0];
             await page.evaluate((w) => { switchWeapon(w); }, w);
@@ -88,7 +122,7 @@ const W = +(args.width || 640), H = +(args.height || 360);
             await page.evaluate((p) => {
                 vmAnim.play('inspect', 2400);
                 const c = vmAnim.clip; c.dur = 1e8; c.start = performance.now() - p * 1e8;
-            }, w === 'rifle' ? 0.2 : 0.3);
+            }, w === 'rifle' ? INSPECT_P : 0.3);
         } else if (view.startsWith('cast-') || view === 'ult') {
             const slot = view === 'ult' ? 'x' : view.slice(5);
             await page.evaluate(() => { switchWeapon('rifle'); });

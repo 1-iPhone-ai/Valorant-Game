@@ -8,7 +8,8 @@
 //    ultimate state and you), with the same number of Math.random draws;
 //  - with identity on, castFX plays the look's mapped gesture (gestures[slot], the ultimate gestures.x);
 // then the second-stage weapon fires (Sova, Raze, Neon, Chamber ultimates) give the tap gesture with a visual kick and
-// no Math.random draw; no shader compiles and no first-use stalls. It prints the V23MATRIX cells for in-match casts.
+// no Math.random draw, and a held fire (Neon's beam) holds its tap: no hidden frame, one palette layer per burst; no
+// shader compiles and no first-use stalls. It prints the V23MATRIX cells for in-match casts.
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { boot, closeBrowser, programState } = require('./harness');
@@ -191,6 +192,62 @@ test('in-match casts: every agent\'s C, Q, E and X consume, spawn on the same ti
         assert.equal(r.on.draws, r.off.draws, `${agent}: the fire draws Math.random as V2.2 does (${r.on.draws} vs ${r.off.draws})`);
         assert.deepEqual([r.off.kind, r.off.kick], [null, 0], `${agent}: identity off: no gesture or kick (V2.2)`);
     }
+    // A held second-stage fire (Neon's beam: a shot every AGENT_TUNING.neon.x.fireIntervalMs): the tap is held, not
+    // restarted, so the hand never drops out while the beam fires, and the palette layer plays once per burst (not for a
+    // burst that starts within a tap clip of the last one). Stepped on a fake clock, 16 ms frames.
+    if (agents.includes('neon')) {
+        const held = await evaluate(() => {
+            __identity(true);
+            agentSystem.selectAgent('neon');
+            switchWeapon('rifle');
+            __clear();
+            const model = game.weapons.rifle.model, interval = (AGENT_TUNING.neon && AGENT_TUNING.neon.x && AGENT_TUNING.neon.x.fireIntervalMs) || 95;
+            let motifs = 0;
+            const realMotif = V23.audio.motif, realNow = performance.now.bind(performance), real = Math.random;
+            V23.audio.motif = function () { motifs++; return realMotif.apply(this, arguments); };
+            let fake = realNow() + 10000, draws = 0;
+            performance.now = () => fake;
+            Math.random = function () { draws++; return real(); };
+            const out = { interval, bursts: [] };
+            try {
+                let t = fake;
+                const step = () => { fake = t; vmAnim.begin(model); vmAnim.end(model, t); t += 16; };
+                // one burst of fire for ms, then frames until the tap is over (and gap ms more)
+                const burst = (ms, gap) => {
+                    const t0 = t, taps = new Set(), m0 = motifs;
+                    let lastFire = -1e9, shown = false, hidden = 0, frames = 0;
+                    while (t <= t0 + ms) {
+                        if (t - lastFire >= interval) { lastFire = t; fake = t; V23.fp.onSecondaryFire('neon.x'); }
+                        step();
+                        if (castFX.active) taps.add(castFX.active);
+                        if (castFX.group.visible) shown = true;
+                        if (shown) { frames++; if (!castFX.group.visible) hidden++; }
+                    }
+                    let tail = 0;
+                    while (castFX.active && tail < 200) { step(); tail++; }
+                    const ended = !castFX.active;
+                    const until = t + gap;
+                    while (t < until) step();
+                    return { taps: taps.size, frames, hidden, motifs: motifs - m0, gesture: V23.fp.state.cur ? V23.fp.state.cur.name : null, ended };
+                };
+                out.bursts.push(burst(1850, 600));   // a long beam
+                out.bursts.push(burst(500, 100));    // a second beam after a pause longer than the tap clip
+                out.bursts.push(burst(300, 0));      // a third straight after the second's tap ends
+            } finally { performance.now = realNow; V23.audio.motif = realMotif; Math.random = real; }
+            __clear();
+            out.draws = draws;
+            return out;
+        });
+        const [b1, b2, b3] = held.bursts;
+        assert.equal(b1.taps, 1, `neon: one tap held for the whole beam, not restarted every ${held.interval} ms (${b1.taps} taps)`);
+        assert.ok(b1.frames > 100 && b1.hidden === 0, `neon: the hand never drops out while the beam fires (${b1.hidden} hidden of ${b1.frames} frames)`);
+        assert.equal(b1.motifs, 1, 'neon: one palette layer for the burst');
+        assert.ok(b1.ended && b2.ended && b3.ended, 'neon: the tap ends once the fire stops');
+        assert.deepEqual([b2.taps, b2.hidden, b2.motifs], [1, 0, 1], 'neon: a later burst: one tap, one palette layer');
+        assert.deepEqual([b3.taps, b3.hidden, b3.motifs], [1, 0, 0], 'neon: a burst within a tap clip of the last: no second palette layer');
+        assert.equal(held.draws, 0, 'neon: no Math.random while the beam\'s taps play');
+    }
+
     await frames(5);
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(programs, watermark, 'no shader compiled after the warm-up');
