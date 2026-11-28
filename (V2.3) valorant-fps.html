@@ -21914,7 +21914,7 @@
             }
             // V2.3: a gun offset [px, py, pz, rx, ry, rz] (authored right-handed) into o, mirrored as vmAnim._keys mirrors
             const _add6 = (v, o, h, k) => { o.px += v[0] * h * k; o.py += v[1] * k; o.pz += v[2] * k; o.rx += v[3] * k; o.ry += v[4] * h * k; o.rz += v[5] * h * k; };
-            const _v6 = [0, 0, 0, 0, 0, 0], _w6 = [0, 0, 0, 0, 0, 0], _x6 = [0, 0, 0, 0, 0, 0], _v1 = [0];
+            const _v6 = [0, 0, 0, 0, 0, 0], _x6 = [0, 0, 0, 0, 0, 0], _v1 = [0];
             // V2.3: transient bumps [c, w, px, py, pz, rx, ry, rz] (V2.2's _bump: a smooth bump peaking at c, half-width w)
             function _bumps(list, p, o, h) {
                 if (!list) return;
@@ -22014,7 +22014,7 @@
                 slots: {},            // slot -> { slot, model, mag, restP, restQ, mau, w, d, h (box sizes), slide, slideRest, spare, shells: [2], accent }
                 pool: null,           // magFX: { meshes: { cls: InstancedMesh }, mats, recs: [8], next }
                 st: { clip: null, kind: null, slot: null, w: null, gun: null, cls: null, empty: false, missing: 0, scr: null, R: null,
-                    look: null, dropAt: -1, dropDone: false, dropPending: null, released: false, phase: 'G', seen: 0 },
+                    look: null, dropDone: false, dropPending: null, phase: 'G' },
                 hand: { on: false, model: null, p: new THREE.Vector3(), q: new THREE.Quaternion(), h: 1, spare: false, shells: 0, R: null },
                 off: { model: null, h: 1 },   // the model whose support hand V23.fp.offHand took away, and on which side
                 owned: false,                 // castFX.group was posed by the reload hand last frame
@@ -22026,7 +22026,7 @@
             };
             // scratch (no uuid: none of these is an Object3D, geometry or material)
             const _M = new THREE.Matrix4(), _H = new THREE.Matrix4(), _Gi = new THREE.Matrix4(), _T = new THREE.Matrix4();
-            const _p = new THREE.Vector3(), _p2 = new THREE.Vector3(), _sc = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
+            const _p2 = new THREE.Vector3(), _sc = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
             const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
             const _e = new THREE.Euler(), _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3(), _qc = new THREE.Quaternion();
             const _n = { rifle: 0, pistol: 0, sniper: 0, shell: 0 };
@@ -22373,7 +22373,7 @@
                 st.empty = !!clip.empty; st.missing = clip.missing || 0;
                 st.R = S.slots[clip.weapon] || null;
                 st.look = (V23.core && V23.core.resolve) ? V23.core.resolve(game.activeAgent) : null;
-                st.dropDone = false; st.dropPending = null; st.released = false; st.phase = 'G'; st.seen = 0;
+                st.dropDone = false; st.dropPending = null; st.phase = 'G';
                 st.scr = st.kind === 'reload' ? _reloadScript(st) : st.kind === 'inspect' ? _inspectScript(st) : null;
                 if (st.R && st.R.mag && st.slot !== 'knife' && st.scr && st.scr.mag) {
                     // V2.2's rest field (vmAnim.finishClip puts the magazine back there), taken as V2.2 takes it
@@ -22563,13 +22563,20 @@
             }
             // V2.3: the dropped magazines (shellFX's integration: gravity, floor bounce, friction, settle; 6 s, fading the last 0.5 s)
             const _cap = () => { const q = (typeof adaptiveSettings !== 'undefined' && adaptiveSettings.currentQuality) || 'medium'; return q === 'low' ? 0 : q === 'medium' ? 4 : CAP; };
+            // V2.3: an object's world matrix composed from the local transforms up its parents (the viewmodel's root is
+            // identity), into out; nothing is updated on the way, so V2.2 code later in the frame reads what it would have
+            function _worldOf(obj, out) {
+                out.compose(obj.position, obj.quaternion, obj.scale);
+                for (let o = obj.parent; o && o.parent; o = o.parent) out.premultiply(_T.compose(o.position, o.quaternion, o.scale));
+                return out;
+            }
             function _spawn(drop) {
                 const P = S.pool, st = S.st, cap = _cap();
                 if (!P || cap === 0) return;
                 const R = st.R || S.slots[drop.cls];
-                camera.updateMatrixWorld();
-                const m = camera.matrixWorld.elements;
-                _right.set(m[0], m[1], m[2]); _up.set(m[4], m[5], m[6]); _fwd.set(-m[8], -m[9], -m[10]);
+                // the camera's frame from its own position and quaternion (its matrices are left as they are)
+                _H.compose(camera.position, camera.quaternion, _one);
+                _right.set(1, 0, 0).applyQuaternion(camera.quaternion); _up.set(0, 1, 0).applyQuaternion(camera.quaternion); _fwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
                 const h = lefty();
                 for (let k = 0; k < (drop.n || 1); k++) {
                     const i = P.next % cap;
@@ -22580,23 +22587,23 @@
                     if (s.cls === 'shell' || !R || !R.mag) {
                         // brass from the action: a little above the gun's middle, out to the side
                         const mdl = R ? R.model : game.weapons[game.activeWeapon].model;
-                        mdl.updateWorldMatrix(true, false);
-                        s.p.set(-0.02 * h + k * 0.012, 0.03, 0.05).applyMatrix4(mdl.matrixWorld);
-                        _q.setFromRotationMatrix(mdl.matrixWorld);
+                        _worldOf(mdl, _M);
+                        s.p.set(-0.02 * h + k * 0.012, 0.03, 0.05).applyMatrix4(_M);
+                        _q.setFromRotationMatrix(_M);
                         s.s.set(1, 1, 1);
                         s.half = 0.0115;
                     } else {
-                        R.mag.updateWorldMatrix(true, false);
-                        R.mag.matrixWorld.decompose(s.p, _q, _sc);
+                        _worldOf(R.mag, _M).decompose(s.p, _q, _sc);
                         s.s.copy(R.mag.scale);
                         s.half = 0.5 * R.d * R.mag.scale.z;
                     }
                     // V2.3: the viewmodel draws at its own 75 degree field of view: the world copy starts where the magazine
                     // was on screen (the same depth, its offset from the view axis scaled to the world camera's field of view)
                     const k1 = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / Math.tan(THREE.MathUtils.degToRad(VIEWMODEL_FOV) / 2);
-                    s.p.applyMatrix4(camera.matrixWorldInverse);
+                    _Gi.copy(_H).invert();
+                    s.p.applyMatrix4(_Gi);
                     s.p.x *= k1; s.p.y *= k1;
-                    s.p.applyMatrix4(camera.matrixWorld);
+                    s.p.applyMatrix4(_H);
                     _e.setFromQuaternion(_q);
                     s.r.set(_e.x, _e.y, _e.z);
                     const r = S.rng || (S.rng = V23.rand(0x564d3235));
@@ -22691,9 +22698,11 @@
                     }
                     return false;
                 },
-                // V2.3 (H20.4) (vmAnim.finishClip, cancelReload): parts at rest, the hand back, the clip's magFX state ended
+                // V2.3 (H20.4) (vmAnim.finishClip, cancelReload): parts at rest, the hand back, the clip's magFX state ended, and the
+                // holster ghost (it belongs to the draw) put away at once
                 reset: function () {
                     if (S.st.clip) _restore();
+                    if (S.ghost.model) _endGhost(game.weapons[game.activeWeapon].model !== S.ghost.model);
                     _offHand(null, 1);
                     if (S.owned) _release();
                     return null;

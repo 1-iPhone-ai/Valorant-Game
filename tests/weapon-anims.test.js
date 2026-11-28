@@ -34,12 +34,50 @@ const VM = `
 `;
 
 test('weapon animations: every gun and the knife, reloads, magFX, draws, holster ghost, inspects, classic = V2.2', { timeout: 240000 }, async () => {
-    const { page, errors, evaluate } = await boot({ quality: 'medium', initScript: () => {
+    const { page, errors, frames, evaluate } = await boot({ quality: 'medium', initScript: () => {
         // headless pointer lock leaks renderer memory when play resumes many times
         Element.prototype.requestPointerLock = function () {};
         document.exitPointerLock = function () {};
     } });
     await page.addScriptTag({ content: VM });
+
+    // no first-use upload in play (first, as the boot agent, before anything else is shown): the first live drops into magFX
+    // (a magazine and brass), the spare magazine and the shells in the hand make no new GL buffer (gl.bufferData), because
+    // the warm-up drew them all. The same guns and reloads run first under 'classic' (V2.2's own first uses, e.g. a gun kit's
+    // parts the first time it is shown, happen there), then under 'v23', which must add none; idle frames are the floor.
+    // (An agent picked after boot has first-person geometry of WP4's that its first V2.3 reload draws for the first time,
+    // the support-forearm halves and its cast hand: a few KB of index and vertex data, WP4's, outside this check.)
+    const bufferData = () => evaluate(() => perfTelemetry.glBufferDataCalls);
+    await evaluate(() => perfTelemetry.instrumentGL());
+    const idle0 = await bufferData();
+    await frames(20);
+    const idle = (await bufferData()) - idle0;
+    const uploads = {};
+    for (const mode of ['classic', 'v23']) {
+        const b0 = await bufferData();
+        for (const [gun, ammo, until] of [['vandal', 0, 'alive'], ['bucky', 3, 'shells'], ['outlaw', 0, 'alive']]) {
+            await evaluate(([g, a, m]) => {
+                game.userSettings.weaponAnims = m; game.userSettings.infiniteAmmo = false; window.updateEnemies = () => {};
+                if (vmAnim.clip) vmAnim.finishClip(game.weapons[game.activeWeapon]);
+                game.reloading = false; equipGun(g);
+                if (vmAnim.clip) vmAnim.finishClip(game.weapons[game.activeWeapon]);
+                window.__seen = { alive: 0, shells: false };
+                const w = game.weapons[game.activeWeapon]; w.ammo = a; reload();
+            }, [gun, ammo, mode]);
+            await page.waitForFunction(([u, m]) => {
+                if (m === 'classic') return !game.reloading;
+                const R = V23.vm.state.slots[game.activeWeapon];
+                if (R && (R.shells[0].visible || R.spare.visible)) __seen.shells = true;
+                __seen.alive = Math.max(__seen.alive, V23.vm.state.alive);
+                return u === 'alive' ? __seen.alive > 0 : __seen.shells;
+            }, [until, mode], { timeout: 120000, polling: 'raf' });
+            await page.waitForFunction(() => !game.reloading, null, { timeout: 120000, polling: 100 });
+            await frames(6);
+        }
+        uploads[mode] = (await bufferData()) - b0;
+    }
+    assert.ok(uploads.v23 <= idle, `no new GL buffer for the drops, the spare magazine and the shells (v23 ${uploads.v23}, classic ${uploads.classic}, idle ${idle})`);
+
     const r = await evaluate(() => {
         window.updateEnemies = () => {};
         window.presentPlayerCamera = () => {};
@@ -191,6 +229,12 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
         draw.rifle = vmAnim.clip ? vmAnim.clip.dur : 380;
         settle();
         switchWeapon('knife'); draw.knife = vmAnim.clip.dur; settle();
+        // a draw ended early (finishClip) puts the ghost away at once
+        switchWeapon('rifle');
+        const g3 = V23.vm.state.ghost;
+        vmAnim.finishClip(game.weapons.rifle);
+        draw.finished = { ghost: V23.vm.state.ghost, visible: g3 ? g3.visible : null, was: g3 === game.weapons.knife.model };
+        settle();
         // draws per class: each its own shape
         const drawPath = (gun) => {
             take(gun === 'knife' ? 'vandal' : (GUN_DEFS[gun].slot === 'rifle' ? 'classic' : 'vandal'));
@@ -410,6 +454,7 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     assert.ok(r.draw.sinking > 0.05 && r.draw.stillGhost, `it sinks for the first 30% (${r.draw.sinking})`);
     assert.deepEqual(r.draw.ghostAfter, { ghost: null, visible: false }, 'then it is gone');
     assert.deepEqual(r.draw.snapped, { ghost: null, visible: false, was: true }, 'a shot snaps the ghost away');
+    assert.deepEqual(r.draw.finished, { ghost: null, visible: false, was: true }, 'finishClip puts the ghost away');
     const drawPaths = Object.values(r.draw.byClass).map((d) => d.path);
     assert.equal(new Set(drawPaths).size, 7, 'draws are class-shaped');
     for (const [cls, d] of Object.entries(r.draw.byClass)) assert.ok(d.rest < 1e-6, `${cls} draw: back at rest`);
