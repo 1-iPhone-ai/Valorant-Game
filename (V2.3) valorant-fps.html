@@ -22702,13 +22702,15 @@
                     if (c && D[cls]) mesh.instanceMatrix.needsUpdate = true;
                 }
             }
-            // V2.3: the holster ghost: the gun put away sinks for the first 30% of the draw, then hides
+            // V2.3: the holster ghost: the gun put away sinks for the first 30% of the draw, then hides. It leaves on an
+            // ease-in (slowly at first, then dropping away), so it is still in view while the new gun rises into it
+            const _easeIn = (t) => t * t;
             function _ghostStep(now) {
                 const G = S.ghost;
                 if (!G.model) return;
                 const g = (now - G.start) / G.dur;
                 if (!on() || !(g < 1) || game.weapons[game.activeWeapon].model === G.model) { _endGhost(game.weapons[game.activeWeapon].model !== G.model); return; }
-                _tk(GHOST[G.cls] || GHOST.rifle, Math.max(0, g), _v6);
+                _tk(GHOST[G.cls] || GHOST.rifle, Math.max(0, g), _v6, _easeIn);
                 G.model.position.set(G.p0.x + _v6[0] * G.h, G.p0.y + _v6[1], G.p0.z + _v6[2]);
                 G.model.rotation.set(G.r0.x + _v6[3], G.r0.y + _v6[4] * G.h, G.r0.z + _v6[5] * G.h);
             }
