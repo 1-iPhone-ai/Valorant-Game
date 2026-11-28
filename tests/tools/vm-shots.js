@@ -145,7 +145,13 @@ const W = +(args.width || 640), H = +(args.height || 360);
         }
     }
     await clear();
-    const st = await page.evaluate(() => ({ programs: renderer.info.programs.length, watermark: perfTelemetry.programWatermark, stalls: perfTelemetry.shaderStalls || 0 }));
+    // V2.3: the harness's programState: the program count, the warm-up's watermark and perfTelemetry.firstUseStalls (a
+    // frame that compiled a program after the warm-up); the run fails unless programs equal the watermark with 0 stalls
+    const st = await page.evaluate(() => ({ programs: renderer.info.programs.length, watermark: perfTelemetry.programWatermark, stalls: perfTelemetry.firstUseStalls }));
     console.log('programs', st.programs, 'watermark', st.watermark, 'stalls', st.stalls, 'errors', JSON.stringify(errors));
     await browser.close();
+    if (st.programs !== st.watermark || !(st.stalls === 0)) {
+        console.error(`vm-shots: programs ${st.programs} != watermark ${st.watermark} or stalls ${st.stalls} > 0`);
+        process.exit(2);
+    }
 })().catch((e) => { console.error(e); process.exit(1); });
