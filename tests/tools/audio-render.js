@@ -14,7 +14,9 @@
 // RMS over the part that sounds (from the first to the last sample above -80 dBFS), in dBFS.
 // Renders: the motif for C, Q and E, the ultimate sting, the previews (intro, the single cues, an ability preview with
 // the cast's own method), a bot's 300 ms warning sting and the mortar arming (positional), the V2.2 per-ability sounds
-// the motifs sit under (iceWall, omenTeleport, ult), and enemy steps (V2.2's, and surface x footwear recipes).
+// the motifs sit under (iceWall, omenTeleport, ult), enemy steps (V2.2's, and surface x footwear recipes, as
+// V23.audio.state.step builds them), and the motif of the three detuned-pair families (choir, buzz, drone) from their
+// reference vectors through V23.audio.state.trial (their looks are still role-default stubs).
 const path = require('path'), fs = require('fs'), os = require('os');
 const { boot, closeBrowser } = require(path.join(__dirname, '..', 'harness'));
 
@@ -35,7 +37,10 @@ const RENDERS = [
     ['sage.bot.arm.mortar', 0.9, "__cue('sage', 'arm.mortar')"], ['omen.bot.warn.flash', 0.9, "__cue('omen', 'windup.flash')"], ['omen.bot.cast.smoke', 1.0, "__cue('omen', 'cast.smoke')"],
     ['v22.iceWall', 1.2, 'soundFX.iceWall()'], ['v22.omenTeleport', 1.2, 'soundFX.omenTeleport()'], ['v22.ult', 1.2, 'soundFX.ult()'],
     ['step.v22', 0.5, '__step(null)'], ['step.concrete.boot', 0.5, "__step('concrete', 'boot')"], ['step.metal.plated', 0.5, "__step('metal', 'plated')"],
-    ['step.wood.soft', 0.5, "__step('wood', 'soft')"], ['step.stone.heavy', 0.5, "__step('stone', 'heavy')"], ['step.snow.runner', 0.5, "__step('snow', 'runner')"]
+    ['step.wood.soft', 0.5, "__step('wood', 'soft')"], ['step.stone.heavy', 0.5, "__step('stone', 'heavy')"], ['step.snow.runner', 0.5, "__step('snow', 'runner')"],
+    ['family.choir.motif', 1.2, "V23.audio.state.trial(V23.audio.state.families.choir.v, 'motif', 'c')"],
+    ['family.buzz.motif', 1.2, "V23.audio.state.trial(V23.audio.state.families.buzz.v, 'motif', 'c')"],
+    ['family.drone.motif', 1.4, "V23.audio.state.trial(V23.audio.state.families.drone.v, 'motif', 'c')"]
 ].filter((r) => !ONLY || ONLY.has(r[0]));
 
 function wav(int16, channels, rate) {
@@ -66,7 +71,7 @@ function wav(int16, channels, rate) {
             const f = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
             const x = camera.position.x + f.x * 3, z = camera.position.z + f.z * 3;
             let kind = null;
-            if (surf) { const S = V23.audio.state.surfSteps[surf], W = V23.audio.state.footwear[foot]; kind = { surf, foot, noise: S.noise, tones: S.tones.concat(W).slice(0, 3), mix: S.mix }; }
+            if (surf) kind = V23.audio.state.step(surf, foot);   // the recipe surfAt returns on that surface for that footwear
             soundFX.at(x, 0.1, z, () => soundFX.enemyStep(kind));
         };
         window.__render = async (seconds, code) => {

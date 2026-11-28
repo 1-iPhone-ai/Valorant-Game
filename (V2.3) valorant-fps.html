@@ -23651,9 +23651,12 @@
         //    bellMul, hissDrop, sh). An unknown family plays GENERIC, so a new look needs data only. FAMILIES holds the 29
         //    design families (design 5 and 4.1/4.2), each with its design agent and its reference palette vector v (what
         //    the role batch copies into the look's sound field; pairwise distinct, same-role pairs differ in wave or
-        //    interval set), and the 4 role-default families (v null: their numbers are the role defaults in the look).
+        //    interval set), and the 4 role-default families (v null: their numbers are the role defaults in the look). The
+        //    engine never reads v (it plays the look's own sound field); tests/audio-identity.test.js requires every full
+        //    look's sound field to equal its family's v field by field, so the look and this table cannot drift apart.
         //  - Recipes (10, each one voice: a source, an optional filter, an envelope gain, then soundFX._route): tonal (an
-        //    oscillator of the palette wave with a glide, optional low-pass sweep, vibrato or detuned twin), fmBell (a sine
+        //    oscillator of the palette wave with a glide, optional low-pass sweep, vibrato or a detuned twin: two
+        //    oscillators mixed at 0.5 each, so the pair never peaks above the voice's gain), fmBell (a sine
         //    carrier with a decaying FM index), noiseSweep (noise through the palette filter swept by shape.sweep), crackle
         //    (granular noise grains on an envelope curve), pluck (a bright oscillator through a closing low-pass), clickTrain
         //    (noise clicks at shape.rate, or sample-and-hold steps), arp (an oscillator stepping through the intervals),
@@ -23668,11 +23671,12 @@
         //  - Positional events: atShared(x, y, z, fn) gives every voice fn plays one bus, routed once through soundFX.at (one
         //    HRTF panner, the occlusion low-pass when a wall is between, the reverb send), soundFX._out pointing at the bus
         //    meanwhile (the _placedOut pattern). botCue(enemy, kind[, hz]) (WP8, inside V23.seeded): 'windup.<k>' one rising
-        //    voice, 'cast.<k>' the cast layer (the motif's 2 voices), and the 300 ms warning sting (3 voices) for a bot's
-        //    heaviest utility (design 12.3, open decision 7): the rusher's flash windup ('windup.flash'), the mortar arming
-        //    ('arm.mortar', placed at the hazard, the third argument) and agent-mode signature casts ('sig.<k>', for WP8's
-        //    M2 agent mode). Cues beyond 50 m are skipped. (The contract lists botCue(enemy, kind); the optional third
-        //    argument is read from arguments, as WP8 sends it.)
+        //    voice (every windup but the flash's), 'cast.<k>' the cast layer (the motif's 2 voices), and the 300 ms warning
+        //    sting (3 voices) only for a bot's heaviest utility (design 12.3, open decision 7): the rusher's flash windup
+        //    ('windup.flash'), the mortar arming ('arm.mortar', placed at the hazard, the third argument) and agent-mode
+        //    signature casts ('sig.<k>'). Cues beyond 50 m are skipped. (V23.CONTRACT lists botCue(enemy, kind) and WP8
+        //    sends windup, cast and arm only: the optional third argument is read from arguments, as WP8 sends it, and
+        //    'sig.<k>' waits for M2's agent mode to send it; both are reported to the coordinator for the contract.)
         //  - Previews (design 6.8, 12.2): preview(agent, slot) plays 2D on a bus of its own that feeds soundFX._out (when the
         //    showroom set one) or the destination, with soundFX._out on that bus during the call (so no reverb): the slot's
         //    PREVIEW_SOUNDS calls (the cast's own soundFX methods) plus the palette layer, or the look's intro cues (Sage's
@@ -23680,28 +23684,44 @@
         //    by name. A new preview, or preview(null), ramps the last preview's bus to 0 in 30 ms.
         //  - Randomness: every event runs inside V23.seeded on its own V23.rand stream (a bot cue on the stream WP8's
         //    V23.seeded set, when there is one), and the noise voices take their buffer offsets, grains and clicks from that
-        //    stream; no Math.random. The shared noise and reverb buffers are built by prebuild at the first pointerdown,
-        //    keydown or touchstart (listeners registered here; nothing is built and no AudioContext is made at boot): the
-        //    noise buffer from a V23.rand stream, the reverb by V2.2's _ensureReverb inside V23.core._quiet, so neither takes
-        //    a draw from the game's stream. A voice that finds no noise buffer builds it the same way first.
+        //    stream; no Math.random. The shared noise and reverb buffers are built by prebuild at the first user-activation
+        //    gesture while Agent Identity is on (a mouse pointerdown, a touch or pen pointerup, a touchend, a keydown other
+        //    than Escape: the events that let a page start audio; listeners registered here; nothing is built and no
+        //    AudioContext is made at boot): the noise buffer from a V23.rand stream, the reverb by V2.2's _ensureReverb
+        //    inside V23.core._quiet, so neither takes a draw from the game's stream. An event that finds either missing
+        //    builds it the same way first (_prep), so no V2.2 helper fills one from Math.random inside a V2.3 event.
+        //  - The AudioContext (design 2.7): no V2.3 event makes one. motif, ultSting, botCue, atShared and preview play on
+        //    the live soundFX.ctx and play nothing while there is none (a preview may make it while the page holds a
+        //    transient user activation: the showroom's own click). The only other V2.3 context is prebuild's, at the
+        //    gesture. Accepted deviation (design 2.7): with identity on, the context exists from the first gesture rather
+        //    than from V2.2's first sound, so the V2.2 systems that wait for soundFX.ctx (enemyAudio's steps, one
+        //    Math.random each; the weather's rain and wind buffers; acoustics) start at that gesture in unseeded play. The
+        //    drivers and the boot probe make the context and the buffers themselves, so their streams are unchanged. With
+        //    identity off nothing is built at a gesture (V2.2's timing); the listeners stay and build at the first gesture
+        //    once it is on.
         //  - Surface steps (design 12.4): surfAt(e) finds the collisionIndex box under the bot's (x, z) whose top is within
         //    0.3 m of its feet (the nearest; the higher on a tie): a map piece gives its surf % 10 (concrete, stone, metal,
         //    wood); a box that is no piece (a prop, door or breakable) gives undefined, so V2.2's step plays; no box gives the
         //    player's own rule (weather snow, sand or wet, else concrete). The box result is cached per bot per 0.5 m cell
         //    (and 0.25 m of height, and collisionIndex.revision). It returns a frozen step recipe {surf, foot, noise, tones,
         //    mix} (one per surface x footwear) that soundFX.enemyStep plays: one noiseLayer with V2.2's gain argument 0.16 (so
-        //    the same early return and one Math.random per step, as V2.2's playNoise), the surface and footwear tones (at
-        //    most 3) through playTone, all on one bus (one panner inside soundFX.at); it never calls step(), so stepsPlayed
-        //    and lastStep stay the player's.
+        //    the same early return and one Math.random per step, as V2.2's playNoise), at most 3 tones through playTone
+        //    (every footwear tone, then the surface's first tones in the room left), all on one bus (one panner inside
+        //    soundFX.at); it never calls step(), so stepsPlayed and lastStep stay the player's. Map floors are no
+        //    collision boxes and a bot walks at y 0, so almost every real enemy step takes the open-floor rule; the piece
+        //    tops a V2.2 bot reaches are the rope decks of Icebox and Split (botMechanics on), metal or concrete.
         //  - Settings (design 12.5): soundEnabled (ensureContext null: no node), masterVolume per voice (V2.2's scale, cap
-        //    and 0.0002 threshold), positionalAudio off (soundFX.at plays straight: no panner; atShared then gives the bus
-        //    the inverse-distance level the panner would have), occlusion (soundFX.at's low-pass on the shared path),
+        //    and 0.0002 threshold), positionalAudio off (soundFX.at plays straight: no panner, and atShared's bus stays at
+        //    unity, so a bot's cue plays at full level as V2.2's enemy gunshots and steps do then), occlusion (soundFX.at's
+        //    low-pass on the shared path),
         //    enemyFootsteps and the 22 m range (enemyAudio, V2.2's), headshotVolume (no V2.3 voice plays on a hit, kill or
         //    headshot; V2.2's dink and kill sounds are untouched). Palette voices route like every other effect, so the music
         //    and ambience buses are untouched.
         //  - Agent Identity off: motif, ultSting and botCue play nothing and surfAt returns null (V2.2's enemy step). The
         //    showroom is always on, so preview still plays.
-        //  - Data for the tests (read only): V23.audio.state; private helpers start with '_'.
+        //  - Data for the tests (read only): V23.audio.state, with state.step(surf, foot) (a step recipe) and
+        //    state.trial(palette, ev, slot) (a motif or sting from a palette object: a family's reference vector, before
+        //    its look lands, through the same engine); private helpers start with '_'.
         V23.audio = (function () {
             // ---- data --------------------------------------------------------------------------------------------------
             const RECIPES = Object.freeze(['tonal', 'fmBell', 'noiseSweep', 'crackle', 'pluck', 'clickTrain', 'arp', 'hiss', 'swell', 'pulse']);
@@ -23734,7 +23754,7 @@
                     ['arp', 'clickTrain'], ['arp', ['arp', { mul: 2 }], 'clickTrain'], 'clickTrain', { step: 0.04, rate: 30 }],
                 flute: ['skye', 'sine', 587, [0, 5, 9], ['bandpass', 1600, 2], 0.05, 0.5, 0.15, 0, 'soft',
                     ['swell', 'hiss'], ['swell', 'swell', 'hiss'], 'swell', { vib: [5, 0.008], hissDrop: 1.2 }],
-                drone: ['fade', 'triangle', 73, [0, 1, 7], ['lowpass', 400, 2], 0.08, 0.9, 0.05, 0.5, 'soft',
+                drone: ['fade', 'sine', 73, [0, 1, 7], ['lowpass', 400, 2], 0.08, 0.9, 0.05, 0.5, 'soft',
                     ['swell', 'noiseSweep'], ['swell', ['swell', { mul: 2 }], 'noiseSweep'], 'noiseSweep', { detune: 9, sweep: [0.75, 3] }],
                 hissThump: ['breach', 'sine', 60, [0, 5, 7], ['highpass', 3800, 0.7], 0.003, 0.35, 0, 0.9, 'heavy',
                     ['hiss', 'tonal'], ['tonal', 'hiss', ['tonal', { mul: 2 }]], 'hiss', { glide: 0.55, hissDrop: 0.6 }],
@@ -23854,6 +23874,9 @@
 
             // ---- helpers -----------------------------------------------------------------------------------------------
             const _idOn = () => !!(V23.core && V23.core.enabled && V23.core.enabled());
+            // V2.3: the live AudioContext, never a new one (design 2.7: a V2.3 event makes no context; soundEnabled off: null,
+            // as ensureContext; a suspended one is resumed by ensureContext)
+            const _ctx = () => (soundFX.ctx && game.soundEnabled ? soundFX.ensureContext() : null);
             // V2.3: V2.2's Master volume scale (playTone, playNoise and noiseLayer read it the same way)
             const _master = () => { const u = game.userSettings; return (u && typeof u.masterVolume === 'number') ? u.masterVolume / 100 : 1.0; };
             const _look = (id) => (id && V23.core && V23.core.resolve ? V23.core.resolve(id) : null);
@@ -23879,6 +23902,13 @@
                 for (let i = 0; i < len; i++) d[i] = r() * 2 - 1;
                 soundFX._noiseBuffer = buf;
                 return buf;
+            }
+            // V2.3: an event's shared buffers before any voice: the noise buffer (V23.rand), and the reverb when the event
+            // routes through V2.2's send (V2.2's _ensureReverb inside V23.core._quiet), so no V2.2 helper fills either from
+            // Math.random inside a V2.3 event
+            function _prep(ctx, reverb) {
+                _noise(ctx);
+                if (reverb && soundFX._reverb === null && V23.core && V23.core._quiet) V23.core._quiet(() => soundFX._ensureReverb(ctx));
             }
             // V2.3: envelope curves (0..1 at 400 points a second) for the granular recipes, drawn from the event's stream
             function _grains(rng, dur, perSec) {
@@ -23969,12 +23999,12 @@
                         _freq(osc.frequency, v, t0, dur);
                         srcs.push([osc, 0]);
                         head = osc;
-                        if (v.pair) {   // V2.3: a detuned twin into one mix (still one voice)
+                        if (v.pair) {   // V2.3: a detuned twin into one mix (still one voice), 0.5 each: the pair peaks at the voice's gain
                             const o2 = ctx.createOscillator(), mix = ctx.createGain();
                             o2.type = v.wave;
                             _freq(o2.frequency, v, t0, dur);
                             o2.detune.value = v.pair;
-                            mix.gain.value = 0.6;
+                            mix.gain.value = 0.5;
                             osc.connect(mix); o2.connect(mix);
                             srcs.push([o2, 0]);
                             head = mix;
@@ -24070,11 +24100,6 @@
                 _trace(e);
                 return voices;
             }
-            // V2.3: the inverse-distance level of soundFX's panner (refDistance 4, rolloff 1.1), for a bus with no panner
-            function _distGain(x, y, z) {
-                const d = Math.hypot(x - camera.position.x, y - camera.position.y, z - camera.position.z);
-                return 4 / (4 + 1.1 * (Math.max(d, 4) - 4));
-            }
             // V2.3: the last preview's bus to 0 in 30 ms (design 6.8 interruption)
             function _fade(ctx) {
                 const bus = S.pv;
@@ -24116,7 +24141,9 @@
                 let d = S.steps[key];
                 if (d) return d;
                 const s = SURF_STEPS[surf] || SURF_STEPS.concrete, w = FOOTWEAR[foot] || FOOTWEAR.boot;
-                d = S.steps[key] = _freeze({ surf: surf, foot: foot, noise: s.noise.slice(), tones: s.tones.concat(w).slice(0, STEP_TONES).map((t) => t.slice()), mix: s.mix });
+                // V2.3: every footwear tone (the bot's identity), then the surface's first tones in the room left (3 in all)
+                const tones = s.tones.slice(0, Math.max(0, STEP_TONES - w.length)).concat(w.slice(0, STEP_TONES));
+                d = S.steps[key] = _freeze({ surf: surf, foot: foot, noise: s.noise.slice(), tones: tones.map((t) => t.slice()), mix: s.mix });
                 return d;
             }
             // V2.3: the box under (x, z) whose top is within 0.3 m of the feet: 1-4 a map piece's surface, -1 a box that is no
@@ -24143,9 +24170,19 @@
                 if (weatherSurf.uWet.value > 0.4) return 'wet';
                 return 'concrete';
             }
-            // V2.3: build the shared buffers at the first user gesture (listeners on window, capture, passive; removed once built)
-            const GESTURES = ['pointerdown', 'keydown', 'touchstart'];
-            const _onGesture = function () { try { if (V23.audio && V23.core) V23.audio.prebuild(); } catch (e) {} };
+            // V2.3: build the shared buffers at the first user-activation gesture while identity is on (listeners on window,
+            // capture, passive; removed once built). Only the events that activate a page start a running context: a mouse
+            // pointerdown, a touch or pen pointerup, touchend, a keydown other than Escape (touchstart does not)
+            const GESTURES = ['pointerdown', 'pointerup', 'keydown', 'touchend'];
+            const _onGesture = function (ev) {
+                try {
+                    if (ev && ev.type === 'pointerdown' && ev.pointerType && ev.pointerType !== 'mouse') return;   // its pointerup activates
+                    if (ev && ev.type === 'pointerup' && (!ev.pointerType || ev.pointerType === 'mouse')) return;   // its pointerdown did
+                    if (ev && ev.type === 'keydown' && ev.key === 'Escape') return;
+                    if (!V23.audio || !V23.core || !_idOn()) return;   // V2.3: identity off: V2.2's timing (still listening)
+                    V23.audio.prebuild();
+                } catch (e) {}
+            };
             function _listen(on) {
                 if (typeof window === 'undefined' || !window.addEventListener || S.listening === on) return;
                 for (const t of GESTURES) {
@@ -24154,6 +24191,21 @@
                 }
                 S.listening = on;
             }
+
+            // V2.3: an ability slot's interval index (c 0, q 1, e 2, x 3; anything else 0)
+            const _si = (slot) => (Object.prototype.hasOwnProperty.call(SLOT_I, slot) ? SLOT_I[slot] : 0);
+            // V2.3: the motif's and the ultimate sting's layers from a palette (the look's events and state.trial share them)
+            function _motifEv(ctx, agentId, slot, P, rng) {
+                const F = _fam(P), si = _si(slot);
+                return _event('motif', agentId, slot, P, rng, (r) => _layer(ctx, r, P, F, F.motif, { si: si, gains: MOTIF_G, len: _motifLen(P), cap: 0.06 }));
+            }
+            function _stingEv(ctx, agentId, P, tempo, rng) {
+                const F = _fam(P);
+                return _event('ult', agentId, 'x', P, rng, (r) => _layer(ctx, r, P, F, F.sting, { si: 0, gains: STING_G, len: _stingLen(P), cap: 0.08, chord: true, stagger: 0.06 / (tempo || 1) }));
+            }
+            // V2.3: whether the page holds a transient user activation now (a click or key being handled); browsers without
+            // navigator.userActivation answer no
+            const _activated = () => !!(typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.isActive === true);
 
             // ---- the contract (V23.CONTRACT.api.audio) -----------------------------------------------------------------
             const A = {
@@ -24177,38 +24229,44 @@
                 },
                 motif: function (agentId, slot) {
                     // V2.3: the palette layer at the gesture's release key (V23.fp): 2 voices (each <= 0.06), 2D, under the
-                    // ability's own soundFX method (unchanged, at t 0)
+                    // ability's own soundFX method (unchanged, at t 0); on the live context only (none: nothing)
                     if (!_idOn()) return null;
-                    const ctx = soundFX.ensureContext();
+                    const ctx = _ctx();
                     if (!ctx) return null;
                     const L = _look(agentId);
                     if (!L || !L.sound) return null;
-                    const P = L.sound, F = _fam(P), si = Object.prototype.hasOwnProperty.call(SLOT_I, slot) ? SLOT_I[slot] : 0;
+                    _prep(ctx, true);
                     S.stats.motifs++;
-                    _event('motif', agentId, slot, P, _stream(L.lookIdx, si), (rng) => _layer(ctx, rng, P, F, F.motif, { si: si, gains: MOTIF_G, len: _motifLen(P), cap: 0.06 }));
+                    _motifEv(ctx, agentId, slot, L.sound, _stream(L.lookIdx, _si(slot)));
                     return null;
                 },
                 ultSting: function (agentId) {
-                    // V2.3: the ultimate's activation sting (V23.fp.ultCue): 3 voices, a chord on the first three intervals, 2D
+                    // V2.3: the ultimate's activation sting (V23.fp.ultCue): 3 voices, a chord on the first three intervals, 2D;
+                    // on the live context only
                     if (!_idOn()) return null;
-                    const ctx = soundFX.ensureContext();
+                    const ctx = _ctx();
                     if (!ctx) return null;
                     const L = _look(agentId);
                     if (!L || !L.sound) return null;
-                    const P = L.sound, F = _fam(P), tempo = (L.motion && L.motion.tempo) || 1;
+                    _prep(ctx, true);
                     S.stats.stings++;
-                    _event('ult', agentId, 'x', P, _stream(L.lookIdx, 4), (rng) => _layer(ctx, rng, P, F, F.sting, { si: 0, gains: STING_G, len: _stingLen(P), cap: 0.08, chord: true, stagger: 0.06 / tempo }));
+                    _stingEv(ctx, agentId, L.sound, (L.motion && L.motion.tempo) || 1, _stream(L.lookIdx, 4));
                     return null;
                 },
                 preview: function (agentId, slot) {
                     // V2.3: the showroom's sounds (see the header): 2D, inside V23.seeded, on a bus per preview feeding soundFX._out
-                    // (or the destination); a new preview or preview(null) ramps the last bus to 0 in 30 ms
-                    const ctx = soundFX.ensureContext();
+                    // (or the destination); a new preview or preview(null) ramps the last bus to 0 in 30 ms. The live context; with
+                    // none, one is made only while the page holds a transient user activation (the showroom's click), never on a timer
+                    let ctx = _ctx();
+                    if (!ctx && agentId && game.soundEnabled && _activated()) ctx = soundFX.ensureContext();
                     if (!ctx) return null;
                     _fade(ctx);
                     if (!agentId) return null;
                     const L = _look(agentId);
                     if (!L || !L.sound) return null;
+                    // V2.3: the noise buffer before the cast's own methods run (V2.2's playNoise would fill it from Math.random);
+                    // the preview's bus takes no reverb, so none is built for it
+                    _prep(ctx, false);
                     let bus;
                     try { bus = ctx.createGain(); bus.connect(soundFX._out || ctx.destination); } catch (e) { return null; }
                     S.pv = bus;
@@ -24224,13 +24282,14 @@
                 },
                 atShared: function (x, y, z, fn) {
                     // V2.3: one positional event: every voice fn plays goes into one bus, routed once through soundFX.at (one HRTF
-                    // panner, the occlusion low-pass, the reverb send); no context: nothing (no node)
-                    const ctx = soundFX.ensureContext();
+                    // panner, the occlusion low-pass, the reverb send); positionalAudio off: soundFX.at plays straight, no panner,
+                    // and the bus stays at unity (V2.2's level for its positional sounds then); no live context: nothing (no node)
+                    const ctx = _ctx();
                     if (!ctx || typeof fn !== 'function') return null;
+                    _prep(ctx, true);
                     let bus;
                     try { bus = ctx.createGain(); } catch (e) { return null; }
-                    const cfg = game.userSettings || {}, prevOut = soundFX._out, prevPos = soundFX._pos;
-                    if (cfg.positionalAudio === false) bus.gain.value = _distGain(x, y, z);   // V2.3: no panner: its distance level on the bus
+                    const prevOut = soundFX._out, prevPos = soundFX._pos;
                     soundFX.at(x, y, z, () => soundFX._route(ctx, bus));
                     soundFX._out = bus;
                     soundFX._pos = null;
@@ -24242,7 +24301,7 @@
                     // V2.3: WP8's positional bot layer (see the header); hz, the optional third argument, places 'arm.mortar'
                     const hz = arguments.length > 2 ? arguments[2] : null;
                     if (!enemy || typeof kind !== 'string' || !_idOn()) return null;
-                    const ctx = soundFX.ensureContext();
+                    const ctx = _ctx();   // V2.3: the live context: a cue on WP8's sim tick never makes one (no gesture)
                     if (!ctx) return null;
                     const L = _look(enemy.agentId);
                     if (!L || !L.sound) return null;
@@ -24266,12 +24325,11 @@
                     return null;
                 },
                 prebuild: function () {
-                    // V2.3: the shared noise and reverb buffers (see the header), at the first user gesture; no context: retried
-                    // at the next gesture
+                    // V2.3: the context and the shared noise and reverb buffers (see the header), at the first user-activation
+                    // gesture with identity on (the one place V2.3 makes a context); sound off: retried at the next gesture
                     const ctx = soundFX.ensureContext();
                     if (!ctx) return null;
-                    _noise(ctx);
-                    if (soundFX._reverb === null && V23.core && V23.core._quiet) V23.core._quiet(() => soundFX._ensureReverb(ctx));   // V2.3: its IR's draws on a V23.rand stream
+                    _prep(ctx, true);   // V2.3: the noise from V23.rand, the reverb IR's draws on a V23.rand stream (_quiet)
                     S.prebuilt = true;
                     S.stats.prebuilds++;
                     _listen(false);
@@ -24282,7 +24340,21 @@
                     get families() { return FAMILIES; }, get recipes() { return RECIPES; }, get cues() { return CUES; }, get intros() { return INTROS; },
                     get surfSteps() { return SURF_STEPS; }, get footwear() { return FOOTWEAR; }, get stats() { return Object.assign({}, S.stats); },
                     get trace() { return S.trace.slice(); }, get prebuilt() { return S.prebuilt; }, get listening() { return S.listening; },
-                    get previewBus() { return S.pv; },
+                    get previewBus() { return S.pv; }, get gestures() { return GESTURES.slice(); },
+                    // V2.3: the frozen step recipe of a surface x footwear (what surfAt returns there)
+                    step: function (surf, foot) {
+                        return _step(Object.prototype.hasOwnProperty.call(SURF_STEPS, surf) ? surf : 'concrete', Object.prototype.hasOwnProperty.call(FOOTWEAR, foot) ? foot : 'boot');
+                    },
+                    // V2.3: a motif ('motif', slot c/q/e/x) or an ultimate sting ('ult') from a palette object instead of a look:
+                    // the tests and tools play a family's reference vector through the same engine before its look lands.
+                    // Identity, sound and context rules as motif and ultSting; returns the event's voices (the trace's)
+                    trial: function (P, ev, slot) {
+                        if (!P || typeof P !== 'object' || !_idOn()) return null;
+                        const ctx = _ctx();
+                        if (!ctx) return null;
+                        _prep(ctx, true);
+                        return ev === 'ult' ? _stingEv(ctx, null, P, 1, _stream(97, 4)) : _motifEv(ctx, null, slot, P, _stream(97, _si(slot)));
+                    },
                     // V2.3: an agent's palette as the engine plays it: the resolved sound field, its family and its motif roots
                     palette: function (agentId) {
                         const L = _look(agentId);

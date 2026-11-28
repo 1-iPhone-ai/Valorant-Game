@@ -1,26 +1,38 @@
 'use strict';
-// V2.3 agent sound (WP10; design 12, 17.1). One boot on Ascent, bots frozen. The AudioContext's node creation is spied
-// (every oscillator, filter, buffer source, gain and panner the game makes, with its scheduled values and its
-// connections), and V23.audio's own trace says which recipe made each voice. It checks:
-//  - boot: no AudioContext and no shared buffer before the first user gesture; the gesture builds the noise and
-//    reverb buffers (V23.audio.prebuild) with no draw from the game's Math.random stream; soundEnabled off at the
-//    first gesture waits for the next;
-//  - palettes: the 29 design families (one per AGENT_ORDER agent, in its role) have pairwise-distinct palette vectors,
-//    same-role pairs differ in wave or interval set, the 10 recipes are all used, every agent resolves to a known
-//    family (a stub to its role default); prints the motif table and the V23MATRIX 'sound palette distinct' cells;
+// V2.3 agent sound (WP10; design 12, 17.1). One boot on Ascent, bots frozen (the last subtest moves to Icebox and Split
+// for their rope decks). The AudioContext's node creation is spied (every oscillator, filter, buffer source, gain and
+// panner the game makes, with its scheduled values and its connections), and V23.audio's own trace says which recipe
+// made each voice. It checks:
+//  - boot: no AudioContext and no shared buffer before the first user gesture, and no V2.3 event (motif, sting, bot
+//    cue, atShared, a trial, a preview with no user activation) makes one; the gesture listeners are the activation
+//    events (a touch pointerdown waits for its pointerup); identity off at a gesture builds nothing (V2.2's timing);
+//    the gesture builds the context and the noise and reverb buffers (V23.audio.prebuild) with no draw from the game's
+//    Math.random stream; soundEnabled off at the first gesture waits for the next;
+//  - palettes, from what the engine plays: every full look's resolved sound field equals its design family's
+//    reference vector field by field; the resolved full-look palettes are pairwise distinct and same-role ones differ
+//    in wave or interval set; the 29 reference vectors (what the role batches copy) are too; every agent resolves to a
+//    known family (a stub to its role default); each family's reference vector played through the engine
+//    (state.trial) gives a 2-voice motif at <= 0.06 and a 3-voice sting, no detuned pair summing above its voice's gain,
+//    and all 10 recipes; prints the motif table and the V23MATRIX 'sound palette distinct' cells, computed from the
+//    resolved palettes (a stub shares its role default, so its cell is open until its role batch);
 //  - Sage (glass) and Omen (void): their motif node graphs differ in wave, intervals and filter (reported), each
 //    motif is 2 voices at gain <= 0.06; a real cast (castAbility) plays the ability's own method at t 0 and the motif at
 //    the gesture's release key; the ultimate sting is 3 voices, also from a real ultimate;
 //  - positional events: one gain and one HRTF panner per event (a bot's cast, windup and warning sting; the mortar's
 //    sting placed at the hazard), the occlusion low-pass on the shared path;
-//  - surface steps: bots on Ascent's concrete, stone, metal and wood pieces give that enemyStep kind; a box that is no
-//    map piece (a barrel) gives V2.2's step; open floor follows the player's weather rule; the cache; footwear from the
-//    look; enemyStep(kind) makes one noise call (filter and duration of the surface), its tones and one panner, with
-//    exactly 1 Math.random; enemyStep() makes V2.2's nodes exactly, with 1 Math.random; neither touches the player's
-//    step counters; the live enemyAudio path passes the kind;
+//  - surface steps: a piece of each surface id (Ascent's concrete, stone, metal and wood piece tops: walls and roofs,
+//    the mapping only) gives that enemyStep kind; where Ascent's bots really walk (every open nav cell at y 0) the
+//    open-floor rule answers; a box that is no map piece (a barrel) gives V2.2's step; open floor follows the player's
+//    weather rule; the cache; footwear from the look, its tones kept on every surface; enemyStep(kind) makes one noise
+//    call (filter and duration of the surface), its tones and one panner, with exactly 1 Math.random; enemyStep() makes
+//    V2.2's nodes exactly, with 1 Math.random; neither touches the player's step counters; the live enemyAudio path
+//    passes the kind; on Icebox's container deck (a rope deck: the piece tops a V2.2 bot reaches, botMechanics on) the
+//    live path, with botMechanics._air walking the bot, gives metal steps with its footwear; Split's decks are metal
+//    and concrete pieces (concrete while the open-floor rule would say snow);
 //  - settings: soundEnabled off makes no node, enemyFootsteps off and the 22 m range make no step, positionalAudio off
-//    makes no panner, masterVolume scales every voice, Agent Identity off silences the in-match layers (previews stay),
-//    headshotVolume still scales the dink and no V2.3 voice joins it;
+//    makes no panner and leaves a bot cue's bus at unity (V2.2's level for positional sounds then), masterVolume scales
+//    every voice, Agent Identity off silences the in-match layers (previews stay), headshotVolume still scales the dink
+//    and no V2.3 voice joins it;
 //  - previews: Sage's chime and Omen's tear and 10 plate clacks on a bus of their own (no reverb), the cast's own soundFX
 //    methods inside V23.seeded, the bus ramped to 0 in 30 ms by the next preview or preview(null), soundFX._out honoured;
 //  - no Math.random from any V2.3 sound; programs equal the warm-up watermark, no first-use stalls.
@@ -57,7 +69,7 @@ function init() {
         return real();
     };
     // armed before the game's own listeners (this one is registered first, in the capture phase), disarmed after them
-    for (const t of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(t, () => { window.__rnd.armed = true; setTimeout(() => { window.__rnd.armed = false; }, 0); }, true);
+    for (const t of ['pointerdown', 'pointerup', 'keydown', 'touchend']) window.addEventListener(t, () => { window.__rnd.armed = true; setTimeout(() => { window.__rnd.armed = false; }, 0); }, true);
 }
 
 test('agent sound: palettes, motifs, stings, positional cues, surface steps, previews and settings', { timeout: 600000 }, async (t) => {
@@ -65,11 +77,44 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
 
     // ---- boot and the first gesture ------------------------------------------------------------------------------
     await t.test('nothing is built and no AudioContext is made before the first gesture; the gesture builds the buffers quietly', async () => {
-        const before = await evaluate(() => ({ ac: __ac.n, ctx: !!soundFX.ctx, nb: !!soundFX._noiseBuffer, rv: soundFX._reverb, listening: V23.audio.state.listening, prebuilt: V23.audio.state.prebuilt, map: game.mapPreset }));
+        const before = await evaluate(() => ({ ac: __ac.n, ctx: !!soundFX.ctx, nb: !!soundFX._noiseBuffer, rv: soundFX._reverb, listening: V23.audio.state.listening, prebuilt: V23.audio.state.prebuilt, map: game.mapPreset,
+            gestures: V23.audio.state.gestures, identity: V23.core.enabled() }));
         assert.equal(before.map, 'ascent');
+        assert.equal(before.identity, true, 'Agent Identity on by default');
         assert.equal(before.ac, 0, 'no AudioContext at boot');
         assert.deepEqual([before.ctx, before.nb, before.rv], [false, false, null], 'no context, noise buffer or reverb at boot');
         assert.deepEqual([before.listening, before.prebuilt], [true, false], 'the gesture listeners wait');
+        assert.deepEqual(before.gestures, ['pointerdown', 'pointerup', 'keydown', 'touchend'], 'the user-activation events (no touchstart)');
+        // no V2.3 event makes a context: a motif, a sting, a bot's cues (WP8 sends them on its sim tick, with no gesture),
+        // atShared, a trial, and a preview while the page holds no user activation (the harness's page.evaluate runs as a
+        // user gesture, so for the preview the page's activation is stubbed off: no gesture, as on a showroom timer)
+        const none = await evaluate(() => {
+            const e = enemyObjects.find((x) => x.isActive && !x.hit), cc = characterController;
+            V23.audio.motif('sage', 'c'); V23.audio.ultSting('omen');
+            V23.audio.botCue(e, 'windup.smoke'); V23.audio.botCue(e, 'windup.flash'); V23.audio.botCue(e, 'arm.mortar', { x: cc.position.x, y: 0.07, z: cc.position.z });
+            V23.audio.atShared(1, 1, 1, () => {}); V23.audio.state.trial(V23.audio.state.families.glass.v, 'motif', 'c');
+            Object.defineProperty(navigator, 'userActivation', { configurable: true, get: () => ({ isActive: false, hasBeenActive: false }) });
+            try { V23.audio.preview('sage', 'intro'); V23.audio.preview(null); } finally { delete navigator.userActivation; }
+            return { ac: __ac.n, ctx: !!soundFX.ctx, events: V23.audio.state.stats.events, restored: typeof navigator.userActivation.isActive === 'boolean' && !Object.prototype.hasOwnProperty.call(navigator, 'userActivation') };
+        });
+        assert.deepEqual([none.ac, none.ctx, none.events], [0, false, 0], 'no V2.3 event makes an AudioContext (and none plays without one)');
+        assert.ok(none.restored, 'navigator.userActivation restored');
+        // a touch pointerdown is no activation (its pointerup is), nor is Escape: nothing is built
+        const touch = await evaluate(() => {
+            window.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true }));
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            return { ac: __ac.n, listening: V23.audio.state.listening, prebuilt: V23.audio.state.prebuilt };
+        });
+        assert.deepEqual(touch, { ac: 0, listening: true, prebuilt: false }, 'a touch pointerdown or Escape: no context, still listening');
+        // Agent Identity off at a gesture: nothing is built (V2.2's timing: the context waits for V2.2's first sound). A
+        // key that plays nothing (Shift: walk); a click in play would fire the rifle, whose gunshot makes the context in
+        // V2.2 as well (probed: shoot > gunshot > noiseLayer > ensureContext in both builds)
+        await evaluate(() => { game.userSettings.agentIdentity = 'off'; V23.core.applySettings(game.userSettings, 'agentIdentity'); });
+        await page.keyboard.press('Shift');
+        await frames(1);
+        const idOff = await evaluate(() => ({ ac: __ac.n, ctx: !!soundFX.ctx, listening: V23.audio.state.listening, prebuilt: V23.audio.state.prebuilt }));
+        await evaluate(() => { game.userSettings.agentIdentity = 'on'; V23.core.applySettings(game.userSettings, 'agentIdentity'); });
+        assert.deepEqual(idOff, { ac: 0, ctx: false, listening: true, prebuilt: false }, 'identity off at the gesture: no context, still listening');
         // soundEnabled off at the first gesture: nothing is made, the listeners stay for the next one
         await evaluate(() => { game.soundEnabled = false; });
         await page.mouse.click(5, 5);
@@ -147,59 +192,117 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
     }, kit.SPOT);
 
     // ---- palettes ------------------------------------------------------------------------------------------------
-    await t.test('the 29 families: pairwise-distinct palette vectors, same-role pairs differ in wave or intervals, every agent resolves', async () => {
+    await t.test('palettes from what the engine plays: full looks equal their family vector, distinct palettes, same-role pairs differ, every family through the engine', async () => {
         const r = await evaluate(() => {
-            const F = V23.audio.state.families, out = { rows: [], design: [], problems: [] };
+            const F = V23.audio.state.families, out = { fam: [], pals: [], problems: [], trials: [] };
             const design = Object.keys(F).filter((k) => F[k].agent);
             out.design = design;
-            const used = new Set();
-            for (const k of Object.keys(F)) for (const it of F[k].motif.concat(F[k].sting, [F[k].cue])) used.add(it[0]);
-            out.used = [...used].sort();
             out.recipes = V23.audio.state.recipes.slice();
-            const key = (v, f) => [v.wave, v.base, v.intervals.join(' '), v.noise.type, v.noise.f, v.noise.q, v.attack, v.tail, v.shimmer, v.sub, v.footwear, f.motif.map((x) => x[0]).join('+')].join('|');
+            // the palette's sound fields (what a look carries and the engine reads), and a key for distinctness: those
+            // fields and the family's recipes (two palettes with one key would play alike)
+            const FIELDS = ['family', 'wave', 'base', 'intervals', 'noise', 'attack', 'tail', 'shimmer', 'sub', 'footwear'];
+            const val = (x) => JSON.stringify(x && typeof x === 'object' && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, k) => { o[k] = x[k]; return o; }, {}) : x);
+            const key = (v, f) => FIELDS.filter((k) => k !== 'family').map((k) => val(v[k])).concat([f.motif.map((x) => x[0]).join('+'), f.sting.map((x) => x[0]).join('+'), f.cue[0]]).join('|');
             for (const k of design) {
                 const f = F[k], def = AGENT_DEFS[f.agent];
                 if (!def) { out.problems.push(k + ': no agent ' + f.agent); continue; }
-                out.rows.push({ family: k, agent: f.agent, role: def.role, wave: f.v.wave, iv: f.v.intervals.join(' '), key: key(f.v, f) });
+                out.fam.push({ family: k, agent: f.agent, role: def.role, wave: f.v.wave, iv: f.v.intervals.join(' '), key: key(f.v, f) });
             }
+            // every agent as the engine plays it: V23.audio.state.palette (the resolved look's sound field)
             for (const id of AGENT_ORDER) {
-                const p = V23.audio.state.palette(id);
-                out.rows.push({ agentPalette: id, role: AGENT_DEFS[id].role, stub: p.stub, family: p.family, known: p.known, wave: p.wave, base: p.base, iv: p.intervals.join(' '),
+                const p = V23.audio.state.palette(id), fam = F[p.family], ref = design.find((k) => F[k].agent === id) || null;
+                // a full look against its family's reference vector, field by field (the two copies cannot drift)
+                const drift = (!p.stub && fam && fam.v) ? FIELDS.filter((k) => val(p[k]) !== val(fam.v[k])).map((k) => `${k} ${val(p[k])} vs ${val(fam.v[k])}`) : null;
+                out.pals.push({ id, role: AGENT_DEFS[id].role, stub: p.stub, family: p.family, known: p.known, wave: p.wave, base: p.base, iv: p.intervals.join(' '),
                     noise: p.noise.type + ' ' + p.noise.f + ' Q' + p.noise.q, attack: p.attack, tail: p.tail, shimmer: p.shimmer, sub: p.sub, footwear: p.footwear,
-                    motif: p.motif.join('+'), sting: p.sting.join('+'), cue: p.cue, roots: [p.roots.c, p.roots.q, p.roots.e].join(' / '),
-                    designFamily: design.find((k) => F[k].agent === id) || null });
+                    motif: p.motif.join('+'), sting: p.sting.join('+'), cue: p.cue, roots: [p.roots.c, p.roots.q, p.roots.e].join(' / '), designFamily: ref,
+                    hasV: !!(fam && fam.v), drift, key: fam ? key(p, fam) : null });
+            }
+            // each family's reference vector through the engine (state.trial), spied: the motif and the sting voices, and
+            // every gain that mixes two oscillators (a detuned pair: its inputs' sum must stay at or under 1)
+            for (const k of design) {
+                __take();
+                const m = V23.audio.state.trial(F[k].v, 'motif', 'c') || [];
+                const gm = __take();
+                const u = V23.audio.state.trial(F[k].v, 'ult') || [];
+                const gu = __take();
+                let mixes = 0, mixMax = 0;
+                for (const g of [gm, gu]) g.forEach((n, i) => {
+                    if (n.k !== 'gain') return;
+                    const osc = g.filter((x) => x.k === 'osc' && x.to.includes(i)).length;
+                    if (osc >= 2) { mixes++; mixMax = Math.max(mixMax, n.peak * osc); }
+                });
+                out.trials.push({ family: k, motif: m.map((v) => [v.r, v.gain]), ult: u.map((v) => [v.r, v.gain]), mixes, mixMax: +mixMax.toFixed(4),
+                    recipes: m.concat(u).map((v) => v.r) });
             }
             return out;
         });
-        const fam = r.rows.filter((x) => x.family && !x.agentPalette);
+        // the reference table: 29 families, one per agent, pairwise distinct, same-role pairs differ in wave or intervals
         assert.equal(r.design.length, 29, '29 design families');
-        assert.deepEqual(fam.map((x) => x.agent).sort(), await evaluate(() => AGENT_ORDER.slice().sort()), 'one family per AGENT_ORDER agent');
+        assert.deepEqual(r.fam.map((x) => x.agent).sort(), await evaluate(() => AGENT_ORDER.slice().sort()), 'one family per AGENT_ORDER agent');
         assert.deepEqual(r.problems, []);
-        assert.deepEqual(r.used, r.recipes.slice().sort(), 'every one of the 10 recipes is used');
         assert.equal(r.recipes.length, 10);
-        const keys = new Set(fam.map((x) => x.key));
-        assert.equal(keys.size, 29, 'pairwise-distinct palette vectors');
-        const clash = [];
-        for (let i = 0; i < fam.length; i++) for (let j = i + 1; j < fam.length; j++) {
-            const a = fam[i], b = fam[j];
-            if (a.role === b.role && a.wave === b.wave && a.iv === b.iv) clash.push(a.family + '/' + b.family);
-        }
-        assert.deepEqual(clash, [], 'same-role families differ in wave or interval set');
-        const pals = r.rows.filter((x) => x.agentPalette && (!ROLE || x.role === ROLE));
+        // the clashes in a set of palettes: the same key, or the same role with the same wave and interval set
+        const distinct = (rows) => {
+            const seen = new Map(), clash = [];
+            for (const x of rows) { if (seen.has(x.key)) clash.push(`${seen.get(x.key)}=${x.name}`); else seen.set(x.key, x.name); }
+            for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
+                const a = rows[i], b = rows[j];
+                if (a.role === b.role && a.wave === b.wave && a.iv === b.iv) clash.push(`${a.name}~${b.name}`);
+            }
+            return clash;
+        };
+        assert.deepEqual(distinct(r.fam.map((x) => ({ name: x.family, key: x.key, role: x.role, wave: x.wave, iv: x.iv }))), [], 'the 29 reference vectors: pairwise distinct, same-role pairs differ in wave or interval set');
+        // what the game plays: every agent resolves; a stub to its role default; a full look to its design family, with
+        // its sound field equal to the family's reference vector field by field
         const roleFam = { DUELIST: 'duelist', INITIATOR: 'initiator', CONTROLLER: 'controller', SENTINEL: 'sentinel' };
-        // the motif parameter table (the report reads these lines)
+        for (const p of r.pals) {
+            assert.ok(p.known, `${p.id}: a known family (${p.family})`);
+            if (p.stub) assert.equal(p.family, roleFam[p.role], `${p.id}: a stub plays its role default`);
+            else {
+                assert.equal(p.family, p.designFamily, `${p.id}: a full look names its design family`);
+                assert.ok(p.hasV, `${p.id}: its family has a reference vector`);
+                assert.deepEqual(p.drift, [], `${p.id}: its resolved sound field equals the ${p.family} reference vector`);
+            }
+        }
+        // the resolved full-look palettes: pairwise distinct, same-role ones differ in wave or interval set
+        const rows = r.pals.map((p) => ({ name: p.id, key: p.key, role: p.role, wave: p.wave, iv: p.iv, stub: p.stub }));
+        const full = rows.filter((x) => !x.stub);
+        assert.ok(full.length >= 2, `full looks: ${full.map((x) => x.name).join(', ')}`);
+        assert.deepEqual(distinct(full), [], 'resolved full-look palettes: pairwise distinct, same-role pairs differ in wave or interval set');
+        // every family's reference vector through the engine: the motif 2 voices at <= 0.06, the sting 3 at <= 0.08, no
+        // detuned pair above its voice's gain, all 10 recipes played
+        const played = new Set();
+        let mixes = 0;
+        for (const tr of r.trials) {
+            assert.equal(tr.motif.length, 2, `${tr.family}: a 2-voice motif`);
+            for (const v of tr.motif) assert.ok(v[1] <= 0.06 + 1e-9, `${tr.family}: motif voice ${v[0]} gain ${v[1]} <= 0.06`);
+            assert.equal(tr.ult.length, 3, `${tr.family}: a 3-voice sting`);
+            for (const v of tr.ult) assert.ok(v[1] <= 0.08 + 1e-9, `${tr.family}: sting voice ${v[0]} gain ${v[1]} <= 0.08`);
+            assert.ok(tr.mixMax <= 1 + 1e-9, `${tr.family}: a detuned pair sums to ${tr.mixMax} (<= 1, so the voice peaks at its gain)`);
+            mixes += tr.mixes;
+            tr.recipes.forEach((x) => played.add(x));
+        }
+        assert.ok(mixes >= 3, `detuned pairs exercised (${mixes})`);
+        // the windup recipe is the family's cue (one per family); the motif and sting cover the rest
+        const cues = await evaluate(() => Object.values(V23.audio.state.families).filter((f) => f.agent).map((f) => f.cue[0]));
+        cues.forEach((x) => played.add(x));
+        assert.deepEqual([...played].sort(), r.recipes.slice().sort(), 'every one of the 10 recipes is played');
+        // V23MATRIX, computed from the resolved palettes of all 29 agents: distinct when no other agent's palette has its
+        // key and no same-role agent shares its wave and interval set (and a full look equals its family vector); a stub
+        // shares its role default with the other stubs of its role, so its cell stays open until its role batch
+        const pals = r.pals.filter((x) => !ROLE || x.role === ROLE);
         console.log('# MOTIF agent | role | stub | family | wave | base | intervals | noise | attack | tail | shimmer | sub | footwear | motif | sting | windup | roots c/q/e | design family');
         for (const p of pals) {
-            console.log(`# MOTIF ${p.agentPalette} | ${p.role} | ${p.stub ? 'stub (role default)' : 'full'} | ${p.family} | ${p.wave} | ${p.base} | ${p.iv} | ${p.noise} | ${p.attack} | ${p.tail} | ${p.shimmer} | ${p.sub} | ${p.footwear} | ${p.motif} | ${p.sting} | ${p.cue} | ${p.roots} | ${p.designFamily}`);
-            assert.ok(p.known, `${p.agentPalette}: a known family (${p.family})`);
-            if (p.stub) assert.equal(p.family, roleFam[p.role], `${p.agentPalette}: a stub plays its role default`);
-            else assert.equal(p.family, p.designFamily, `${p.agentPalette}: a full look names its design family`);
-            // V23MATRIX: a full look's palette is distinct (its design family's vector); a stub still carries its role default
-            // (not distinct within its role until its role batch writes the design family's vector), so its cell is open
-            matrix(p.agentPalette, 'sound palette distinct', !p.stub, `${p.family} ${p.wave} ${p.base} Hz [${p.iv}]${p.stub ? ' (role default until the role batch; its design family ' + p.designFamily + ' is ready)' : ''}`);
+            console.log(`# MOTIF ${p.id} | ${p.role} | ${p.stub ? 'stub (role default)' : 'full'} | ${p.family} | ${p.wave} | ${p.base} | ${p.iv} | ${p.noise} | ${p.attack} | ${p.tail} | ${p.shimmer} | ${p.sub} | ${p.footwear} | ${p.motif} | ${p.sting} | ${p.cue} | ${p.roots} | ${p.designFamily}`);
+            const me = rows.find((x) => x.name === p.id), clash = [];
+            for (const o of rows) if (o.name !== p.id && (o.key === me.key || (o.role === me.role && o.wave === me.wave && o.iv === me.iv))) clash.push(o.name);
+            const ok = clash.length === 0 && (p.stub || (p.drift && p.drift.length === 0));
+            matrix(p.id, 'sound palette distinct', ok, `${p.family} ${p.wave} ${p.base} Hz [${p.iv}]` + (clash.length ? `; shares wave and intervals with ${clash.slice(0, 4).join(', ')}${clash.length > 4 ? ' and ' + (clash.length - 4) + ' more' : ''}` : '') +
+                (p.stub ? ` (role default until its role batch; its design family ${p.designFamily} is ready)` : ''));
         }
-        const fams = fam.map((x) => `${x.family}(${x.agent}) ${x.wave} [${x.iv}]`);
-        console.log('# FAMILIES ' + fams.join('; '));
+        console.log('# FAMILIES ' + r.fam.map((x) => `${x.family}(${x.agent}) ${x.wave} [${x.iv}]`).join('; '));
+        console.log('# TRIALS ' + r.trials.map((x) => `${x.family}: ${x.motif.map((v) => v[0]).join('+')} / ${x.ult.map((v) => v[0]).join('+')}${x.mixes ? ' pair ' + x.mixMax : ''}`).join('; '));
     });
 
     // ---- Sage and Omen: motif graphs --------------------------------------------------------------------------------
@@ -377,11 +480,14 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
     });
 
     // ---- surface steps -------------------------------------------------------------------------------------------
-    await t.test('surface steps: Ascent pieces give their kind, a prop gives V2.2\'s step, open floor follows the weather; one Math.random per step', async () => {
+    await t.test('surface steps: each surface id gives its kind, Ascent\'s walked floor is open floor, a prop gives V2.2\'s step, the weather rule, footwear kept; one Math.random per step', async () => {
         const r = await evaluate(() => {
             __identity(true);
             const e = __bot(), out = { found: {}, steps: {} }, agent0 = e.agentId;
             const want = { 1: 'concrete', 2: 'stone', 3: 'metal', 4: 'wood' };
+            // the mapping: a piece of each surface id. Ascent has no piece top a bot reaches (bots walk at y 0 and the map
+            // floor is no collision box; its low tops, 0.5-0.6 m, block the nav grid), so these are wall and roof tops: they
+            // show the surf % 10 mapping and each surface's node graph, not a walked surface (the rope decks, last subtest)
             const under = (x, z, y) => collisionIndex.query(x, z, x, z, []).filter((rc) => x >= rc.minX && x <= rc.maxX && z >= rc.minZ && z <= rc.maxZ && Math.abs(rc.maxY - y) <= 0.3);
             for (const pc of mapPieces) {
                 if (pc.shape !== 'box') continue;
@@ -401,9 +507,30 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
                 __take();
                 const draws = __draws(() => soundFX.at(p[0], p[1] + 0.1, p[2], () => soundFX.enemyStep(kind)));
                 const g = __take();
-                return { kind: kind === undefined ? 'undefined' : kind === null ? 'null' : kind, draws, g, counters: [soundFX.stepsPlayed, soundFX.lastStep], s0 };
+                return { kind: kind === undefined ? 'undefined' : kind === null ? 'null' : kind, kindRef: kind, draws, g, counters: [soundFX.stepsPlayed, soundFX.lastStep], s0 };
             };
             for (const s of Object.keys(out.found)) out.steps[s] = stepAt(out.found[s]);
+            out.same = Object.keys(out.steps).every((s) => out.steps[s].kindRef === V23.audio.state.step(s, out.steps[s].kindRef.foot));
+            // where Ascent's bots really walk: every open nav cell's centre at y 0, with snow forced so the open-floor rule
+            // answers 'snow' and a piece would still answer its own surface
+            navGrid.ensure();
+            const snow0 = weatherSurf.uSnow.value;
+            weatherSurf.uSnow.value = 1;
+            out.walk = {};
+            for (let j = 0; j < navGrid.N; j++) for (let i = 0; i < navGrid.N; i++) {
+                if (navGrid.blocked[j * navGrid.N + i]) continue;
+                e.mesh.position.set(i - navGrid.EXT + 0.5, 0, j - navGrid.EXT + 0.5);
+                const k = V23.audio.surfAt(e), key = k === undefined ? 'prop' : k === null ? 'null' : k.surf === 'snow' ? 'open floor' : 'piece ' + k.surf;
+                out.walk[key] = (out.walk[key] || 0) + 1;
+            }
+            weatherSurf.uSnow.value = snow0;
+            // footwear tones on every surface: all of the footwear's, then the surface's in the room left (3 in all)
+            out.tones = [];
+            const SS = V23.audio.state.surfSteps, FW = V23.audio.state.footwear;
+            for (const sf of Object.keys(SS)) for (const fw of Object.keys(FW)) {
+                const k = V23.audio.state.step(sf, fw), has = (t) => k.tones.some((x) => x.join() === t.join());
+                out.tones.push({ sf, fw, n: k.tones.length, foot: FW[fw].every(has), surf: SS[sf].tones.slice(0, Math.max(0, 3 - FW[fw].length)).every(has), hz: k.tones.map((x) => x[0]) });
+            }
             // a prop: a barrel's top (a collider whose owner is no map piece), or one made for the test
             let prop = (breakables.barrels || []).find((b) => b.rec && b.rec.indexed);
             let made = null;
@@ -446,9 +573,23 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
             out.v22 = __take();
             out.v22counters = [soundFX.stepsPlayed, soundFX.lastStep];
             out.mm = game.userSettings.masterVolume / 100;
+            for (const s of Object.keys(out.steps)) delete out.steps[s].kindRef;
             return out;
         });
-        assert.deepEqual(Object.keys(r.found).sort(), ['concrete', 'metal', 'stone', 'wood'], 'Ascent has a standable piece of each surface');
+        assert.deepEqual(Object.keys(r.found).sort(), ['concrete', 'metal', 'stone', 'wood'], 'Ascent has a piece top of each surface (the mapping)');
+        assert.ok(r.same, 'surfAt gives the same frozen recipe as state.step');
+        // Ascent's walked floor: the open-floor rule (the common case for real enemy steps)
+        const walked = Object.values(r.walk).reduce((a, b) => a + b, 0);
+        assert.ok(walked > 1000, `open nav cells sampled (${walked})`);
+        assert.ok((r.walk['open floor'] || 0) / walked >= 0.95, `the open-floor rule answers where bots walk: ${JSON.stringify(r.walk)}`);
+        // footwear kept on every surface (the plate tick of a plated bot on metal too)
+        for (const x of r.tones) {
+            assert.ok(x.n <= 3, `${x.sf}/${x.fw}: at most 3 tones`);
+            assert.ok(x.foot, `${x.sf}/${x.fw}: every footwear tone kept (${x.hz.join(', ')})`);
+            assert.ok(x.surf, `${x.sf}/${x.fw}: the surface's first tones in the room left (${x.hz.join(', ')})`);
+        }
+        const mp = r.tones.find((x) => x.sf === 'metal' && x.fw === 'plated');
+        assert.deepEqual(mp.hz, [410, 95, 2600], 'metal x plated: the metal ring, the heel and the plate tick');
         const checkStep = (label, s, surf) => {
             assert.equal(typeof s.kind, 'object', `${label}: a step kind`);
             assert.equal(s.kind.surf, surf, `${label}: kind ${s.kind.surf}`);
@@ -478,7 +619,8 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
         assert.deepEqual(v22, ['noise::::', 'filter:lowpass:520:120:', 'gain::::' + +(0.16 * mm).toFixed(4), 'panner::::', 'osc:sine:95::', 'gain::::' + +(0.07 * mm).toFixed(4), 'panner::::'], 'enemyStep(): V2.2\'s step');
         assert.equal(r.v22draws, 1, 'enemyStep(): one Math.random');
         assert.deepEqual(r.prop.g.map((n) => n.k), r.v22.map((n) => n.k), 'the prop step is V2.2\'s');
-        console.log(`# STEPS pieces ${JSON.stringify(r.found)}; prop: ${r.propKind}; foot ${JSON.stringify(r.foot)}`);
+        console.log(`# STEPS piece tops (mapping) ${JSON.stringify(r.found)}; prop: ${r.propKind}; foot ${JSON.stringify(r.foot)}; Ascent's open nav cells at y 0: ${JSON.stringify(r.walk)}`);
+        console.log('# STEPTONES ' + r.tones.map((x) => `${x.sf}/${x.fw} [${x.hz.join(' ')}]`).join('; '));
     });
 
     await t.test('the live path: enemyAudio passes the kind; enemyFootsteps off and beyond 22 m make no step', async () => {
@@ -546,7 +688,8 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
             V23.audio.motif('sage', 'c');
             out.zero = __take().length;
             game.userSettings.masterVolume = mv;
-            // 3D audio off: no panner; the cue's bus takes the panner's distance level
+            // 3D audio off: no panner, and the cue's bus stays at unity (soundFX.at plays straight: V2.2's level for its
+            // positional sounds, the same bot's gunshot and steps, then)
             game.userSettings.positionalAudio = false;
             __take();
             V23.audio.botCue(e, 'cast.flash');
@@ -584,9 +727,8 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
         assert.equal(r.zeroDraws, 0, 'masterVolume 0: no draw (V2.2\'s step draws none there either)');
         assert.equal(r.pos3dOff.panners, 0, 'positionalAudio off: no panner');
         assert.ok(r.pos3dOff.stepNodes > 0, 'positionalAudio off: the step still plays');
-        const want = 4 / (4 + 1.1 * (Math.max(r.dist, 4) - 4));
         assert.equal(r.pos3dOff.busPeak.length, 1, 'positionalAudio off: one bus reaches the destination');
-        assert.ok(Math.abs(r.pos3dOff.busPeak[0] - want) < 0.01, `positionalAudio off: the cue's bus at the panner's distance level (${r.pos3dOff.busPeak[0]} vs ${want.toFixed(3)})`);
+        assert.equal(r.pos3dOff.busPeak[0], 1, `positionalAudio off: the cue's bus at unity, as V2.2's positional sounds then (the bot ${r.dist.toFixed(1)} m away)`);
         assert.equal(r.idOff, 0, 'identity off: no motif, sting or bot cue');
         assert.equal(r.idOffSurf, null, 'identity off: surfAt null (V2.2\'s step)');
         assert.ok(r.idOffPreview > 0, 'identity off: previews still play');
@@ -669,6 +811,7 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
             out.cues = __draws(() => { for (const id of ids) { e.agentId = id; for (const k of ['windup.flash', 'cast.flash', 'windup.sonar', 'cast.sonar', 'windup.mortar', 'cast.mortar', 'windup.smoke', 'cast.smoke', 'cast.teleport', 'sig.slowEntry']) V23.audio.botCue(e, k); V23.audio.botCue(e, 'arm.mortar', { x: cc.position.x, y: 0.07, z: cc.position.z }); } });
             e.agentId = ag0;
             out.shared = __draws(() => V23.audio.atShared(2, 1, 2, () => soundFX.playTone(440, 440, 0.05, 'sine', 0.03, 0)));
+            out.trials = __draws(() => { const F = V23.audio.state.families; for (const k of Object.keys(F)) if (F[k].v) { V23.audio.state.trial(F[k].v, 'motif', 'e'); V23.audio.state.trial(F[k].v, 'ult'); } });
             out.surf = __draws(() => { for (let i = 0; i < 20; i++) { e.mesh.position.x += 0.3; V23.audio.surfAt(e); } });
             // prebuild from scratch: both buffers made again, no draw from Math.random
             const nb = soundFX._noiseBuffer, rv = soundFX._reverb;
@@ -681,13 +824,112 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
             soundFX.isOccluded = __occ;
             return out;
         }, ROLE);
-        assert.deepEqual([r.casts, r.previews, r.cues, r.shared, r.surf, r.prebuild], [0, 0, 0, 0, 0, 0], 'no Math.random from V2.3 sound (motifs and stings, previews, bot cues, atShared, surfAt, prebuild)');
+        assert.deepEqual([r.casts, r.previews, r.cues, r.shared, r.trials, r.surf, r.prebuild], [0, 0, 0, 0, 0, 0, 0], 'no Math.random from V2.3 sound (motifs and stings, previews, bot cues, atShared, the 29 families\' trials, surfAt, prebuild)');
         assert.deepEqual(r.rebuilt, [true, true], 'prebuild rebuilds both buffers');
         await frames(5);
         const [programs, watermark, stalls] = await programState(page);
         assert.equal(programs, watermark, 'no shader compiled after the warm-up');
         assert.equal(stalls, 0, 'no first-use stalls');
         console.log(`# EVENTS ${r.events} V2.3 sound events in this run`);
+    });
+
+    // ---- rope decks: the piece tops a V2.2 bot reaches -----------------------------------------------------------------
+    await t.test("rope decks (the piece tops a bot reaches): the live path on Icebox's container deck gives metal steps with the footwear; Split's decks are pieces", async () => {
+        await evaluate(() => rebuildMapPreset('icebox'));
+        await frames(3);
+        const r = await evaluate(() => {
+            __identity(true);
+            __spy.on = true;
+            soundFX.isOccluded = () => false;
+            window.updateEnemies = () => {};
+            const e = __bot(), cc = characterController, L = mapLayout(), rope = L.ropes[0], agent0 = e.agentId;
+            const out = { map: game.mapPreset, rope: rope.name, steps: [], snow: weatherSurf.uSnow.value };
+            e.agentId = 'omen';   // plated footwear: the plate tick on metal
+            const deckY = rope.topY - 0.2, pos = e.mesh.position;
+            // the player on the ground 6 m from the deck's exit (inside the 22 m range)
+            cc.position.set(rope.exit.x + 6, cc.position.y, rope.exit.z);
+            camera.position.copy(cc.position);
+            // each call of the step detector: its kind, its spied nodes and its Math.random draws, and whether it is this
+            // bot's (soundFX.at's position is the bot's)
+            const orig = soundFX.enemyStep;
+            soundFX.enemyStep = function (k) {
+                __take();
+                const real = Math.random;
+                let n = 0;
+                Math.random = function () { n++; return real(); };
+                try { orig.call(this, k); } finally { Math.random = real; }
+                const g = __take(), x = pos.x, z = pos.z, y = pos.y;
+                const under = collisionIndex.query(x, z, x, z, []).filter((rc) => x >= rc.minX && x <= rc.maxX && z >= rc.minZ && z <= rc.maxZ && Math.abs(rc.maxY - y) <= 0.3);
+                out.steps.push({ at: [+x.toFixed(2), +y.toFixed(2), +z.toFixed(2)], mine: !!(soundFX._pos && Math.abs(soundFX._pos.x - x) < 1e-6 && Math.abs(soundFX._pos.z - z) < 1e-6),
+                    surf: k ? k.surf : String(k), foot: k ? k.foot : null, hz: k ? k.tones.map((q) => q[0]) : [],
+                    piece: under.length ? (under[0].owner && typeof under[0].owner.surf === 'number' ? under[0].owner.surf % 10 : -1) : 0, draws: n,
+                    noise: g.filter((q) => q.k === 'noise').length, osc: g.filter((q) => q.k === 'osc').length, panners: g.filter((q) => q.k === 'panner').length });
+            };
+            // botMechanics._air walks the bot at deckY from the cable to the exit ('onTop') and back ('back'), as in a match
+            // with botMechanics on (mechHoldMs set, so the perch at the exit draws no hold time); enemyAudio.update is the
+            // live step path (H31.1)
+            const bm = botMechanics, keepLayout = bm.layout;
+            bm.layout = L;
+            e._stepX = undefined;
+            pos.set(rope.x, deckY, rope.z);
+            Object.assign(e, { mechState: 'onTop', mechKind: 'rope', mechIdx: 0, mechAir: true, mechX: rope.x, mechZ: rope.z, mechHoldMs: 1500 });
+            let now = gameNow();
+            e.mechUntil = now + 1500;
+            const tick = () => { bm._air(e, pos, cc.position, 36, now, Date.now(), 1 / 60, 1, 1, 1); enemyAudio.update(); now += 1000 / 60; };
+            enemyAudio.update();
+            try {
+                for (let i = 0; i < 120 && e.mechState === 'onTop'; i++) tick();
+                out.reached = e.mechState;
+                e.mechState = 'back';
+                e.mechUntil = now + 1500;
+                for (let i = 0; i < 120 && e.mechState === 'back'; i++) tick();
+                out.after = e.mechState;
+            } finally {
+                soundFX.enemyStep = orig;
+                bm.clear(e);
+                e.mechHoldMs = 0; pos.y = 0; e._stepX = undefined; e.agentId = agent0;
+                bm.layout = keepLayout;
+            }
+            return out;
+        });
+        assert.equal(r.map, 'icebox');
+        assert.equal(r.reached, 'perch', `the bot walked the deck to the exit (${r.rope})`);
+        assert.equal(r.after, 'down', 'and back to the cable');
+        const mine = r.steps.filter((x) => x.mine);
+        assert.ok(mine.length >= 2, `steps on the deck walk (${mine.length})`);
+        const metal = mine.filter((x) => x.piece === 3);
+        assert.ok(metal.length >= 1, 'at least one step over the container deck');
+        for (const x of mine) {
+            assert.equal(x.surf, x.piece === 3 ? 'metal' : x.piece === 0 ? (r.snow > 0.4 ? 'snow' : 'concrete') : x.surf, `a step at ${x.at.join(', ')}: the surface under it`);
+            assert.equal(x.foot, 'plated', 'its footwear from the look');
+            assert.deepEqual([x.noise, x.panners, x.osc, x.draws], [1, 1, x.hz.length, 1], `a step at ${x.at.join(', ')}: one noise call, one panner, its tones, one Math.random`);
+        }
+        for (const x of metal) assert.deepEqual(x.hz, [410, 95, 2600], 'a plated step on metal: the ring, the heel and the plate tick');
+        console.log(`# DECK ${r.map} ${r.rope}: ${mine.map((x) => `${x.surf}/${x.foot} at [${x.at.join(' ')}] [${x.hz.join(' ')}]`).join('; ')}`);
+        // Split: the Underpass deck is metal and the Crossing deck a concrete piece (concrete while open floor says snow)
+        await evaluate(() => rebuildMapPreset('split'));
+        await frames(3);
+        const s = await evaluate(() => {
+            const e = __bot(), L = mapLayout(), out = { map: game.mapPreset, decks: [] }, p0 = e.mesh.position.clone(), snow0 = weatherSurf.uSnow.value;
+            weatherSurf.uSnow.value = 1;
+            for (const rope of L.ropes) {
+                e.mesh.position.set(rope.exit.x, rope.topY - 0.2, rope.exit.z);
+                const k = V23.audio.surfAt(e);
+                e.mesh.position.set(rope.x, rope.topY - 0.2, rope.z);   // over the cable's foot: no box, the open-floor rule
+                const k0 = V23.audio.surfAt(e);
+                out.decks.push([rope.name, k ? k.surf : String(k), k0 ? k0.surf : String(k0)]);
+            }
+            weatherSurf.uSnow.value = snow0;
+            e.mesh.position.copy(p0);
+            return out;
+        });
+        assert.equal(s.map, 'split');
+        assert.deepEqual(s.decks, [['UNDERPASS ASCENDER', 'metal', 'snow'], ['CROSSING ASCENDER', 'concrete', 'snow']], "Split's decks: a metal and a concrete piece (open floor beside them: snow forced)");
+        console.log(`# DECK split: ${s.decks.map((d) => d[0] + ' ' + d[1]).join('; ')}`);
+        await frames(5);
+        const [programs, watermark, stalls] = await programState(page);
+        assert.equal(programs, watermark, 'no shader compiled after the warm-up (two map switches)');
+        assert.equal(stalls, 0, 'no first-use stalls');
     });
 
     assert.deepEqual(errors, []);
