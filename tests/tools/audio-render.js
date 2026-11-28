@@ -1,17 +1,24 @@
 #!/usr/bin/env node
 'use strict';
-// V2.3 (WP10) audio-render: renders Sage's and Omen's palette sounds to WAV files and reports their peak and RMS levels
-// (a tool, not a test; listening is not verifiable in this environment, so the files are for a person to hear).
+// V2.3 (WP10) audio-render: renders Sage's and Omen's palette sounds to WAV files and reports their peak and RMS levels,
+// unweighted and perceptually weighted (A and K), and every enemy surface step's loudness against V2.2's (a tool, not a
+// test; listening is not verifiable in this environment, so the files are for a person to hear).
 //
 // Usage (from the repository root): NODE_PATH=tests/node_modules node tests/tools/audio-render.js --out <dir>
-//   [--file '(V2.3) valorant-fps.html'] [--only sage.motif.c,omen.ult]
+//   [--file '(V2.3) valorant-fps.html'] [--only sage.motif.c,omen.ult] [--steps 16]
 // How: the game boots once (tests/harness.js); a click (the first user gesture) makes the AudioContext and the shared
 // noise and reverb buffers (V23.audio.prebuild). Each sound is then rendered offline: soundFX.ctx is swapped for an
 // OfflineAudioContext at the live sample rate and soundFX._out for a gain on it, so every voice the game builds for
 // that call lands in the offline graph (with _out set, soundFX._route skips the live shared reverb; the renders are dry)
 // and the listener is copied from the camera for the positional ones; soundFX.ctx and _out are restored at once and
 // the offline context renders. Each render is written as 16-bit PCM stereo WAV, with its peak, RMS over the file and
-// RMS over the part that sounds (from the first to the last sample above -80 dBFS), in dBFS.
+// RMS over the part that sounds (from the first to the last sample above -80 dBFS), in dBFS, and that active RMS
+// A-weighted (IEC 61672) and K-weighted (ITU-R BS.1770), in dBFS(A) and dBFS(K) (tests/tools/step-meter.js weighs).
+// Unweighted RMS rates a low thud and a bright click of one energy alike, though the ear hears the bright one louder: a
+// level meant to match what a player hears is read from the weighted columns.
+// The step table (--steps N, default 16; 0 skips it): every surface x footwear enemy step against V2.2's enemy step,
+// each the mean over N noise buffer offsets (the step's one Math.random picks where its noise is read), 3 m ahead
+// through the HRTF panner, in dB A-weighted, K-weighted and unweighted (positive: louder than V2.2's).
 // Renders: the motif for C, Q and E, the ultimate sting, the previews (intro, the single cues, an ability preview with
 // the cast's own method), a bot's 300 ms warning sting and the mortar arming (positional), the V2.2 per-ability sounds
 // the motifs sit under (iceWall, omenTeleport, ult), enemy steps (V2.2's, and surface x footwear recipes, as
@@ -19,11 +26,13 @@
 // reference vectors through V23.audio.state.trial (their looks are still role-default stubs).
 const path = require('path'), fs = require('fs'), os = require('os');
 const { boot, closeBrowser } = require(path.join(__dirname, '..', 'harness'));
+const meter = require(path.join(__dirname, 'step-meter'));
 
 const argv = process.argv.slice(2), opt = {};
 for (let i = 0; i < argv.length; i++) { const a = argv[i]; if (a.startsWith('--')) { const eq = a.indexOf('='); if (eq > 0) opt[a.slice(2, eq)] = a.slice(eq + 1); else { opt[a.slice(2)] = argv[i + 1]; i++; } } }
 const OUT = path.resolve(opt.out || path.join(os.tmpdir(), 'v23-wav'));
 const ONLY = opt.only ? new Set(String(opt.only).split(',')) : null;
+const STEP_N = opt.steps === undefined ? 16 : Math.max(0, Math.round(+opt.steps) || 0);
 fs.mkdirSync(OUT, { recursive: true });
 
 // name, seconds, the page-side call (a string evaluated in the page, with soundFX.ctx the offline context)
@@ -99,14 +108,21 @@ function wav(int16, channels, rate) {
             let act = 0;
             for (let i = Math.max(0, first); i <= last; i++) act += L[i] * L[i] + R[i] * R[i];
             const db = (v) => (v > 0 ? +(20 * Math.log10(v)).toFixed(1) : -Infinity);
+            // the weighted energies of the whole render (silence adds nothing) over the active part's samples
+            const w = __meter.weigh([L, R], rate), na = first < 0 ? 0 : 2 * (last - first + 1);
+            const wdb = (e) => (na && e > 0 ? +(10 * Math.log10(e / na)).toFixed(1) : -Infinity);
             const bytes = new Uint8Array(pcm.buffer);
             let bin = '';
             for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
             return { rate, n, peak: db(peak), rms: db(Math.sqrt(sum / (2 * n))), rmsActive: first < 0 ? -Infinity : db(Math.sqrt(act / (2 * (last - first + 1)))),
-                activeS: first < 0 ? 0 : +((last - first + 1) / rate).toFixed(3), b64: btoa(bin) };
+                activeS: first < 0 ? 0 : +((last - first + 1) / rate).toFixed(3), rmsA: wdb(w.a), rmsK: wdb(w.k), b64: btoa(bin) };
         };
         return { rate: soundFX.ctx && soundFX.ctx.sampleRate, prebuilt: V23.audio.state.prebuilt, identity: V23.core.enabled() };
     });
+    await evaluate(meter.install);
+    // the game's frame loop stops here: the renders need no frames, and SwiftShader's would take the CPU the offline
+    // audio rendering needs (the loop asks for its next frame first thing, so a no-op requestAnimationFrame ends it)
+    await evaluate(() => { window.requestAnimationFrame = () => 0; });
     console.log(`context ${ready.rate} Hz, prebuilt ${ready.prebuilt}, identity ${ready.identity ? 'on' : 'off'}; writing to ${OUT}`);
     const rows = [];
     for (const [name, seconds, code] of RENDERS) {
@@ -114,10 +130,18 @@ function wav(int16, channels, rate) {
         const int16 = new Int16Array(new Uint8Array(Buffer.from(r.b64, 'base64')).buffer);
         const file = path.join(OUT, name + '.wav');
         fs.writeFileSync(file, wav(int16, 2, r.rate));
-        rows.push({ name, seconds, peak: r.peak, rms: r.rms, rmsActive: r.rmsActive, activeS: r.activeS, file });
-        console.log(`${name.padEnd(22)} peak ${String(r.peak).padStart(6)} dBFS  rms ${String(r.rms).padStart(6)} dBFS  active rms ${String(r.rmsActive).padStart(6)} dBFS over ${r.activeS} s`);
+        rows.push({ name, seconds, peak: r.peak, rms: r.rms, rmsActive: r.rmsActive, rmsA: r.rmsA, rmsK: r.rmsK, activeS: r.activeS, file });
+        console.log(`${name.padEnd(22)} peak ${String(r.peak).padStart(6)} dBFS  rms ${String(r.rms).padStart(6)} dBFS  active rms ${String(r.rmsActive).padStart(6)} dBFS, A ${String(r.rmsA).padStart(6)}, K ${String(r.rmsK).padStart(6)} over ${r.activeS} s`);
     }
-    fs.writeFileSync(path.join(OUT, 'levels.json'), JSON.stringify(rows, null, 1));
+    let steps = null;
+    if (STEP_N > 0) {
+        steps = await page.evaluate((n) => __meter.table(n), STEP_N);
+        console.log(`enemy steps vs V2.2's enemy step (3 m ahead, HRTF, the mean over ${STEP_N} noise offsets), dB: A-weighted | K-weighted | unweighted`);
+        for (const x of steps.rows) console.log(`step ${(x.surf + '/' + x.foot).padEnd(17)} ${String(x.a).padStart(6)} ${String(x.k).padStart(6)} ${String(x.plain).padStart(6)}`);
+        const span = (m) => { const v = steps.rows.map((x) => x[m]); return `${Math.min.apply(null, v)} to ${Math.max.apply(null, v)}`; };
+        console.log(`steps span: A ${span('a')} dB, K ${span('k')} dB, unweighted ${span('plain')} dB`);
+    }
+    fs.writeFileSync(path.join(OUT, 'levels.json'), JSON.stringify({ renders: rows, steps: steps && steps.rows, stepOffsets: STEP_N }, null, 1));
     if (errors.length) { console.log('page errors:', errors); process.exitCode = 1; }
     await closeBrowser();
 })().catch((e) => { console.error(e); process.exit(1); });

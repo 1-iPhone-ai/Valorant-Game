@@ -22908,29 +22908,36 @@
                     return;
                 }
                 // V2.3: a surface step: kind is the frozen recipe surfAt returns ({ surf, foot, noise [s, filter, Hz, Q], tones
-                // [[f0, f1, s, wave, gain, delay]], mix }). No context or Master volume 0: nothing, as V2.2's playNoise returns
-                // there before its draw
+                // [[f0, f1, s, wave, gain, delay]], noiseMix }). No context or Master volume 0: nothing, as V2.2's playNoise
+                // returns there before its draw
                 const ctx = this.ensureContext();
                 if (!ctx) return;
                 const mm = (game.userSettings && typeof game.userSettings.masterVolume === 'number') ? game.userSettings.masterVolume / 100 : 1.0;
                 if (Math.min(0.45, Math.max(0, 0.16 * mm)) <= 0.0002) return;
                 // V2.3: one bus for the step's voices: inside soundFX.at it takes the one HRTF panner (and the occlusion
-                // low-pass and reverb send) for all of them, instead of one panner per voice
+                // low-pass and reverb send) for all of them, instead of one panner per voice. The noise reaches the bus
+                // through its own trim (noiseMix): the surface noise sits at 1-3 kHz, where the ear is most sensitive, so it
+                // is trimmed to keep the step as loud as V2.2's A-weighted, while the tones (a boot's heel is V2.2's 95 Hz
+                // thud) play at their own gains (design 12.4; AUDIO header, SURF_STEPS)
                 const pos = this._pos, out = this._out;
-                let bus = null;
+                let bus = null, nbus = null;
                 try {
                     bus = ctx.createGain();
-                    bus.gain.value = kind.mix;
+                    nbus = ctx.createGain();
+                    nbus.gain.value = typeof kind.noiseMix === 'number' ? kind.noiseMix : 1;
+                    nbus.connect(bus);
                     this._route(ctx, bus);
-                } catch (e) { bus = null; }
-                if (bus) { this._pos = null; this._out = bus; }
+                } catch (e) { bus = null; nbus = null; }
+                if (bus) this._pos = null;
                 try {
                     // V2.3: the one noise call, with V2.2's gain argument 0.16 (the same early return) and the surface's filter and
                     // duration: one Math.random for its buffer offset, as V2.2's step draws (never inside V23.seeded)
                     const n = kind.noise;
+                    if (nbus) this._out = nbus;
                     this.noiseLayer(n[0], 0.16, 0, n[1], n[2], n[3]);
                     // V2.3: the surface and footwear tones (playTone draws nothing); step() is never called, so the player's
                     // stepsPlayed and lastStep are untouched
+                    if (bus) this._out = bus;
                     const T = kind.tones;
                     for (let i = 0; i < T.length; i++) this.playTone(T[i][0], T[i][1], T[i][2], T[i][3], T[i][4], T[i][5]);
                 } finally { this._pos = pos; this._out = out; }
@@ -23672,7 +23679,8 @@
         //    HRTF panner, the occlusion low-pass when a wall is between, the reverb send), soundFX._out pointing at the bus
         //    meanwhile (the _placedOut pattern). botCue(enemy, kind[, hz]) (WP8, inside V23.seeded): 'windup.<k>' one rising
         //    voice (every windup but the flash's), 'cast.<k>' the cast layer (the motif's 2 voices), and the 300 ms warning
-        //    sting (3 voices) only for a bot's heaviest utility (design 12.3, open decision 7): the rusher's flash windup
+        //    sting (3 voices 25 ms apart, 0.25 s each: it ends at 0.3 s) only for a bot's heaviest utility (design 12.3, open
+        //    decision 7): the rusher's flash windup
         //    ('windup.flash'), the mortar arming ('arm.mortar', placed at the hazard, the third argument) and agent-mode
         //    signature casts ('sig.<k>'). Cues beyond 50 m are skipped. (V23.CONTRACT lists botCue(enemy, kind) and WP8
         //    sends windup, cast and arm only: the optional third argument is read from arguments, as WP8 sends it, and
@@ -23703,11 +23711,14 @@
         //    0.3 m of its feet (the nearest; the higher on a tie): a map piece gives its surf % 10 (concrete, stone, metal,
         //    wood); a box that is no piece (a prop, door or breakable) gives undefined, so V2.2's step plays; no box gives the
         //    player's own rule (weather snow, sand or wet, else concrete). The box result is cached per bot per 0.5 m cell
-        //    (and 0.25 m of height, and collisionIndex.revision). It returns a frozen step recipe {surf, foot, noise, tones,
-        //    mix} (one per surface x footwear) that soundFX.enemyStep plays: one noiseLayer with V2.2's gain argument 0.16 (so
-        //    the same early return and one Math.random per step, as V2.2's playNoise), at most 3 tones through playTone
-        //    (every footwear tone, then the surface's first tones in the room left), all on one bus (one panner inside
-        //    soundFX.at); it never calls step(), so stepsPlayed and lastStep stay the player's. Map floors are no
+        //    (and the height to 5 mm, and collisionIndex.revision). It returns a frozen step recipe {surf, foot, noise, tones,
+        //    noiseMix} (one per surface x footwear) that soundFX.enemyStep plays: one noiseLayer with V2.2's gain argument
+        //    0.16 (so the same early return and one Math.random per step, as V2.2's playNoise), trimmed to noiseMix, and at
+        //    most 3 tones through playTone (every footwear tone, then the surface's first tones in the room left), all on one
+        //    bus (one panner inside soundFX.at); it never calls step(), so stepsPlayed and lastStep stay the player's. Levels
+        //    (SURF_STEPS) match V2.2's enemy step in perceived loudness, A-weighted, not in unweighted RMS (which rates V2.2's
+        //    low thud and the brighter surface steps alike while the ear hears the bright ones 3-10 dB louder), so a surface
+        //    step is no easier to hear or place than V2.2's. Map floors are no
         //    collision boxes and a bot walks at y 0, so almost every real enemy step takes the open-floor rule; the piece
         //    tops a V2.2 bot reaches are the rope decks of Icebox and Split (botMechanics on), metal or concrete.
         //  - Settings (design 12.5): soundEnabled (ensureContext null: no node), masterVolume per voice (V2.2's scale, cap
@@ -23823,6 +23834,9 @@
             const SLOT_I = { c: 0, q: 1, e: 2, x: 3 };
             const KIND_I = { smoke: 0, flash: 1, sonar: 1, mortar: 2, teleport: 0 };
             const MOTIF_G = [0.05, 0.03], STING_G = [0.07, 0.06, 0.05], WARN_G = [0.07, 0.06, 0.05];
+            // V2.3: the bot's warning sting lasts 300 ms in all (design 12.3): its 3 voices start 25 ms apart and each is
+            // cut so the last one ends at 0.3 s (0.25 s each)
+            const WARN_LEN = 0.3, WARN_STAGGER = 0.025, WARN_VOICE = WARN_LEN - WARN_STAGGER * (WARN_G.length - 1);
             // V2.3: the showroom cues (palette-shaped recipes; preview(agent, name) plays one, the intros schedule them)
             const CUES = _freeze({
                 chime: { items: _items([['fmBell', { mul: 2 }], ['tonal', { mul: 3, wave: 'sine', len: 0.8 }]]), gains: [0.06, 0.03], len: 1.6 },
@@ -23844,24 +23858,35 @@
                 });
             })();
             // V2.3: enemy step recipes by surface (the player's step table, soundFX.step) and footwear (design 3.1):
-            // noise [s, filter, Hz, Q] (played with V2.2's gain argument 0.16), tones [f0, f1, s, wave, gain, delay], and the
-            // step bus's mix, set so a surface step is about as loud as V2.2's enemy step (tests/tools/audio-render.js: RMS
-            // within about 2 dB with a boot; snow, sand and wet a little softer, as the player's own are)
+            // noise [s, filter, Hz, Q] (played with V2.2's gain argument 0.16, then trimmed to noiseMix on the step bus), and
+            // tones [f0, f1, s, wave, gain, delay] at their own gains. Levels match perceived loudness, not unweighted RMS:
+            // V2.2's enemy step is a thud (noise low-passed at 520 Hz and a 95 Hz tone) with almost all of its energy below
+            // 500 Hz, where the ear is least sensitive, while the surface noise sits at 1-3 kHz (and the metal ring and the
+            // wood knock at the ear's middle), so equal RMS would sound 3-10 dB louder and brighter. Each surface's step with a
+            // boot is set to V2.2's step A-weighted (IEC 61672) by trimming the bright noise and the surface tones, keeping
+            // the low thud (the boot's heel is V2.2's 95 Hz tone, 10 ms shorter); with a boot it also stays within 1.2 dB K-weighted
+            // (BS.1770) and unweighted. Measured by tests/tools/step-meter.js (3 m ahead of a level listener through the HRTF
+            // panner, the mean over 16 noise buffer offsets): with a boot every surface is within 0.15 dB(A) of V2.2's step,
+            // and all 35 surface x footwear steps within -1.4 to +0.8 dB(A); soft and runner soles are quieter K-weighted
+            // (about -5 dB: lighter heels), never louder (tests/audio-identity.test.js holds all 35 within 2 dB(A), 1 dB(A)
+            // with a boot; tests/tools/audio-render.js prints the table)
             const SURF_STEPS = _freeze({
-                concrete: { noise: [0.05, 'bandpass', 1500, 1.1], tones: [], mix: 1.0 },
-                stone: { noise: [0.045, 'bandpass', 2000, 1.3], tones: [[1900, 1700, 0.025, 'triangle', 0.018, 0]], mix: 0.9 },
-                metal: { noise: [0.035, 'bandpass', 3200, 1.2], tones: [[410, 400, 0.16, 'sine', 0.035, 0], [1130, 1120, 0.12, 'sine', 0.02, 0]], mix: 0.9 },
-                wood: { noise: [0.06, 'lowpass', 900, 0.8], tones: [[150, 90, 0.09, 'sine', 0.08, 0]], mix: 0.75 },
-                wet: { noise: [0.12, 'highpass', 2200, 0.6], tones: [], mix: 0.85 },
-                snow: { noise: [0.09, 'bandpass', 1100, 1.4], tones: [], mix: 1.0 },
-                sand: { noise: [0.1, 'lowpass', 1200, 0.6], tones: [], mix: 1.0 }
+                concrete: { noise: [0.05, 'bandpass', 1500, 1.1], tones: [], noiseMix: 0.59 },
+                stone: { noise: [0.045, 'bandpass', 2000, 1.3], tones: [[1900, 1700, 0.025, 'triangle', 0.018, 0]], noiseMix: 0.49 },
+                metal: { noise: [0.035, 'bandpass', 3200, 1.2], tones: [[410, 400, 0.16, 'sine', 0.0075, 0], [1130, 1120, 0.12, 'sine', 0.0042, 0]], noiseMix: 0.33 },
+                wood: { noise: [0.06, 'lowpass', 900, 0.8], tones: [[150, 90, 0.09, 'sine', 0.018, 0]], noiseMix: 0.535 },
+                wet: { noise: [0.12, 'highpass', 2200, 0.6], tones: [], noiseMix: 0.232 },
+                snow: { noise: [0.09, 'bandpass', 1100, 1.4], tones: [], noiseMix: 0.56 },
+                sand: { noise: [0.1, 'lowpass', 1200, 0.6], tones: [], noiseMix: 0.427 }
             });
+            // V2.3: the footwear tones (the bot's identity on every surface): the heel (a boot's is V2.2's 95 Hz thud), a plated
+            // sole's tick; the runner's light heel and the plate tick sit where the ear is keener, so they are the softest
             const FOOTWEAR = _freeze({
                 soft: [[120, 70, 0.05, 'sine', 0.04, 0]],
                 boot: [[95, 55, 0.07, 'sine', 0.07, 0]],
-                plated: [[95, 55, 0.06, 'sine', 0.06, 0], [2600, 2400, 0.04, 'triangle', 0.02, 0.008]],
+                plated: [[95, 55, 0.06, 'sine', 0.06, 0], [2600, 2400, 0.04, 'triangle', 0.015, 0.008]],
                 heavy: [[72, 40, 0.1, 'sine', 0.09, 0]],
-                runner: [[160, 95, 0.04, 'sine', 0.05, 0]]
+                runner: [[160, 95, 0.04, 'sine', 0.04, 0]]
             });
             const SURF_IDS = { 1: 'concrete', 2: 'stone', 3: 'metal', 4: 'wood' };   // MAP_SURF ids (piece.surf % 10)
             const CUE_RANGE = 50, STEP_TONES = 3;
@@ -24143,7 +24168,7 @@
                 const s = SURF_STEPS[surf] || SURF_STEPS.concrete, w = FOOTWEAR[foot] || FOOTWEAR.boot;
                 // V2.3: every footwear tone (the bot's identity), then the surface's first tones in the room left (3 in all)
                 const tones = s.tones.slice(0, Math.max(0, STEP_TONES - w.length)).concat(w.slice(0, STEP_TONES));
-                d = S.steps[key] = _freeze({ surf: surf, foot: foot, noise: s.noise.slice(), tones: tones.map((t) => t.slice()), mix: s.mix });
+                d = S.steps[key] = _freeze({ surf: surf, foot: foot, noise: s.noise.slice(), tones: tones.map((t) => t.slice()), noiseMix: s.noiseMix });
                 return d;
             }
             // V2.3: the box under (x, z) whose top is within 0.3 m of the feet: 1-4 a map piece's surface, -1 a box that is no
@@ -24213,13 +24238,15 @@
                     // V2.3 (hook H31.1): the step recipe for the surface under a bot (see the header); null with identity off (V2.2's step),
                     // undefined on a box that is no map piece (V2.2's step: no guessing)
                     if (!enemy || !enemy.mesh || !_idOn()) return null;
-                    const p = enemy.mesh.position, cx = Math.floor(p.x * 2), cz = Math.floor(p.z * 2), cy = Math.round(p.y * 4), rev = collisionIndex.revision;
+                    const p = enemy.mesh.position, cx = Math.floor(p.x * 2), cz = Math.floor(p.z * 2), rev = collisionIndex.revision;
                     let c = S.surf.get(enemy);
-                    if (!c) { c = { cx: 0, cz: 0, cy: 0, rev: -1, raw: 0 }; S.surf.set(enemy, c); }
-                    if (c.rev !== rev || c.cx !== cx || c.cz !== cz || c.cy !== cy) {
-                        // V2.3: cached per bot per 0.5 m cell (0.25 m of height, the index revision): one query when it changes
+                    if (!c) { c = { cx: 0, cz: 0, y: NaN, rev: -1, raw: 0 }; S.surf.set(enemy, c); }
+                    if (c.rev !== rev || c.cx !== cx || c.cz !== cz || !(Math.abs(c.y - p.y) < 0.005)) {
+                        // V2.3: cached per bot per 0.5 m cell (and the index revision); the height is matched to 5 mm, not
+                        // bucketed, so the 0.3 m rule holds exactly at a deck's edge (a bot walks at one height: the cache
+                        // still answers its steps). One query when any of these changes
                         c.raw = _under(p.x, p.y, p.z);
-                        c.cx = cx; c.cz = cz; c.cy = cy; c.rev = rev;
+                        c.cx = cx; c.cz = cz; c.y = p.y; c.rev = rev;
                         S.stats.surfLookups++;
                     } else S.stats.surfCached++;
                     if (c.raw < 0) return undefined;
@@ -24306,7 +24333,8 @@
                     const L = _look(enemy.agentId);
                     if (!L || !L.sound) return null;
                     const dot = kind.indexOf('.'), ev = dot < 0 ? kind : kind.slice(0, dot), k = dot < 0 ? '' : kind.slice(dot + 1);
-                    // V2.3: the heaviest utility's 300 ms warning sting (design 12.3, open decision 7)
+                    // V2.3: the heaviest utility's 300 ms warning sting (design 12.3, open decision 7): 3 voices, the whole sting
+                    // inside 0.3 s (fixed lengths; no family's item length stretches it)
                     const warn = ev === 'arm' || ev === 'sig' || (ev === 'windup' && k === 'flash');
                     const src = hz && typeof hz.x === 'number' ? hz : (enemy.mesh ? enemy.mesh.position : null);
                     if (!src) return null;
@@ -24317,7 +24345,7 @@
                     if (warn) S.stats.warnings++; else S.stats.cues++;
                     A.atShared(x, y, z, () => {
                         _event(warn ? 'warn' : ev, enemy.agentId, kind, P, rng, (r) => (warn
-                            ? _layer(ctx, r, P, F, F.sting, { si: 0, gains: WARN_G, len: 0.3, cap: 0.08, chord: true, stagger: 0.025, fixed: true, extra: { glide: 1.12 } })
+                            ? _layer(ctx, r, P, F, F.sting, { si: 0, gains: WARN_G, len: WARN_VOICE, cap: 0.08, chord: true, stagger: WARN_STAGGER, fixed: true, extra: { glide: 1.12, len: 1 } })
                             : ev === 'windup'
                                 ? _layer(ctx, r, P, F, [F.cue], { si: si, gains: [0.045], len: 0.35, cap: 0.05, extra: { glide: 1.08 } })
                                 : _layer(ctx, r, P, F, F.motif, { si: si, gains: MOTIF_G, len: _motifLen(P), cap: 0.06 })), { pos: [x, y, z] });

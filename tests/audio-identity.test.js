@@ -19,16 +19,22 @@
 //    motif is 2 voices at gain <= 0.06; a real cast (castAbility) plays the ability's own method at t 0 and the motif at
 //    the gesture's release key; the ultimate sting is 3 voices, also from a real ultimate;
 //  - positional events: one gain and one HRTF panner per event (a bot's cast, windup and warning sting; the mortar's
-//    sting placed at the hazard), the occlusion low-pass on the shared path;
+//    sting placed at the hazard), the occlusion low-pass on the shared path; the warning sting is 300 ms in all (its
+//    voices from the trace, and the envelopes the spy saw scheduled);
 //  - surface steps: a piece of each surface id (Ascent's concrete, stone, metal and wood piece tops: walls and roofs,
-//    the mapping only) gives that enemyStep kind; where Ascent's bots really walk (every open nav cell at y 0) the
+//    the mapping only) gives that enemyStep kind; the 0.3 m rule at the edge (0.25 m above or below a piece's top gives
+//    the piece, 0.35 m above or below, or y 0 under the raised piece, the open floor); where Ascent's bots really walk (every open nav cell at y 0) the
 //    open-floor rule answers; a box that is no map piece (a barrel) gives V2.2's step; open floor follows the player's
 //    weather rule; the cache; footwear from the look, its tones kept on every surface; enemyStep(kind) makes one noise
 //    call (filter and duration of the surface), its tones and one panner, with exactly 1 Math.random; enemyStep() makes
 //    V2.2's nodes exactly, with 1 Math.random; neither touches the player's step counters; the live enemyAudio path
 //    passes the kind; on Icebox's container deck (a rope deck: the piece tops a V2.2 bot reaches, botMechanics on) the
 //    live path, with botMechanics._air walking the bot, gives metal steps with its footwear; Split's decks are metal
-//    and concrete pieces (concrete while the open-floor rule would say snow);
+//    and concrete pieces (concrete while the open-floor rule would say snow), and a bot at y 0 under a deck's exit gets
+//    the open floor, not the deck;
+//  - step loudness (tests/tools/step-meter.js): each surface step against V2.2's enemy step, rendered offline 3 m ahead
+//    through the HRTF panner and weighed A (perceived loudness, IEC 61672), K and unweighted: within 1 dB(A) with a
+//    boot, within 2 dB(A) for every surface x footwear (unweighted RMS alone would hide a brighter, louder step);
 //  - settings: soundEnabled off makes no node, enemyFootsteps off and the 22 m range make no step, positionalAudio off
 //    makes no panner and leaves a bot cue's bus at unity (V2.2's level for positional sounds then), masterVolume scales
 //    every voice, Agent Identity off silences the in-match layers (previews stay), headshotVolume still scales the dink
@@ -40,6 +46,7 @@ const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { boot, closeBrowser, programState } = require('./harness');
 const kit = require('./hifi-kit');
+const meter = require('./tools/step-meter');
 
 after(closeBrowser);
 
@@ -147,7 +154,7 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
         const M = ['setValueAtTime', 'linearRampToValueAtTime', 'exponentialRampToValueAtTime', 'setValueCurveAtTime', 'setTargetAtTime'];
         const wrapParam = (rec, name, p) => {
             const log = rec.p[name] = [];
-            for (const m of M) { const o = p[m].bind(p); p[m] = function (v, a, b) { log.push([m, v && v.length !== undefined ? Math.max.apply(null, Array.from(v)) : v, a]); return o(v, a, b); }; }
+            for (const m of M) { const o = p[m].bind(p); p[m] = function (v, a, b) { log.push([m, v && v.length !== undefined ? Math.max.apply(null, Array.from(v)) : v, a, b]); return o(v, a, b); }; }
         };
         const wrapNode = (kind, n) => {
             if (!S.on) return n;
@@ -440,12 +447,21 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
             const run = (kind, hz) => {
                 __take();
                 if (hz) V23.audio.botCue(e, kind, hz); else V23.audio.botCue(e, kind);
+                // the event's schedule as the spy saw it: from the first gain automation to the last one's end (an
+                // envelope's final ramp, or a curve's start plus its length), in context seconds
+                let t0 = Infinity, t1 = -Infinity;
+                for (const rec of __spy.nodes) if (rec.kind === 'gain') for (const x of (rec.p.gain || [])) {
+                    if (typeof x[2] !== 'number') continue;
+                    t0 = Math.min(t0, x[2]);
+                    t1 = Math.max(t1, x[0] === 'setValueCurveAtTime' ? x[2] + x[3] : x[2]);
+                }
                 const g = __take(), tr = __lastTrace()[0];
                 const panners = g.map((n, i) => [n, i]).filter((x) => x[0].k === 'panner');
                 // the event's bus: the gain that connects to the panner (or to the occlusion filter in front of it)
                 const voices = tr.voices.length;
                 const envs = g.filter((n) => n.k === 'gain' && n.to.length && n.to.every((d) => typeof d === 'number' && g[d].k === 'gain' && g[d].to.some((x) => typeof x === 'number' && (g[x].k === 'panner' || g[x].k === 'filter'))));
-                return { kind, ev: tr.ev, voices, panners: panners.length, pos: panners.length ? panners[0][0].pos : null, envOnBus: envs.length, dest: g.filter((n) => n.to.includes('dest')).map((n) => n.k), agent: tr.agent };
+                return { kind, ev: tr.ev, voices, panners: panners.length, pos: panners.length ? panners[0][0].pos : null, envOnBus: envs.length, dest: g.filter((n) => n.to.includes('dest')).map((n) => n.k), agent: tr.agent,
+                    lens: tr.voices.map((v) => [+v.at.toFixed(4), +v.dur.toFixed(4)]), span: t1 > t0 ? +(t1 - t0).toFixed(4) : null };
             };
             out.cast = run('cast.smoke');
             out.windup = run('windup.smoke');
@@ -473,10 +489,20 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
         }
         assert.equal(r.cast.voices, 2, 'a cast layer: 2 voices');
         assert.equal(r.windup.voices, 1, 'a windup: 1 voice');
-        for (const k of ['warnFlash', 'arm', 'sig']) { assert.equal(r[k].ev, 'warn', `${r[k].kind}: the warning sting`); assert.equal(r[k].voices, 3, `${r[k].kind}: 3 voices`); }
+        for (const k of ['warnFlash', 'arm', 'sig']) {
+            const x = r[k];
+            assert.equal(x.ev, 'warn', `${x.kind}: the warning sting`);
+            assert.equal(x.voices, 3, `${x.kind}: 3 voices`);
+            // 300 ms in all (design 12.3, open decision 7): every voice ends by 0.3 s and the last one at it, each at least
+            // 0.2 s long; and the spied envelopes (what the context plays) span 0.3 s, give or take a render quantum
+            const ends = x.lens.map((v) => v[0] + v[1]);
+            assert.ok(ends.every((t) => t <= 0.3 + 1e-6) && Math.abs(Math.max.apply(null, ends) - 0.3) < 1e-6, `${x.kind}: the sting ends at 0.3 s (voices [at, dur] ${JSON.stringify(x.lens)})`);
+            assert.ok(x.lens.every((v) => v[1] >= 0.2 && v[0] >= 0), `${x.kind}: each voice 0.2-0.3 s (${JSON.stringify(x.lens)})`);
+            assert.ok(x.span !== null && x.span >= 0.29 && x.span <= 0.3 + 0.006, `${x.kind}: the scheduled envelopes span ${x.span} s (0.3 s)`);
+        }
         assert.deepEqual(r.arm.pos, r.hz, 'the mortar sting is placed at the hazard');
         assert.deepEqual(r.occluded, { lp: 1, panners: 1 }, 'occluded: one low-pass and one panner for the event');
-        console.log(`# CUES bot ${r.agent}: cast ${r.cast.voices} voices, windup ${r.windup.voices}, warnings ${r.warnFlash.voices}/${r.arm.voices}/${r.sig.voices}, one panner each`);
+        console.log(`# CUES bot ${r.agent}: cast ${r.cast.voices} voices, windup ${r.windup.voices}, warnings ${r.warnFlash.voices}/${r.arm.voices}/${r.sig.voices}, one panner each; warning spans ${r.warnFlash.span}/${r.arm.span}/${r.sig.span} s, voices [at, dur] ${JSON.stringify(r.warnFlash.lens)}`);
     });
 
     // ---- surface steps -------------------------------------------------------------------------------------------
@@ -499,6 +525,32 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
                 if (u.length !== 1 || u[0].owner !== pc) continue;
                 out.found[want[id]] = [cx, top, cz];
             }
+            // the 0.3 m rule at a piece's top (design 12.4): on a piece of each surface, a bot 0.25 m above or below its top
+            // gets the piece, one 0.35 m above or below gets the open-floor rule, and one at y 0 under it (a raised piece:
+            // its top far above the feet) gets the open-floor rule, not the piece. Snow is forced, so the open floor answers
+            // 'snow' and cannot pass for a concrete piece. Spots are taken where, by the independent check (under), the
+            // piece is the only box within 0.3 m at +-0.25 and no box is within 0.3 m at +-0.35 or at y 0
+            const snowE = weatherSurf.uSnow.value;
+            weatherSurf.uSnow.value = 1;
+            out.edge = {};
+            for (const pc of mapPieces) {
+                if (pc.shape !== 'box') continue;
+                const id = pc.surf % 10;
+                if (!want[id] || out.edge[want[id]]) continue;
+                const b = pc.bounds;
+                if (b.max.x - b.min.x < 0.6 || b.max.z - b.min.z < 0.6 || b.max.y < 0.8) continue;
+                const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2, top = b.max.y;
+                const only = (y) => { const u = under(cx, cz, y); return u.length === 1 && u[0].owner === pc; };
+                if (!only(top + 0.25) || !only(top - 0.25) || under(cx, cz, top + 0.35).length || under(cx, cz, top - 0.35).length || under(cx, cz, 0).length) continue;
+                const got = {};
+                for (const [name, y] of [['+0.25', top + 0.25], ['-0.25', top - 0.25], ['+0.35', top + 0.35], ['-0.35', top - 0.35], ['y0', 0]]) {
+                    e.mesh.position.set(cx, y, cz);
+                    const k = V23.audio.surfAt(e);
+                    got[name] = k === undefined ? 'undefined' : k === null ? 'null' : k.surf;
+                }
+                out.edge[want[id]] = { at: [+cx.toFixed(2), +top.toFixed(2), +cz.toFixed(2)], got };
+            }
+            weatherSurf.uSnow.value = snowE;
             // a step at p: the kind surfAt gives, then that step played inside soundFX.at, spied, with its Math.random draws
             const stepAt = (p) => {
                 e.mesh.position.set(p[0], p[1], p[2]);
@@ -577,6 +629,12 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
             return out;
         });
         assert.deepEqual(Object.keys(r.found).sort(), ['concrete', 'metal', 'stone', 'wood'], 'Ascent has a piece top of each surface (the mapping)');
+        // the 0.3 m rule at the edge: within 0.3 m of the top the piece, beyond it (and at y 0 under a raised piece) open floor
+        assert.deepEqual(Object.keys(r.edge).sort(), ['concrete', 'metal', 'stone', 'wood'], `a piece of each surface for the edge cases (${JSON.stringify(r.edge)})`);
+        for (const sf of Object.keys(r.edge)) {
+            const x = r.edge[sf];
+            assert.deepEqual(x.got, { '+0.25': sf, '-0.25': sf, '+0.35': 'snow', '-0.35': 'snow', y0: 'snow' }, `${sf} piece top ${x.at[1]} m at ${x.at[0]}, ${x.at[2]}: the piece within 0.3 m of the feet only`);
+        }
         assert.ok(r.same, 'surfAt gives the same frozen recipe as state.step');
         // Ascent's walked floor: the open-floor rule (the common case for real enemy steps)
         const walked = Object.values(r.walk).reduce((a, b) => a + b, 0);
@@ -620,7 +678,42 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
         assert.equal(r.v22draws, 1, 'enemyStep(): one Math.random');
         assert.deepEqual(r.prop.g.map((n) => n.k), r.v22.map((n) => n.k), 'the prop step is V2.2\'s');
         console.log(`# STEPS piece tops (mapping) ${JSON.stringify(r.found)}; prop: ${r.propKind}; foot ${JSON.stringify(r.foot)}; Ascent's open nav cells at y 0: ${JSON.stringify(r.walk)}`);
+        console.log(`# EDGE ${Object.keys(r.edge).map((k) => `${k} top ${r.edge[k].at[1]}: ${JSON.stringify(r.edge[k].got)}`).join('; ')}`);
         console.log('# STEPTONES ' + r.tones.map((x) => `${x.sf}/${x.fw} [${x.hz.join(' ')}]`).join('; '));
+    });
+
+    // ---- step loudness ---------------------------------------------------------------------------------------------
+    await t.test("step loudness: every surface step is about as loud as V2.2's enemy step, A-weighted (perceived), not only in RMS", async () => {
+        // tests/tools/step-meter.js: each step rendered offline 3 m ahead of a level listener through the HRTF panner, the
+        // mean over 8 noise buffer offsets, weighed A (IEC 61672), K (BS.1770) and unweighted. V2.2's step is a low thud
+        // (most of its energy below 500 Hz) and the surface steps are brighter, so equal RMS would sound louder: the check
+        // is A-weighted. The game's frames are held meanwhile (each requestAnimationFrame callback kept and handed back
+        // after): the renders need none, and SwiftShader's would take the CPU the offline audio rendering needs
+        await evaluate(meter.install);
+        const r = await page.evaluate(async () => {
+            __identity(true);
+            const raf = window.requestAnimationFrame, held = [];
+            window.requestAnimationFrame = (cb) => { held.push(cb); return 0; };
+            try {
+                const M = window.__meter, n = 8, out = { rows: [] }, db = (x, ref) => +(10 * Math.log10(x / ref)).toFixed(2);
+                const pairs = [];
+                for (const sf of Object.keys(V23.audio.state.surfSteps)) for (const fw of Object.keys(V23.audio.state.footwear)) pairs.push([sf, fw]);
+                const ref = await M.step(null, null, n);
+                for (const [sf, fw] of pairs) {
+                    const e = await M.step(sf, fw, n);
+                    out.rows.push({ surf: sf, foot: fw, a: db(e.a, ref.a), k: db(e.k, ref.k), plain: db(e.plain, ref.plain) });
+                }
+                out.rate = soundFX.ctx.sampleRate;
+                return out;
+            } finally { window.requestAnimationFrame = raf; for (const cb of held) raf(cb); }
+        });
+        await frames(2);
+        console.log(`# STEPLEVELS vs V2.2's enemy step at ${r.rate} Hz, dB A / K / unweighted: ` + r.rows.map((x) => `${x.surf}/${x.foot} ${x.a} / ${x.k} / ${x.plain}`).join('; '));
+        assert.equal(r.rows.length, 35, 'every surface x footwear step (7 x 5)');
+        for (const x of r.rows) {
+            assert.ok(Math.abs(x.a) <= 2, `${x.surf}/${x.foot}: ${x.a} dB(A) from V2.2's step (within 2)`);
+            if (x.foot === 'boot') assert.ok(Math.abs(x.a) <= 1, `${x.surf}/boot: ${x.a} dB(A) from V2.2's step (within 1 with a boot)`);
+        }
     });
 
     await t.test('the live path: enemyAudio passes the kind; enemyFootsteps off and beyond 22 m make no step', async () => {
@@ -912,12 +1005,18 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
         const s = await evaluate(() => {
             const e = __bot(), L = mapLayout(), out = { map: game.mapPreset, decks: [] }, p0 = e.mesh.position.clone(), snow0 = weatherSurf.uSnow.value;
             weatherSurf.uSnow.value = 1;
+            const under = (x, z, y) => collisionIndex.query(x, z, x, z, []).filter((rc) => x >= rc.minX && x <= rc.maxX && z >= rc.minZ && z <= rc.maxZ && Math.abs(rc.maxY - y) <= 0.3);
+            out.below = [];
             for (const rope of L.ropes) {
                 e.mesh.position.set(rope.exit.x, rope.topY - 0.2, rope.exit.z);
                 const k = V23.audio.surfAt(e);
                 e.mesh.position.set(rope.x, rope.topY - 0.2, rope.z);   // over the cable's foot: no box, the open-floor rule
                 const k0 = V23.audio.surfAt(e);
                 out.decks.push([rope.name, k ? k.surf : String(k), k0 ? k0.surf : String(k0)]);
+                // at y 0 under the deck's exit (the deck's top far above the feet): the open-floor rule, not the deck
+                e.mesh.position.set(rope.exit.x, 0, rope.exit.z);
+                const kb = V23.audio.surfAt(e);
+                out.below.push([rope.name, kb ? kb.surf : String(kb), under(rope.exit.x, rope.exit.z, 0).length, +(rope.topY - 0.2).toFixed(2)]);
             }
             weatherSurf.uSnow.value = snow0;
             e.mesh.position.copy(p0);
@@ -925,7 +1024,11 @@ test('agent sound: palettes, motifs, stings, positional cues, surface steps, pre
         });
         assert.equal(s.map, 'split');
         assert.deepEqual(s.decks, [['UNDERPASS ASCENDER', 'metal', 'snow'], ['CROSSING ASCENDER', 'concrete', 'snow']], "Split's decks: a metal and a concrete piece (open floor beside them: snow forced)");
-        console.log(`# DECK split: ${s.decks.map((d) => d[0] + ' ' + d[1]).join('; ')}`);
+        for (const b of s.below) {
+            assert.equal(b[2], 0, `${b[0]}: no box top within 0.3 m of y 0 under the deck's exit (the deck at ${b[3]} m)`);
+            assert.equal(b[1], 'snow', `${b[0]}: a bot at y 0 under the deck gets the open floor, not the deck (${b[1]})`);
+        }
+        console.log(`# DECK split: ${s.decks.map((d) => d[0] + ' ' + d[1]).join('; ')}; at y 0 under the exits: ${s.below.map((b) => `${b[0]} ${b[1]} (deck at ${b[3]} m)`).join('; ')}`);
         await frames(5);
         const [programs, watermark, stalls] = await programState(page);
         assert.equal(programs, watermark, 'no shader compiled after the warm-up (two map switches)');

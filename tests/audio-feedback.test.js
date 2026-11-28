@@ -84,16 +84,19 @@ test('3D audio: panner routing, wall occlusion, listener tracking, enemy gunfire
     });
     assert.ok(shots >= 1, 'enemy gunfire makes a sound');
 
-    // Footsteps: an enemy walking within 22 m steps; one walking 40 m away does not
+    // Footsteps: an enemy walking within 22 m steps; one walking 40 m away does not. V2.3: the wrapper passes on the
+    // step kind the H31.1 hook gives (V23.audio.surfAt: a surface step with Agent Identity on, null with it off) and
+    // records its surface, so the shipped default's surface-step path is what plays here
     const steps = await evaluate(() => {
         window.__steps = 0;
+        window.__kinds = [];
         const o = soundFX.enemyStep.bind(soundFX);
-        soundFX.enemyStep = () => { window.__steps++; return o(); };
+        soundFX.enemyStep = (k) => { window.__steps++; window.__kinds.push(k === undefined ? 'undefined' : k === null ? null : k.surf); return o(k); };
         return true;
     });
     assert.ok(steps);
     const walk = async (z) => {
-        await evaluate(() => { window.__steps = 0; });
+        await evaluate(() => { window.__steps = 0; window.__kinds = []; });
         for (let i = 0; i < 12; i++) {
             await evaluate(([z, i]) => {
                 for (const e of enemyObjects) { if (e.isActive && !e.hit) { e.mesh.position.set(-8 + i * 0.6, 0, z); } }
@@ -105,8 +108,23 @@ test('3D audio: panner routing, wall occlusion, listener tracking, enemy gunfire
     // The walks place the enemies themselves: their AI is paused meanwhile (a bot far from the
     // player patrols round its own spawn, which on V1.8 Ascent can be within 22 m of here)
     await evaluate(() => { window.__ue = window.updateEnemies; window.updateEnemies = () => {}; });
+    // V2.3: Agent Identity set explicitly (on, the default): the nearby walk passes surface step kinds (open floor here:
+    // a surface name; 'undefined' only on a prop, door or breakable, which plays V2.2's step)
+    await evaluate(() => { game.userSettings.agentIdentity = 'on'; V23.core.applySettings(game.userSettings, 'agentIdentity'); });
     assert.ok((await walk(9.5)) >= 1, 'nearby enemies make footsteps');
+    const kindsOn = await evaluate(() => window.__kinds.slice());
+    const SURF = ['concrete', 'stone', 'metal', 'wood', 'wet', 'snow', 'sand'];
+    assert.ok(kindsOn.length >= 1 && kindsOn.every((k) => SURF.includes(k) || k === 'undefined'), `identity on: surface step kinds (${kindsOn.join(',')})`);
+    assert.ok(kindsOn.some((k) => SURF.includes(k)), `identity on: at least one surface step (${kindsOn.join(',')})`);
     assert.equal(await walk(-45), 0, 'enemies beyond 22 m are silent');
+    // V2.3: Agent Identity off: V2.2's step (the kind is null), nearby and still none beyond 22 m
+    await evaluate(() => { game.userSettings.agentIdentity = 'off'; V23.core.applySettings(game.userSettings, 'agentIdentity'); });
+    assert.ok((await walk(9.5)) >= 1, 'identity off: nearby enemies make footsteps');
+    const kindsOff = await evaluate(() => window.__kinds.slice());
+    assert.ok(kindsOff.length >= 1 && kindsOff.every((k) => k === null), `identity off: V2.2's step, kind null (${kindsOff.join(',')})`);
+    assert.equal(await walk(-45), 0, 'identity off: enemies beyond 22 m are silent');
+    await evaluate(() => { game.userSettings.agentIdentity = 'on'; V23.core.applySettings(game.userSettings, 'agentIdentity'); });
+    await frames(3);
     await evaluate(() => { window.updateEnemies = window.__ue; clearInterval(__keepAlive); });
 
     const [programs, watermark] = await programState(page);
