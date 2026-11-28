@@ -334,6 +334,13 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
         out.lefty = { mirrored, side, rest: __rest() };
         game.userSettings.leftHanded = false;
         take('vandal');
+        // ---- Agent Identity off: the same V2.3 reload with V2.2's hands and cast hand (the off-hand API works either way) -----
+        game.userSettings.agentIdentity = 'off';
+        V23.core.applySettings(game.userSettings, 'agentIdentity');
+        out.identityOff = { tac: reloadOnce('vandal', 1), empty: reloadOnce('vandal', 0), mat: castFX.hand.material.color.getHexString() };
+        game.userSettings.agentIdentity = 'on';
+        V23.core.applySettings(game.userSettings, 'agentIdentity');
+        take('vandal');
         // ---- 'classic' equals V2.2's clips: the same steps with V23.vm absent (every hook short-circuits) ---------------
         // both runs start at the same time on the synthetic clock (Enhanced Animations' breathing reads the absolute time)
         const TC = T + 1e6;
@@ -483,6 +490,12 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     assert.ok(r.ea.on.hand && r.ea.on.off && r.ea.on.spare, 'EA on: the same off-hand reload');
     assert.deepEqual([r.lefty.mirrored, r.lefty.side], [true, 'R'], 'left-handed: the right hand reloads, mirrored');
     assert.ok(r.lefty.rest < 1e-6);
+    for (const k of ['tac', 'empty']) {
+        const x = r.identityOff[k];
+        assert.ok(x.hand && x.off && x.spare && x.rest < 1e-6 && x.mag < 1e-9, `identity off, ${k}: the V2.3 reload with V2.2's hands, back at rest`);
+        assert.deepEqual([x.after.off, x.after.hand, x.after.spare], [null, false, false]);
+    }
+    assert.equal(r.identityOff.tac.path, r.guns.vandal.tac.path, 'identity off: the same gun path');
     // classic = V2.2
     for (const row of r.classic.concat(r.classicEA)) assert.ok(row[1], `'classic' ${row[0]}: the V2.2 clip exactly (${row[2]})`);
     assert.equal(r.vmRandom, 0, 'no Math.random inside V23.vm');
