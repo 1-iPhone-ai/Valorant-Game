@@ -13,7 +13,8 @@ const restDelta = (evaluate) => evaluate(() => {
 
 test('viewmodel: draw, recoil spring, reload choreography, inspect, shell casings; returns exactly to rest', { timeout: 300000 }, async () => {
     const { page, errors, frames, evaluate } = await boot({ quality: 'medium' });
-    await evaluate(() => { window.updateEnemies = () => {}; game.userSettings.infiniteAmmo = false; });
+    // V2.3 (WP5): the V2.2 assertions are pinned to Weapon Animations 'classic' (V2.2's clips); 'v23' is checked at the end
+    await evaluate(() => { window.updateEnemies = () => {}; game.userSettings.infiniteAmmo = false; game.userSettings.weaponAnims = 'classic'; });
 
     // Draw: switching starts low and rolled, then settles
     await evaluate(() => switchWeapon('pistol'));
@@ -106,6 +107,51 @@ test('viewmodel: draw, recoil spring, reload choreography, inspect, shell casing
     await frames(3);
     assert.equal(await evaluate(() => game.weapons.pistol.slide.position.z), await evaluate(() => game.weapons.pistol.slideRestZ));
     assert.ok(slide > 0.02, 'slide kicks back on a shot');
+
+    // V2.3 (WP5): Weapon Animations 'v23': a class-shaped draw (the rifle rolls in low), the magazine out of the gun into the
+    // off hand and back, the inspect turns the gun; back exactly to rest after each
+    await evaluate(() => { game.userSettings.weaponAnims = 'v23'; switchWeapon('pistol'); });
+    await page.waitForFunction(() => !vmAnim.clip, null, { timeout: 10000 });
+    const v23draw = await evaluate(() => {
+        switchWeapon('rifle');
+        const m = game.weapons.rifle.model, t = vmAnim.clip.start + 50;
+        vmAnim.begin(m); vmAnim.end(m, t);
+        return { clip: vmAnim.clip && vmAnim.clip.kind, dur: vmAnim.clip && vmAnim.clip.dur, py: vmAnim.last.py, rz: vmAnim.last.rz, ghost: V23.vm.state.ghost === game.weapons.pistol.model };
+    });
+    assert.equal(v23draw.clip, 'draw');
+    assert.equal(v23draw.dur, 380, 'the draw keeps its 380 ms');
+    assert.ok(v23draw.py < -0.05 && v23draw.rz > 0.3, `v23: the rifle rolls in low (${v23draw.py.toFixed(3)}, ${v23draw.rz.toFixed(3)})`);
+    assert.ok(v23draw.ghost, 'v23: the pistol put away sinks as a ghost');
+    await page.waitForFunction(() => !vmAnim.clip && !V23.vm.state.ghost, null, { timeout: 10000 });
+    await frames(30);
+    assert.ok((await restDelta(evaluate)) < 0.02, 'v23: settles at rest after the draw');
+    assert.equal(await evaluate(() => game.weapons.pistol.model.visible), false, 'v23: the ghost is gone');
+    await evaluate(() => {
+        window.__v23Rec = { hidden: false, spare: false, hand: false };
+        const step = V23.vm.step;
+        V23.vm.step = function () {
+            const r = step.apply(this, arguments);
+            const w = game.weapons.rifle, R = V23.vm.state.slots.rifle;
+            if (vmAnim.clip && vmAnim.clip.kind === 'reload') {
+                if (!w.magazine.visible) __v23Rec.hidden = true;
+                if (R.spare.visible) __v23Rec.spare = true;
+                if (castFX.group.visible && V23.vm.state.handOn) __v23Rec.hand = true;
+            }
+            return r;
+        };
+        const w = game.weapons.rifle; w.ammo = 3; reload();
+    });
+    await page.waitForFunction(() => !game.reloading, null, { timeout: 15000, polling: 50 });
+    await frames(5);
+    const v23after = await evaluate(() => ({ rec: __v23Rec, ammo: game.weapons.rifle.ammo, max: game.weapons.rifle.maxAmmo, y: game.weapons.rifle.magazine.position.y, rest: game.weapons.rifle.magRestY, vis: game.weapons.rifle.magazine.visible, hand: castFX.group.visible, off: V23.vm.state.offModel }));
+    assert.deepEqual(v23after.rec, { hidden: true, spare: true, hand: true }, 'v23: the magazine leaves the gun into the off hand');
+    assert.equal(v23after.ammo, v23after.max);
+    assert.ok(Math.abs(v23after.y - v23after.rest) < 1e-6 && v23after.vis && !v23after.hand && v23after.off === null, 'v23: magazine back in place, the off hand back on the gun');
+    await evaluate(() => { __vmRec.maxRy = 0; inspectWeapon(); });
+    await page.waitForFunction(() => !vmAnim.clip, null, { timeout: 15000 });
+    assert.ok((await evaluate(() => __vmRec.maxRy)) > 0.2, 'v23: the gun turns during the inspect');
+    await frames(30);
+    assert.ok((await restDelta(evaluate)) < 0.02, 'v23: back at rest after the inspect (no drift)');
 
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(programs, watermark, 'no new shader programs');
