@@ -392,6 +392,7 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
         out.mid = { slot, hand2: st.hand2.visible, pose: castFX.hand.geometry.name };
         // the clock jumps past the clip (a pause or a long stall): castFX.apply ends it without a last pose
         vmAnim.begin(model); vmAnim.end(model, t + 5000);
+        out.afterJump = { active: !!castFX.active, hand2: st.hand2.visible };
         // Enhanced Animations' off hand takes castFX.group for a mantle
         characterController.mantleT = 0.4;
         for (let x = t + 5016; x <= t + 5400; x += 16) { vmAnim.begin(model); vmAnim.end(model, x); }
@@ -404,6 +405,7 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
         return out;
     });
     assert.equal(cut.mid.hand2, true, `a two-hand gesture (${cut.mid.slot}) shows hand2`);
+    assert.deepEqual(cut.afterJump, { active: false, hand2: false }, 'the clip cut off by the jump: hand2 is no longer shown (no render needed)');
     assert.deepEqual(cut.mantle, { offKind: 'mantle', group: true, hand2: false, pose: 'v23:castHand:open', fore: 'full' }, 'after the cut: hand2 hidden, the open hand with its one-hand forearm');
 
     // ---- 4. ultimates leave the centre clear; the #ult-cue vignette ------------------------------------------------------

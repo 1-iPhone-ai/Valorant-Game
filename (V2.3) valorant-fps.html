@@ -19859,8 +19859,9 @@
         //    Fidelity's self renderer reads it. FP rule (in-view floor): a key's palm centre is kept at NDC y >= -0.85 at
         //    its depth (WP2's low palm keys, e.g. palmPress at y -0.34, z -0.26, sit wholly under the view); applied to the
         //    key before the blend from rest. With no gesture playing (a clip cut off by a clock jump, Enhanced Animations'
-        //    off hand on a ledge, a plant, a rope or a door), hand2 is hidden and the cast hand is open (checked once per
-        //    viewmodel render, before three culls: hand2's own updateMatrixWorld).
+        //    off hand on a ledge, a plant, a rope or a door), hand2 is hidden (its visible flag reads false as soon as the
+        //    clip that showed it is gone) and the cast hand is open with its one-hand forearm (checked once per viewmodel
+        //    render, before three culls: hand2's own updateMatrixWorld).
         //  - Ultimates (H18): the look's own gesture; at t0 #ult-cue (an edge vignette: the centre 55% of the short side
         //    clear, at most 0.35 opacity over 700 ms, half in Competitive, thin and dim under Reduce Flashes, below the
         //    crosshair, no pointer) and V23.audio.ultSting; the hands keep 0.3 NDC off the vertical centre line after p 0.2,
@@ -20307,6 +20308,14 @@
                     S.hand2.add(S.hand2Fore);
                     fx.group.add(S.hand2);
                     if (S.warmSet) fx.group.add(S.warmSet);
+                });
+                // V2.3: hand2 is shown only while the gesture that showed it plays: its visible flag reads false as soon as
+                // castFX's clip is gone (ended by a clock jump with no last pose) or is another one
+                let h2on = false;
+                Object.defineProperty(S.hand2, 'visible', {
+                    configurable: true,
+                    get: function () { return h2on && S.applied && !!S.cast && !!S.cast.active && S.cur.active === S.cast.active; },
+                    set: function (v) { h2on = !!v; }
                 });
                 // V2.3: once per viewmodel render, before three culls and draws (Object3D.updateMatrixWorld runs for every
                 // child of the scene): with no gesture playing, hand2 hides and the cast hand opens (_guard)
