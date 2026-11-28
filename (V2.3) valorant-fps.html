@@ -19814,63 +19814,97 @@
         // Clocks: castFX / vmAnim real clock (performance.now) for gestures and the ultimate vignette.
         //
         // V2.3 (WP4): how first person carries the agent (design 7). Everything here is built once, the first time Agent
-        //   Identity is applied (the first V23.fp.reapply with identity on: at boot that is the shader warm-up's
-        //   ultraRealism.warm, through ultraGuns.apply's H15.2 line), inside V23.core._quiet, so the uuids of the THREE
-        //   objects made here take no draw from the game's Math.random stream. After that, an agent change, a tier swap or a
-        //   setting change only swaps geometry and material references and writes material values (no allocation, no
-        //   compile: every material is a V23.mat.vm, the gun and hands program).
+        //   Identity is applied, inside V23.core._quiet (so the uuids of the THREE objects made here take no draw from the
+        //   game's Math.random stream), and its buffers are uploaded there and then (V23.core.uploadDraw of the warm set
+        //   below: the gun program, no new one). At boot that first application is the first V23.fp.reapply with identity
+        //   on: today the shader warm-up's ultraRealism.warm (ultraGuns.apply's H15.2 line); where Ultra is unsupported
+        //   (WebGL1) that warm returns early, so initCast queues a reapply for the end of initGame's task (the saved
+        //   settings are loaded by then): the set is built before play, never inside a cast. (CORE's init does not call
+        //   reapply yet; when it does, the set is built in H2 and the warm-up's vm step draws the objects tagged
+        //   userData.v23Warm = 'vm' here: the arms and the warm set.) After that, an agent change, a tier swap or a setting
+        //   change only swaps geometry and material references and writes material values (no allocation, no compile:
+        //   every material is a V23.mat.vm, the gun and hands program).
         //  - Hands (H13, H15): each of the 4 gun models' hands mesh draws a grouped variant of the V2.2 geometry it would
         //    draw (simple, or Low's two-finger simple, High Detail, Ultra with its cuff): the same parts at the same places,
         //    with the fingertips (and thumb tips) as their own parts, in 4 groups: [hand A glove, hand A tips, hand B glove,
-        //    hand B tips]. Hand A (gun-local x +0.08, the one V2.2's builders call the left hand) is exactly the first half of
-        //    the index buffer, as in V2.2. A full-glove agent's hands take one glove material (three ignores the groups: one
-        //    draw); a fingerless or wrapped agent's take [glove, tip] (4 draws). The variant follows the tier from the game's
-        //    own state (ultraGuns, characterDetail), not from the mesh, so Ultra turning off (whose apply compares against
-        //    its own geometry) still lands on the right variant.
+        //    hand B tips]. Hand A (gun-local x +0.08: the player's RIGHT hand, on the right forearm of the arm set; V2.2's
+        //    builders call it the left hand, a label that no longer holds once the arms have sides) is exactly the first
+        //    half of the index buffer, as in V2.2; hand B (x -0.08, the LEFT hand) the second half. A full-glove agent's
+        //    hands take one glove material (three ignores the groups: one draw); a fingerless or wrapped agent's take
+        //    [glove, tip] (4 draws). The variant follows the tier from the game's own state (ultraGuns, characterDetail),
+        //    not from the mesh, so Ultra turning off (whose apply compares against its own geometry) still lands on the
+        //    right variant.
         //  - Arms (H13, H14): one Group (userData.isAgentArm) is put right after each model's hands (index 9 on the rifle
         //    and the pistol), holding a sleeve mesh and a detail mesh with the agent's V23.parts.fpArms geometry pair (one
-        //    pair per agent, shared by the 4 models), at (0, 0, handZ). Skins, the workshop clone, characterDetail and
-        //    ultraGuns skip it (H14). Left-handed mode only translates the gun model, so the arms follow and are not mirrored.
+        //    pair per agent, shared by the 4 models; right forearm at x > 0, left at x < 0), at (0, 0, handZ). Skins, the
+        //    workshop clone, characterDetail and ultraGuns skip it (H14). Left-handed mode only translates the gun model,
+        //    so the arms follow and are not mirrored.
         //  - castFX (H16-H18): the cast hand draws one of 6 grouped pose geometries (open, cup, fist, point, snap, flat:
-        //    V23.motion.CAST_POSES) with the agent's glove materials; hand2, a child of castFX.group, is the exact mirror
-        //    image of the hand about the screen's centre line (its matrix is T^-1 x mirror x T) for two-hand gestures;
-        //    castFX.sleeve and a detail mesh take the agent's forearm (the right-hand half of its fpArms pair, re-indexed,
-        //    sharing the pair's vertex buffers). V23.fp.pose drives castFX._pose (Enhanced Animations off) and
-        //    eaFP.castPose (on) from the look's gesture (V23.motion.gesture: its first-person keys), with the look's tempo,
-        //    snap, sway and asym. Every gesture is wound up at once and reaches its release key at p 0.10-0.16 (the effect
-        //    spawned at t 0); the core flare and the palette layer (V23.audio.motif) fire there. castFX.core is placed at the
-        //    energy point (the palm, kept out of the screen centre), because High Fidelity's self renderer reads it.
+        //    V23.motion.CAST_POSES) with the agent's glove materials. castFX.hand is the player's LEFT hand (REST x < 0,
+        //    thumb toward the centre), so castFX.sleeve takes the agent's left forearm (the x < 0 half of its fpArms pair,
+        //    placed from the left-wrist frame); hand2, a child of castFX.group, is the exact mirror image of the hand
+        //    about the screen's centre line (its matrix is T^-1 x mirror x T) for two-hand gestures, and its forearm is
+        //    the agent's RIGHT forearm placed through a second mirror, so it is drawn unmirrored and the asymmetric
+        //    modules (Omen's plates on the left) sit on their own arm. Left-handed mode mirrors castFX.group (V2.2), so
+        //    the two forearms trade sides. Each cast forearm is one geometry (that side's sleeve and detail parts) drawn
+        //    'full' (a draw per slot: the arm set's own), 'folded' (cuff and accent in the sleeve's material) or 'mono'
+        //    (the sleeve material alone): one-hand gestures draw it full; two-hand gestures keep both forearms inside the
+        //    first-person draw budget (design 15: V2.3 minus V2.2 at most +3 gloved, +6 fingerless; with the gun below the
+        //    frame that is (H - 1) + (F1 - 1) + H + F2 <= 3H for H hand materials, so F1 + F2 <= H + 2), lowering the
+        //    costlier one a step at a time (hand2 first on a tie). V23.fp.pose drives castFX._pose (Enhanced Animations
+        //    off) and eaFP.castPose (on) from the look's gesture (V23.motion.gesture: its first-person keys), with the
+        //    look's tempo, snap, sway and asym. Every gesture is wound up at once and reaches its release key at p
+        //    0.10-0.16 (the effect spawned at t 0); the core flare and the palette layer (V23.audio.motif) fire there.
+        //    castFX.core is placed at the energy point (the palm, kept out of the screen centre), because High
+        //    Fidelity's self renderer reads it. FP rule (in-view floor): a key's palm centre is kept at NDC y >= -0.85 at
+        //    its depth (WP2's low palm keys, e.g. palmPress at y -0.34, z -0.26, sit wholly under the view); applied to the
+        //    key before the blend from rest. With no gesture playing (a clip cut off by a clock jump, Enhanced Animations'
+        //    off hand on a ledge, a plant, a rope or a door), hand2 is hidden and the cast hand is open (checked once per
+        //    viewmodel render, before three culls: hand2's own updateMatrixWorld).
         //  - Ultimates (H18): the look's own gesture; at t0 #ult-cue (an edge vignette: the centre 55% of the short side
         //    clear, at most 0.35 opacity over 700 ms, half in Competitive, thin and dim under Reduce Flashes, below the
         //    crosshair, no pointer) and V23.audio.ultSting; the hands keep 0.3 NDC off the vertical centre line after p 0.2,
         //    every energy card keeps 0.3 NDC off the centre and the halo stays small enough to leave the centre clear; the
         //    V2.2 release at p 0.68 (shake, light) is kept, the light in the palette's glow colour.
         //  - Second-stage fires (H19): a visual kick on vmAnim's spring (written here: vmAnim.fire draws Math.random) and
-        //    the ability's tap gesture.
-        //  - Off-hand drawRange API (for VMANIM, WP5): V23.fp.offHand(model, hidden) -> bool. hidden true draws only the
-        //    second half of that model's hands index buffer (setDrawRange(half, half): hand A, gun-local +x, is gone);
-        //    false draws both again. It works with Agent Identity on or off (V2.2's merged hands keep hand A first too),
-        //    returns false for a model V23.fp.attach never saw, and the state is kept per model: every hands geometry
-        //    swap (tier changes, identity on or off) re-applies it on the new geometry and resets the old one.
+        //    the ability's tap gesture. A fire while that ability's tap is still up (Neon's beam, every 95 ms) holds the
+        //    tap at its hold pose instead of restarting it (no hidden frame), and the palette layer plays once per burst
+        //    (not when a tap of the same ability was up within the last tap clip).
+        //  - Off-hand drawRange API (for VMANIM, WP5: a magazine reload takes the support hand away): V23.fp.offHand(model,
+        //    hidden) -> bool. hidden true takes the support hand away: the LEFT hand (hand B, gun-local x -0.08, the
+        //    second half of that model's hands index buffer: setDrawRange(0, half) keeps hand A), or the RIGHT hand (hand
+        //    A: setDrawRange(half, n - half)) when Left-Handed is on (V2.2 mirrors every viewmodel motion there), and with
+        //    it the same side's forearm (the arm draws only the other forearm's half of its sleeve and detail: no cuff or
+        //    wrist module is left without its hand); the side is fixed at the call and kept until offHand(model, false),
+        //    which draws both hands and both forearms again. It works with Agent Identity on or off (V2.2's merged hands
+        //    keep hand A first too), returns false for a model V23.fp.attach never saw, and the state is kept per model:
+        //    every hands geometry swap (tier changes, identity on or off, also while identity is off from boot) re-applies
+        //    it on the new geometry and resets the old one.
         //  - Identity off: nothing here runs, so the V2.2 hands, castFX and gestures are untouched; after identity was on,
         //    switching it off puts back the V2.2 geometry the tier wants, the V2.2 skin materials (0xffdbac), V2.2's cast
-        //    hand and sleeve, and hides the arms, hand2 and the cast detail.
+        //    hand and sleeve, and hides the arms and hand2.
         //  - Data for the tests (read only): V23.fp.state; private helpers start with '_'.
         V23.fp = (function () {
             const S = {
-                models: [],        // per gun model: { model, slot, handZ, hands, v22Mat, simple, arm, sleeve, detail, offHidden }
+                models: [],        // per gun model: { model, slot, handZ, hands, v22Mat, simple, kind, src, arm, sleeve, detail, offSide, seen }
                 cast: null,        // castFX (initCast)
                 v22: null,         // castFX's V2.2 hand and sleeve (geometry, material, transform)
-                built: false, applied: false, everApplied: false, buildMs: 0, builds: 0,
-                mats: null, handArr: null, sleeveArr: null, detailArr: null,
+                built: false, applied: false, everApplied: false, buildMs: 0, builds: 0, bootQueued: false,
+                mats: null, handArr: null, sleeveArr: null, detailArr: null, castArr: null,
                 grouped: new Map(),   // V2.2 hands geometry -> its grouped variant
-                arms: {},             // agentId -> { res, castSleeve, castDetail }
+                arms: {},             // agentId -> { id, look, res, half: { L, R: { sleeve, detail } }, fore: { L, R: { full, folded, draws } } }
+                armA: null,           // the active agent's arm set
                 poses: {},            // cast-hand pose name -> geometry
-                hand2: null, hand2Sleeve: null, hand2Detail: null, castDetail: null, cloneStub: null,
-                castXf: null,         // { p, q, s }: the forearm's place under the cast hand (fpArms hand space -> cast space)
-                agent: null, two: false,
-                cur: { active: null, kind: null, key: null, agent: null, slot: null, name: null, g: null, pr: 0.12, h2: 0.7, two: false,
-                    released: false, releasedAt: -1, motion: null, energy: new THREE.Vector3(), lastP: -1 },
+                hand2: null, hand2Fore: null, cloneStub: null, warmSet: null, warm: null,
+                castXf: null,         // { L, Lm: { p, q, s } }: a forearm's place under the cast hand (fpArms hand space -> cast space)
+                foreX: [null, null],  // the transform last written on castFX.sleeve and on hand2's forearm
+                foreMode: ['full', 'full'],
+                alloc: [{ m: 'L', h: 'R', two: 'full', two2: 'full' }, { m: 'R', h: 'L', two: 'full', two2: 'full' }],   // [right-handed, left-handed]
+                G: { glove: null, tip: null, two: false },   // the agent's glove (written in place on every agent change)
+                agent: null,
+                cur: { active: null, kind: null, key: null, agent: null, slot: null, name: null, g: null, pr: 0.12, h2: 0.7, pHold: 0.7, two: false,
+                    released: false, releasedAt: -1, motion: null, energy: new THREE.Vector3(), lastP: -1, holdUntil: 0, motif: true },
+                tapKey: null, tapLast: -1e9,   // the last tap posed (its ability key and when): one palette layer per burst
                 castN: 0, rng: null, cue: null   // rng: made at first use (CORE, which defines V23.rand, loads after this block)
             };
             // ---- scratch (no allocation while a gesture plays) -------------------------------------------------------------
@@ -19879,7 +19913,9 @@
             const _p = new THREE.Vector3(), _s = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
             const _m3 = new THREE.Matrix3();
             const _ENERGY = new THREE.Vector3(0.009, 0.05, -0.04);   // the energy point in front of the palm (cast-hand space)
+            const _LV = ['full', 'folded', 'mono'];
             const _enabled = () => !!(V23.core && V23.core.enabled());
+            const _lefty = () => !!(game.userSettings && game.userSettings.leftHanded);
             const _clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
             const _sm = (a, b, x) => { const u = _clamp01((x - a) / (b - a)); return u * u * (3 - 2 * u); };
             // V2.3: the gesture easing (PARTS' _EASE): smoothstep, sharpened toward an ease-out by motion.snap
@@ -20039,24 +20075,35 @@
                 S.grouped.set(src, g);
                 return g;
             }
-            // V2.3: the off-hand drawRange: hidden draws the second half (hand B) only
-            function _range(g, hidden) {
+            // V2.3: the off-hand drawRange of a hands geometry: side 'L' hidden draws hand A only (the first half), 'R' hidden
+            // hand B only (the second half), null both
+            function _range(g, side) {
                 if (!g) return;
                 const n = g.index ? g.index.count : g.attributes.position.count, half = (g.userData && g.userData.v23Half) || n / 2;
-                if (hidden) g.setDrawRange(half, n - half); else g.setDrawRange(0, Infinity);
+                if (side === 'L') g.setDrawRange(0, half);
+                else if (side === 'R') g.setDrawRange(half, n - half);
+                else g.setDrawRange(0, Infinity);
+            }
+            // V2.3: the drawRange follows the model's hands geometry: the one it left is drawn whole again, the one it draws
+            // now takes the model's off-hand state (identity on or off: every H15 reapply and every offHand call)
+            function _seen(E) {
+                const g = E.hands.geometry;
+                if (E.seen && E.seen !== g) _range(E.seen, null);
+                E.seen = g;
+                _range(g, E.offSide);
             }
 
             // ---- arms ----------------------------------------------------------------------------------------------------
-            // V2.3: the right-hand half of an fpArms geometry (triangles whose centre is at x > 0 in its hand space), as a
-            // geometry of its own that shares the pair's vertex buffers (a new index only), groups kept in order
-            function _rightHalf(src, name) {
-                const pos = src.attributes.position.array, idx = src.index.array, out = [], groups = [];
+            // V2.3: one forearm of an fpArms geometry (side 'L': the triangles whose centre is at x < 0 in its hand space;
+            // 'R': x > 0) as a geometry of its own that shares the pair's vertex buffers (a new index only), groups kept
+            function _half(src, side, name) {
+                const pos = src.attributes.position.array, idx = src.index.array, out = [], groups = [], sg = side === 'R' ? 1 : -1;
                 const list = src.groups.length ? src.groups : [{ start: 0, count: idx.length, materialIndex: 0 }];
                 for (const gr of list) {
                     const st = out.length;
                     for (let t = gr.start; t < gr.start + gr.count; t += 3) {
                         const a = idx[t], b = idx[t + 1], c = idx[t + 2];
-                        if (pos[a * 3] + pos[b * 3] + pos[c * 3] > 0) out.push(a, b, c);
+                        if ((pos[a * 3] + pos[b * 3] + pos[c * 3]) * sg > 0) out.push(a, b, c);
                     }
                     if (out.length > st) groups.push([st, out.length - st, gr.materialIndex]);
                 }
@@ -20067,34 +20114,85 @@
                 for (const [s0, c, mi] of groups) g.addGroup(s0, c, mi);
                 g.computeBoundingSphere();
                 g.name = name;
+                g.userData.v23Side = side;
                 return g;
             }
-            // V2.3: an agent's arm set: its fpArms pair (cached per look by PARTS) and the cast forearm made from it; a
-            // redefined look (a new pair) is re-indexed once, when it is first used
+            // V2.3: the cast forearm of one side: that side's sleeve and detail triangles in one geometry of its own (new
+            // buffers with only the vertices they use), the index in four runs [sleeve slot | cuff | accent | skin], drawn
+            // with S.castArr = [sleeve, cuff, accent, skin]: 'full' takes a group per run (the arm set's own draws), 'folded'
+            // draws the cuff and accent runs in the sleeve's material (the sleeve's draws: same attributes and index, other
+            // groups), 'mono' is the folded geometry under the sleeve material alone (one draw)
+            function _castFore(res, side, name) {
+                const sg = side === 'R' ? 1 : -1, srcs = [res.sleeve, res.detail], runs = [[], [], [], []];
+                srcs.forEach((geo, w) => {
+                    const pos = geo.attributes.position.array, idx = geo.index.array;
+                    const list = geo.groups.length ? geo.groups : [{ start: 0, count: idx.length, materialIndex: 0 }];
+                    for (const gr of list) {
+                        const run = w === 0 ? (gr.materialIndex === 1 ? 3 : 0) : (gr.materialIndex === 1 ? 2 : 1);
+                        for (let t = gr.start; t < gr.start + gr.count; t += 3) {
+                            const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+                            if ((pos[a * 3] + pos[b * 3] + pos[c * 3]) * sg > 0) runs[run].push(w, a, b, c);
+                        }
+                    }
+                });
+                const maps = [new Map(), new Map()];
+                let nv = 0, ni = 0;
+                for (const r of runs) for (let k = 0; k < r.length; k += 4) { ni += 3; for (let j = 1; j < 4; j++) if (!maps[r[k]].has(r[k + j])) maps[r[k]].set(r[k + j], nv++); }
+                const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), I = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+                srcs.forEach((geo, w) => {
+                    const sp = geo.attributes.position.array, sn = geo.attributes.normal.array;
+                    for (const [o, n] of maps[w]) for (let d = 0; d < 3; d++) { P[n * 3 + d] = sp[o * 3 + d]; N[n * 3 + d] = sn[o * 3 + d]; }
+                });
+                const at = [];
+                let io = 0;
+                for (const r of runs) { at.push(io); for (let k = 0; k < r.length; k += 4) for (let j = 1; j < 4; j++) I[io++] = maps[r[k]].get(r[k + j]); }
+                at.push(io);
+                const pa = new THREE.BufferAttribute(P, 3), na = new THREE.BufferAttribute(N, 3), ia = new THREE.BufferAttribute(I, 1);
+                const mk = (groups, mode) => {
+                    const g = V23.core._quiet(() => new THREE.BufferGeometry());   // V2.3: no draw from the game's stream
+                    g.setAttribute('position', pa); g.setAttribute('normal', na); g.setIndex(ia);
+                    for (const [s0, c, mi] of groups) if (c > 0) g.addGroup(s0, c, mi);
+                    g.computeBoundingSphere();
+                    g.name = name + ':' + mode;
+                    g.userData.v23Side = side;
+                    return g;
+                };
+                const full = mk([[at[0], at[1] - at[0], 0], [at[1], at[2] - at[1], 1], [at[2], at[3] - at[2], 2], [at[3], at[4] - at[3], 3]], 'full');
+                const folded = mk([[at[0], at[3] - at[0], 0], [at[3], at[4] - at[3], 3]], 'folded');
+                return { full: full, folded: folded, draws: { full: full.groups.length, folded: folded.groups.length, mono: 1 } };
+            }
+            // V2.3: an agent's arm set: its fpArms pair (cached per look by PARTS), each forearm's half of it (the off-hand
+            // API) and each side's cast forearm; a redefined look (a new pair) is re-indexed once, when it is first used
             function _armOf(id) {
                 const look = V23.core.resolve(id);
                 if (!look) return null;
                 const res = V23.parts.fpArms(look);
                 let A = S.arms[id];
                 if (A && A.res === res) return A;
-                A = { id: id, look: look, res: res, castSleeve: _rightHalf(res.sleeve, 'v23:fp:castSleeve:' + id), castDetail: _rightHalf(res.detail, 'v23:fp:castDetail:' + id) };
+                const nm = 'v23:fp:' + id + ':';
+                A = { id: id, look: look, res: res, half: {}, fore: {} };
+                for (const side of ['L', 'R']) {
+                    A.half[side] = { sleeve: _half(res.sleeve, side, nm + 'sleeve' + side), detail: _half(res.detail, side, nm + 'detail' + side) };
+                    A.fore[side] = _castFore(res, side, nm + 'castFore' + side);
+                }
                 S.arms[id] = A;
                 return A;
             }
-            // V2.3: the cast forearm's place under the cast hand: fpArms hand space (right wrist (0.08, -0.09, 0), forearm toward
-            // (0, -0.75, 0.66), back of the hand outward +x) to cast-hand space (wrist under the palm, forearm down -y, back of
-            // the hand toward the camera +z): C = T(wrist) R_cast R_fp^T T(-W)
+            // V2.3: the cast forearm's place under the cast hand: fpArms hand space (left wrist (-0.08, -0.09, 0), forearm
+            // toward (0, -0.75, 0.66), back of the left hand outward -x, its thumb along a x pz) to cast-hand space (wrist
+            // under the palm, forearm down -y, back of the hand toward the camera +z, thumb toward +x as the cast hand's):
+            // C = T(wrist) R_cast R_fpL^T T(-W_L). Lm = C x mirror(x) carries the RIGHT forearm there, mirrored, for the
+            // mirrored mounts (hand2; the cast hand in left-handed mode), so it is drawn unmirrored in the end
             function _castTransform() {
-                const a = new THREE.Vector3(0, -0.75, 0.66).normalize(), pz = new THREE.Vector3(1, 0, 0), ex = new THREE.Vector3().crossVectors(a, pz).normalize();
+                const a = new THREE.Vector3(0, -0.75, 0.66).normalize(), pz = new THREE.Vector3(-1, 0, 0), ex = new THREE.Vector3().crossVectors(a, pz).normalize();
                 const Rfp = new THREE.Matrix4().makeBasis(ex, a, pz);
                 const a2 = new THREE.Vector3(0, -1, 0), pz2 = new THREE.Vector3(0, 0, 1), ex2 = new THREE.Vector3().crossVectors(a2, pz2).normalize();
                 const Rc = new THREE.Matrix4().makeBasis(ex2, a2, pz2);
-                const C = new THREE.Matrix4().makeTranslation(0, -0.036, 0).multiply(Rc).multiply(Rfp.clone().transpose()).multiply(new THREE.Matrix4().makeTranslation(-0.08, 0.09, 0));
-                const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
-                C.decompose(p, q, s);
-                return { p: p, q: q, s: s };
+                const C = new THREE.Matrix4().makeTranslation(0, -0.036, 0).multiply(Rc).multiply(Rfp.clone().transpose()).multiply(new THREE.Matrix4().makeTranslation(0.08, 0.09, 0));
+                const Cm = C.clone().multiply(new THREE.Matrix4().makeScale(-1, 1, 1));
+                const dec = (X) => { const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(); X.decompose(p, q, s); return { p: p, q: q, s: s }; };
+                return { L: dec(C), Lm: dec(Cm) };
             }
-            const _place = (o, X) => { o.position.copy(X.p); o.quaternion.copy(X.q); o.scale.copy(X.s); };
 
             // ---- materials ---------------------------------------------------------------------------------------------------
             // V2.3: a palette entry {c, r, m, e?, ei?} written into a V23.mat.vm material (runtime colours: setHex then
@@ -20109,12 +20207,26 @@
             }
             const _slot = (look, name) => (look.palette[name] || (name === 'visor' ? look.palette.glow : null) || look.palette.base);
             // V2.3: the agent's glove (and tips) colours, and whether the tips draw apart: fingerless and wrapped gloves, or
-            // tips 'skin', show the skin palette on the tip parts; a bare hand is skin all over (one material, one draw)
+            // tips 'skin', show the skin palette on the tip parts; a bare hand is skin all over (one material, one draw).
+            // Written into S.G (no allocation: this runs on every agent change)
             function _gloveOf(look) {
-                const G = look.gloves || {}, type = G.type || 'full';
-                const glove = type === 'bare' ? look.palette.skin : _slot(look, (look.fp && look.fp.glove) || G.slot || 'glove');
-                const tipsSkin = type !== 'bare' && (G.tips === 'skin' || type === 'fingerless' || type === 'wrap');
-                return { glove: glove, tip: look.palette.skin, two: tipsSkin && look.palette.skin.c !== glove.c };
+                const G = look.gloves || {}, type = G.type || 'full', out = S.G;
+                out.glove = type === 'bare' ? look.palette.skin : _slot(look, (look.fp && look.fp.glove) || G.slot || 'glove');
+                out.tip = look.palette.skin;
+                out.two = type !== 'bare' && (G.tips === 'skin' || type === 'fingerless' || type === 'wrap') && look.palette.skin.c !== out.glove.c;
+                return out;
+            }
+            // V2.3: the two cast forearms' draw modes for two-hand gestures inside the budget (block header: F1 + F2 <= H + 2),
+            // for both handedness settings (S.alloc[0] right-handed: the cast hand carries the left forearm; [1] left-handed)
+            function _alloc(A, H) {
+                for (let lh = 0; lh < 2; lh++) {
+                    const out = S.alloc[lh], dm = A.fore[out.m].draws, dh = A.fore[out.h].draws;
+                    let im = 0, ih = 0;
+                    while (dm[_LV[im]] + dh[_LV[ih]] > H + 2 && (im < 2 || ih < 2)) {
+                        if (ih < 2 && (im >= 2 || dh[_LV[ih]] >= dm[_LV[im]])) ih++; else im++;
+                    }
+                    out.two = _LV[im]; out.two2 = _LV[ih];
+                }
             }
 
             // ---- the build (the first identity application) ------------------------------------------------------------------
@@ -20126,6 +20238,7 @@
                     S.handArr = [S.mats.glove, S.mats.tip];
                     S.sleeveArr = [S.mats.sl0, S.mats.sl1];
                     S.detailArr = [S.mats.dt0, S.mats.dt1];
+                    S.castArr = [S.mats.sl0, S.mats.dt0, S.mats.dt1, S.mats.sl1];
                     for (const id of AGENT_ORDER) _armOf(id);
                     const A = _armOf(game.activeAgent) || _armOf('jett');
                     // V2.3: the workshop clones a whole gun model before H14.2 removes the arms; the arm Group clones as this
@@ -20137,6 +20250,7 @@
                         const arm = new THREE.Group();
                         arm.name = 'v23FpArm';
                         arm.userData.isAgentArm = true;
+                        arm.userData.v23Warm = 'vm';   // V2.3: drawn in the warm-up's viewmodel step when built before it (H3b)
                         E.sleeve = new THREE.Mesh(A.res.sleeve, S.sleeveArr);
                         E.detail = new THREE.Mesh(A.res.detail, S.detailArr);
                         for (const m of [E.sleeve, E.detail]) { m.userData.isAgentArm = true; m.updateMatrix(); m.matrixAutoUpdate = false; }
@@ -20150,39 +20264,63 @@
                         const at = E.model.children.indexOf(E.hands);
                         E.model.children.splice(at + 1, 0, arm);
                         arm.parent = E.model;
+                        arm.updateMatrixWorld(true);   // V2.3: placed now (the build may run inside a render's matrix update)
                         E.arm = arm;
                     }
                     for (const pose of V23.motion.CAST_POSES) S.poses[pose] = _bake(_castHandParts(pose), 'v23:castHand:' + pose);
                     S.castXf = _castTransform();
+                    // V2.3: the warm set (hidden; tagged for the warm-up's vm step, and drawn once by V23.core.uploadDraw at
+                    // the end of the build): one mesh per buffer set the first-person set draws later by reference (the
+                    // pose geometries, the active agent's pair, forearm halves and cast forearms, the 4 grouped hands);
+                    // hand2 draws the same buffers (mirrored), so it needs none of its own
+                    const W = new THREE.Group();
+                    W.name = 'v23FpWarm';
+                    W.visible = false;
+                    W.userData.v23Warm = 'vm';
+                    const wm = (g, mat) => { const m = new THREE.Mesh(g, mat); m.frustumCulled = false; W.add(m); return m; };
+                    S.warm = {
+                        poses: V23.motion.CAST_POSES.map((pose) => wm(S.poses[pose], S.handArr)),
+                        pair: [wm(A.res.sleeve, S.sleeveArr), wm(A.res.detail, S.detailArr)],
+                        half: [wm(A.half.L.sleeve, S.sleeveArr), wm(A.half.L.detail, S.detailArr), wm(A.half.R.sleeve, S.sleeveArr), wm(A.half.R.detail, S.detailArr)],
+                        fore: [wm(A.fore.L.full, S.castArr), wm(A.fore.R.full, S.castArr)],
+                        hands: S.models.map((E) => wm(E.hands.geometry, S.handArr))
+                    };
+                    S.warmSet = W;
                 });
                 S.built = true;
                 _buildCast();
                 S.builds++;
                 S.buildMs = performance.now() - t0;
             }
-            // V2.3: castFX's extras (once castFX exists): the cast detail and hand2 with its forearm, children of castFX.group
+            // V2.3: castFX's extras (once castFX exists): hand2 with its forearm, and the warm set, children of castFX.group
             function _buildCast() {
                 const fx = S.cast;
                 if (!S.built || S.hand2 || !fx || !fx.group) return;
                 const A = _armOf(game.activeAgent) || _armOf('jett');
                 V23.core._quiet(() => {   // V2.3: no draw from the game's stream
-                    S.castDetail = new THREE.Mesh(A.castDetail, S.detailArr);
-                    _place(S.castDetail, S.castXf);
-                    S.castDetail.visible = false;
                     S.hand2 = new THREE.Mesh(S.poses.open, S.mats.glove);
+                    S.hand2.name = 'v23Hand2';
                     S.hand2.matrixAutoUpdate = false;
                     S.hand2.visible = false;
-                    S.hand2Sleeve = new THREE.Mesh(A.castSleeve, S.sleeveArr);
-                    S.hand2Detail = new THREE.Mesh(A.castDetail, S.detailArr);
-                    _place(S.hand2Sleeve, S.castXf);
-                    _place(S.hand2Detail, S.castXf);
-                    S.hand2.add(S.hand2Sleeve, S.hand2Detail);
-                    fx.group.add(S.castDetail, S.hand2);
+                    S.hand2Fore = new THREE.Mesh(A.fore.R.folded, S.castArr);
+                    S.hand2Fore.name = 'v23Hand2Fore';
+                    S.hand2.add(S.hand2Fore);
+                    fx.group.add(S.hand2);
+                    if (S.warmSet) fx.group.add(S.warmSet);
                 });
+                // V2.3: once per viewmodel render, before three culls and draws (Object3D.updateMatrixWorld runs for every
+                // child of the scene): with no gesture playing, hand2 hides and the cast hand opens (_guard)
+                const base = THREE.Object3D.prototype.updateMatrixWorld;
+                S.hand2.updateMatrixWorld = function (force) { _guard(); return base.call(this, force); };
+            }
+            // V2.3: the boot build's buffer upload: the warm set drawn once into CORE's 4x4 target (the gun program)
+            function _upload() {
+                if (S.warmSet && V23.core && V23.core.uploadDraw) V23.core.uploadDraw(S.warmSet);
             }
 
             // ---- applying identity -------------------------------------------------------------------------------------------
-            // V2.3: the agent's materials and geometry references (H6 through V23.core.onAgentChanged, and every reapply)
+            // V2.3: the agent's materials, budget and geometry references (H6 through V23.core.onAgentChanged, and every
+            // reapply); nothing is allocated
             function _applyAgent(id) {
                 const A = _armOf(id) || _armOf('jett');
                 const look = A.look, G = _gloveOf(look), sl = A.res.slots.sleeve, dt = A.res.slots.detail;
@@ -20192,46 +20330,86 @@
                 _paint(S.mats.sl1, _slot(look, sl[1] || sl[0]));
                 _paint(S.mats.dt0, _slot(look, dt[0]));
                 _paint(S.mats.dt1, _slot(look, dt[1] || dt[0]));
+                _alloc(A, G.two ? 2 : 1);
                 S.agent = A.id;
-                S.two = G.two;
+                S.armA = A;
+                // V2.3: the warm set follows the agent (references only)
+                const w = S.warm;
+                if (w) {
+                    w.pair[0].geometry = A.res.sleeve; w.pair[1].geometry = A.res.detail;
+                    w.half[0].geometry = A.half.L.sleeve; w.half[1].geometry = A.half.L.detail; w.half[2].geometry = A.half.R.sleeve; w.half[3].geometry = A.half.R.detail;
+                    w.fore[0].geometry = A.fore.L.full; w.fore[1].geometry = A.fore.R.full;
+                    const hm = G.two ? S.handArr : S.mats.glove;
+                    for (const m of w.poses) m.material = hm;
+                    for (const m of w.hands) m.material = hm;
+                }
                 return A;
             }
-            function _applyModel(E, on, A) {
+            // V2.3: a model's arm draws the agent's pair, or with the support hand away only the other forearm's half
+            function _armGeo(E, A) {
+                if (!E.arm || !A) return;
+                const vis = E.offSide === 'L' ? A.half.R : E.offSide === 'R' ? A.half.L : null;
+                const sg = vis ? vis.sleeve : A.res.sleeve, dg = vis ? vis.detail : A.res.detail;
+                if (E.sleeve.geometry !== sg) E.sleeve.geometry = sg;
+                if (E.detail.geometry !== dg) E.detail.geometry = dg;
+            }
+            function _applyModel(E, on, A, i) {
                 _v22Hands(E);
                 let g;
                 if (on) {
                     g = _groupedOf(E, E.kind, E.src);
-                    E.hands.material = S.two ? S.handArr : S.mats.glove;
-                    if (E.arm) {
-                        E.arm.visible = true;
-                        if (E.sleeve.geometry !== A.res.sleeve) E.sleeve.geometry = A.res.sleeve;
-                        if (E.detail.geometry !== A.res.detail) E.detail.geometry = A.res.detail;
-                    }
+                    E.hands.material = S.G.two ? S.handArr : S.mats.glove;
+                    if (E.arm) { E.arm.visible = true; _armGeo(E, A); }
+                    if (S.warm && S.warm.hands[i]) S.warm.hands[i].geometry = g;
                 } else {
                     g = E.src;
                     E.hands.material = E.v22Mat;
                     if (E.arm) E.arm.visible = false;
                 }
-                if (E.hands.geometry !== g) { _range(E.hands.geometry, false); E.hands.geometry = g; }
-                _range(g, E.offHidden);
+                if (E.hands.geometry !== g) E.hands.geometry = g;
+                _seen(E);
+            }
+            // V2.3: a forearm mesh (castFX.sleeve, slot 0, or hand2's, slot 1) in a draw mode on a place (references only;
+            // its matrices are refreshed when the place changes, which may happen inside a render's matrix update)
+            function _setFore(mesh, slot, F, mode, X) {
+                const g = mode === 'full' ? F.full : F.folded, mat = mode === 'mono' ? S.mats.sl0 : S.castArr;
+                if (mesh.geometry !== g) mesh.geometry = g;
+                if (mesh.material !== mat) mesh.material = mat;
+                S.foreMode[slot] = mode;
+                if (S.foreX[slot] !== X) {
+                    S.foreX[slot] = X;
+                    mesh.position.copy(X.p); mesh.quaternion.copy(X.q); mesh.scale.copy(X.s);
+                    if (mesh.parent) mesh.updateMatrixWorld(true);
+                }
+            }
+            // V2.3: the cast forearms for this frame: the cast hand (the left hand; the right one in left-handed mode, where
+            // castFX.group is mirrored) carries that side's forearm, hand2 the other, each in the mode the budget gives it
+            function _fore(fx, two) {
+                const A = S.armA;
+                if (!A || !fx || !fx.sleeve) return;
+                const lh = _lefty() ? 1 : 0, al = S.alloc[lh];
+                _setFore(fx.sleeve, 0, A.fore[al.m], two ? al.two : 'full', lh ? S.castXf.Lm : S.castXf.L);
+                if (S.hand2Fore) _setFore(S.hand2Fore, 1, A.fore[al.h], al.two2, lh ? S.castXf.L : S.castXf.Lm);
+            }
+            // V2.3: no gesture playing (hand2's per-render check): hand2 hidden, the cast hand open with its one-hand forearm
+            function _guard() {
+                const fx = S.cast, C = S.cur;
+                if (!S.applied || !fx || !fx.hand) { if (S.hand2) S.hand2.visible = false; return; }
+                if (fx.active && C.active === fx.active && C.g) return;   // pose() owns this frame
+                S.hand2.visible = false;
+                if (fx.hand.geometry !== S.poses.open) fx.hand.geometry = S.poses.open;
+                _fore(fx, false);
             }
             function _applyCast(on, A) {
                 const fx = S.cast;
                 if (!fx || !fx.hand || !S.v22) return;
                 if (on && !S.hand2) _buildCast();
+                S.foreX[0] = S.foreX[1] = null;   // the places are written again
                 if (on) {
                     fx.hand.geometry = S.poses.open;
-                    fx.hand.material = S.two ? S.handArr : S.mats.glove;
-                    fx.sleeve.geometry = A.castSleeve;
-                    fx.sleeve.material = S.sleeveArr;
-                    _place(fx.sleeve, S.castXf);
-                    if (S.castDetail) { S.castDetail.geometry = A.castDetail; S.castDetail.visible = true; }
-                    if (S.hand2) {
-                        S.hand2.material = fx.hand.material;
-                        S.hand2.visible = false;
-                        S.hand2Sleeve.geometry = A.castSleeve;
-                        S.hand2Detail.geometry = A.castDetail;
-                    }
+                    fx.hand.material = S.G.two ? S.handArr : S.mats.glove;
+                    _fore(fx, false);
+                    if (S.hand2) { S.hand2.material = fx.hand.material; S.hand2.visible = false; }
                 } else {
                     const V = S.v22;
                     fx.hand.geometry = V.handGeom;
@@ -20239,7 +20417,6 @@
                     fx.sleeve.geometry = V.sleeveGeom;
                     fx.sleeve.material = V.sleeveMat;
                     fx.sleeve.position.copy(V.p); fx.sleeve.quaternion.copy(V.q); fx.sleeve.scale.copy(V.s);
-                    if (S.castDetail) S.castDetail.visible = false;
                     if (S.hand2) S.hand2.visible = false;
                 }
             }
@@ -20269,7 +20446,10 @@
                 const h = K[K.length - 1][0];
                 C.active = a; C.kind = kind; C.key = key || null; C.agent = agent; C.slot = slot; C.name = name; C.g = g; C.motion = M;
                 C.pr = pr; C.h2 = Math.min(0.9, Math.max(pr + 0.1, 1 - (1 - h) / (M.tempo || 1)));
-                C.two = g.hands > 1; C.released = false; C.releasedAt = -1; C.lastP = -1;
+                C.pHold = Math.min(C.h2, 0.75);   // where a held fire holds a tap (H19): the hand up, a quarter clip to spare
+                C.two = g.hands > 1; C.released = false; C.releasedAt = -1; C.lastP = -1; C.holdUntil = 0;
+                // V2.3: one palette layer per burst: none for a tap of the same ability posed within the last tap clip
+                C.motif = kind !== 'tap' || !(S.tapKey === C.key && a && a.start - S.tapLast < fx.CLIPS.tap);
                 C.energy.set(0, 0, 0);
                 if (fx.hand && S.poses.open && fx.hand.geometry !== S.poses.open) fx.hand.geometry = S.poses.open;
                 if (S.hand2) S.hand2.visible = false;
@@ -20285,9 +20465,9 @@
                 out[6] = a[9] + (b[9] - a[9]) * u;
                 return q >= b[0] - 1e-9 ? b[7] : a[7];
             }
-            // V2.3: the in-view floor for a key: its palm centre no lower than NDC y -0.85 at its depth (the low palm keys,
-            // e.g. palmPress at y -0.34, z -0.26, sat wholly under the view); applied to the key before the blend from rest,
-            // so the hand still rises from below and returns there
+            // V2.3: the in-view floor for a key (the FP rule in the header): its palm centre no lower than NDC y -0.85 at its
+            // depth (the low palm keys, e.g. palmPress at y -0.34, z -0.26, sat wholly under the view); applied to the key
+            // before the blend from rest, so the hand still rises from below and returns there
             function _floor(y, z, Pm) { const zz = Math.max(0.05, -z), yMin = -0.85 * zz / Pm[5]; return y < yMin ? yMin : y; }
             // V2.3: keep a card's centre at least minR (NDC) off the screen centre, at its depth (weaponGroup space is the
             // viewmodel camera's view space)
@@ -20319,38 +20499,51 @@
                         if (c.userData && c.userData.isHands && c.userData.handZ === handZ) { hands = c; break; }
                     }
                     if (!hands) return null;
-                    S.models.push({ model: model, slot: slot, handZ: handZ, hands: hands, v22Mat: hands.material, simple: hands.geometry, kind: 'simple', src: hands.geometry, arm: null, sleeve: null, detail: null, offHidden: false });
+                    S.models.push({ model: model, slot: slot, handZ: handZ, hands: hands, v22Mat: hands.material, simple: hands.geometry, kind: 'simple', src: hands.geometry, arm: null, sleeve: null, detail: null, offSide: null, seen: hands.geometry });
                     return null;
                 },
                 // V2.3 (hook H15) (after characterDetail's and ultraGuns' hands swaps), H6 (V23.core.onAgentChanged) and the identity
-                // setting: the tier's grouped hands, the agent's arms, gloves and cast forearm, the off-hand drawRange; with
+                // setting: the tier's grouped hands, the agent's arms, gloves and cast forearms, the off-hand drawRange; with
                 // identity off (after it was on) the V2.2 hands and castFX come back. Builds only the first time it applies.
                 reapply: function () {
                     const on = _enabled();
-                    if (!on && !S.everApplied) return null;   // V2.3: identity off from the start: V2.2 owns everything
-                    if (on && !S.built) _build();
+                    if (!on && !S.everApplied) {
+                        // V2.3: identity off from the start: V2.2 owns everything; only the off-hand drawRange follows a swap
+                        for (const E of S.models) _seen(E);
+                        return null;
+                    }
+                    const first = on && !S.built;
+                    if (first) _build();
                     const A = on ? _applyAgent(game.activeAgent) : null;
-                    for (const E of S.models) _applyModel(E, on, A);
+                    S.models.forEach((E, i) => _applyModel(E, on, A, i));
                     _applyCast(on, A);
                     S.applied = on;
                     if (on) S.everApplied = true;
+                    if (first) _upload();   // V2.3: the buffers upload now (the build's own), not in play
                     return null;
                 },
-                // V2.3 (hook H16.1) (castFX.init end): record castFX and its V2.2 hand and sleeve (nothing is built here)
+                // V2.3 (hook H16.1) (castFX.init end): record castFX and its V2.2 hand and sleeve (nothing is built here), and queue
+                // the boot build for the end of initGame's task, for boots where nothing before the first frame of play applies
+                // identity (WebGL1: ultraRealism.warm returns early); a no-op when the set is built or identity is off
                 initCast: function (castFX) {
                     if (!castFX || !castFX.hand || !castFX.sleeve) return null;
                     S.cast = castFX;
                     const sv = castFX.sleeve;
                     S.v22 = { handGeom: castFX.hand.geometry, handMat: castFX.hand.material, sleeveGeom: sv.geometry, sleeveMat: sv.material,
                         p: sv.position.clone(), q: sv.quaternion.clone(), s: sv.scale.clone() };
+                    if (!S.bootQueued && typeof queueMicrotask === 'function') {
+                        S.bootQueued = true;
+                        const fp = this;
+                        queueMicrotask(() => { if (!S.built && _enabled()) fp.reapply(); });
+                    }
                     return null;
                 },
                 // V2.3 (hook H16.2) (castFX.start end): the agent's gesture for this cast; an ultimate also starts its cue and turns
                 // its release light to the palette's glow
                 onStart: function (castFX, kind, abilityKey) {
                     const on = _enabled();
-                    // V2.3: the setting changed by a path that did not reapply (V23.core.applySettings(cfg, null) after boot,
-                    // or a boot whose warm-up never reapplied): the first cast after it puts the set right, either way
+                    // V2.3: the setting changed by a path that did not reapply (V23.core.applySettings(cfg, null) after boot):
+                    // the first cast after it puts the set right, either way
                     if (on !== S.applied && (on || S.everApplied)) this.reapply();
                     if (!on || !castFX || !castFX.active || !S.built) return null;
                     const C = _begin(castFX, kind, abilityKey);
@@ -20369,7 +20562,14 @@
                     let C = S.cur;
                     if (C.active !== castFX.active || !C.g) C = _begin(castFX, kind, null);
                     const g = C.g, K = g.fp, n = K.length, M = C.motion, fx = castFX;
-                    const hand = (game.userSettings && game.userSettings.leftHanded) ? -1 : 1;
+                    // V2.3: a held fire (H19) holds a tap at its hold pose: the clip's start moves with the clock while the
+                    // fire lasts, so the tap neither restarts nor runs out, and goes on from there once it stops
+                    if (kind === 'tap') {
+                        if (C.holdUntil > now && p > C.pHold && fx.active) { p = C.pHold; fx.active.start = now - p * fx.active.dur; }
+                        S.tapKey = C.key; S.tapLast = now;
+                    }
+                    _fore(fx, C.two);
+                    const hand = _lefty() ? -1 : 1;
                     const pr = C.pr, h2 = C.h2, r = K[1][0], h = K[n - 1][0];
                     // V2.3: the gesture's progress q: wound up at once, the release key at pr, the hold to h2, then the
                     // recovery holds the last key while the envelope takes the hand down to rest
@@ -20465,18 +20665,19 @@
                         _push(wsp.position, 0.3);
                         wsp.scale.setScalar(0.05 + 0.04 * wispOn);
                     }
-                    // V2.3: the release key: the palette layer plays there (the ability's own sound played at t 0)
+                    // V2.3: the release key: the palette layer plays there (the ability's own sound played at t 0), once per burst
                     if (!C.released && p >= pr - 1e-9) {   // (p is a time ratio: a hair under the key still counts)
                         C.released = true;
                         C.releasedAt = p;
-                        if (V23.audio && C.slot && kind !== 'ult') V23.audio.motif(C.agent, C.slot);
+                        if (V23.audio && C.slot && kind !== 'ult' && C.motif) V23.audio.motif(C.agent, C.slot);
                     }
                     C.lastP = p;
                     return up * _k[6];
                 },
                 // V2.3 (hook H19) (shoot's second-stage and ultimate fire branches): a visual kick on the viewmodel spring and the
                 // ability's tap gesture. vmAnim.fire draws Math.random for its roll, so the kick is written here, its roll
-                // from a V2.3 stream; nothing here touches gameplay state.
+                // from a V2.3 stream; nothing here touches gameplay state. A fire while this ability's tap is up holds it
+                // (see pose) rather than starting it again.
                 onSecondaryFire: function (abilityKey) {
                     if (!_enabled() || typeof vmAnim === 'undefined' || !vmAnim.sp) return null;
                     const s = vmAnim.sp, amt = 0.035;
@@ -20485,17 +20686,25 @@
                     s.vy -= amt * 40;
                     if (!S.rng) S.rng = V23.rand(0x46503421);   // V2.3: the kick's roll: a V2.3 stream, never Math.random
                     s.vr += (S.rng() - 0.5) * amt * 24;
+                    const fx = S.cast, C = S.cur, key = abilityKey || null;
+                    if (fx && S.applied && fx.active && fx.active.kind === 'tap' && C.active === fx.active && C.key === key) {
+                        const now = performance.now();
+                        C.holdUntil = now + 0.45 * fx.CLIPS.tap;
+                        if ((now - fx.active.start) / fx.active.dur > C.pHold) fx.active.start = now - C.pHold * fx.active.dur;
+                        return null;
+                    }
                     const agent = String(abilityKey || '').split('.')[0], def = AGENT_DEFS[agent] || AGENT_DEFS[game.activeAgent];
-                    if (S.cast && def) S.cast.start('tap', def.themeColor, abilityKey);
+                    if (fx && def) fx.start('tap', def.themeColor, abilityKey);
                     return null;
                 },
-                // V2.3: the off-hand drawRange API (see the block header): hidden true draws only hand B of the model's hands
+                // V2.3: the off-hand drawRange API (see the block header): hidden true takes the support hand and its forearm away
                 offHand: function (model, hidden) {
                     let E = null;
                     for (const m of S.models) if (m.model === model) { E = m; break; }
                     if (!E) return false;
-                    E.offHidden = !!hidden;
-                    _range(E.hands.geometry, E.offHidden);
+                    E.offSide = hidden ? (_lefty() ? 'R' : 'L') : null;
+                    if (S.applied) _armGeo(E, S.armA);
+                    _seen(E);
                     return true;
                 },
                 // V2.3: the ultimate's activation cue at t0: #ult-cue (CSS FP block) in the palette's glow colour, half in
@@ -20520,11 +20729,12 @@
                 // data for the tests (read only)
                 state: {
                     get applied() { return S.applied; }, get built() { return S.built; }, get buildMs() { return S.buildMs; }, get builds() { return S.builds; },
-                    get agent() { return S.agent; }, get two() { return S.two; }, get casts() { return S.castN; },
+                    get agent() { return S.agent; }, get two() { return S.G.two; }, get casts() { return S.castN; },
                     get cur() { return S.cur.active && S.cast && S.cur.active === S.cast.active ? S.cur : null; },
-                    get models() { return S.models.map((E) => ({ slot: E.slot, arm: E.arm, offHidden: E.offHidden, handsIndex: E.model.children.indexOf(E.hands), armIndex: E.arm ? E.model.children.indexOf(E.arm) : -1 })); },
-                    get mats() { return S.mats; }, get hand2() { return S.hand2; }, get castDetail() { return S.castDetail; }, get poses() { return S.poses; },
-                    get grouped() { return S.grouped.size; }
+                    get models() { return S.models.map((E) => ({ slot: E.slot, arm: E.arm, offSide: E.offSide, handsIndex: E.model.children.indexOf(E.hands), armIndex: E.arm ? E.model.children.indexOf(E.arm) : -1 })); },
+                    get mats() { return S.mats; }, get hand2() { return S.hand2; }, get hand2Fore() { return S.hand2Fore; }, get poses() { return S.poses; },
+                    get castArr() { return S.castArr; }, get fore() { return S.foreMode.slice(); }, get alloc() { return S.alloc.map((a) => Object.assign({}, a)); },
+                    get warmSet() { return S.warmSet; }, get grouped() { return S.grouped.size; }
                 },
                 // V2.3 (private, the tests): a grouped hands geometry built apart (kind 'simple' | 'detailed' | 'ultra'), an
                 // agent's arm set
