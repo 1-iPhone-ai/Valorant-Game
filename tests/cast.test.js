@@ -48,6 +48,8 @@ test('ability casts: the off-hand comes up in the agent colour, throws, and the 
         out.after = { active: castFX.active, hand: castFX.group.visible, glow: castFX.halo.visible, drift: __dist(__pose(model), rest) };
 
         // A cast during a reload leaves the reload running (the magazine still comes back)
+        // V2.3 (WP5): pinned to Weapon Animations 'classic' (V2.2's reload); 'v23' is checked below
+        game.userSettings.weaponAnims = 'classic';
         const w = game.weapons.rifle;
         w.ammo = 1;
         reload();
@@ -59,6 +61,28 @@ test('ability casts: the off-hand comes up in the agent colour, throws, and the 
         out.reloadKept = vmAnim.clip && vmAnim.clip.kind === 'reload';
         __vmStep(t + 300, t + w.reloadTime * 1000 + 400);
         out.magBack = w.magazine ? Math.abs(w.magazine.position.y - w.magRestY) < 1e-9 && w.magazine.visible : true;
+
+        // V2.3 (WP5): Weapon Animations 'v23': the reload's off hand (castFX) holds the magazine; a cast takes the hand (the
+        // gun's own support hand comes back, the spare magazine hides), the reload runs on, and the hand returns after it
+        game.userSettings.weaponAnims = 'v23';
+        game.reloading = false;
+        w.ammo = 1;
+        reload();
+        t = performance.now() + 7000;
+        const R = V23.vm.state.slots.rifle, dur = vmAnim.clip.dur;
+        vmAnim.clip.start = t;
+        const step = (a, b) => { for (let x = a; x <= b; x += 16) { vmAnim.begin(model); vmAnim.end(model, x); V23.vm.step(0.016, x); } };
+        step(t, t + 0.3 * dur);
+        const v = out.v23 = { before: [V23.vm.state.offModel === model, R.spare.visible, castFX.group.visible] };
+        castFX.start('cast', 0x38f6ff, 'jett.q');
+        castFX.active.start = t + 0.3 * dur + 16;
+        step(t + 0.3 * dur + 16, t + 0.3 * dur + 200);
+        v.during = [V23.vm.state.offModel, R.spare.visible, vmAnim.clip && vmAnim.clip.kind];
+        step(t + 0.3 * dur + 216, t + 0.3 * dur + 900);
+        v.after = [castFX.active, V23.vm.state.offModel === model, R.spare.visible, vmAnim.clip && vmAnim.clip.kind];
+        step(t + 0.3 * dur + 916, t + dur + 400);
+        v.end = [w.magazine.visible && Math.abs(w.magazine.position.y - w.magRestY) < 1e-9, V23.vm.state.offModel, castFX.group.visible, vmAnim.clip];
+        game.reloading = false;
 
         // Left-handed: the off-hand is the right hand (mirrored)
         game.userSettings.leftHanded = true;
@@ -79,6 +103,10 @@ test('ability casts: the off-hand comes up in the agent colour, throws, and the 
     assert.ok(r.after.drift < 1e-6, `gun back at rest (${r.after.drift})`);
     assert.ok(r.reloadKept, 'reload not interrupted');
     assert.ok(r.magBack, 'magazine seated after the reload');
+    assert.deepEqual(r.v23.before, [true, true, true], 'v23: mid-swap the off hand holds the magazine, the support hand is away');
+    assert.deepEqual(r.v23.during, [null, false, 'reload'], 'v23: a cast takes the hand, the support hand is back, the reload runs on');
+    assert.deepEqual(r.v23.after, [null, true, true, 'reload'], 'v23: after the cast the off hand has the magazine again');
+    assert.deepEqual(r.v23.end, [true, null, false, null], 'v23: the magazine seated, the hands back, the clip over');
     assert.ok(r.mirrored, 'left-handed mirrors the hand');
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(programs, watermark, 'no new shader programs');

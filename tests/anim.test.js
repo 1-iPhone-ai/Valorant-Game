@@ -404,6 +404,8 @@ test('first person on: no bob walking into a wall, a lift on a jump and a dip on
         window.updateEnemies = () => {};
         window.presentPlayerCamera = () => {};
         game.userSettings.infiniteAmmo = false;
+        // V2.3 (WP5): the V2.2 assertions below are pinned to Weapon Animations 'classic' (V2.2's clips); 'v23' is checked after
+        game.userSettings.weaponAnims = 'classic';
         const out = {};
         const cc = characterController;
         // Walking into a wall: hold W into a wall for a second of steps, the gun's height over time
@@ -478,6 +480,13 @@ test('first person on: no bob walking into a wall, a lift on a jump and a dip on
         out.off = { wall: intoWall(), jump: jumpLand(), reloads: reloads() };
         enhancedAnim.set(true);
         out.on = { wall: intoWall(), jump: jumpLand(), reloads: reloads() };
+        // V2.3 (WP5): Weapon Animations 'v23': the V2.3 reloads, Enhanced Animations on (as here) and off
+        game.userSettings.weaponAnims = 'v23';
+        out.v23 = { on: reloads() };
+        enhancedAnim.set(false);
+        out.v23.off = reloads();
+        enhancedAnim.set(true);
+        game.userSettings.weaponAnims = 'classic';
         // Breathing at rest: the gun moves a little with nothing else going on
         let t = performance.now() + 40000;
         __vm(t - 3000, t);
@@ -532,6 +541,19 @@ test('first person on: no bob walking into a wall, a lift on a jump and a dip on
     }
     // Off: every gun has the one classic reload shape (bar its bolt / slide / handle accents) and is back at rest
     for (const [gun, x] of Object.entries(r.off.reloads)) assert.ok(x.rest < 1e-6 && x.mag < 1e-9, `off ${gun}: back at rest`);
+    // V2.3 (WP5): Weapon Animations 'v23', Enhanced Animations off and on: each gun type reloads its own V2.3 way, ends, is back
+    // exactly at rest (magazine and slide too) and is not V2.2's reload
+    for (const ea of ['off', 'on']) {
+        const R = r.v23[ea];
+        assert.equal(new Set(Object.values(R).map((x) => x.path)).size, 5, `v23, EA ${ea}: each gun type reloads its own way`);
+        for (const [gun, x] of Object.entries(R)) {
+            assert.equal(x.clip, null, `v23, EA ${ea}, ${gun}: the reload ends`);
+            assert.ok(x.rest < 1e-6, `v23, EA ${ea}, ${gun}: back exactly at rest (${x.rest})`);
+            assert.ok(x.mag < 1e-9 && x.slide < 1e-9, `v23, EA ${ea}, ${gun}: magazine and slide back in place`);
+            assert.notEqual(x.path, r[ea].reloads[gun].path, `v23, EA ${ea}, ${gun}: not the V2.2 reload`);
+        }
+        if (ea === 'on') for (const gun of Object.keys(R)) assert.notEqual(R[gun].path, r.v23.off[gun].path, `v23 ${gun}: Enhanced Animations adds its secondary motion`);
+    }
     // Your body
     assert.ok(r.body.spread > 0.05, `side steps spread the legs (${r.body.spread})`);
     assert.ok(r.body.back.fwd < -0.5 && r.body.back.swing > 0.2, `walking backwards swings the legs (${JSON.stringify(r.body.back)})`);
