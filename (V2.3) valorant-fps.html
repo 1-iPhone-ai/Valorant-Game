@@ -21949,7 +21949,30 @@
             // V2.3: the per-gun overrides on their class preset (design 8's build order: Vandal and Classic first)
             const GUNS = {
                 vandal: { post: [null, 'charge'], insp: 'magCheck' },     // the charging handle after an empty reload; a magazine check
-                classic: { insp: 'pressCheck' }                           // the slide locked back and released; a press check
+                classic: { insp: 'pressCheck' },                          // the slide locked back and released; a press check
+                // rifle magazine, bolt release on empty (the rifle preset)
+                phantom: { insp: 'muzzle' },                              // a look down the suppressor
+                bulldog: { insp: 'selector' },                            // the burst selector clicked twice
+                guardian: { insp: 'scope' },                              // a look through the scope
+                // SMG magazine, bolt slap on empty (the SMG preset)
+                stinger: { insp: 'flick' },
+                spectre: { insp: 'twist' },                               // the suppressor twisted
+                // min(missing, 4) shell pushes, a pump on empty (the shotgun preset)
+                bucky: { insp: 'pump' },
+                // the Judge's model is the rifle body with no kit: a magazine swap, the charging handle on empty
+                judge: { r: 'mag', post: [null, 'charge'], insp: 'magCheck' },
+                // pistol magazine, the slide locked back after the last shot (the pistol preset)
+                frenzy: { insp: 'spin' },
+                ghost: { insp: 'twist' },
+                bandit: { insp: 'hammer' },
+                // a revolver: side-loaded with the slot's own parts (its magazine swings out as the cylinder), no slide lock
+                sheriff: { r: 'side', post: [null, null], lock: false, insp: 'cylinder' },
+                marshal: { r: 'bolt1', insp: 'bolt' },                    // the bolt and a single round
+                outlaw: { r: 'break', post: [null, null], insp: 'breakCheck' },   // break-action, two shells
+                operator: { insp: 'scope' },                              // bolt and magazine (the sniper preset; sniperMag's matrixAutoUpdate restored)
+                // box magazine with a belt shake (the heavy preset)
+                ares: { insp: 'heft' },
+                odin: { insp: 'heft' }
             };
             // V2.3: a gun's preset with its overrides (merged once per gun, then read from the cache)
             const _defs = new Map();
