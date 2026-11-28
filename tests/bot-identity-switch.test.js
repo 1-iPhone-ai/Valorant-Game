@@ -1,10 +1,11 @@
 'use strict';
 // V2.3 (WP6): Agent Identity switched on in play, from a boot with it off (design 2.5, 9.3). One boot of the V2.3 build
 // with agentIdentity 'off' saved, at most 4 minutes. Checks:
-//  - the first switch-on, made with the real pill while every bot moves: the identity build runs inside the next pack
-//    (a page's flush), and after that one pack every live slot holds its own bot's kit (instanceKit x = the agent's mask
-//    on the tier, the kit flag, the flash flag only while flashing, no dissolve on a living bot; the kit colour =
-//    leaves[0]'s) and every kit draws at its page's count; again after real frames;
+//  - the first switch-on, made with the real pill: the identity build and the switch run at the click itself (V2.3
+//    coordinator: CORE's applySettings calls BOTKIT's sync), with no Math.random draw; with every bot standing still,
+//    the next pack gives every live slot its own bot's kit (instanceKit x = the agent's mask on the tier, the kit flag,
+//    the flash flag only while flashing, no dissolve on a living bot; the kit colour = leaves[0]'s) and every kit draws
+//    at its page's count; again after a pack with every bot moving, and after real frames;
 //  - the build's warm reserve after the warm-up: two pages, drawn once by the next frame (prefill: the frame's pixels
 //    equal those of the frame after it, every reserve object hidden after its draw); a free page's new kit likewise;
 //    a bot entering a new chunk then takes a reserve page and creates no GPU buffer, and a bot taking the free page
@@ -113,15 +114,18 @@ test('bot identity switched on in play (boot with it off): every slot\'s kit aft
         if (lone) { window.__lone = lone; lone.mesh.visible = false; packEnemyBatches(); }
         out.free = enemyPageFree.length;
         const p0 = renderer.info.programs.length;
+        const r0 = R.total, sr0 = st.switchRepacks;
         document.querySelector('#setting-agent-identity-pills [data-agentidentity="on"]').click();
-        out.builtByPill = S.built;
-        const r0 = R.total;
+        out.byPill = { built: S.built, on: S.on, uIdentity: enemyAnimUniforms.uIdentity.value, draws: R.total - r0 };
+        // V2.3: every bot standing still: the game's next pack alone writes every slot (the switch marked them dirty)
+        packEnemyBatches();
+        out.still = window.__kitCheck();
         for (const e of enemyObjects) if (e.page) { e.mesh.position.x += 0.01; e.poseDirty = true; }
         packEnemyBatches();
         out.packDraws = R.total - r0;
+        out.switchInFlush = st.switchRepacks - sr0;
         out.check = window.__kitCheck();
         out.built = S.built;
-        out.switchRepacks = st.switchRepacks;
         out.made = st.reserveMade;
         // the prefill: the reserve pages (and the free page's kit) wait for the next draw, shown with one instance
         out.waiting = S.reserve.every((pg) => pg.meshes.every((m) => m.visible && m.count === 1 && Object.prototype.hasOwnProperty.call(m, 'onAfterRender')) && pg.kit.visible);
@@ -146,12 +150,14 @@ test('bot identity switched on in play (boot with it off): every slot\'s kit aft
         out.programs = [p0, renderer.info.programs.length];
         return out;
     });
-    assert.equal(first.builtByPill, false, 'the pill alone builds nothing (CORE\'s applySettings does not call BOTKIT): the build is the next pack\'s');
-    assert.ok(first.built && first.check.on && first.check.uIdentity === 1, 'the pack after the pill built the kits and switched them on');
-    assert.equal(first.switchRepacks, 1, 'the switch came inside a page\'s flush (the case V2.2\'s structureDirty clear used to lose)');
+    assert.deepEqual(first.byPill, { built: true, on: true, uIdentity: 1, draws: 0 }, 'the pill itself built the kits and switched them on, with no Math.random draw');
+    assert.equal(first.switchInFlush, 0, 'so no pack had to make the switch');
+    assert.ok(first.still.slots >= 3, `live bots on pages (${JSON.stringify(first.still)})`);
+    assert.deepEqual(first.still.bad, [], 'with every bot standing still, the next pack gives every live slot its own kit and colour');
+    assert.ok(first.built && first.check.on && first.check.uIdentity === 1, 'still on after a pack with every bot moving');
     assert.ok(first.check.slots >= 3 && first.check.pages < first.check.slots, `live bots on pages, some sharing one (${JSON.stringify(first.check)})`);
     assert.deepEqual(first.check.bad, [], 'after one pack every live slot holds its own bot\'s kit and colour, and every kit its page\'s count');
-    assert.equal(first.packDraws, 0, 'the switch-on pack (the build and the reserve) takes no Math.random draw from the game\'s stream');
+    assert.equal(first.packDraws, 0, 'the switch-on (the build and the reserve) and the packs after it take no Math.random draw from the game\'s stream');
     assert.equal(first.made, 2, 'the build made the two reserve pages after the warm-up');
     assert.ok(first.waiting, 'the reserve pages wait for the next frame\'s draw');
     assert.ok(first.lone && first.free >= 1 && first.freeKit.length >= 1 && first.freeKit.every(Boolean), `the free page's new kit waits in the scene for its draw (${JSON.stringify(first.freeKit)})`);
