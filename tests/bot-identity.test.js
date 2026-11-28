@@ -17,7 +17,11 @@
 //    colours follow enemyPartPalette in all four highlight colours, cyan torso 0x0891b2 included;
 //  - every kit module of every tier inside the union hit volume + 0.03 m at every archetype scale (JS, no Ultra boot);
 //  - rendered crops: the rim's own pixels (uRimBase on minus off) carry the highlight hue for red, yellow, purple and
-//    cyan; a hit flash makes the kit one flat colour (the flash flag in instanceKit, one hue in the kit's pixels);
+//    cyan; a hit flash makes the kit one flat colour (the flash flag in instanceKit, one hue in the kit's pixels); the
+//    kit mask collapse in pixels (the kit alone: Sage's and Omen's kits light different pixels, each well under the full
+//    superset's, and a head-only mask lights nothing below the shoulders);
+//  - the crosshair preview's practice bot (H27.2): V2.2's colour strings for red, yellow and purple, cyan's own, and the
+//    canvas pixel inside the bot drawn in each mode's fill (cyan no longer drawn as red);
 //  - the dissolve (onKilled, death ticks): 0 until 0.6 s into the lie, then rising, written only on death ticks;
 //  - identity off (the pill): every kit hidden (0 kit draws), uIdentity 0; on again restores them;
 //  - wingmen: one Group child, the kit as the figure's 5th child, draws equal with Enhanced Animations off and on, and
@@ -27,9 +31,12 @@
 //  - kitRep and archOverride (the replay override API) apply and restore bit-exact, the restore also with identity off,
 //    and a save from an earlier life is dropped after a respawn;
 //  - steady frames (bots moved inside their chunks) upload no kit bytes; programs == watermark, 0 stalls, no page errors.
+// ROLE=<role> (design 17.1) narrows the per-agent kit mask rows to that role's agents; the pool checks stay whole.
+// (tests/bot-identity-switch.test.js boots with Agent Identity off and switches it on in play.)
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const path = require('path');
 const { boot, closeBrowser, programState, GAME_FILE } = require('./harness');
 
 after(closeBrowser);
@@ -64,6 +71,7 @@ const hexHue = (h) => hueOf((h >> 16) & 255, (h >> 8) & 255, h & 255);
 // No pointer lock in headless runs (it leaks renderer memory when play resumes many times)
 // and the forced content tier, if any, saved before the game reads it
 const TIER = process.env.BOT_IDENTITY_TIER || null;
+const ROLE = process.env.ROLE ? process.env.ROLE.toUpperCase() : null;
 const INIT = (tier) => {
     Element.prototype.requestPointerLock = function () {}; document.exitPointerLock = function () {};
     if (tier) try { const k = 'valorant_v16_user_settings'; const o = JSON.parse(localStorage.getItem(k) || '{}'); o.contentTierMode = tier; localStorage.setItem(k, JSON.stringify(o)); } catch (e) {}
@@ -350,6 +358,42 @@ test(`bot identity (${TIER ? TIER + ' content tier' : 'the machine\'s content ti
     assert.equal(kits.colours.cyan.rim, kits.cyanRim, 'cyan rim 0x67e8f9');
     console.log('# draws with kits / without (main, shadow):', JSON.stringify([kits.withKits, kits.noKits]), 'live pages', kits.live, 'tier', kits.tier);
 
+    // ---- the crosshair preview's practice bot (H27.2): V2.2's strings for red, yellow and purple (read from the reference
+    // build), cyan's own, and the canvas pixel inside the bot (clear of the crosshair and the grid) in each mode's fill
+    // over the preview's own background (the pixel beside it on the same row) -------------------------------------------
+    const v22 = fs.readFileSync(path.resolve(__dirname, '..', '(V2.2) valorant-fps.html'), 'utf8');
+    const pick = (name) => {
+        const m = v22.match(new RegExp('const ' + name + " = hlMode === 'yellow' \\? '([^']+)' : \\(hlMode === 'purple' \\? '([^']+)' : '([^']+)'\\);"));
+        return m && { yellow: m[1], purple: m[2], red: m[3] };
+    };
+    const S22 = pick('botStroke'), F22 = pick('botFill');
+    assert.ok(S22 && F22, "V2.2's practice bot colours are read from the reference build");
+    const wantPrev = { cyan: { stroke: 'rgba(103, 232, 249, 0.75)', fill: 'rgba(103, 232, 249, 0.24)' } };
+    for (const m of ['red', 'yellow', 'purple']) wantPrev[m] = { stroke: S22[m], fill: F22[m] };
+    const prev = await evaluate(() => {
+        const sm = settingsManager, ctx = sm.previewCtx, keep = game.userSettings.enemyHighlightColor, out = { ctx: !!ctx, modes: {} };
+        try {
+            for (const mode of ['red', 'yellow', 'purple', 'cyan']) {
+                game.userSettings.enemyHighlightColor = mode;
+                const c = V23.bots.previewColors(mode);
+                sm.drawCrosshairPreview();
+                // the preview centre is (124, 78); the bot's disc has radius 18, the crosshair arms run along its axes
+                const at = (x, y) => (ctx ? Array.from(ctx.getImageData(x, y, 1, 1).data) : null);
+                out.modes[mode] = { stroke: c && c.stroke, fill: c && c.fill, px: at(124 + 9, 78 - 9), bg: at(124 + 40, 78 - 9) };
+            }
+        } finally { game.userSettings.enemyHighlightColor = keep; sm.drawCrosshairPreview(); }
+        return out;
+    });
+    assert.ok(prev.ctx, 'the crosshair preview canvas is there');
+    const rgba = (txt) => txt.match(/[\d.]+/g).map(Number);
+    for (const [mode, r] of Object.entries(prev.modes)) {
+        assert.deepEqual({ stroke: r.stroke, fill: r.fill }, wantPrev[mode], `${mode}: the practice bot's colours (V2.2's, cyan its own)`);
+        const [fr, fg, fb, fa] = rgba(wantPrev[mode].fill), exp = [fr, fg, fb].map((v, i) => v * fa + r.bg[i] * (1 - fa));
+        assert.ok(exp.every((v, i) => Math.abs(v - r.px[i]) <= 3), `${mode}: the pixel inside the practice bot is its fill over the background (${r.px} vs ${exp.map((v) => v.toFixed(1))})`);
+    }
+    assert.notDeepEqual(prev.modes.cyan.px, prev.modes.red.px, 'cyan is no longer drawn as red');
+    console.log('# practice bot pixels:', Object.entries(prev.modes).map(([m, r]) => m + ' ' + r.px.slice(0, 3)).join(', '));
+
     // ---- every kit module of every tier inside the union hit volume + 0.03 m at every archetype scale (JS) -----------
     const kitData = await evaluate(() => ['low', 'medium', 'high', 'ultra'].map((t) => {
         const g = V23.parts.kitSuperset(t);
@@ -375,24 +419,25 @@ test(`bot identity (${TIER ? TIER + ' content tier' : 'the machine\'s content ti
     // where the superset holds all of the kit's modules the mask is the kit itself
     const masks = await evaluate(() => AGENT_ORDER.map((id) => {
         const L = V23.core.resolve(id), kit = ((L && L.bot && L.bot.kit) || []).filter((k) => k >= 0 && k <= 22);
-        return { id: id, kit: kit, pool: L && L.bot && L.bot.pool, tiers: ['low', 'medium', 'high', 'ultra'].map((t) => {
+        return { id: id, kit: kit, role: L && L.role, pool: L && L.bot && L.bot.pool, tiers: ['low', 'medium', 'high', 'ultra'].map((t) => {
             const mods = V23.parts.kitSuperset(t).userData.kit.modules, has = (k) => mods.some((m) => m.id === k && m.vertices > 0);
             const mask = V23.bots._kitMask(id, t), bits = [];
             for (let k = 0; k < 24; k++) if (Math.floor(mask / Math.pow(2, k)) % 2 === 1) bits.push(k);
             return { tier: t, bits: bits, held: bits.every(has), exact: !kit.every(has) || (bits.length === kit.length && kit.every((k) => bits.indexOf(k) >= 0)) };
         }) };
     }));
-    const badMask = [];
-    for (const m of masks) for (const t of m.tiers) if (m.kit.length && (!t.bits.length || !t.held || !t.exact)) badMask.push(m.id + '/' + t.tier + ' kit ' + m.kit + ' bits ' + t.bits);
-    assert.deepEqual(badMask, [], 'every agent kit draws on every tier, only modules the tier holds, the kit itself where it can');
-    // and two agents of one pool never draw the same kit on a tier (Low's stand-ins included)
+    const badMask = [], rows = masks.filter((m) => !ROLE || m.role === ROLE);
+    assert.ok(rows.length > 0, `agents to check${ROLE ? ' for ROLE ' + ROLE : ''}`);
+    for (const m of rows) for (const t of m.tiers) if (m.kit.length && (!t.bits.length || !t.held || !t.exact)) badMask.push(m.id + '/' + t.tier + ' kit ' + m.kit + ' bits ' + t.bits);
+    assert.deepEqual(badMask, [], `every agent kit draws on every tier, only modules the tier holds, the kit itself where it can (${rows.length} agents${ROLE ? ', ROLE ' + ROLE : ''})`);
+    // and two agents of one pool never draw the same kit on a tier (Low's stand-ins included; every pool, whatever ROLE)
     const same = [];
     for (let t = 0; t < 4; t++) for (let i = 0; i < masks.length; i++) for (let j = i + 1; j < masks.length; j++) {
         const A = masks[i], Bm = masks[j];
         if (A.pool === Bm.pool && A.kit.length && Bm.kit.length && A.tiers[t].bits.join() === Bm.tiers[t].bits.join()) same.push(A.tiers[t].tier + ' ' + A.pool + ': ' + A.id + '/' + Bm.id);
     }
     assert.deepEqual(same, [], 'no two agents of a pool share a kit mask on any tier');
-    console.log('# Low kits with stand-ins:', masks.filter((m) => m.kit.join() !== m.tiers[0].bits.join() && m.kit.slice().sort((a, b) => a - b).join() !== m.tiers[0].bits.join()).map((m) => m.id + ' ' + m.kit + '>' + m.tiers[0].bits).join('; '));
+    console.log('# Low kits with stand-ins:', rows.filter((m) => m.kit.join() !== m.tiers[0].bits.join() && m.kit.slice().sort((a, b) => a - b).join() !== m.tiers[0].bits.join()).map((m) => m.id + ' ' + m.kit + '>' + m.tiers[0].bits).join('; '));
 
     // ---- rendered crops: the rim hue per highlight colour; a hit flash is one flat colour ------------------------------
     const crops = await evaluate(() => {
@@ -441,6 +486,39 @@ test(`bot identity (${TIER ? TIER + ' content tier' : 'the machine\'s content ti
             }
             out.rim[mode] = { hue: hue(R, G, Bl), px: n, bot: bot, sum: [R, G, Bl] };
         }
+        // the kit mask collapse in pixels: the kit alone (body materials hidden) drawn as Omen, as Sage, with every module
+        // of the superset on the slot, and with the head modules only (0 helmShell, 1 segVisor, 2 earGuard, 9 visorBand:
+        // every tier holds them); a pixel is the kit's where it differs from the same frame without the bot
+        {
+            const none = shot(false, true);
+            const kitPx = () => {
+                const img = shot(true), set = new Set();
+                for (let i = 0; i < img.length; i += 4) if (img[i] !== none[i] || img[i + 1] !== none[i + 1] || img[i + 2] !== none[i + 2]) set.add(i >> 2);
+                return set;
+            };
+            const setMask = (m) => { const A = e.page.kit.geometry.attributes.instanceKit, s = e.page.members.indexOf(e); A.setX(s, m); perfTelemetry.requestUpload(A, s * 4, 4); };
+            V23.bots.kitRep(e, { agentId: 'omen' }); e.colorDirty = true; packEnemyBatches();
+            const omen = kitPx();
+            V23.bots.kitRep(e, { agentId: 'sage' }); packEnemyBatches();
+            const sage = kitPx();
+            setMask(16777215);
+            const full = kitPx();
+            setMask(1 + 2 + 4 + 512);
+            const head = kitPx();
+            let xor = 0;
+            for (const j of omen) if (!sage.has(j)) xor++;
+            for (const j of sage) if (!omen.has(j)) xor++;
+            // the highest screen row (readPixels rows count from the bottom) a point at shoulder height (1.55 m x the
+            // bot's scale) reaches anywhere within 0.6 m of the bot; a head pixel must lie above it
+            const sy = e.mesh.scale.y, p = e.mesh.position;
+            let row = -Infinity;
+            for (const dx of [-0.6, 0.6]) for (const dz of [-0.6, 0.6]) { const v = new THREE.Vector3(p.x + dx, p.y + 1.55 * sy, p.z + dz).project(cam); row = Math.max(row, (v.y + 1) / 2 * H); }
+            let below = 0;
+            for (const j of head) if (Math.floor(j / W) < row) below++;
+            out.mask = { omen: omen.size, sage: sage.size, full: full.size, xor: xor, head: head.size, below: below, row: +row.toFixed(1),
+                masks: [V23.bots._kitMask('omen', V23.bots._state.tier), V23.bots._kitMask('sage', V23.bots._state.tier)] };
+            V23.bots.kitRep(e, { agentId: 'omen' }); e.colorDirty = true; packEnemyBatches();
+        }
         // a hit flash, with the highlight cyan (its accents far from the orange flash): the kit alone, at rest and in the
         // flash; every kit pixel counts, and those near the flash hue are the flat ones
         game.userSettings.enemyHighlightColor = 'cyan';
@@ -477,6 +555,12 @@ test(`bot identity (${TIER ? TIER + ' content tier' : 'the machine\'s content ti
         assert.ok(hueDist(r.hue, hexHue(ACC[mode])) < 25, `${mode}: rim hue ${r.hue.toFixed(1)} vs accent ${hexHue(ACC[mode]).toFixed(1)}`);
     }
     console.log('# rim hues:', Object.entries(crops.rim).map(([m, r]) => m + ' ' + r.hue.toFixed(1) + ' (accent ' + hexHue(ACC[m]).toFixed(1) + ', ' + r.px + ' px)').join(', '));
+    const mk = crops.mask;
+    assert.ok(mk.full > 500 && mk.omen > 100 && mk.sage > 100, `the kit alone lights pixels (${JSON.stringify(mk)})`);
+    assert.ok(mk.omen < 0.7 * mk.full && mk.sage < 0.7 * mk.full, `the mask drops the modules a kit lacks: Omen ${mk.omen} px and Sage ${mk.sage} px against ${mk.full} px for the whole superset`);
+    assert.ok(mk.xor > 0.2 * Math.min(mk.omen, mk.sage), `Omen's and Sage's kits light different pixels (${mk.xor} px differ; masks ${mk.masks})`);
+    assert.ok(mk.head > 30 && mk.below === 0, `a head-only mask lights nothing below the shoulders (${mk.head} px, ${mk.below} below row ${mk.row})`);
+    console.log('# kit pixels by mask:', JSON.stringify(mk));
     const fl = crops.flash, fh = hexHue(0xffaa00);
     const near = (hs) => hs.filter((h) => h >= 0 && hueDist(h, fh) < 25).length / Math.max(1, hs.length);
     assert.ok(fl.until && fl.flagged, `the flash flag is set in instanceKit (${fl.w})`);

@@ -16610,8 +16610,9 @@
         //    forward skips an agent a live bot of the same archetype already shows, and the player's own agent, where the
         //    pool allows. It writes actor.agentId and actor.lookIdx and nothing else, with Agent Identity on or off.
         //  - The identity build runs once, the first time a hook finds Agent Identity on after CORE built its boot set (at
-        //    boot: the warm-up's first packEnemyBatches; later: the next hook after the setting is switched on). Every THREE
-        //    object it makes is made inside V23.core._quiet (no draw from the game's Math.random stream). It gives every page
+        //    boot: the warm-up's first packEnemyBatches; later: the next hook after the setting is switched on; CORE's
+        //    applySettings, which the pill calls, does not call this block). Every THREE object it makes is made inside
+        //    V23.core._quiet (no draw from the game's Math.random stream). It gives every page
         //    (live and free) a kit: page.kit, a fifth InstancedMesh (castShadow false, a child of the torso mesh, so it is
         //    shown, hidden, added and removed with the page) drawing the content tier's kit superset (V23.parts.kitSuperset)
         //    with V23.mat.kitPage(); it shares the torso's instanceMatrix and instanceAnim/2/3 attribute objects (the leaves'
@@ -16622,14 +16623,24 @@
         //  - Writes: packColor (the colorDirty path) writes the kit colour and the slot's instanceKit; packPose writes only
         //    on death ticks (a dying bot whose dissolve moved); flush sets the kit's count and asks for the colour-range and
         //    death-range uploads. A steady frame writes nothing.
-        //  - The warm reserve: when the build runs before the warm-up ends, two more pages are made (inside _quiet), packed
-        //    with one kit instance in front of the camera and tagged for the warm-up (CORE's warmPre / warmPost show and
-        //    restore them), so every buffer they hold is on the GPU before the first frame. They are held here, not put in
-        //    enemyPageFree: a free page there would stand in for a createEnemyPage call V2.2 makes, and its uuids are 32 of
-        //    the game's Math.random draws, so the stream would shift. Instead, when V2.2's createEnemyPage has made a page
-        //    (its draws exactly as V2.2), onPage gives it a reserve page's meshes and kit in place of the ones it just made
-        //    (never drawn: they hold no GPU state), so a bot entering a new chunk creates no buffer. The reserve pages carry
-        //    their own Enhanced Animations buffers (instanceAnim2/3) from the start, so this holds with EA switched on later.
+        //  - The switch: switching on repacks every live page and marks every bot on a page colorDirty (a per-bot flag, so it
+        //    holds when V2.2 clears a page's structureDirty after its flush); when the switch happens inside a page's flush
+        //    (V2.2 wrote that page's slots while identity was off), flush writes every slot of that page itself, so no bot
+        //    shows a stale or empty kit for even a frame.
+        //  - The warm reserve: the build makes two more pages (inside _quiet), packed with one kit instance. When the build
+        //    runs before the warm-up ends, the instance stands in front of the camera and the pages are tagged for the
+        //    warm-up (CORE's warmPre / warmPost show and restore them). When it runs later (the first switch-on of a boot
+        //    with Agent Identity off), the next frame's own passes draw them once instead (prefill): the instance is scaled
+        //    to nothing (degenerate triangles, no pixel), the materials and passes are the live pages' (no program is
+        //    made), and each object hides itself after that draw. Either way every buffer they hold is on the GPU before a
+        //    bot needs a new page. A free page's new kit is drawn once by the next frame the same way (its fresh instanceKit
+        //    is zeros: the shader drops every vertex), then goes back under its torso. The reserve pages are held here, not
+        //    put in enemyPageFree: a free page there would stand in for a createEnemyPage call V2.2 makes, and its uuids
+        //    are 32 of the game's Math.random draws, so the stream would shift. Instead, when V2.2's createEnemyPage has
+        //    made a page (its draws exactly as V2.2), onPage gives it a reserve page's meshes and kit in place of the ones
+        //    it just made (never drawn: they hold no GPU state), so a bot entering a new chunk creates no buffer. The
+        //    reserve pages carry their own Enhanced Animations buffers (instanceAnim2/3) from the start, so this holds with
+        //    EA switched on later.
         //  - Identity off: uIdentity 0 (the shader's identity code does not run), every kit at count 0 (0 kit draws), wingman
         //    kits drawn with no triangles; the V2.2 picture exactly. The kits stay built for the next switch-on. A kit stays
         //    in the render list while it is off (count 0 draws nothing), so its onBeforeRender notices a switch made while no
@@ -16688,7 +16699,7 @@
             const _white = new THREE.Color(1, 1, 1), _col = new THREE.Color(), _hsl = { h: 0, s: 0, l: 0 };
             const _m4 = new THREE.Matrix4(), _v3 = new THREE.Vector3();
             // data for the tests (never read by the game)
-            const stats = { built: 0, sets: 0, reserveMade: 0, reserveUsed: 0, kitWrites: 0, deathWrites: 0, uploadBytes: 0, tierSwaps: 0, wingKits: 0, rigKits: 0, buildMs: 0, tierMs: 0 };
+            const stats = { built: 0, sets: 0, reserveMade: 0, reserveUsed: 0, reservePrefilled: 0, kitWrites: 0, deathWrites: 0, uploadBytes: 0, tierSwaps: 0, wingKits: 0, rigKits: 0, buildMs: 0, tierMs: 0, switchRepacks: 0 };
 
             // V2.3: Agent Identity as the game shows it: the setting on (V23.core.enabled) and CORE's boot set built
             const wanted = () => !!(V23.core && V23.core.enabled() && V23.core.stats && V23.core.stats.identityBuilt);
@@ -16768,6 +16779,12 @@
                 stats.kitWrites++;
             }
 
+            // V2.3: one slot's colour-path write: the kit colour (leaves[0]'s: rest, flash or blind) and its instanceKit
+            function colorWrite(page, k, enemy) {
+                page.kit.setColorAt(k, enemy.leaves[0].material.color);
+                kitWrite(page.kit.userData.v23.attr, k, enemy, slotOf(enemy));
+            }
+
             // ---- kit sets (an InstancedMesh, its geometry and the page's instanceKit), pooled ----------------------------
             // V2.3: the kit superset's own attributes on a kit geometry (the tier swaps call it again)
             function bindSuperset(g) {
@@ -16834,12 +16851,18 @@
                 page.kit = st.mesh;
                 page.structureDirty = true;
             }
-            // V2.3: the warm reserve (see the header): two pages made inside _quiet, one instance each at 3 m in front of the
-            // camera (as warmShaderVariants' warm point), the kit with every module, tagged 'pre' for CORE's warm registry
+            // V2.3: the warm reserve (see the header): two pages made inside _quiet, one instance each, the kit with every
+            // module. Before the warm-up ends: the instance at 3 m in front of the camera (as warmShaderVariants' warm
+            // point), tagged 'pre' for CORE's warm registry. After it (live): the instance scaled to nothing, shown for the
+            // next frame's own passes, each object hiding itself after its first draw (prefilled)
             function makeReserve() {
-                camera.updateMatrixWorld();
-                _v3.set(0, 0, -1).transformDirection(camera.matrixWorld);
-                _m4.makeTranslation(camera.position.x + _v3.x * 3, camera.position.y + _v3.y * 3 - 1.2, camera.position.z + _v3.z * 3);
+                const live = perfTelemetry.programWatermark > 0;
+                if (live) _m4.makeScale(0, 0, 0).setPosition(0, -50, 0);   // V2.3: every vertex on one point: no pixel
+                else {
+                    camera.updateMatrixWorld();
+                    _v3.set(0, 0, -1).transformDirection(camera.matrixWorld);
+                    _m4.makeTranslation(camera.position.x + _v3.x * 3, camera.position.y + _v3.y * 3 - 1.2, camera.position.z + _v3.z * 3);
+                }
                 for (let i = 0; i < RESERVE; i++) {
                     const page = createEnemyPage();   // inside _build's _quiet; onPage skips it (B.making)
                     // V2.3: the page's own Enhanced Animations buffers (instanceAnim2/3, as enhancedAnim.geomAttrs makes them)
@@ -16855,20 +16878,49 @@
                     for (const m of page.meshes) {
                         m.setMatrixAt(0, _m4);
                         m.count = 1;
-                        m.visible = false;
+                        m.visible = live;
                         m.frustumCulled = false;
-                        m.userData.v23Warm = 'pre';
+                        if (live) m.onAfterRender = prefilled;
+                        else m.userData.v23Warm = 'pre';
                         scene.add(m);
                     }
                     const st = page.kit.userData.v23;
                     st.attr.setXYZW(0, FULL_MASK, 0x404448, 0x9aa0a8, 1);
                     st.mesh.count = 1;
-                    st.mesh.visible = false;
+                    st.mesh.visible = live;
                     st.mesh.frustumCulled = false;
-                    st.mesh.userData.v23Warm = 'pre';
+                    if (live) st.mesh.onAfterRender = prefilled;
+                    else st.mesh.userData.v23Warm = 'pre';
                     B.reserve.push(page);
                     stats.reserveMade++;
                 }
+            }
+            // V2.3: a live reserve object's first draw (its buffers are uploaded by then; the shadow pass may have drawn the
+            // page's parts already, with the same zero-scale instance): hidden from now on, the callback gone
+            function prefilled() {
+                this.visible = false;
+                delete this.onAfterRender;
+                stats.reservePrefilled++;
+            }
+            // V2.3: a free page's new kit (the build gives free pages a kit too) is drawn once by the next frame, so its own
+            // buffers (instanceKit, instanceColor) are on the GPU before a bot takes the page: it stands in the scene with
+            // one instance whose fresh instanceKit is all zeros (kit flag off: the shader drops every vertex, no pixel), and
+            // after that draw goes back under its page's torso (count 0 unless the page went live meanwhile)
+            function freePrefill(page) {
+                const kit = page.kit;
+                if (!kit) return;
+                scene.add(kit);
+                kit.count = 1;
+                kit.frustumCulled = false;
+                kit.onAfterRender = freeFilled;
+            }
+            function freeFilled() {
+                const pg = this.userData.v23.page;
+                delete this.onAfterRender;
+                this.frustumCulled = true;
+                if (pg && pg.meshes.length && this.parent !== pg.meshes[0]) pg.meshes[0].add(this);
+                if (!pg || !pg.live) this.count = 0;
+                stats.reservePrefilled++;
             }
             // V2.3: a page V2.2 just made takes a reserve page's meshes and kit (uploaded in the warm-up) in place of its own;
             // a reserve page that does not match (another part count or material) stays held
@@ -16879,6 +16931,7 @@
                 for (let p = 0; p < r.meshes.length; p++) {
                     const m = r.meshes[p];
                     delete m.userData.v23Warm;
+                    delete m.onAfterRender;   // V2.3: a live reserve page taken before its first draw
                     m.count = 0;
                     m.visible = false;
                     m.frustumCulled = true;
@@ -16887,6 +16940,7 @@
                 }
                 const kit = r.kit;
                 delete kit.userData.v23Warm;
+                delete kit.onAfterRender;
                 kit.frustumCulled = true;
                 kit.count = 0;
                 kit.visible = true;
@@ -16998,8 +17052,9 @@
                         B.mat = V23.mat.kitPage();
                         B.zero = new THREE.InstancedBufferAttribute(new Float32Array(ENEMY_PAGE_CAP * 4), 4);
                         for (const chunk of enemyChunks.values()) for (const page of chunk.pages) attach(page);
-                        for (const page of enemyPageFree) attach(page);
-                        if (perfTelemetry.programWatermark === 0 && enemyPartSpecs.length) makeReserve();
+                        for (const page of enemyPageFree) { attach(page); freePrefill(page); }
+                        // V2.3: the reserve at boot (the warm-up draws it) and at a later first switch-on (prefilled)
+                        if (enemyPartSpecs.length) makeReserve();
                     });
                     B.built = true;
                     stats.built++;
@@ -17016,8 +17071,12 @@
                 for (const st of B.sets) if (!on) st.mesh.count = 0;   // V2.3: on again, flush gives each page its count
                 for (const r of B.rigs) if (r.kit) r.kit.count = on ? 1 : 0;
                 for (const w of B.wing) wingShow(w);
-                // V2.3: every live page repacks (instanceKit and the kit colours are not written while identity is off)
+                // V2.3: every live page repacks (instanceKit and the kit colours are not written while identity is off), and
+                // every bot on a page is marked colorDirty: V2.2 clears a page's structureDirty right after its flush, so
+                // when this switch comes from a flush the page flag alone would be lost for that page (flush also writes
+                // that page's slots at once); the bot's own flag holds until its next pack
                 for (const chunk of enemyChunks.values()) for (const page of chunk.pages) page.structureDirty = true;
+                if (on) for (let i = 0; i < enemyObjects.length; i++) if (enemyObjects[i].page) enemyObjects[i].colorDirty = true;
             }
             // V2.3: every hook starts here: the build on the first identity-on, the switch, the rim weight
             function sync() {
@@ -17061,9 +17120,11 @@
                 // V2.3 (H22.1): a page V2.2 just made: a reserve page's meshes and kit when one is left, else a kit of its own
                 onPage: function (page) {
                     if (B.making) return null;
+                    const fresh = !B.built;
                     sync();
                     if (!B.built) return null;
-                    if (perfTelemetry.programWatermark > 0 && B.reserve.length && fromReserve(page)) return null;
+                    // V2.3: a reserve made by the build this call just ran is not on the GPU yet: it stays for the next pages
+                    if (!fresh && perfTelemetry.programWatermark > 0 && B.reserve.length && fromReserve(page)) return null;
                     attach(page);
                     return null;
                 },
@@ -17074,6 +17135,8 @@
                     if (!kit) return null;
                     const st = kit.userData.v23;
                     if (kit.parent) kit.parent.remove(kit);
+                    delete kit.onAfterRender;   // V2.3: a free page released before its kit's first draw
+                    kit.frustumCulled = true;
                     for (let i = 0; i < SHARED.length; i++) if (st.geom.attributes[SHARED[i]]) st.geom.deleteAttribute(SHARED[i]);
                     st.geom.boundingSphere = null;
                     st.geom.boundingBox = null;
@@ -17098,13 +17161,12 @@
                 // V2.3 (H22.4): the colour path: the kit colour (leaves[0]'s: rest, flash or blind) and the slot's instanceKit
                 packColor: function (page, k, enemy) {
                     if (!B.on || !page.kit) return null;
-                    const set = page.kit.userData.v23;
-                    page.kit.setColorAt(k, enemy.leaves[0].material.color);
-                    kitWrite(set.attr, k, enemy, slotOf(enemy));
+                    colorWrite(page, k, enemy);
                     return null;
                 },
                 // V2.3 (H22.5): the kit's count, its shared attributes and bounds, and the colour and death range uploads
                 flush: function (page, n, colorLo, colorHi) {
+                    const was = B.on;
                     sync();
                     const kit = page.kit;
                     if (!kit) return null;
@@ -17113,6 +17175,15 @@
                     if (kit.instanceMatrix !== torso.instanceMatrix) kit.instanceMatrix = torso.instanceMatrix;
                     shareTorso(set.geom, torso);
                     if (!B.on || n === 0) { set.dLo = Infinity; set.dHi = -1; return null; }
+                    // V2.3: identity switched on by the sync above, inside this page's pack: V2.2 wrote its slots while it
+                    // was off (packColor wrote nothing) and clears page.structureDirty when this returns, so every slot's kit
+                    // colour and instanceKit are written here and the whole page uploads (setOn repacks the other pages)
+                    if (!was) {
+                        for (let s = 0; s < n; s++) colorWrite(page, s, page.members[s]);
+                        colorLo = 0;
+                        colorHi = n - 1;
+                        stats.switchRepacks++;
+                    }
                     if (colorHi >= colorLo) {
                         perfTelemetry.requestUpload(kit.instanceColor, colorLo * 3, (colorHi - colorLo + 1) * 3);
                         stats.uploadBytes += (colorHi - colorLo + 1) * 12;
