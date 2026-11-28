@@ -25329,9 +25329,9 @@
                     try { fn(bus); } finally { soundFX._out = prevOut; soundFX._pos = prevPos; }
                     return null;
                 },
-                botCue: function (enemy, kind) {
+                botCue: function (enemy, kind, hz) {
                     // V2.3: WP8's positional bot layer (see the header); hz, the optional third argument, places 'arm.mortar'
-                    const hz = arguments.length > 2 ? arguments[2] : null;
+                    if (hz === undefined) hz = null;
                     if (!enemy || typeof kind !== 'string' || !_idOn()) return null;
                     const ctx = _ctx();   // V2.3: the live context: a cue on WP8's sim tick never makes one (no gesture)
                     if (!ctx) return null;
@@ -27889,7 +27889,7 @@
                 }),
                 audio: Object.freeze({
                     surfAt: 'surfAt(enemy) -> obj', motif: 'motif(agentId, slot) -> void', ultSting: 'ultSting(agentId) -> void',
-                    preview: 'preview(agentId, slot) -> void', atShared: 'atShared(x, y, z, fn) -> void', botCue: 'botCue(enemy, kind) -> void',
+                    preview: 'preview(agentId, slot) -> void', atShared: 'atShared(x, y, z, fn) -> void', botCue: 'botCue(enemy, kind, hz?) -> void',
                     prebuild: 'prebuild() -> void'
                 }),
                 arena: Object.freeze({
@@ -49299,8 +49299,10 @@
         //      10 place/slam; V23.motion.botCode(name) answers first when it knows the gesture), t the windup's progress:
         //      0 at the start, then every sim tick in [0, 0.95] toward the predicted cast, 1 on the cast tick (the release);
         //      code 0 ends it (the pose goes back to rest).
-        //    V23.audio.botCue(enemy, kind, hz): 'windup.<k>' at the windup start (the positional warning sting, design
-        //      12.3) and 'cast.<k>' on the cast tick, k one of flash, sonar, mortar, smoke, teleport (no third argument);
+        //    V23.audio.botCue(enemy, kind, hz): 'windup.<k>' at the windup start (a positional windup layer; for k = flash,
+        //      the rusher's flash, AUDIO also plays the 300 ms warning sting of design 12.3) and 'cast.<k>' on the cast
+        //      tick, k one of flash, sonar, mortar, smoke, teleport (no third argument); the agent-mode signature casts
+        //      (M2) send 'sig.<k>', which AUDIO answers with the warning sting;
         //      'arm.mortar' when a mortar arms (detonateAt, 850 ms after the cast; design 12.3 and open decision 7), with
         //      the hazard as the third argument: the sting belongs at hz.x/y/z (the danger zone, up to 21 m from the
         //      bot), the enemy names the caster's palette. Sent only while the caster is alive and the life that cast it.
