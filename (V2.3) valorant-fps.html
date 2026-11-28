@@ -17335,7 +17335,9 @@
                 // data for the tests (never read by the game): counters, the build's state, an agent's kit mask on a tier
                 _kitMask: function (agentId, tier) { return maskFor(kitOf(AGENT_ORDER.indexOf(agentId)), quiet(() => V23.parts.kitSuperset(tier))); },
                 _stats: stats,
-                _state: B
+                _state: B,
+                // V2.3 (coordinator): CORE's applySettings runs the switch at the settings change itself (private; no hook)
+                _sync: function () { return sync(); }
             };
         })();
         // ===== END V2.3 BLOCK BOTKIT =====
@@ -20606,14 +20608,13 @@
         //   Identity is applied, inside V23.core._quiet (so the uuids of the THREE objects made here take no draw from the
         //   game's Math.random stream), and its buffers are uploaded there and then (V23.core.uploadDraw of the warm set
         //   below: the gun program, no new one). At boot that first application is the first V23.fp.reapply with identity
-        //   on: today the shader warm-up's ultraRealism.warm (ultraGuns.apply's H15.2 line); where Ultra is unsupported
-        //   (WebGL1) that warm returns early, so initCast queues a reapply for the end of initGame's task (the saved
-        //   settings are loaded by then). A cast never builds: when identity was switched on by a path that applies no
-        //   identity (V23.core.applySettings(cfg, null) after boot: the settings Reset, a load), the first cast keeps
-        //   V2.2's gesture and the build is queued for the end of that frame's task. (CORE's init and applySettings(cfg,
-        //   null) do not call reapply yet; when they do, the set is built in H2 or at the settings change, and the
-        //   warm-up's vm step draws the objects tagged userData.v23Warm = 'vm' here: the arms and the warm set.) Every
-        //   agent's arm set and cast forearms are built in that one build (design 7.2: an agent change allocates nothing).
+        //   on: CORE's bootBuild in core.init (H2), so the warm-up's vm step draws the objects tagged userData.v23Warm = 'vm'
+        //   here (the arms and the warm set); ultraRealism.warm (H15.2) and initCast's queued reapply (WebGL1) find it
+        //   built. After boot, CORE's applySettings reapplies on any identity change (the pill, the settings Reset, a
+        //   load). A cast never builds: should identity still be unapplied when a cast starts, that cast keeps V2.2's
+        //   gesture and the build is queued for the end of that frame's task (a fallback; CORE applies the setting at
+        //   the change). Every agent's arm set and cast forearms are built in that one build (design 7.2: an agent change
+        //   allocates nothing).
         //   After that, an agent change, a tier swap or a setting change only swaps geometry, group and material
         //   references, writes material values and the cast hand's bare-forearm index slot (no allocation, no compile:
         //   every material is a V23.mat.vm, the gun and hands program).
@@ -25993,11 +25994,13 @@
         //    no shared reverb (_route skips _send), so a bus that is silenced or ramped silences its voices completely.
         //  - Boot order (initGame; the hooks that run before the first frame, first call each): H32.2 arena.applyTier,
         //    H32.1 arena.onMapBuilt, H13 fp.attach (x4), H16.1 fp.initCast, H30.4 replay.ghostInit, H10.1
-        //    stage.buildShowcase, H21 bots.assign / util.onActivate, H6 core.onAgentChanged, H9 stage.renderGrid, H7
+        //    stage.buildShowcase, H21 bots.assign / util.onActivate, H6 core.onAgentChanged, H29.5 util.poolSize (the
+        //    hazard pool's size, initBotAbilities3D), H9 stage.renderGrid, H7
         //    stage.setAgent, H33.3 core.applySettings(cfg, null) (the saved settings are loaded by then; H27.1
         //    bots.setRim and H32.3 arena.onAtmosphere follow), H27.2 bots.previewColors, H28 bots.wingKit, H20.6
         //    vm.onSwitch, H2 core.init, H22 bots.onPage / packPose / packColor / flush, H3a core.warmPre, H3b warmVm,
-        //    H3c warmWorld, H15.1 / H22.8 fp.reapply / bots.onTier, H3d core.warmPost. So fp.attach and fp.initCast run
+        //    core.resolve (not a hook line: the FP block's once-per-viewmodel-render check, first run by the warm-up's
+        //    viewmodel render), H3c warmWorld, H15.1 / H22.8 fp.reapply / bots.onTier, H3d core.warmPost. So fp.attach and fp.initCast run
         //    before the saved settings load: they only record their targets, and nothing is built there; applySettings
         //    (cfg, null) runs before core.init, so it only records the values, and core.init builds (when agentIdentity is
         //    'on') from game.userSettings. V23.CONTRACT.bootOrder holds the list (identity-budget checks it).
@@ -26152,9 +26155,10 @@
                 'abilityLook.emit', 'abilityLook.spray', 'soundFX.playNoise', 'soundFX.noiseLayer', 'soundFX.playTone', 'soundFX.gunshot']),
             // the hooks that run during initGame, in order (first call of each, from the hook lines); see the header
             bootOrder: Object.freeze(['arena.applyTier', 'arena.onMapBuilt', 'fp.attach', 'fp.initCast', 'replay.ghostInit', 'stage.buildShowcase',
-                'bots.assign', 'util.onActivate', 'core.onAgentChanged', 'stage.renderGrid', 'stage.setAgent', 'core.applySettings', 'bots.setRim',
-                'arena.onAtmosphere', 'bots.previewColors', 'bots.wingKit', 'vm.onSwitch', 'core.init', 'bots.onPage', 'bots.packPose', 'bots.packColor',
-                'bots.flush', 'core.warmPre', 'core.warmVm', 'core.warmWorld', 'fp.reapply', 'bots.onTier', 'core.warmPost'])
+                'bots.assign', 'util.onActivate', 'core.onAgentChanged', 'util.poolSize', 'stage.renderGrid', 'stage.setAgent', 'core.applySettings',
+                'bots.setRim', 'arena.onAtmosphere', 'bots.previewColors', 'bots.wingKit', 'vm.onSwitch', 'core.init', 'bots.onPage', 'bots.packPose',
+                'bots.packColor', 'bots.flush', 'core.warmPre', 'core.warmVm', 'core.resolve', 'core.warmWorld', 'fp.reapply', 'bots.onTier',
+                'core.warmPost'])
         });
 
         // V2.3: mulberry32. A deterministic stream per agent, per bot slot + generation, per cast (V2.3 never calls Math.random)
@@ -26729,6 +26733,8 @@
                 const a = S.active || 'jett';
                 if (!(S.built[a] && S.built[a].show)) buildNow(a, 'show');
                 if (!(S.built[a] && S.built[a].world)) buildNow(a, 'world');
+                // V2.3 (coordinator): the first-person set too, so the warm-up's vm step (H3b) draws it
+                V23.fp && V23.fp.reapply();
             }
             // V2.3: the states the staged builder may run in (never in live combat)
             function stagedAllowed() {
@@ -26870,10 +26876,14 @@
                 // first time builds the boot set synchronously
                 applySettings: function (cfg, key) {
                     const c = cfg || (typeof game !== 'undefined' && game.userSettings) || {};
+                    const was = S.settings ? S.settings.agentIdentity : null;
                     S.settings = { agentIdentity: c.agentIdentity === 'off' ? 'off' : 'on', weaponAnims: c.weaponAnims === 'classic' ? 'classic' : 'v23', botUtility: c.botUtility === 'agent' ? 'agent' : 'classic' };
-                    if (key === 'agentIdentity' && S.booted) {
+                    // V2.3 (coordinator): after boot, a change from any path is applied at once: the pill passes its key, the
+                    // settings Reset and a load pass null (applyAllSettings, H33.3)
+                    if (S.booted && (key === 'agentIdentity' || (was !== null && was !== S.settings.agentIdentity))) {
                         if (enabledNow() && !S.identityBuilt) bootBuild();
                         V23.fp && V23.fp.reapply();
+                        V23.bots && V23.bots._sync && V23.bots._sync();
                     }
                     return null;
                 },
