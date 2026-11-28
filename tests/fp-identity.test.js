@@ -1,12 +1,15 @@
 'use strict';
-// V2.3 first-person identity (WP4; design 7 and 17.1). Three boots.
-// The first, with Agent Identity set on explicitly:
+// V2.3 first-person identity (WP4; design 7 and 17.1). One boot, Agent Identity set on explicitly (the boots with
+// identity off from the start and without WebGL2 are fp-identity-off.test.js and fp-identity-webgl1.test.js):
 //  - for every agent (AGENT_ORDER; ROLE=<role> filters): each gun model's arm Group sits right after its hands with the
-//    agent's V23.parts.fpArms pair, the sleeve and detail materials take the palette slots the pair names, the look's fp
-//    fields (sleeve, cuff, wrist, overlay) show, the wrist module stands out of the forearm at the wrist, and the glove
-//    and tip materials match the palette (the tips are skin for fingerless gloves); castFX's hand takes the gloves, its
-//    sleeve the agent's LEFT forearm (the cast hand is the left hand) placed from the left-wrist frame, hand2 the right
-//    forearm through a mirrored mount; V23MATRIX rows for the sleeve, glove and tips, and wrist columns;
+//    agent's V23.parts.fpArms pair, each forearm's wrist on its hand's wrist (within 1 mm), the sleeve and detail
+//    materials take the palette slots the pair names, the look's fp fields (sleeve, cuff, wrist, overlay) show, the
+//    wrist module stands out of the forearm at the wrist, and the glove and tip materials match the palette (the tips
+//    are skin for fingerless gloves); castFX's hand takes the gloves on a pose geometry whose skin draw also holds the
+//    bare forearm, its sleeve the agent's LEFT forearm (the cast hand is the left hand) carried from the left-wrist
+//    frame, hand2 the right forearm through the mirrored frame, each forearm's runs in their palette slots; right- and
+//    left-handed (the sides trade), every forearm unmirrored in the end (world determinant x bake determinant > 0) with
+//    its wrist on its hand's wrist; V23MATRIX rows for the sleeve, glove and tips, and wrist columns;
 //  - the grouped hands: 4 groups with hand A exactly the first half (simple with 2 and 4 fingers, High Detail, Ultra);
 //    the off-hand drawRange API takes the support hand (the left, hand B; the right in left-handed mode) and its
 //    forearm away, so no cuff or wrist module is left without its hand, identity on and off;
@@ -18,16 +21,20 @@
 //  - an ultimate leaves the centre clear: after p 0.25 no energy card within 0.28 NDC of the centre, the centre crop's
 //    luminance within 10% at p 0.7, and the #ult-cue vignette (clear centre, opacity caps, below the crosshair);
 //  - the first-person draw budget (design 15) for Sage, Omen and 4 others in gun views, casts (one- and two-hand), the
-//    ultimate, taps and Enhanced Animations' off hand: the identity's draws over V2.2's own for the same objects (the gun
-//    hands, the cast hand and sleeve), at most +6 fingerless and +3 gloved (V23BUDGET lines carry the numbers);
+//    ultimate, taps and Enhanced Animations' off hand, at the hip and aiming down sights (pistol and rifle, Enhanced
+//    Animations off and on): the identity's draws over the V2.2 objects they stand for (the gun hands, the cast hand
+//    and sleeve, each counted where V2.2's own geometry would be drawn at the same place), at most +6 fingerless and +3
+//    gloved, and at mid gesture (casts at p 0.3, ultimates at p 0.5; where V2.2's own gesture has its cast hand and
+//    sleeve in view) the whole viewmodel pass with identity on minus off in the same frozen frame (renderer.info) within
+//    the same caps (V23BUDGET lines carry the numbers); two-hand
+//    gestures keep the look's glow slot on the wrist module (both wrists for fingerless agents, the cast hand's for
+//    gloved ones);
 //  - render crops for Sage, Omen and 4 others in every hand tier (the session's simple hands, High Detail, Ultra) and in
 //    left-handed mode (the game's own placement: the arms follow the gun across and are never mirrored), through the
 //    plain, Cinematic and Ultra pipelines, with the off hand kept away across each tier swap, programs == watermark and
 //    no stalls;
-//  - identity off: the V2.2 hands (0xffdbac), no arms, V2.2's castFX and pose.
-// The second boot has Agent Identity off from the start (saved): nothing is built, and the off-hand drawRange follows
-// every hands swap. The third boots without WebGL2 (Ultra unsupported): the first-person set is built and applied before
-// play, and the first cast builds nothing.
+//  - identity off: the V2.2 hands (0xffdbac), no arms, V2.2's castFX and pose;
+//  - a look redefined at runtime: the old forearm halves and cast set are disposed and the new pair is drawn.
 // Crops are written as PNG files when FP_SHOTS=<dir> is set.
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -41,7 +48,6 @@ const ROLE = process.env.ROLE ? String(process.env.ROLE).toUpperCase() : null;
 const SHOTS = process.env.FP_SHOTS || null;
 const CROP_AGENTS = ['sage', 'omen', 'jett', 'sova', 'killjoy', 'viper'];
 const matrix = (agent, column, ok, detail) => console.log('V23MATRIX ' + JSON.stringify({ agent, column, ok: !!ok, detail: detail === undefined ? '' : detail }));
-const SETTINGS_KEY = 'valorant_v16_user_settings';
 
 // In the page: steps the viewmodel animator by hand (synchronously, as cast.test does), so a gesture is sampled at
 // exact clip progress whatever the renderer's speed
@@ -93,27 +99,57 @@ const PAGE = `
         for (let t = dr.start; t < end; t += 3) { if (pos[idx[t] * 3] + pos[idx[t + 1] * 3] + pos[idx[t + 2] * 3] < 0) L++; else R++; }
         return [L, R];
     };
-    // the viewmodel pass's draws, counted per object (onBeforeRender runs once per drawn group): the identity's own draws
-    // over V2.2's for the same objects. V2.2 draws each gun hands mesh, the cast hand and the cast sleeve once; the arms,
-    // hand2, its forearm and the warm set are new; the energy cards and the guns are V2.2's in both (not counted)
+    // the viewmodel pass's draws, counted per object (onBeforeRender runs once per drawn group; a group outside the
+    // geometry's drawRange is not a draw): the identity's own draws over the V2.2 objects they stand for. Each gun hands
+    // mesh, the cast hand and the cast sleeve stand for V2.2's own, which count 1 where V2.2's geometry (the tier's hands,
+    // castFX's V2.2 hand and sleeve) would be drawn at the same place (three's sphere test); the arms, hand2, its forearm
+    // and the warm set are new; the energy cards and the guns are V2.2's in both (not counted)
     window.__budget = () => {
-        const counts = new Map(), hook = function () { counts.set(this, (counts.get(this) || 0) + 1); }, saved = [];
+        const counts = new Map(), saved = [];
+        const hook = function (r, sc, cam, geometry, material, group) {
+            if (group && (group.start >= geometry.drawRange.start + geometry.drawRange.count || group.start + group.count <= geometry.drawRange.start)) return;
+            counts.set(this, (counts.get(this) || 0) + 1);
+        };
         viewmodelScene.traverse((o) => { if (o.isMesh) { saved.push([o, Object.prototype.hasOwnProperty.call(o, 'onBeforeRender') ? o.onBeforeRender : undefined]); o.onBeforeRender = hook; } });
         syncViewmodelCamera(); viewmodelScene.environment = scene.environment; renderer.setRenderTarget(null);
         try { renderer.render(viewmodelScene, viewmodelCamera); }
         finally { for (const [o, f] of saved) { if (f === undefined) delete o.onBeforeRender; else o.onBeforeRender = f; } }
+        const fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(viewmodelCamera.projectionMatrix, viewmodelCamera.matrixWorldInverse));
+        const shown = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+        const v22In = (mesh, g) => { if (!shown(mesh)) return 0; if (!g.boundingSphere) g.computeBoundingSphere(); return fr.intersectsSphere(g.boundingSphere.clone().applyMatrix4(mesh.matrixWorld)) ? 1 : 0; };
         const st = V23.fp.state, mine = new Set([st.hand2, st.hand2Fore]);
         if (st.warmSet) st.warmSet.traverse((o) => mine.add(o));
         let d = 0;
         const what = [];
-        for (const [o, c] of counts) {
-            const v22 = o.userData.isHands || o === castFX.hand || o === castFX.sleeve;
-            const v23 = v22 || o.userData.isAgentArm || mine.has(o);
-            if (!v23) continue;
-            d += c - (v22 ? 1 : 0);
-            what.push((o.userData.isHands ? 'hands' : o === castFX.hand ? 'castHand' : o === castFX.sleeve ? 'castFore' : o === st.hand2 ? 'hand2' : o === st.hand2Fore ? 'hand2Fore' : o.userData.isAgentArm ? 'arm' : 'warm') + 'x' + c);
+        const add = (label, o, base) => { const c = counts.get(o) || 0; d += c - base; if (c || base) what.push(label + 'x' + c + (base ? '-' + base : '')); };
+        for (const m of st.models) {
+            const model = game.weapons[m.slot].model, hands = model.children[m.handsIndex];
+            add('hands', hands, v22In(hands, m.v22));
+            if (m.arm) for (const c of m.arm.children) add('arm', c, 0);
         }
+        add('castHand', castFX.hand, v22In(castFX.hand, st.v22.hand));
+        add('castFore', castFX.sleeve, v22In(castFX.sleeve, st.v22.sleeve));
+        add('hand2', st.hand2, 0); add('hand2Fore', st.hand2Fore, 0);
+        if (st.warmSet) st.warmSet.traverse((o) => { if (o.isMesh) add('warm', o, 0); });
         return { d, what: what.sort().join(' ') };
+    };
+    // the whole viewmodel pass, identity on minus off, in the same frozen frame (renderer.info); pose() places the frame.
+    // v22Up: the identity-off frame drew V2.2's cast hand and its sleeve (V2.2's own gesture has the hand up there; where
+    // it holds them under the frame, e.g. Enhanced Animations' place, the difference measures the two gestures' paths)
+    window.__calls = (seen) => {
+        syncViewmodelCamera(); viewmodelScene.environment = scene.environment; renderer.setRenderTarget(null);
+        const hook = function () { seen.add(this); };
+        for (const o of [castFX.hand, castFX.sleeve]) o.onBeforeRender = hook;
+        try { renderer.info.reset(); renderer.render(viewmodelScene, viewmodelCamera); }
+        finally { for (const o of [castFX.hand, castFX.sleeve]) delete o.onBeforeRender; }
+        return renderer.info.render.calls;
+    };
+    window.__onOff = (pose) => {
+        const seen = new Set();
+        pose(); const on = __calls(new Set());
+        __identity(false); pose(); const off = __calls(seen);
+        __identity(true); pose();
+        return { d: on - off, v22Up: seen.has(castFX.hand) && seen.has(castFX.sleeve) };
     };
 `;
 
@@ -151,6 +187,14 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
                 const arm = m.arm;
                 if (!arm || !arm.userData.isAgentArm || !arm.visible) { probs.push(m.slot + ': no visible arm'); continue; }
                 if (m.armIndex !== m.handsIndex + 1) probs.push(m.slot + ': arm at ' + m.armIndex + ', hands at ' + m.handsIndex);
+                // each forearm's wrist (fpArms hand space (+-0.08, -0.09, 0)) on its hand's wrist bottom (the hands
+                // geometry's (+-0.08, -0.09, handZ)), in the model's space, within 1 mm
+                const hm = game.weapons[m.slot].model.children[m.handsIndex], hz = hm.userData.handZ;
+                arm.updateMatrix(); hm.updateMatrix();
+                for (const sx of [1, -1]) {
+                    const wa = new THREE.Vector3(0.08 * sx, -0.09, 0).applyMatrix4(arm.matrix), wh = new THREE.Vector3(0.08 * sx, -0.09, hz).applyMatrix4(hm.matrix);
+                    if (wa.distanceTo(wh) > 1e-3) probs.push(m.slot + ': the ' + (sx > 0 ? 'right' : 'left') + ' forearm\'s wrist is ' + (wa.distanceTo(wh) * 1000).toFixed(1) + ' mm off its hand\'s');
+                }
                 const [sl, dt] = arm.children;
                 if (sl.geometry !== res.sleeve || dt.geometry !== res.detail) probs.push(m.slot + ': not the agent\'s fpArms pair');
                 for (const [mesh, slots] of [[sl, res.slots.sleeve], [dt, res.slots.detail]]) {
@@ -199,23 +243,33 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
             }
             if (G.type === 'fingerless' && !two) gloveOk = false;   // fingerless: the tips are skin
             if (!gloveOk) probs.push('gloves ' + G.type + ' two ' + two + '/' + st.two);
-            // castFX: the same glove materials; its sleeve is the agent's LEFT forearm (sleeve and detail triangles at x < 0,
-            // one geometry) on the left-wrist frame: the left wrist under the palm, the left hand's thumb toward +x (the
-            // cast hand's thumb side), a proper rotation; hand2's forearm is the RIGHT one on a mirrored mount (hand2 is
-            // itself a mirror image, so it ends up unmirrored); each run of the forearm takes its palette slot
-            const fx = castFX, A = V23.fp._arm(id), fore = fx.sleeve.geometry, h2f = st.hand2Fore;
-            fx.sleeve.updateMatrix(); h2f.updateMatrix();
+            // castFX: the hand draws a pose geometry of the cast set with the glove materials (the skin draw holds the tips
+            // and the bare forearm), its sleeve the agent's LEFT forearm (the cast hand is the left hand; all of that
+            // side's sleeve and detail triangles, the bare skin in the hand's skin run) carried from the left-wrist frame
+            // (the left wrist under the palm, the left hand's thumb toward +x, a proper rotation); hand2 the RIGHT forearm
+            // through the mirrored frame (hand2 is itself a mirror image, so it ends up unmirrored); each forearm run takes
+            // its palette slot. __castFrames checks the frames right- and left-handed (below)
+            const fx = castFX, A = V23.fp._arm(id), fore = fx.sleeve.geometry, h2f = st.hand2Fore, pg = st.cast.pg;
             const thumbL = new THREE.Vector3().crossVectors(a, new THREE.Vector3(-1, 0, 0)).normalize().negate();
-            const wL = new THREE.Vector3(-0.08, -0.09, 0).applyMatrix4(fx.sleeve.matrix), wR = new THREE.Vector3(0.08, -0.09, 0).applyMatrix4(h2f.matrix);
-            const thumb = thumbL.clone().transformDirection(fx.sleeve.matrix);
-            const runSlot = [res.slots.sleeve[0], res.slots.detail[0], res.slots.detail[1] || res.slots.detail[0], res.slots.sleeve[1] || res.slots.sleeve[0]];
+            const bakeL = fore.userData.v23Bake || new THREE.Matrix4();
+            const wL = new THREE.Vector3(-0.08, -0.09, 0).applyMatrix4(bakeL), thumb = thumbL.clone().transformDirection(bakeL);
+            const sl = res.slots.sleeve, dsl = res.slots.detail;
+            const runSlot = [sl[0], dsl[0], 'glow'];
             let runsOk = fx.sleeve.material === st.castArr;
             for (const gr of fore.groups) if (!__same(st.castArr[gr.materialIndex].color, slotHex(runSlot[gr.materialIndex]))) runsOk = false;
-            const castOk = fx.hand.material === hands[0].material && fore === A.fore.L.full && fore.userData.v23Side === 'L'
-                && fore.index.count === A.half.L.sleeve.index.count + A.half.L.detail.index.count && fore.index.count > 0
-                && near(wL, 0, -0.036, 0) && thumb.x > 0.99 && fx.sleeve.matrix.determinant() > 0 && runsOk
-                && h2f.parent === st.hand2 && (h2f.geometry === A.fore.R.full || h2f.geometry === A.fore.R.folded) && near(wR, 0, -0.036, 0) && h2f.matrix.determinant() < 0;
-            if (!castOk) probs.push('castFX hand or forearms (wrist ' + wL.toArray().map((x) => x.toFixed(3)) + ', thumb ' + thumb.x.toFixed(3) + ', runs ' + runsOk + ')');
+            const skinRun = A.fskin.L.length, tris = A.half.L.sleeve.index.count + A.half.L.detail.index.count;
+            const handOk = fx.hand.material === st.handArr && fx.hand.geometry === pg.L.open && st.hand2.geometry === pg.R.open
+                && __same(st.handArr[0].color, gloveHex) && __same(st.handArr[1].color, P.skin.c);
+            const castOk = handOk && fore === A.cf.L && fore.userData.v23Side === 'L' && fore.index.count + skinRun === tris && fore.index.count > 0
+                && near(wL, 0, -0.036, 0) && thumb.x > 0.99 && bakeL.determinant() > 0 && runsOk
+                && h2f.parent === st.hand2 && h2f.geometry === A.cf.R && A.cf.R.userData.v23Bake.determinant() < 0;
+            if (!castOk) probs.push('castFX hand or forearms (hand ' + handOk + ', wrist ' + wL.toArray().map((x) => x.toFixed(3)) + ', thumb ' + thumb.x.toFixed(3) + ', runs ' + runsOk + ', triangles ' + (fore.index.count + skinRun) + '/' + tris + ')');
+            // the bare forearm's skin is in the hand's skin run: Sage's rolled sleeve shows skin at the wrist
+            if (sl[1] === 'skin') {
+                const u = pg.L.open.userData, o = st.cast.gc + st.cast.tc, slot = Array.from(pg.L.open.index.array.subarray(o, o + skinRun));
+                const inSkin = st.two ? u.two[1].count === st.cast.tc + skinRun : u.gl2[1].count === skinRun;
+                if (!(skinRun > 0 && inSkin && slot.join() === Array.from(A.fskin.L).join())) probs.push('the bare forearm is not in the cast hand\'s skin draw');
+            }
             out[id] = { probs, sleeve: sleeveOk, cuff: cuffOk, wrist: wristOk, glove: gloveOk, cast: castOk, draws: res.draws, slots: res.slots.sleeve.join('+') + '/' + res.slots.detail.join('+'), type: G.type, two };
         }
         return out;
@@ -233,10 +287,53 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
     if (data.omen) {
         assert.deepEqual([data.omen.slots.split('/')[0], data.omen.two, data.omen.type], ['under', false, 'gauntlet']);
         const plates = await evaluate(() => {
-            const A = V23.fp._arm('omen'), cuff = (g) => { const gr = g.groups.find((x) => x.materialIndex === 1); return gr ? gr.count : 0; };
-            return { L: cuff(A.fore.L.full), R: cuff(A.fore.R.full) };
+            const A = V23.fp._arm('omen'), cuff = (g) => { const gr = g.userData.lv[0].find((x) => x.materialIndex === 1); return gr ? gr.count : 0; };
+            return { L: cuff(A.cf.L), R: cuff(A.cf.R) };
         });
         assert.ok(plates.L > plates.R, `Omen's plate overlay is on the left forearm, the cast hand's (${plates.L} vs ${plates.R} cuff indices)`);
+    }
+
+    // ---- 1b. the cast forearms' frames, right- and left-handed: a two-hand gesture (the slot whose gesture uses two hands,
+    // else the ultimate) at p 0.3; the cast hand carries the left forearm and hand2 the right one, traded in left-handed
+    // mode (castFX.group mirrored); each forearm is unmirrored in the end (its world determinant times its bake's > 0) and
+    // its wrist meets its hand's wrist (the cast-hand wrist (0, -0.036, 0)) in castFX.group's space within 1 mm ----------
+    const frameAgents = agents.filter((id) => CROP_AGENTS.includes(id));
+    const castFrames = await evaluate((ids) => {
+        const out = {}, st = V23.fp.state;
+        for (const id of ids) for (const lefty of [false, true]) {
+            agentSystem.selectAgent(id);
+            switchWeapon('rifle');
+            if (vmAnim.clip) vmAnim.finishClip(game.weapons.rifle);
+            game.userSettings.leftHanded = lefty;
+            const look = V23.core.resolve(id), model = game.weapons.rifle.model, t = performance.now() + 1000;
+            const slot = ['c', 'q', 'e'].find((s) => V23.motion.gesture(look.gestures[s]).hands > 1) || 'x';
+            __clearCast();
+            castFX.start(slot === 'x' ? 'ult' : 'cast', AGENT_DEFS[id].themeColor, id + '.' + slot);
+            const a = castFX.active; a.dur = 1e8; a.start = t - 0.3 * 1e8;
+            vmAnim.begin(model); vmAnim.end(model, t);
+            castFX.group.updateMatrixWorld(true);
+            const gi = castFX.group.matrixWorld.clone().invert(), res = { slot };
+            for (const [label, hand, fore] of [['cast', castFX.hand, castFX.sleeve], ['hand2', st.hand2, st.hand2Fore]]) {
+                const g = fore.geometry, bake = g.userData.v23Bake, side = g.userData.v23Side;
+                const wF = new THREE.Vector3(side === 'L' ? -0.08 : 0.08, -0.09, 0).applyMatrix4(bake).applyMatrix4(fore.matrixWorld).applyMatrix4(gi);
+                const wH = new THREE.Vector3(0, -0.036, 0).applyMatrix4(hand.matrixWorld).applyMatrix4(gi);
+                res[label] = { side, poseSide: hand.geometry.userData.v23Side, det: fore.matrixWorld.determinant() * bake.determinant(), wrist: wF.distanceTo(wH), shown: hand.visible };
+            }
+            out[id + (lefty ? '-left' : '')] = res;
+            __clearCast();
+            game.userSettings.leftHanded = false;
+            vmAnim.begin(model); vmAnim.end(model, t + 2000);
+        }
+        return out;
+    }, frameAgents);
+    for (const [k, r] of Object.entries(castFrames)) {
+        const left = k.endsWith('-left');
+        assert.deepEqual([r.cast.side, r.cast.poseSide, r.hand2.side, r.hand2.poseSide], left ? ['R', 'R', 'L', 'L'] : ['L', 'L', 'R', 'R'], `${k} (${r.slot}): the cast hand carries the ${left ? 'right' : 'left'} forearm, hand2 the other`);
+        assert.equal(r.hand2.shown, true, `${k} (${r.slot}): hand2 shown`);
+        for (const h of ['cast', 'hand2']) {
+            assert.ok(r[h].det > 0, `${k} ${h}: the forearm is not mirrored in the end (det ${r[h].det.toFixed(4)})`);
+            assert.ok(r[h].wrist < 1e-3, `${k} ${h}: the forearm's wrist meets the hand's (${(r[h].wrist * 1000).toFixed(2)} mm)`);
+        }
     }
 
     // ---- 2. grouped hands: hand A is the first half; the off-hand drawRange API ------------------------------------------
@@ -389,7 +486,7 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
         castFX.start(slot === 'x' ? 'ult' : 'cast', AGENT_DEFS.sage.themeColor, 'sage.' + slot);
         castFX.active.start = t;
         for (let x = t; x <= t + 0.35 * castFX.active.dur; x += 16) { vmAnim.begin(model); vmAnim.end(model, x); }
-        out.mid = { slot, hand2: st.hand2.visible, pose: castFX.hand.geometry.name };
+        out.mid = { slot, hand2: st.hand2.visible, pose: st.pose[0] };
         // the clock jumps past the clip (a pause or a long stall): castFX.apply ends it without a last pose
         vmAnim.begin(model); vmAnim.end(model, t + 5000);
         out.afterJump = { active: !!castFX.active, hand2: st.hand2.visible };
@@ -397,7 +494,7 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
         characterController.mantleT = 0.4;
         for (let x = t + 5016; x <= t + 5400; x += 16) { vmAnim.begin(model); vmAnim.end(model, x); }
         __frame();
-        out.mantle = { offKind: eaFP.offKind, group: castFX.group.visible, hand2: st.hand2.visible, pose: castFX.hand.geometry.name, fore: st.fore[0] };
+        out.mantle = { offKind: eaFP.offKind, group: castFX.group.visible, hand2: st.hand2.visible, pose: castFX.hand.geometry === st.cast.pg.L.open, fore: castFX.sleeve.geometry.userData.v23Side, level: st.levels[0] };
         characterController.mantleT = -1;
         for (let x = t + 5416; x <= t + 6400; x += 16) { vmAnim.begin(model); vmAnim.end(model, x); }
         enhancedAnim.set(false);
@@ -406,7 +503,7 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
     });
     assert.equal(cut.mid.hand2, true, `a two-hand gesture (${cut.mid.slot}) shows hand2`);
     assert.deepEqual(cut.afterJump, { active: false, hand2: false }, 'the clip cut off by the jump: hand2 is no longer shown (no render needed)');
-    assert.deepEqual(cut.mantle, { offKind: 'mantle', group: true, hand2: false, pose: 'v23:castHand:open', fore: 'full' }, 'after the cut: hand2 hidden, the open hand with its one-hand forearm');
+    assert.deepEqual(cut.mantle, { offKind: 'mantle', group: true, hand2: false, pose: true, fore: 'L', level: 0 }, 'after the cut: hand2 hidden, the open hand with its forearm, every run drawn');
 
     // ---- 4. ultimates leave the centre clear; the #ult-cue vignette ------------------------------------------------------
     const ultAgents = agents.filter((id) => CROP_AGENTS.includes(id));
@@ -486,48 +583,88 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
         camera.rotation.set(0, 0, 0, 'YXZ'); if (cc.targetRotation) cc.targetRotation.y = 0;
         updateWeaponPosition();
         const settle = () => { for (let i = 0; i < 80; i++) applyWeaponBobbingBase(performance.now(), false); };
+        const st = V23.fp.state;
         for (const id of budgetAgents) {
             agentSystem.selectAgent(id);
-            const look = V23.core.resolve(id), rows = [];
-            let max = -99, at = '';
+            const look = V23.core.resolve(id), rows = [], onOff = [], glow = [];
+            const P = look.palette, lin = __lin(P.glow ? P.glow.c : 0);
+            let max = -99, at = '', maxOO = -99, atOO = '';
             const take = (label, r) => { rows.push(label + ' ' + r.d); if (r.d > max) { max = r.d; at = label + ' (' + r.what + ')'; } };
+            // the wrist modules' glow in a two-hand view: does each forearm draw a group in the glow material?
+            const glowOn = (fore) => fore.geometry.groups.some((g) => { const m = st.castArr[g.materialIndex]; return Math.abs(m.color.r - lin.r) < 1e-4 && Math.abs(m.color.g - lin.g) < 1e-4 && Math.abs(m.color.b - lin.b) < 1e-4 && g.count > 0; });
             // a frozen frame as the game makes it: vmAnim.begin, the base placement (hip or ADS, settled), vmAnim.end
-            const view = (w, label, fn, ps) => {
+            const view = (w, label, fn, ps, opt) => {
+                const o = opt || {};
                 __clearCast(); if (vmAnim.clip) vmAnim.finishClip(game.weapons[game.activeWeapon]);
+                enhancedAnim.set(!!o.ea);
                 switchWeapon(w);
                 if (vmAnim.clip) vmAnim.finishClip(game.weapons[w]);   // the draw clip
-                game.adsActive = false; game.adsProgress = 0;
+                game.adsActive = !!o.ads; game.adsProgress = o.ads ? 1 : 0;
                 const model = game.weapons[w].model, t = performance.now() + 1000;
+                const pose = () => { vmAnim.begin(model); settle(); vmAnim.end(model, t); };
                 for (const p of ps || [0]) {
                     if (fn) fn(p, t);
-                    vmAnim.begin(model); settle(); vmAnim.end(model, t);
-                    take(label + (ps ? '@' + p : ''), __budget());
+                    pose();
+                    const lab = label + (ps ? '@' + p : '');
+                    take(lab, __budget());
+                    if (o.glow && st.hand2.visible && P.glow) glow.push([lab, glowOn(castFX.sleeve), glowOn(st.hand2Fore)]);
+                    // at mid gesture: the whole viewmodel pass, identity on minus off, the same frozen frame
+                    if (o.mid !== undefined && Math.abs(p - o.mid) < 1e-9) {
+                        const oo = __onOff(pose);
+                        onOff.push(lab + ' ' + oo.d + (oo.v22Up ? '' : ' (V2.2 hand or sleeve out of view)'));
+                        if (oo.v22Up && oo.d > maxOO) { maxOO = oo.d; atOO = lab; }
+                    }
                 }
                 __clearCast(); if (vmAnim.clip) vmAnim.finishClip(game.weapons[w]);
                 game.adsActive = false; game.adsProgress = 0;
                 vmAnim.begin(model); settle(); vmAnim.end(model, t + 2000);
+                enhancedAnim.set(false);
             };
             const cast = (kind, slot) => (p, t) => { __clearCast(); castFX.start(kind, AGENT_DEFS[id].themeColor, id + '.' + slot); const a = castFX.active; a.dur = 1e8; a.start = t - p * 1e8; };
+            const two = (slot) => V23.motion.gesture(look.gestures[slot]).hands > 1;
+            const tag = (slot) => slot + (two(slot) ? '[2h]' : '');
             for (const w of ['rifle', 'pistol', 'knife']) view(w, w + '-hip');
-            view('pistol', 'pistol-ads', () => { game.adsActive = true; game.adsProgress = 1; });
+            view('pistol', 'pistol-ads', null, null, { ads: true });
+            view('rifle', 'rifle-ads', null, null, { ads: true });
             view('rifle', 'rifle-inspect', (p, t) => { if (!vmAnim.clip) vmAnim.play('inspect', 2400); const c = vmAnim.clip; c.dur = 1e8; c.start = t - p * 1e8; }, [0.15, 0.3]);
-            for (const slot of ['c', 'q', 'e']) view('rifle', 'cast-' + slot + (V23.motion.gesture(look.gestures[slot]).hands > 1 ? '[2h]' : ''), cast('cast', slot), [0.05, 0.3, 0.5, 0.8]);
+            for (const slot of ['c', 'q', 'e']) view('rifle', 'cast-' + tag(slot), cast('cast', slot), [0.05, 0.3, 0.5, 0.8], { mid: 0.3, glow: true });
             view('knife', 'knife-cast-c', cast('cast', 'c'), [0.05, 0.3]);
-            view('rifle', 'ult[2h]', cast('ult', 'x'), [0.15, 0.5, 0.8]);
-            view('pistol', 'pistol-ult[2h]', cast('ult', 'x'), [0.15, 0.5]);
-            view('rifle', 'tap', cast('tap', 'q'), [0.05, 0.3]);
-            view('rifle', 'ea-mantle', (p) => { enhancedAnim.set(true); cc.mantleT = p; eaFP.offKind = 'mantle'; eaFP.offW = 1; eaFP.offT = 0.2; }, [0.2, 0.6]);
+            view('rifle', 'ult[2h]', cast('ult', 'x'), [0.15, 0.5, 0.8], { mid: 0.5, glow: true });
+            view('pistol', 'pistol-ult[2h]', cast('ult', 'x'), [0.15, 0.5], { mid: 0.5, glow: true });
+            view('rifle', 'tap', cast('tap', 'q'), [0.05, 0.3], { mid: 0.3 });
+            // aiming down sights while casting (casting never ends ADS): a one-hand cast, a two-hand one and the ultimate,
+            // pistol and rifle, Enhanced Animations off and on
+            const oneSlot = ['c', 'q', 'e'].find((sl) => !two(sl)), twoSlot = ['c', 'q', 'e'].find((sl) => two(sl));
+            for (const ea of [false, true]) for (const w of ['pistol', 'rifle']) {
+                const pre = (ea ? 'ea-' : '') + w + '-ads';
+                if (oneSlot) view(w, pre + '-cast-' + oneSlot, cast('cast', oneSlot), [0.05, 0.3, 0.5], { ads: true, ea, mid: 0.3 });
+                if (twoSlot) view(w, pre + '-cast-' + twoSlot + '[2h]', cast('cast', twoSlot), [0.05, 0.3, 0.5], { ads: true, ea, mid: 0.3, glow: true });
+                view(w, pre + '-ult[2h]', cast('ult', 'x'), [0.15, 0.5, 0.8], { ads: true, ea, mid: 0.5, glow: true });
+            }
+            view('rifle', 'ea-mantle', (p) => { enhancedAnim.set(true); cc.mantleT = p; eaFP.offKind = 'mantle'; eaFP.offW = 1; eaFP.offT = 0.2; }, [0.2, 0.6], { ea: true });
             cc.mantleT = -1; eaFP.offKind = null; eaFP.offW = 0; enhancedAnim.set(false); castFX.hide();
-            out[id] = { max, at, rows, two: V23.fp.state.two, type: look.gloves.type };
+            out[id] = { max, at, rows, maxOO, atOO, onOff, glow, two: st.two, type: look.gloves.type, glowRun: !!P.glow && V23.fp._arm(id).cf.L.userData.lv[0].some((g) => g.materialIndex === 2) };
         }
         game.adsActive = false; game.adsProgress = 0;
         return out;
     }, budgetAgents);
     for (const id of budgetAgents) {
         const b = budget[id], cap = b.two ? 6 : 3;
-        console.log('V23BUDGET ' + JSON.stringify({ agent: id, gloves: b.type + (b.two ? ' (fingerless budget +6)' : ' (gloved budget +3)'), max: b.max, at: b.at, views: b.rows.join(', ') }));
-        assert.ok(b.max <= cap, `${id}: first-person draws over V2.2 at most +${cap} (max +${b.max} at ${b.at})`);
+        console.log('V23BUDGET ' + JSON.stringify({ agent: id, gloves: b.type + (b.two ? ' (fingerless budget +6)' : ' (gloved budget +3)'), max: b.max, at: b.at, onOffMax: b.maxOO, onOffAt: b.atOO, views: b.rows.join(', '), onOff: b.onOff.join(', ') }));
+        assert.ok(b.max <= cap, `${id}: first-person draws over V2.2's at most +${cap} (max +${b.max} at ${b.at})`);
+        assert.ok(b.maxOO <= cap, `${id}: identity on minus off at mid gesture (V2.2's hand up) at most +${cap} (max +${b.maxOO} at ${b.atOO})`);
+        assert.ok(b.onOff.filter((r) => !/out of view/.test(r)).length >= 8, `${id}: on minus off compared in enough views (${b.onOff.join(', ')})`);
+        // two-hand gestures keep the look's glow slot on the wrist module: both wrists for a fingerless agent (+6 holds
+        // both hands' every run), the cast hand's for a gloved one
+        if (b.glowRun) {
+            assert.ok(b.glow.length > 0, `${id}: two-hand views seen`);
+            for (const [lab, castGlow, h2Glow] of b.glow) {
+                assert.ok(castGlow, `${id} ${lab}: the cast hand's wrist keeps its glow`);
+                if (b.two) assert.ok(h2Glow, `${id} ${lab}: hand2's wrist keeps its glow`);
+            }
+        }
     }
+    if (budget.sage) assert.ok(budget.sage.glowRun && budget.sage.glow.length >= 10, `Sage's jade ampoules checked in her two-hand views (${budget.sage.glow.length})`);
 
     // ---- 5. render crops: 6 agents x every hand tier (+ left-handed), plain, Cinematic and Ultra -------------------------
     const tiers = [['medium', 'simple'], ['cinematic', 'detailed'], ['ultraRealism', 'ultra']];
@@ -581,7 +718,10 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
                 // mirrored (a proper world matrix)
                 const armView = new THREE.Vector3().setFromMatrixPosition(arm.matrixWorld).applyMatrix4(viewmodelCamera.matrixWorldInverse);
                 const handsNdc = new THREE.Box3().setFromObject(hands).getCenter(new THREE.Vector3()).project(viewmodelCamera);
-                out.lefty[label] = { modelX: model.position.x, armX: armView.x, det: arm.matrixWorld.determinant(), sleeveDet: arm.children[0].matrixWorld.determinant(), handsX: handsNdc.x };
+                // each forearm's wrist on its hand's wrist bottom, in world space (the arm at the hands' depth)
+                let wrist = 0;
+                for (const sx of [1, -1]) wrist = Math.max(wrist, new THREE.Vector3(0.08 * sx, -0.09, 0).applyMatrix4(arm.matrixWorld).distanceTo(new THREE.Vector3(0.08 * sx, -0.09, hands.userData.handZ).applyMatrix4(hands.matrixWorld)));
+                out.lefty[label] = { modelX: model.position.x, armX: armView.x, det: arm.matrixWorld.determinant(), sleeveDet: arm.children[0].matrixWorld.determinant(), handsX: handsNdc.x, wrist };
                 __frame();
                 const px = __crop(rc[0], rc[1], rc[2], rc[3]);
                 let h = 2166136261;
@@ -613,7 +753,10 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
             const R = r.lefty[id], L = r.lefty[id + '-left'];
             assert.ok(R.modelX > 0 && L.modelX < 0 && Math.abs(L.modelX + R.modelX) < 1e-3, `${quality} ${id}: the game's left-handed placement mirrors the gun's x (${R.modelX.toFixed(3)}, ${L.modelX.toFixed(3)})`);
             assert.ok(R.armX > 0 && L.armX < 0, `${quality} ${id}: the arm follows the gun across (${R.armX.toFixed(3)}, ${L.armX.toFixed(3)})`);
-            for (const [lab, s] of [['right', R], ['left', L]]) assert.ok(s.det > 0 && s.sleeveDet > 0, `${quality} ${id} ${lab}-handed: the arm is not mirrored (det ${s.det.toFixed(4)})`);
+            for (const [lab, s] of [['right', R], ['left', L]]) {
+                assert.ok(s.det > 0 && s.sleeveDet > 0, `${quality} ${id} ${lab}-handed: the arm is not mirrored (det ${s.det.toFixed(4)})`);
+                assert.ok(s.wrist < 1e-3, `${quality} ${id} ${lab}-handed: the forearms' wrists meet the hands' (${(s.wrist * 1000).toFixed(2)} mm)`);
+            }
             assert.ok(R.handsX > 0 && L.handsX < 0 && Math.abs(R.handsX + L.handsX) < 0.05, `${quality} ${id}: the hands sit on the mirrored sides of the screen (NDC x ${R.handsX.toFixed(3)}, ${L.handsX.toFixed(3)})`);
             for (const label of [id, id + '-left']) {
                 const c = r.crops[label];
@@ -659,91 +802,29 @@ test('first-person identity: arms, gloves, wrists, off hand, gestures, budget, u
     assert.equal(off.pose, null, 'V2.2\'s cast pose runs');
     assert.equal(off.cur, null, 'no V2.3 gesture');
     assert.equal(off.back, true, 'identity on again');
+
+    // ---- 7. a look redefined at runtime (V23.core.define, a development path): the old forearm halves and cast set are
+    // disposed and the gun arms and castFX draw the new pair by the next render ------------------------------------------
+    const redef = await evaluate(() => {
+        agentSystem.selectAgent('sage');
+        switchWeapon('rifle');
+        const st = V23.fp.state, A0 = V23.fp._arm('sage'), rifle = st.models.find((m) => m.slot === 'rifle');
+        const disposed = new Set(), watch = (g) => g.addEventListener('dispose', () => disposed.add(g));
+        const olds = [A0.half.L.sleeve, A0.half.L.detail, A0.half.R.sleeve, A0.half.R.detail, A0.cf.L, A0.cf.R];
+        olds.forEach(watch);
+        V23.core.define('sage', JSON.parse(JSON.stringify(AGENT_LOOKS.sage)));
+        __frame();
+        const A1 = V23.fp._arm('sage'), arm = rifle.arm;
+        return {
+            newPair: A1.res !== A0.res, disposed: olds.filter((g) => disposed.has(g)).length, of: olds.length,
+            armOnNew: arm.children[0].geometry === A1.res.sleeve && arm.children[1].geometry === A1.res.detail,
+            castOnNew: castFX.sleeve.geometry === A1.cf.L && st.hand2Fore.geometry === A1.cf.R && castFX.hand.geometry === st.cast.pg.L.open,
+            applied: st.applied, agent: st.agent
+        };
+    });
+    assert.deepEqual(redef, { newPair: true, disposed: 6, of: 6, armOnNew: true, castOnNew: true, applied: true, agent: 'sage' }, 'a redefined look: old halves and cast forearms disposed, the new pair drawn');
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(programs, watermark, 'no shader compiled after the warm-up');
     assert.equal(stalls, 0, 'no first-use stalls');
-    assert.deepEqual(errors, []);
-});
-
-test('Agent Identity off from boot: nothing built, the off-hand drawRange follows every hands swap', { timeout: 300000 }, async () => {
-    const { page, errors, frames, evaluate } = await boot({ quality: 'medium', viewport: { width: 480, height: 270 }, initArg: SETTINGS_KEY, initScript: (key) => {
-        try { const o = JSON.parse(localStorage.getItem(key) || '{}'); o.agentIdentity = 'off'; localStorage.setItem(key, JSON.stringify(o)); } catch (e) {}
-    } });
-    await frames(4);
-    const r = await evaluate(() => {
-        Element.prototype.requestPointerLock = function () {};
-        document.exitPointerLock = function () {};
-        const out = { identity: game.userSettings.agentIdentity, enabled: V23.core.enabled(), built: V23.fp.state.built };
-        const m = game.weapons.pistol.model, h = m.children.find((c) => c.userData.isHands);
-        const dr = (g) => [g.drawRange.start, g.drawRange.count];
-        const n = (g) => (g.index ? g.index.count : g.attributes.position.count);
-        out.skin = h.material.color.getHexString() === new THREE.Color(0xffdbac).convertSRGBToLinear().getHexString();
-        out.arms = m.children.some((c) => c.userData.isAgentArm);
-        const g0 = h.geometry, wasHd = characterDetail.enabled;
-        out.api = V23.fp.offHand(m, true);
-        out.g0 = [dr(g0), n(g0)];
-        characterDetail.set(!wasHd);   // a tier swap while the support hand is away (a reload on an Auto-quality step)
-        const g1 = h.geometry;
-        out.swapped = g1 !== g0;
-        out.g1 = [dr(g1), n(g1)];
-        out.g0After = dr(g0);
-        V23.fp.offHand(m, false);   // the reload ends
-        out.g1Shown = dr(g1);
-        V23.fp.offHand(m, true);    // another reload, and the tier goes back during it
-        characterDetail.set(wasHd);
-        out.back = h.geometry === g0;
-        out.g0Back = dr(g0); out.g1Back = dr(g1);
-        V23.fp.offHand(m, false);
-        out.final = [dr(g0), dr(g1)];
-        out.builtAfter = V23.fp.state.built;
-        return out;
-    });
-    assert.deepEqual([r.identity, r.enabled, r.built, r.skin, r.arms], ['off', false, false, true, false], 'identity off from boot: V2.2 hands, nothing built');
-    assert.equal(r.api, true);
-    assert.deepEqual(r.g0[0], [0, r.g0[1] / 2], 'the left hand away on the V2.2 geometry');
-    assert.equal(r.swapped, true, 'the tier swap changed the hands geometry');
-    assert.deepEqual(r.g1[0], [0, r.g1[1] / 2], 'the new geometry takes the off-hand state');
-    assert.deepEqual(r.g0After, [0, Infinity], 'the geometry left behind draws whole again');
-    assert.deepEqual(r.g1Shown, [0, Infinity], 'offHand(false) on the new geometry');
-    assert.equal(r.back, true);
-    assert.deepEqual([r.g0Back, r.g1Back], [[0, r.g0[1] / 2], [0, Infinity]], 'the swap back carries the state again');
-    assert.deepEqual(r.final, [[0, Infinity], [0, Infinity]], 'both hands on both geometries at the end');
-    assert.equal(r.builtAfter, false, 'still nothing built');
-    const [programs, watermark, stalls] = await programState(page);
-    assert.equal(programs, watermark);
-    assert.equal(stalls, 0);
-    assert.deepEqual(errors, []);
-});
-
-test('without WebGL2 (Ultra unsupported): the first-person set is built and applied before play, the first cast builds nothing', { timeout: 300000 }, async () => {
-    const { page, errors, frames, evaluate } = await boot({ quality: 'medium', viewport: { width: 480, height: 270 }, initScript: () => {
-        const orig = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function (type, attrs) { if (type === 'webgl2') return null; return orig.call(this, type, attrs); };
-    } });
-    const r = await evaluate(() => {
-        Element.prototype.requestPointerLock = function () {};
-        document.exitPointerLock = function () {};
-        window.updateEnemies = () => {};
-        try { tacticalEnhancements.toggleWingmanAI(false); } catch (e) {}
-        const st = V23.fp.state, hands = game.weapons.rifle.model.children.find((c) => c.userData.isHands);
-        const out = { webgl2: renderer.capabilities.isWebGL2, ultra: ultraRealism.isSupported(), enabled: V23.core.enabled(), built: st.built, applied: st.applied, builds: st.builds,
-            grouped: !!hands.geometry.userData.v23Src, arm: game.weapons.rifle.model.children.some((c) => c.userData.isAgentArm && c.visible), buildMs: st.buildMs };
-        game.userSettings.infiniteAbilities = true;
-        const t0 = performance.now();
-        agentSystem.castAbility('c');
-        out.castMs = performance.now() - t0;
-        out.buildsAfterCast = st.builds;
-        out.gesture = st.cur ? st.cur.name : null;
-        return out;
-    });
-    console.log('V23WEBGL1 ' + JSON.stringify(r));
-    assert.deepEqual([r.webgl2, r.ultra, r.enabled], [false, false, true], 'WebGL1, Ultra unsupported, identity on');
-    assert.deepEqual([r.built, r.applied, r.builds, r.grouped, r.arm], [true, true, 1, true, true], 'built and applied at boot: grouped hands and the arms');
-    assert.equal(r.buildsAfterCast, 1, 'the first cast builds nothing');
-    assert.ok(r.gesture, 'the cast plays its gesture');
-    await frames(4);
-    const [programs, watermark, stalls] = await programState(page);
-    assert.equal(programs, watermark);
-    assert.equal(stalls, 0);
     assert.deepEqual(errors, []);
 });
