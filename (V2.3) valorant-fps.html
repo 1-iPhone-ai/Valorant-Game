@@ -16672,11 +16672,14 @@
             const ORB_BIT = 8388608;            // 2^23: kit module 23, the windup orb
             const FULL_MASK = 16777215;         // all 24 modules (the warm draw)
             const SHARED = ['instanceAnim', 'instanceAnim2', 'instanceAnim3'];
-            // V2.3: stand-ins for kit modules a tier's superset lacks (maskFor): 3 brimCap, 6 tallHat and 7 crestRidge the
-            // helmShell; 4 respHalf the segVisor; 5 boomMic the earGuard; 8 haloArc the visorBand; 10 collarFunnel and 14
-            // lamellar the frontPanel; 17 shoulderCape the left pauldron; 18 yoke both pauldrons; 20 tanksPair and 22
-            // backDisc the packSmall
-            const STAND = Object.freeze({ 3: [0], 4: [1], 5: [2], 6: [0], 7: [0], 8: [9], 10: [12], 14: [12], 17: [15], 18: [15, 16], 20: [19], 22: [19] });
+            // V2.3: stand-ins for kit modules a tier's superset lacks (maskFor), each from the same body region: head 3 brimCap
+            // the visorBand (its flat plate reads as the brim), 4 respHalf the segVisor, 5 boomMic the earGuard, 6 tallHat
+            // and 7 crestRidge the helmShell, 8 haloArc the visorBand; chest 10 collarFunnel the frontPanel, 14 lamellar the
+            // bandolier; shoulders 18 yoke both pauldrons; back 17 shoulderCape the coatTails, 20 tanksPair the packSmall, 22
+            // backDisc the backPole. Chosen so the pools stay apart on Low: of the 29 stub and pilot kits, no two pool
+            // members share a Low mask and one pair (brimstone, deadlock) is a single module apart (without stand-ins: 17
+            // pairs under 2 modules apart, 3 of them identical, and deadlock and veto with no Low module at all)
+            const STAND = Object.freeze({ 3: [9], 4: [1], 5: [2], 6: [0], 7: [0], 8: [9], 10: [12], 14: [11], 17: [13], 18: [15, 16], 20: [19], 22: [21] });
             const B = {
                 built: false, on: false, making: false, tier: null, geom: null, mat: null, zero: null,
                 sets: [], pool: [], reserve: [], wing: [], rigs: [], slots: [], kits: [],
