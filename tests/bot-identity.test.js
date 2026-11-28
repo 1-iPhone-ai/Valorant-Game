@@ -375,7 +375,7 @@ test(`bot identity (${TIER ? TIER + ' content tier' : 'the machine\'s content ti
     // where the superset holds all of the kit's modules the mask is the kit itself
     const masks = await evaluate(() => AGENT_ORDER.map((id) => {
         const L = V23.core.resolve(id), kit = ((L && L.bot && L.bot.kit) || []).filter((k) => k >= 0 && k <= 22);
-        return { id: id, kit: kit, tiers: ['low', 'medium', 'high', 'ultra'].map((t) => {
+        return { id: id, kit: kit, pool: L && L.bot && L.bot.pool, tiers: ['low', 'medium', 'high', 'ultra'].map((t) => {
             const mods = V23.parts.kitSuperset(t).userData.kit.modules, has = (k) => mods.some((m) => m.id === k && m.vertices > 0);
             const mask = V23.bots._kitMask(id, t), bits = [];
             for (let k = 0; k < 24; k++) if (Math.floor(mask / Math.pow(2, k)) % 2 === 1) bits.push(k);
@@ -385,6 +385,13 @@ test(`bot identity (${TIER ? TIER + ' content tier' : 'the machine\'s content ti
     const badMask = [];
     for (const m of masks) for (const t of m.tiers) if (m.kit.length && (!t.bits.length || !t.held || !t.exact)) badMask.push(m.id + '/' + t.tier + ' kit ' + m.kit + ' bits ' + t.bits);
     assert.deepEqual(badMask, [], 'every agent kit draws on every tier, only modules the tier holds, the kit itself where it can');
+    // and two agents of one pool never draw the same kit on a tier (Low's stand-ins included)
+    const same = [];
+    for (let t = 0; t < 4; t++) for (let i = 0; i < masks.length; i++) for (let j = i + 1; j < masks.length; j++) {
+        const A = masks[i], Bm = masks[j];
+        if (A.pool === Bm.pool && A.kit.length && Bm.kit.length && A.tiers[t].bits.join() === Bm.tiers[t].bits.join()) same.push(A.tiers[t].tier + ' ' + A.pool + ': ' + A.id + '/' + Bm.id);
+    }
+    assert.deepEqual(same, [], 'no two agents of a pool share a kit mask on any tier');
     console.log('# Low kits with stand-ins:', masks.filter((m) => m.kit.join() !== m.tiers[0].bits.join() && m.kit.slice().sort((a, b) => a - b).join() !== m.tiers[0].bits.join()).map((m) => m.id + ' ' + m.kit + '>' + m.tiers[0].bits).join('; '));
 
     // ---- rendered crops: the rim hue per highlight colour; a hit flash is one flat colour ------------------------------
