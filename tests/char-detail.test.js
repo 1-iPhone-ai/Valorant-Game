@@ -78,8 +78,11 @@ test('High Detail Characters & Guns: detailed bots, wingmen and guns; hitboxes, 
     });
     assert.ok(respawned.n > 0 && respawned.ok, 'respawned enemies use the detailed geometry');
 
-    // Skins recolour the kit through the shared materials; hands keep their skin tone
+    // Skins recolour the kit through the shared materials; hands keep their skin tone (V2.3: pinned to Agent Identity
+    // off, where the hands are V2.2's 0xffdbac)
     const skin = await evaluate(() => {
+        game.userSettings.agentIdentity = 'off';
+        V23.core.applySettings(game.userSettings, 'agentIdentity');
         settingsManager.applyWeaponSkin('prime');
         const rifle = game.weapons.rifle.model;
         const hands = rifle.children.find((c) => c.userData.isHands);
@@ -91,6 +94,22 @@ test('High Detail Characters & Guns: detailed bots, wingmen and guns; hitboxes, 
         };
     });
     assert.deepEqual(skin, { handsSkinTone: true, kitSharesMaterials: true });
+    // V2.3: with Agent Identity on, skins never touch the glove (nor the arm's sleeve and detail)
+    const glove = await evaluate(() => {
+        game.userSettings.agentIdentity = 'on';
+        V23.core.applySettings(game.userSettings, 'agentIdentity');
+        agentSystem.selectAgent('sage');
+        const rifle = game.weapons.rifle.model;
+        const hands = rifle.children.find((c) => c.userData.isHands), arm = rifle.children.find((c) => c.userData.isAgentArm);
+        const mats = [].concat(hands.material, arm.children[0].material, arm.children[1].material);
+        const snap = () => mats.map((m) => [m.color.getHexString(), m.emissive.getHexString(), m.roughness, m.metalness, m.emissiveIntensity].join(',')).join('|');
+        const before = snap();
+        settingsManager.applyWeaponSkin('standard');
+        settingsManager.applyWeaponSkin('prime');
+        const gunMats = new Set(rifle.children.filter((c) => c.material && !c.userData.isHands).map((c) => c.material));
+        return { same: snap() === before, notGun: mats.every((m) => !gunMats.has(m)), grouped: !!hands.geometry.userData.v23Src };
+    });
+    assert.deepEqual(glove, { same: true, notGun: true, grouped: true }, 'skins never touch the glove or the arm');
 
     // Low turns it off (simple soldier back); leaving Low turns it on again
     await evaluate(() => setQualitySettings('low'));
