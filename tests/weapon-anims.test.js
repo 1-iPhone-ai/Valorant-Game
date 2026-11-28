@@ -50,15 +50,16 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     // (a magazine and brass), the spare magazine and the shells in the hand make no new GL buffer (gl.bufferData), because
     // the warm-up drew them all. The same guns and reloads run first under 'classic' (V2.2's own first uses, e.g. a gun kit's
     // parts the first time it is shown, happen there), then under 'v23', which must add none; idle frames are the floor.
-    // Each reload is stretched (its clip made 1e8 ms long) and walked through by hand, a rendered frame at each of 7
-    // points (the hand out, the drops at 0.2 and 0.24, the magazine or the shells in the hand, the release), so every
-    // part of it is drawn however slow the frames are; then it runs out.
+    // Each reload is stretched (its clip made 1e8 ms long) and walked through by hand, a rendered frame at each of 5
+    // points (the hand out; the drops at 0.2 and 0.24; the magazine, the Bucky's shells (0.16-0.28, 0.33-0.45) and the
+    // Outlaw's (0.3-0.56) in the hand; the release), so every part of it is drawn however slow the frames are; then it
+    // runs out.
     const bufferData = () => evaluate(() => perfTelemetry.glBufferDataCalls);
     await evaluate(() => perfTelemetry.instrumentGL());
     const idle0 = await bufferData();
-    await frames(20);
+    await frames(10);
     const idle = (await bufferData()) - idle0;
-    const walk = async (mode, list) => {
+    const walk = async (mode, list, PTS = [0.1, 0.25, 0.35, 0.5, 0.8]) => {
         const seen = { drops: 0, alive: 0, spare: false, shells: false, hand: false };
         const d0 = await evaluate(() => V23.vm.state.stats.drops);
         for (const [gun, ammo] of list) {
@@ -77,7 +78,6 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
                 if (p !== null) __walk.start = performance.now() - p * 1e8;
                 return st;
             }, p);
-            const PTS = [0.1, 0.25, 0.35, 0.5, 0.65, 0.8, 0.9];
             for (let i = 0; i <= PTS.length; i++) {
                 const st = await at(i < PTS.length ? PTS[i] : null);
                 if (i > 0) { seen.alive = Math.max(seen.alive, st.alive); seen.spare = seen.spare || st.spare; seen.shells = seen.shells || st.shells; seen.hand = seen.hand || st.hand; }
@@ -85,7 +85,7 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
             }
             // the clip runs out (its refill timer may have fired already: the clip is the animator's, not the reload's)
             await evaluate(() => { if (vmAnim.clip === __walk) __walk.start = performance.now() - 1e8; });
-            await frames(4);
+            await frames(2);
             await evaluate(() => { game.reloading = false; });
         }
         seen.drops = (await evaluate(() => V23.vm.state.stats.drops)) - d0;
@@ -102,17 +102,22 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     assert.deepEqual(seen.v23, { drops: 2, alive: 1, spare: true, shells: true, hand: true }, 'the walk drew the drops, the spare magazine, the shells and the hand');
     assert.deepEqual(seen.classic, { drops: 0, alive: 0, spare: false, shells: false, hand: false }, "'classic' draws none of them");
     assert.ok(uploads.v23 <= idle, `no new GL buffer for the drops, the spare magazine and the shells (v23 ${uploads.v23}, classic ${uploads.classic}, idle ${idle})`);
-    // an agent picked after boot: its first V2.3 reload draws WP4's support-forearm halves and its cast hand for the first
-    // time (WP4's first use, logged: a gap of WP4's, V23.fp.reapply does not draw them at the agent change); after that,
-    // V2.3's reloads add nothing (the magFX meshes, spare magazines and shells are the same for every agent)
+    // an agent picked after boot: its first V2.3 reload draws WP4's geometry of that agent for the first time (WP4's first
+    // use, logged: a gap of WP4's, V23.fp.reapply does not draw them at the agent change): the support-forearm halves
+    // and its cast hand while the reload hand is out, and its full arm pair (576 and 1548 indices) the first time the
+    // gun is raised into view with both hands on it (at rest the arms are under the frame, culled): here the Vandal's
+    // tactical walked through its stance before and after the hand (p 0.05 and 0.9). After that, V2.3's reloads (a drop,
+    // the spare, the shells, the hand) add nothing (the magFX meshes, spare magazines and shells are the same for every
+    // agent)
     const other = await evaluate(() => { const a = game.activeAgent === 'omen' ? 'sage' : 'omen'; agentSystem.selectAgent(a); return a; });
     await frames(6);
     let b1 = await bufferData();
-    await walk('v23', [['vandal', 1]]);
+    await walk('v23', [['vandal', 1]], [0.05, 0.1, 0.25, 0.35, 0.5, 0.8, 0.9]);
     const wp4First = (await bufferData()) - b1;
     b1 = await bufferData();
-    seen.after = await walk('v23', UPLOAD_SET);
+    seen.after = await walk('v23', [['vandal', 0], ['bucky', 3]]);
     uploads.afterAgent = (await bufferData()) - b1;
+    assert.deepEqual(seen.after, { drops: 1, alive: 1, spare: true, shells: true, hand: true }, 'after the agent change: a drop, the spare, the shells, the hand');
     assert.ok(uploads.afterAgent <= idle, `an agent picked after boot (${other}): no new GL buffer from V2.3's reloads (${uploads.afterAgent}, idle ${idle})`);
     console.log('V23WP5UPLOADS ' + JSON.stringify({ idle, classic: uploads.classic, v23: uploads.v23, agent: other, wp4FirstUse: wp4First, afterAgent: uploads.afterAgent }));
 
