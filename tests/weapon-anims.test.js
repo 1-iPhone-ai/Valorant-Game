@@ -77,6 +77,7 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
         uploads[mode] = (await bufferData()) - b0;
     }
     assert.ok(uploads.v23 <= idle, `no new GL buffer for the drops, the spare magazine and the shells (v23 ${uploads.v23}, classic ${uploads.classic}, idle ${idle})`);
+    console.log('V23WP5UPLOADS ' + JSON.stringify({ idle, classic: uploads.classic, v23: uploads.v23 }));
 
     const r = await evaluate(() => {
         window.updateEnemies = () => {};
@@ -467,6 +468,7 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     assert.ok(r.magfx.high.max > 4 && r.magfx.high.max <= 8, `High: up to 8 (${r.magfx.high.max})`);
     assert.deepEqual([r.magfx.low.aliveAfterSwitch, r.magfx.low.max], [0, 0], 'Low: none');
     assert.equal(r.magfx.expired, 0, 'each lives 6 s');
+    console.log('V23WP5MAGFX ' + JSON.stringify({ medium: r.magfx.medium, high: r.magfx.high, low: r.magfx.low, landed: r.magfx.landed }));
     for (const m of r.magfx.meshes) assert.deepEqual([m.instanced, m.color, m.mapped, m.toneMapped], [true, null, false, true], `magFX ${m.cls}: instanced, no instanceColor, shellFX's program`);
     assert.ok(r.magfx.landed.count === 1 && r.magfx.landed.visible && r.magfx.landed.y > 0 && r.magfx.landed.y < 0.05, `the dropped magazine lies on the floor (${JSON.stringify(r.magfx.landed)})`);
     // ADS
@@ -484,6 +486,26 @@ test('weapon animations: every gun and the knife, reloads, magFX, draws, holster
     // classic = V2.2
     for (const row of r.classic.concat(r.classicEA)) assert.ok(row[1], `'classic' ${row[0]}: the V2.2 clip exactly (${row[2]})`);
     assert.equal(r.vmRandom, 0, 'no Math.random inside V23.vm');
+    // the viewmodel pass's draws mid-swap (p 0.3), 'v23' against 'classic' (logged for the report: the reload hand, its
+    // forearm and the spare magazine are transient draws of a reload)
+    const draws = await evaluate(() => {
+        const count = (mode) => {
+            game.userSettings.weaponAnims = mode;
+            applyGunDef('vandal'); switchWeapon('rifle'); if (vmAnim.clip) vmAnim.finishClip(game.weapons.rifle);
+            const w = game.weapons.rifle; w.ammo = 1; game.reloading = false; reload();
+            const c = vmAnim.clip; c.dur = 1e8; const t = performance.now(); c.start = t - 0.3e8;
+            updateWeaponPosition(); applyWeaponBobbing(t, false); V23.vm.step(0.016, t); syncViewmodelCamera();
+            const ar = renderer.info.autoReset; renderer.info.autoReset = false; renderer.info.reset();
+            renderer.render(viewmodelScene, viewmodelCamera);
+            const n = renderer.info.render.calls; renderer.info.autoReset = ar;
+            cancelReload(); game.reloading = false; V23.vm.step(0.016, t + 16);
+            return n;
+        };
+        const out = { classic: count('classic'), v23: count('v23') };
+        game.userSettings.weaponAnims = 'v23';
+        return out;
+    });
+    console.log('V23WP5DRAWS ' + JSON.stringify(draws));
     const [programs, watermark, stalls] = await programState(page);
     assert.equal(programs, watermark, 'no new shader programs');
     assert.equal(stalls, 0);
